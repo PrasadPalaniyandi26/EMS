@@ -1,0 +1,22 @@
+# Secrets — NEVER commit
+.env
+.env.local
+.env.*.local
+
+# Dependencies & build output
+node_modules/
+server/dist/
+client-next/.next/
+client-next/out/
+
+# Misc
+*.tsbuildinfo
+.DS_Store
+.vscode/
+coverage/
+.turbo/
+npm-debug.log*
+
+# Archives
+*.zip
+*.tar.gz
