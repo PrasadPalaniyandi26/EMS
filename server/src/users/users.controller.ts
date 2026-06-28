@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards, ParseIntPipe, ForbiddenException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { UsersService } from './users.service';
 import { CreateUserDto, UpdateUserDto, UpdateCurrencyDto, UpdateEmailDto } from './dto/user.dto';
@@ -21,7 +21,7 @@ export class UsersController {
   // Must be before :id route to avoid ParseIntPipe matching 'managers' as an ID
   @Get('by-role/managers')
   async findManagers() {
-    return this.usersService.findUsersByRole('MANAGER');
+    return this.usersService.findManagersAndAdmins();
   }
 
   @Get(':id')
@@ -36,18 +36,29 @@ export class UsersController {
     return this.usersService.create(dto);
   }
 
+  @Put('me/profile')
+  async updateOwnProfile(@CurrentUser('id') userId: number, @Body() dto: any) {
+    // Only allow self-editable fields — block role/permission changes
+    const allowed = ['username', 'login_name', 'contact_no', 'password'];
+    const safe: any = {};
+    for (const key of allowed) {
+      if (dto[key] !== undefined) safe[key] = dto[key];
+    }
+    return this.usersService.update(userId, safe, userId);
+  }
+
   @Put(':id')
   @UseGuards(RolesGuard)
   @Roles('admin')
-  async update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateUserDto) {
-    return this.usersService.update(id, dto);
+  async update(@CurrentUser('id') adminId: number, @Param('id', ParseIntPipe) id: number, @Body() dto: UpdateUserDto) {
+    return this.usersService.update(id, dto, adminId);
   }
 
   @Delete(':id')
   @UseGuards(RolesGuard)
   @Roles('admin')
-  async delete(@Param('id', ParseIntPipe) id: number) {
-    return this.usersService.delete(id);
+  async delete(@CurrentUser('id') adminId: number, @Param('id', ParseIntPipe) id: number) {
+    return this.usersService.delete(id, adminId);
   }
 
   @Put(':id/roles')
@@ -59,6 +70,9 @@ export class UsersController {
 
   @Put(':id/switch-role')
   async switchRole(@Param('id', ParseIntPipe) id: number, @Body('roleId') roleId: number, @CurrentUser('id') currentUserId: number) {
+    if (id !== currentUserId) {
+      throw new ForbiddenException('Cannot switch roles for another user.');
+    }
     return this.usersService.switchRole(id, roleId);
   }
 
@@ -73,6 +87,8 @@ export class UsersController {
   }
 
   @Get(':id/permissions')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
   async getPermissions(@Param('id', ParseIntPipe) id: number) {
     return this.usersService.getPermissions(id);
   }

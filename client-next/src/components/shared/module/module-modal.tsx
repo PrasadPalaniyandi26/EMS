@@ -1,13 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogFooter 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -27,14 +27,6 @@ interface ModuleModalProps {
   isDestructive?: boolean;
 }
 
-/**
- * ModuleModal
- * Global standard for all management hub modals (Add/Edit/Action).
- * Enforces:
- * 1. Wide layout (default 700px)
- * 2. Standardized header (bg-juniper or bg-rose for destructive)
- * 3. Consistent internal padding and background
- */
 export function ModuleModal({
   isOpen,
   onClose,
@@ -42,69 +34,123 @@ export function ModuleModal({
   children,
   footer,
   footerLeft,
-  maxWidth = "sm:max-w-[700px]",
+  maxWidth = "sm:max-w-[660px]",
   icon,
   headerBg,
   onSave,
   saveLabel = "Save Changes",
   isDestructive = false
 }: ModuleModalProps) {
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const dragging = useRef(false);
+  const origin = useRef({ mx: 0, my: 0, ox: 0, oy: 0 });
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setOffset({ x: 0, y: 0 });
+      scrollRef.current?.scrollTo(0, 0);
+    }
+  }, [isOpen]);
+
+  const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('button')) return;
+    dragging.current = true;
+    origin.current = { mx: e.clientX, my: e.clientY, ox: offset.x, oy: offset.y };
+    e.currentTarget.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  }, [offset]);
+
+  const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragging.current) return;
+    setOffset({
+      x: origin.current.ox + (e.clientX - origin.current.mx),
+      y: origin.current.oy + (e.clientY - origin.current.my),
+    });
+  }, []);
+
+  const onPointerUp = useCallback(() => {
+    dragging.current = false;
+  }, []);
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent 
+      <DialogContent
         className={cn(
-          "p-0 overflow-hidden bg-[#FAF9F6] border-none shadow-2xl rounded-xl flex flex-col",
+          "p-0 gap-0 overflow-hidden border shadow-2xl rounded-xl flex flex-col modal-glow mx-4 sm:mx-0",
           maxWidth
         )}
+        style={{
+          background: 'var(--shell-surface)',
+          borderColor: 'var(--shell-border)',
+          backdropFilter: 'blur(2px)',
+          // 50vw/50vh = true viewport center, independent of sidebar or any layout.
+          // Inline style wins over .dialog-centered CSS class.
+          left: '50vw',
+          top: '50vh',
+          transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px))`,
+        }}
         showCloseButton={false}
       >
-        {/* Standardized Header */}
-        <DialogHeader className={cn(
-          "h-[52px] px-5 text-white flex flex-row items-center justify-between shrink-0 border-none space-y-0",
-          headerBg || (isDestructive ? "bg-rose-600" : "bg-juniper")
-        )}>
-          <div className="flex items-center gap-3">
-            {icon && <div className="text-white/80">{icon}</div>}
-            <DialogTitle className="text-[12px] font-bold uppercase tracking-[0.2em] mt-0.5">
+        {/* Header — drag handle */}
+        <DialogHeader
+          className={cn("px-5 gap-0 flex flex-row items-center justify-between shrink-0 border-none space-y-0", headerBg)}
+          style={{
+            height: '44px',
+            background: isDestructive ? 'var(--destructive)' : 'var(--shell-surface)',
+            borderBottom: '1px solid var(--shell-border)',
+            cursor: 'grab',
+            userSelect: 'none',
+          }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+        >
+          <div className="flex items-center gap-2.5">
+            {icon && <div style={{ color: isDestructive ? 'var(--destructive-foreground)' : 'var(--shell-text-muted)' }}>{icon}</div>}
+            <DialogTitle
+              className="text-[11px] font-bold uppercase tracking-[0.18em]"
+              style={{ color: isDestructive ? 'var(--destructive-foreground)' : 'var(--shell-text-muted)' }}
+            >
               {title}
             </DialogTitle>
           </div>
-          <button 
-            onClick={onClose} 
-            className="text-white hover:bg-white/10 rounded p-1 transition-colors"
+          <button
+            onClick={onClose}
+            className="rounded p-1 transition-colors"
+            style={{ color: isDestructive ? 'var(--destructive-foreground)' : 'var(--shell-text-muted)', opacity: 0.8, cursor: 'pointer' }}
             aria-label="Close Modal"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </DialogHeader>
 
         {/* Content Body */}
-        <div className="p-8 max-h-[85vh] overflow-y-auto custom-scrollbar flex-1">
+        <div ref={scrollRef} className="py-4 px-6 overflow-y-auto custom-scrollbar flex-1 min-h-0" style={{ color: 'var(--shell-text)', background: 'var(--shell-bg)', maxHeight: 'calc(90dvh - 44px - 60px - env(safe-area-inset-bottom, 0px))' }}>
           {children}
         </div>
 
-        {/* Standardized Footer */}
-        <DialogFooter className="bg-mystic/20 border-t border-casper/30 p-8 pt-4 flex flex-row items-center justify-between shrink-0">
+        {/* Footer */}
+        <DialogFooter className="px-5 py-3 flex flex-row items-center justify-between shrink-0"
+          style={{ borderTop: '1px solid var(--shell-border)', background: 'var(--shell-surface)' }}>
           <div className="flex-1">
             {footerLeft}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             {footer || (
               <>
-                <Button 
-                  variant="outline" 
-                  onClick={onClose} 
-                  className="bg-white border-casper text-juniper font-bold text-xs uppercase tracking-widest hover:bg-casper/10 h-11 px-6 shadow-sm"
+                <Button
+                  variant="ghost"
+                  onClick={onClose}
+                  className="h-8 px-4 text-[11.5px] font-medium"
+                  style={{ color: 'var(--shell-text-muted)' }}
                 >
                   Cancel
                 </Button>
-                <Button 
-                  className={cn(
-                    "font-bold text-xs uppercase tracking-widest h-11 px-8 rounded-lg shadow-lg transition-all active:scale-95",
-                    isDestructive 
-                      ? "bg-rose-600 hover:bg-rose-700 shadow-rose-600/20" 
-                      : "bg-juniper hover:brightness-110 shadow-juniper/20"
-                  )} 
+                <Button
+                  variant={isDestructive ? "destructive" : "default"}
+                  className="font-semibold text-[11.5px] h-8 px-5 rounded-lg transition-all active:scale-95"
+                  style={!isDestructive ? { background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' } : {}}
                   onClick={onSave}
                 >
                   {saveLabel}

@@ -1,16 +1,9 @@
 'use client';
 
-import React from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
+import React, { useRef, useCallback } from 'react';
+import { amountLabel, restoreEnteredAmount } from '@/lib/gst';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -21,23 +14,23 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  Edit,
-  PlusCircle,
-  X,
-  Calendar,
+  Plus,
+  Pencil,
   Settings,
-  CheckCircle2,
-  Send,
-  Building2,
-  CreditCard,
-  Repeat,
   Pause,
-  PlayCircle,
   Play,
-  Check,
   CalendarDays,
-  Trash2
+  Trash2,
+  UploadCloud,
+  FileText,
+  X as XIcon,
+  Eye,
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { ModuleModal } from '@/components/shared/module/module-modal';
+import { CurrencyInput } from '@/components/shared/modal-primitives';
+
+const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 
 interface RecurringModalProps {
   isOpen: boolean;
@@ -47,6 +40,8 @@ interface RecurringModalProps {
   form: any;
   setForm: (form: any) => void;
   categories: any[];
+  file: File | null;
+  onFileChange: (f: File | null) => void;
 }
 
 export function RecurringModal({
@@ -57,223 +52,308 @@ export function RecurringModal({
   form,
   setForm,
   categories,
+  file,
+  onFileChange,
 }: RecurringModalProps) {
-  const expenseCategories = categories.filter((c) => c.type === 'expense');
+  const filteredCategories = categories.filter((c) => c.type === form.type);
   const isEdit = !!editing;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = React.useState(false);
 
-  const inp = 'w-full h-8 text-[12px] bg-white border-casper/50 focus:ring-1 focus:ring-juniper focus:border-juniper rounded-lg';
-  const sel = 'w-full h-8 text-[12px] bg-white border-casper/50 focus:ring-1 focus:ring-juniper focus:border-juniper rounded-lg';
-  const lbl = 'text-[9px] font-bold text-juniper uppercase tracking-[0.1em] block mb-1';
+  const validateFile = (f: File) => {
+    if (!ALLOWED_TYPES.includes(f.type)) { toast.error('Only PDF, JPG, PNG, WEBP allowed.'); return false; }
+    if (f.size > 10 * 1024 * 1024) { toast.error('File must be under 10 MB.'); return false; }
+    return true;
+  };
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault(); setDragging(false);
+    const dropped = e.dataTransfer.files[0];
+    if (dropped && validateFile(dropped)) onFileChange(dropped);
+  }, [onFileChange]);
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (f && validateFile(f)) onFileChange(f);
+    e.target.value = '';
+  };
+
+  const inp = 'w-full h-10 text-sm modal-input border border-[var(--shell-border)] text-[var(--shell-text)] focus:ring-1 focus:ring-[var(--shell-accent)]/50 focus:border-[var(--shell-accent)]/50 rounded-lg placeholder:text-[var(--shell-text-muted)]';
+  const sel = 'w-full h-10 text-sm modal-input border border-[var(--shell-border)] text-[var(--shell-text)] focus:ring-1 focus:ring-[var(--shell-accent)]/50 focus:border-[var(--shell-accent)]/50 rounded-lg';
+  const lbl = 'text-[10px] font-bold modal-label';
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent
-        className="sm:max-w-[860px] w-[95vw] p-0 overflow-hidden bg-[#FAF9F6] border-none shadow-2xl rounded-xl flex flex-col"
-        showCloseButton={false}
-      >
-        {/* Header */}
-        <div className="h-[48px] px-5 bg-juniper text-white flex justify-between items-center shrink-0">
-          <div className="flex items-center gap-2.5 text-white">
-            {isEdit ? <Edit className="w-4 h-4 opacity-80" /> : <PlusCircle className="w-4 h-4 opacity-80" />}
-            <h3 className="text-[11px] font-bold uppercase tracking-[0.2em]">
-              {isEdit ? 'Edit Recurring Transaction' : 'Add Recurring Transaction'}
-            </h3>
-          </div>
-          <button onClick={onClose} className="text-white hover:bg-white/10 rounded p-1 transition-colors">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+    <ModuleModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={isEdit ? 'Edit Recurring Transaction' : 'Add Recurring Transaction'}
+      icon={isEdit ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+      onSave={onSave}
+      saveLabel={isEdit ? 'Update Schedule' : 'Schedule Transaction'}
+      maxWidth="sm:max-w-[860px]"
+    >
+      <div className="space-y-2.5">
 
-        {/* Form Body */}
-        <div className="pt-3 px-6 pb-4 overflow-y-auto max-h-[82vh] custom-scrollbar bg-[#FAF9F6] space-y-3">
-
-          {/* Row 1: Vendor + Type */}
-          <div className="grid grid-cols-3 gap-x-6">
-            <div className="col-span-2 space-y-1">
-              <label className={lbl}>Service / Vendor</label>
-              <Input
-                className={inp}
-                placeholder="Enter vendor name..."
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className={lbl}>Transaction Type</label>
-              <div className="flex p-1 bg-[#FAF9F6] border border-casper/50 rounded-lg gap-1 h-8">
-                {['expense', 'income'].map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setForm({ ...form, type: t })}
-                    className={`flex-1 text-[10px] font-bold rounded-md transition-all ${
-                      form.type === t ? 'bg-juniper text-white shadow-sm' : 'text-casper hover:text-charcoal'
-                    }`}
-                  >
-                    {t.charAt(0).toUpperCase() + t.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Row 2: Category, Amount, Frequency */}
-          <div className="grid grid-cols-3 gap-x-6">
-            <div className="space-y-1">
-              <label className={lbl}>Category</label>
-              <Select value={form.category_id} onValueChange={(v) => setForm({ ...form, category_id: v })}>
-                <SelectTrigger className={sel}><SelectValue placeholder="Select Category" /></SelectTrigger>
-                <SelectContent>
-                  {expenseCategories.map((c) => (
-                    <SelectItem className="text-[12px]" key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <label className={lbl}>Amount</label>
-              <Input
-                type="number"
-                className={inp}
-                placeholder="0.00"
-                value={form.amount}
-                onChange={(e) => setForm({ ...form, amount: e.target.value })}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className={lbl}>Frequency</label>
-              <Select value={form.frequency.toLowerCase()} onValueChange={(v) => setForm({ ...form, frequency: v })}>
-                <SelectTrigger className={sel}><SelectValue placeholder="Select Frequency" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem className="text-[12px]" value="daily">Daily</SelectItem>
-                  <SelectItem className="text-[12px]" value="weekly">Weekly</SelectItem>
-                  <SelectItem className="text-[12px]" value="monthly">Monthly</SelectItem>
-                  <SelectItem className="text-[12px]" value="yearly">Yearly</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Row 3: Start Date, End Date, Payment Method */}
-          <div className="grid grid-cols-3 gap-x-6">
-            <div className="space-y-1">
-              <label className={lbl}>Start Date</label>
-              <Input
-                type="date"
-                className={inp}
-                value={form.next_run}
-                onChange={(e) => setForm({ ...form, next_run: e.target.value })}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className={lbl}>End Date / Occurrences</label>
-              <div className="relative">
-                <Input className={`${inp} pr-8`} placeholder="Till end or #..." />
-                <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-casper" />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <label className={lbl}>Payment Method</label>
-              <Select value={form.payment_method || 'corporate_ach'} onValueChange={(v) => setForm({ ...form, payment_method: v })}>
-                <SelectTrigger className={sel}><SelectValue placeholder="Select Method" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem className="text-[12px]" value="corporate_amex">Corporate Amex</SelectItem>
-                  <SelectItem className="text-[12px]" value="corporate_ach">Corporate ACH</SelectItem>
-                  <SelectItem className="text-[12px]" value="wire_transfer">Wire Transfer</SelectItem>
-                  <SelectItem className="text-[12px]" value="digital_wallet">Digital Wallet</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Automation Rules */}
-          <div className="pt-2 border-t border-casper/30">
-            <div className="flex items-center gap-2 mb-2">
-              <Settings className="w-3.5 h-3.5 text-juniper" />
-              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-juniper">Automation Rules</span>
-              <div className="h-[1px] flex-1 bg-slate-100" />
-            </div>
-            <div className="grid grid-cols-3 gap-x-6">
-              <div className="space-y-1">
-                <label className={lbl}>Process On</label>
-                <Select value={form.schedule_on || '1st_of_month'} onValueChange={(v) => setForm({ ...form, schedule_on: v })}>
-                  <SelectTrigger className={sel}><SelectValue placeholder="Select Timing" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem className="text-[12px]" value="1st_of_month">1st day of Month</SelectItem>
-                    <SelectItem className="text-[12px]" value="last_of_month">Last day of Month</SelectItem>
-                    <SelectItem className="text-[12px]" value="mid_month">Specific Date (15th)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <label className={lbl}>Auto-submit for Approval</label>
-                <div className="flex items-center h-8">
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <Checkbox
-                      checked={form.auto_submit}
-                      onCheckedChange={(checked) => setForm({ ...form, auto_submit: !!checked })}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-casper/40 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-casper after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-juniper"></div>
-                    <span className="ml-2.5 text-[11px] font-medium text-charcoal">{form.auto_submit ? 'Enabled' : 'Disabled'}</span>
-                  </label>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <label className={lbl}>Project Association</label>
-                <Select value={form.project_id || 'none'} onValueChange={(v) => setForm({ ...form, project_id: v })}>
-                  <SelectTrigger className={sel}><SelectValue placeholder="Select Project" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem className="text-[12px]" value="none">None</SelectItem>
-                    <SelectItem className="text-[12px]" value="p1">Phoenix Revamp (PHX-23)</SelectItem>
-                    <SelectItem className="text-[12px]" value="p2">Internal Infrastructure</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
-          {/* Notes */}
-          <div className="space-y-1">
-            <label className={lbl}>Recurring Purpose / Notes</label>
-            <Textarea
-              className="w-full text-[12px] bg-white border-casper/50 focus:ring-1 focus:ring-juniper focus:border-juniper rounded-lg resize-none min-h-[64px]"
-              placeholder="Provide a reason for this recurring transaction..."
-              value={form.notes || ''}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+        {/* Row 1: Vendor + Type */}
+        <div className="grid grid-cols-3 gap-x-6">
+          <div className="col-span-2 space-y-1">
+            <label className={lbl}>Service / Vendor</label>
+            <Input
+              className={inp}
+              placeholder="Enter vendor name..."
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
             />
           </div>
+          <div className="space-y-1">
+            <label className={lbl}>Transaction Type</label>
+            <div className="flex p-1 modal-toggle-track rounded-xl gap-1 h-10">
+              {([
+                { val: 'expense', active: 'text-rose-400 border border-rose-400 shadow-sm' },
+                { val: 'income',  active: 'text-emerald-500 border border-emerald-500 shadow-sm' },
+              ]).map(({ val, active }) => (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() => setForm({ ...form, type: val, category_id: '' })}
+                  className={`flex-1 text-xs font-bold rounded-md transition-all ${
+                    form.type === val ? active : 'text-[var(--shell-text-muted)] border border-transparent hover:text-[var(--shell-text)]'
+                  }`}
+                >
+                  {val.charAt(0).toUpperCase() + val.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
-        {/* Footer */}
-        <div className="bg-mystic/20 border-t border-casper/30 px-6 py-3 flex items-center justify-end gap-3 shrink-0">
-          <Button
-            variant="outline"
-            onClick={onClose}
-            className="bg-white border-casper text-juniper font-bold text-[10px] uppercase tracking-widest hover:bg-casper/10 h-9 px-5"
-          >
-            Cancel
-          </Button>
-          <button
-            onClick={onSave}
-            className="bg-juniper hover:brightness-110 text-white font-bold text-[10px] uppercase tracking-widest h-9 px-6 rounded-lg flex items-center gap-2 shadow-lg shadow-juniper/20 active:scale-95 transition-all"
-          >
-            {isEdit ? (
-              <><CheckCircle2 className="w-3.5 h-3.5" /> Update Schedule</>
-            ) : (
-              <><Send className="w-3.5 h-3.5" /> Schedule Transaction</>
-            )}
-          </button>
+        {/* Row 2: Category, Amount, Frequency */}
+        {/* Row 2: Category | Frequency | Payment Method */}
+        <div className="grid grid-cols-3 gap-x-6">
+          <div className="space-y-1">
+            <label className={lbl}>Category</label>
+            <Select value={form.category_id} onValueChange={(v) => setForm({ ...form, category_id: v })}>
+              <SelectTrigger className={sel}><SelectValue placeholder="Select Category" /></SelectTrigger>
+              <SelectContent>
+                {filteredCategories.map((c) => (
+                  <SelectItem className="text-sm" key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label className={lbl}>Frequency</label>
+            <Select value={form.frequency.toLowerCase()} onValueChange={(v) => setForm({ ...form, frequency: v })}>
+              <SelectTrigger className={sel}><SelectValue placeholder="Select Frequency" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem className="text-sm" value="daily">Daily</SelectItem>
+                <SelectItem className="text-sm" value="weekly">Weekly</SelectItem>
+                <SelectItem className="text-sm" value="biweekly">Bi-Weekly</SelectItem>
+                <SelectItem className="text-sm" value="monthly">Monthly</SelectItem>
+                <SelectItem className="text-sm" value="quarterly">Quarterly</SelectItem>
+                <SelectItem className="text-sm" value="yearly">Yearly</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label className={lbl}>Payment Method</label>
+            <Select value={form.payment_method || 'cash'} onValueChange={(v) => setForm({ ...form, payment_method: v })}>
+              <SelectTrigger className={sel}><SelectValue placeholder="Select Method" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem className="text-sm" value="cash">Cash</SelectItem>
+                <SelectItem className="text-sm" value="card">Card</SelectItem>
+                <SelectItem className="text-sm" value="bank_transfer">Bank Transfer</SelectItem>
+                <SelectItem className="text-sm" value="upi">UPI</SelectItem>
+                <SelectItem className="text-sm" value="cheque">Cheque</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-      </DialogContent>
-    </Dialog>
+
+        {/* Row 2b: GST Rate | GST Included | Amount */}
+        <div className="grid grid-cols-3 gap-x-6">
+          <div className="space-y-1">
+            <label className={lbl}>GST Rate</label>
+            <div className="relative">
+              <select
+                className={`${sel} appearance-none pr-8`}
+                value={form.gst_rate}
+                onChange={(e) => setForm({ ...form, gst_rate: e.target.value })}
+              >
+                <option value="">No GST</option>
+                {['6%', '9%', '12%', '18%'].map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--shell-text-muted)] pointer-events-none"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className={lbl}>GST Included</label>
+            <div className="flex items-center gap-2.5 h-10">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={form.gst_included}
+                onClick={() => setForm({ ...form, gst_included: !form.gst_included })}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${form.gst_included ? 'bg-[var(--shell-accent)]' : 'bg-[var(--shell-border)]'}`}
+              >
+                <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-md ring-0 transition-transform ${form.gst_included ? 'translate-x-4' : 'translate-x-0'}`} />
+              </button>
+              <span className="text-[10px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wide whitespace-nowrap">
+                {form.gst_included ? 'Included' : 'Not Included'}
+              </span>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className={lbl}>Amount {amountLabel(form.gst_rate, form.gst_included)}</label>
+            <CurrencyInput value={form.amount} onChange={(v) => setForm({ ...form, amount: v })} />
+          </div>
+        </div>
+
+        {/* Row 3: Start Date | End Date | Open-Ended toggle */}
+        <div className="grid grid-cols-3 gap-x-6">
+          <div className="space-y-1">
+            <label className={lbl}>Start Date</label>
+            <input
+              type="date"
+              className={inp}
+              value={form.next_run}
+              onChange={(e) => setForm({ ...form, next_run: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1">
+            <label className={lbl}>End Date <span className="text-[9px] font-normal normal-case opacity-60">(optional)</span></label>
+            <input
+              type="date"
+              className={inp}
+              value={form.end_date || ''}
+              onChange={(e) => setForm({ ...form, end_date: e.target.value })}
+              disabled={form.open_ended}
+              style={form.open_ended ? { opacity: 0.35, pointerEvents: 'none' } : {}}
+            />
+          </div>
+          <div className="space-y-1">
+            <label className={lbl}>Open-Ended</label>
+            <div className="flex items-center gap-2.5 h-10">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={form.open_ended}
+                onClick={() => setForm({ ...form, open_ended: !form.open_ended, end_date: !form.open_ended ? '' : form.end_date })}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${form.open_ended ? 'bg-[var(--shell-accent)]' : 'bg-[var(--shell-border)]'}`}
+              >
+                <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-md ring-0 transition-transform ${form.open_ended ? 'translate-x-4' : 'translate-x-0'}`} />
+              </button>
+              <span className="text-[11px] font-semibold text-[var(--shell-text-muted)] whitespace-nowrap">
+                {form.open_ended ? 'No end date' : 'Set end date'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Automation Rules */}
+        <div className="pt-2 border-t border-[var(--shell-border)]">
+          <div className="flex items-center gap-2 mb-2">
+            <Settings className="w-3.5 h-3.5 text-[var(--shell-accent)]" />
+            <span className="text-xs font-black uppercase tracking-[0.2em] text-[var(--shell-accent)]">Automation Rules</span>
+            <div className="h-[1px] flex-1 modal-divider" />
+          </div>
+          <div className="grid grid-cols-2 gap-x-6">
+            <div className="space-y-1">
+              <label className={lbl}>Next Run Date</label>
+              <p className="text-[11px] text-[var(--shell-text-muted)] h-10 flex items-center">
+                {form.next_run
+                  ? (() => {
+                      const d = new Date(form.next_run + 'T00:00:00');
+                      return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+                    })()
+                  : '—'}
+                {form.next_run && form.frequency && (
+                  <span className="ml-1.5 text-[var(--shell-accent)] font-semibold capitalize">· {form.frequency}</span>
+                )}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <label className={lbl}>Auto-submit for Approval</label>
+              <div className="flex items-center h-10">
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <Checkbox
+                    checked={form.auto_submit}
+                    onCheckedChange={(checked) => setForm({ ...form, auto_submit: !!checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-casper after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--shell-accent)]" style={{ background: 'var(--shell-border)' }}></div>
+                  <span className="ml-2.5 text-[11px] font-medium text-[var(--shell-text)]">{form.auto_submit ? 'Enabled' : 'Disabled'}</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Notes */}
+        <div className="space-y-1">
+          <label className={lbl}>Recurring Purpose / Notes</label>
+          <Textarea
+            className="w-full text-sm modal-input rounded-lg resize-none min-h-[64px]"
+            placeholder="Provide a reason for this recurring transaction..."
+            value={form.notes || ''}
+            onChange={(e) => setForm({ ...form, notes: e.target.value })}
+          />
+        </div>
+
+        {/* File Upload */}
+        <div className="space-y-1.5">
+          <label className={lbl}>Supporting Document</label>
+          <input ref={fileInputRef} type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={handleFileInput} />
+          <div
+            className={`border-2 border-dashed rounded-lg px-4 py-3 flex items-center gap-3 cursor-pointer transition-all group ${dragging ? 'border-[var(--shell-accent)]/50 modal-section' : 'border-[var(--shell-border)] modal-section hover:border-[var(--shell-accent)]/50'}`}
+            onClick={() => fileInputRef.current?.click()}
+            onDrop={handleDrop}
+            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+          >
+            <UploadCloud className={`w-7 h-7 shrink-0 transition-colors ${dragging ? 'text-[var(--shell-accent)]' : 'text-[var(--shell-text-muted)] group-hover:text-[var(--shell-accent)]'}`} />
+            <div>
+              <p className="text-[12px] text-[var(--shell-text-muted)] font-medium">
+                Drag & drop or <span className="text-[var(--shell-accent)] font-bold">browse files</span>
+              </p>
+              <p className="text-[10px] text-[var(--shell-text-muted)] uppercase tracking-tight">PDF, JPG, PNG · max 10 MB</p>
+            </div>
+          </div>
+          {(file || (isEdit && editing?.receipt_path)) && (
+            <div className="mt-1 modal-section border border-[var(--shell-border)] rounded-lg px-3 py-2 flex items-center justify-between shadow-sm">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <FileText className="w-5 h-5 text-[var(--shell-accent)] shrink-0" />
+                <div className="leading-tight min-w-0">
+                  <p className="text-[12px] font-bold text-[var(--shell-text)] truncate max-w-[280px]">
+                    {file?.name || (editing?.receipt_path ? editing.receipt_path.split('/').pop() : '')}
+                  </p>
+                  {file && <p className="text-[10px] text-[var(--shell-text-muted)] uppercase tracking-tighter">{(file.size / 1024 / 1024).toFixed(1)} MB</p>}
+                </div>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {file && (
+                  <button type="button" onClick={() => window.open(URL.createObjectURL(file), '_blank')}
+                    className="p-1.5 rounded hover:bg-[var(--shell-hover)] text-[var(--shell-text-muted)] hover:text-[var(--shell-accent)] transition-colors">
+                    <Eye className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <button type="button" onClick={() => onFileChange(null)}
+                  className="p-1.5 rounded hover:bg-rose-500/10 text-[var(--shell-text-muted)] hover:text-rose-400 transition-colors">
+                  <XIcon className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </ModuleModal>
   );
 }
 
 interface PauseRecurringModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (reason: string, resumeDate: string | null) => void;
+  onConfirm: () => void;
   targetName: string;
 }
 
@@ -290,91 +370,39 @@ export function PauseRecurringModal({
   onConfirm,
   targetName,
 }: PauseRecurringModalProps) {
-  const [reason, setReason] = React.useState('Budget Review');
-  const [resumeDate, setResumeDate] = React.useState(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
-  const [isScheduled, setIsScheduled] = React.useState(true);
-
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent 
-        className="sm:max-w-[500px] p-0 overflow-hidden bg-[#FAF9F6] border-none shadow-2xl rounded-xl flex flex-col"
-        showCloseButton={false}
-      >
-        <div className="h-[52px] px-5 bg-juniper text-white flex justify-between items-center shrink-0">
-          <div className="flex items-center gap-3">
-            <Pause className="w-5 h-5 text-white/80" />
-            <h3 className="text-[12px] font-bold uppercase tracking-[0.2em] mt-0.5">Pause Schedule</h3>
-          </div>
-          <button onClick={onClose} className="text-white hover:bg-white/10 rounded p-1 transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="p-8 space-y-6">
-          <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 flex gap-3">
-            <Pause className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-            <p className="text-[12px] text-amber-900 leading-relaxed">
-              Are you sure you want to pause <span className="font-bold underline">{targetName}</span>? No new expenses will be generated until resumed.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-juniper uppercase tracking-wider block">Reason</label>
-              <Select value={reason} onValueChange={setReason}>
-                <SelectTrigger className="bg-white border-casper/50 rounded-lg h-10 text-xs text-charcoal shadow-sm">
-                  <SelectValue placeholder="Select Reason" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Budget Review">Budget Review</SelectItem>
-                  <SelectItem value="Service Temporary Suspension">Service Temporary Suspension</SelectItem>
-                  <SelectItem value="Internal Audit">Internal Audit</SelectItem>
-                  <SelectItem value="Vendor Negotiation">Vendor Negotiation</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-juniper uppercase tracking-wider block">Scheduled Resume</label>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-juniper" />
-                <Input
-                  type="date"
-                  disabled={!isScheduled}
-                  className="bg-white border-casper/50 rounded-lg pl-10 h-10 text-xs text-charcoal shadow-sm disabled:opacity-50"
-                  value={resumeDate}
-                  onChange={(e) => setResumeDate(e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
-
-          <label className="flex items-center gap-3 cursor-pointer p-4 bg-white border border-casper rounded-xl">
-            <Checkbox
-              checked={isScheduled}
-              onCheckedChange={(checked) => setIsScheduled(!!checked)}
-              className="data-[state=checked]:bg-juniper"
-            />
-            <span className="text-[11px] font-bold text-charcoal">Enable auto-resume on selected date</span>
-          </label>
-        </div>
-
-        <div className="p-6 bg-mystic/20 border-t border-casper/30 flex justify-end gap-3 shrink-0">
-          <Button 
-            variant="outline" 
-            onClick={onClose} 
-            className="bg-white border-casper px-5 py-2.5 h-11 text-[11px] font-bold text-juniper uppercase tracking-widest hover:bg-casper/10 rounded-lg transition-all shadow-sm"
+    <ModuleModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Pause Schedule"
+      icon={<Pause className="w-4 h-4" />}
+      maxWidth="sm:max-w-[480px]"
+      footer={
+        <>
+          <Button
+            variant="ghost"
+            onClick={onClose}
+            className="h-8 px-4 text-[11.5px] font-medium"
+            style={{ color: 'var(--shell-text-muted)' }}
           >
             Keep Active
           </Button>
           <button
-            onClick={() => onConfirm(reason, isScheduled ? resumeDate : null)}
-            className="px-6 py-2.5 bg-amber-600 text-white rounded-lg text-[11px] font-bold uppercase tracking-widest hover:brightness-110 shadow-lg shadow-amber-200 transition-all flex items-center gap-2"
+            onClick={onConfirm}
+            className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[11px] font-bold uppercase tracking-widest shadow-none transition-all flex items-center gap-2"
           >
             <Pause className="w-4 h-4" /> Pause Schedule
           </button>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </>
+      }
+    >
+      <div className="p-4 bg-amber-500/10 rounded-xl border border-amber-400/20 flex gap-3">
+        <Pause className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+        <p className="text-[12px] text-amber-600 dark:text-amber-300 leading-relaxed">
+          Are you sure you want to pause <span className="font-bold underline">{targetName}</span>? No new transactions will be auto-generated until resumed.
+        </p>
+      </div>
+    </ModuleModal>
   );
 }
 
@@ -388,16 +416,19 @@ export function ResumeRecurringModal({
     next_run: '',
     amount: '',
     frequency: 'monthly',
-    reason: 'Project Restarted',
+    gst_rate: '',
+    gst_included: false,
   });
 
   React.useEffect(() => {
     if (target) {
+      const gstIncluded = target.gst_included ?? false;
       setForm({
-        next_run: (target.next_run || '').split('T')[0],
-        amount: String(target.amount || ''),
+        next_run: (target.next_run_date || '').split('T')[0],
+        amount: String(restoreEnteredAmount(target.net_amount, target.total_amount, gstIncluded, target.amount ?? 0)),
         frequency: target.frequency || 'monthly',
-        reason: 'Project Restarted',
+        gst_rate: target.gst_rate ? `${target.gst_rate}%` : '',
+        gst_included: gstIncluded,
       });
     }
   }, [target]);
@@ -405,156 +436,121 @@ export function ResumeRecurringModal({
   if (!target) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent 
-        className="sm:max-w-[500px] p-0 overflow-hidden bg-[#FAF9F6] border-none shadow-2xl rounded-xl flex flex-col"
-        showCloseButton={false}
-      >
-        <div className="h-[52px] px-5 bg-juniper text-white flex justify-between items-center shrink-0">
-          <div className="flex items-center gap-3">
-            <PlayCircle className="w-5 h-5 text-white/80" />
-            <h3 className="text-[12px] font-bold uppercase tracking-[0.2em] mt-0.5">Resume Schedule</h3>
-          </div>
-          <button onClick={onClose} className="text-white hover:bg-white/10 rounded p-1 transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="p-8 space-y-6">
-          <div className="bg-cyan-50 border border-cyan-200 rounded-xl p-4 flex items-center justify-between shadow-sm">
-            <div>
-              <p className="text-[10px] text-cyan-600 font-bold uppercase tracking-wider">Target Schedule</p>
-              <p className="text-[14px] font-bold text-charcoal">{target.description}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-[10px] text-cyan-600 font-bold uppercase tracking-wider">Last Run</p>
-              <p className="text-[14px] font-bold text-charcoal">
-                {target.last_run ? new Date(target.last_run).toLocaleDateString() : 'None'}
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-juniper uppercase tracking-wider block">Next Billing Date</label>
-              <div className="relative">
-                <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-juniper" />
-                <Input
-                  type="date"
-                  className="bg-white border-casper/50 rounded-lg pl-10 h-10 text-xs text-charcoal shadow-sm"
-                  value={form.next_run}
-                  onChange={(e) => setForm({ ...form, next_run: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-juniper uppercase tracking-wider block">Monthly Amount ($)</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-juniper text-xs font-bold">$</span>
-                <Input
-                  type="number"
-                  className="bg-white border-casper/50 rounded-lg pl-7 h-10 text-xs font-bold text-charcoal shadow-sm"
-                  value={form.amount}
-                  onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-juniper uppercase tracking-wider block">Frequency</label>
-              <Select value={form.frequency.toLowerCase()} onValueChange={(v) => setForm({ ...form, frequency: v })}>
-                <SelectTrigger className="bg-white border-casper/50 rounded-lg h-10 text-xs text-charcoal shadow-sm">
-                  <SelectValue placeholder="Frequency" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="daily">Daily</SelectItem>
-                  <SelectItem value="weekly">Weekly</SelectItem>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                  <SelectItem value="yearly">Yearly</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-juniper uppercase tracking-wider block">Resume Reason</label>
-              <Select value={form.reason} onValueChange={(v) => setForm({ ...form, reason: v })}>
-                <SelectTrigger className="bg-white border-casper/50 rounded-lg h-10 text-xs text-charcoal shadow-sm">
-                  <SelectValue placeholder="Reason" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Project Restarted">Project Restarted</SelectItem>
-                  <SelectItem value="Budget Approved">Budget Approved</SelectItem>
-                  <SelectItem value="Audit Complete">Audit Complete</SelectItem>
-                  <SelectItem value="Alternative Found">Alternative Found</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6 bg-mystic/20 border-t border-casper/30 flex justify-end gap-3 shrink-0">
-          <Button 
-            variant="outline" 
-            onClick={onClose} 
-            className="bg-white border-casper px-5 py-2.5 h-11 text-[11px] font-bold text-juniper uppercase tracking-widest hover:bg-casper/10 rounded-lg transition-all shadow-sm"
+    <ModuleModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Resume Schedule"
+      icon={<Play className="w-4 h-4" />}
+      maxWidth="sm:max-w-[500px]"
+      footer={
+        <>
+          <Button
+            variant="ghost"
+            onClick={onClose}
+            className="h-8 px-4 text-[11.5px] font-medium"
+            style={{ color: 'var(--shell-text-muted)' }}
           >
             Keep Paused
           </Button>
           <button
             onClick={() => onConfirm(form)}
-            className="px-6 py-2.5 bg-cyan-600 text-white rounded-lg text-[11px] font-bold uppercase tracking-widest hover:brightness-110 shadow-lg shadow-cyan-200 transition-all flex items-center gap-2"
+            className="px-6 py-2.5 btn-action-primary border border-[var(--shell-border)] text-[var(--shell-text)] rounded-lg text-[11px] font-bold uppercase tracking-widest shadow-none transition-all flex items-center gap-2"
           >
             <Play className="w-4 h-4" /> Resume Schedule
           </button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        <div className="border border-[var(--shell-border)] rounded-xl p-4 flex items-center justify-between shadow-sm" style={{ background: 'var(--shell-bg)' }}>
+          <div>
+            <p className="text-[10px] text-cyan-600 dark:text-cyan-400 font-bold uppercase tracking-wider">Target Schedule</p>
+            <p className="text-[14px] font-bold" style={{ color: 'var(--shell-text)' }}>{target.description}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] text-cyan-600 dark:text-cyan-400 font-bold uppercase tracking-wider">Last Run</p>
+            <p className="text-[14px] font-bold" style={{ color: 'var(--shell-text)' }}>
+              {target.last_run ? new Date(target.last_run).toLocaleDateString() : 'None'}
+            </p>
+          </div>
         </div>
-      </DialogContent>
-    </Dialog>
+
+        <div className="grid grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold modal-label block">Next Billing Date</label>
+            <div className="relative">
+              <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--shell-accent)]" />
+              <Input
+                type="date"
+                className="modal-input border border-[var(--shell-border)] rounded-lg pl-10 h-10 text-xs text-[var(--shell-text)] shadow-sm"
+                value={form.next_run}
+                onChange={(e) => setForm({ ...form, next_run: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold modal-label block">Amount {amountLabel(form.gst_rate, form.gst_included)}</label>
+            <CurrencyInput value={form.amount} onChange={(v) => setForm({ ...form, amount: v })} />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-[10px] font-bold modal-label block">Frequency</label>
+          <Select value={form.frequency.toLowerCase()} onValueChange={(v) => setForm({ ...form, frequency: v })}>
+            <SelectTrigger className="modal-input border border-[var(--shell-border)] rounded-lg h-10 text-xs text-[var(--shell-text)] shadow-sm">
+              <SelectValue placeholder="Frequency" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="daily">Daily</SelectItem>
+              <SelectItem value="weekly">Weekly</SelectItem>
+              <SelectItem value="biweekly">Bi-Weekly</SelectItem>
+              <SelectItem value="monthly">Monthly</SelectItem>
+              <SelectItem value="quarterly">Quarterly</SelectItem>
+              <SelectItem value="yearly">Yearly</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    </ModuleModal>
   );
 }
 
 export function DeleteRecurringModal({ isOpen, onClose, onConfirm, count }: any) {
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent
-        className="sm:max-w-[480px] p-0 overflow-hidden bg-[#FAF9F6] border-none shadow-2xl rounded-xl flex flex-col"
-        showCloseButton={false}
-      >
-        <div className="h-[52px] px-5 bg-red-600 text-white flex justify-between items-center shrink-0">
-          <div className="flex items-center gap-3">
-            <Trash2 className="w-5 h-5 text-white/80" />
-            <h3 className="text-[12px] font-bold uppercase tracking-[0.2em] mt-0.5">Delete Schedule</h3>
-          </div>
-          <button onClick={onClose} className="text-white hover:bg-white/10 rounded p-1 transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="p-8 space-y-4">
-          <div className="p-4 bg-red-50 rounded-xl border border-red-200 flex gap-3">
-            <Trash2 className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-            <p className="text-[12px] text-red-900 leading-relaxed">
-              Are you sure you want to delete <span className="font-bold">{count} recurring schedule(s)</span>? Future transactions will no longer be generated. This action cannot be undone.
-            </p>
-          </div>
-        </div>
-
-        <div className="px-6 py-5 bg-mystic/20 border-t border-casper/30 flex justify-end gap-3 shrink-0">
+    <ModuleModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Delete Schedule"
+      icon={<Trash2 className="w-4 h-4" />}
+      isDestructive={true}
+      maxWidth="sm:max-w-[480px]"
+      footer={
+        <>
           <Button
-            variant="outline"
+            variant="ghost"
             onClick={onClose}
-            className="bg-white border-casper px-5 py-2.5 h-11 text-[11px] font-bold text-juniper uppercase tracking-widest hover:bg-casper/10 rounded-lg transition-all shadow-sm"
+            className="h-8 px-4 text-[11.5px] font-medium"
+            style={{ color: 'var(--shell-text-muted)' }}
           >
             Cancel
           </Button>
           <button
             onClick={onConfirm}
-            className="px-6 py-2.5 bg-red-600 text-white rounded-lg text-[11px] font-bold uppercase tracking-widest hover:brightness-110 shadow-lg shadow-red-200 transition-all flex items-center gap-2"
+            className="px-6 py-2.5 bg-red-600 text-white rounded-lg text-[11px] font-bold uppercase tracking-widest hover:brightness-110 shadow-lg shadow-red-200/10 transition-all flex items-center gap-2"
           >
             <Trash2 className="w-4 h-4" /> Delete Permanently
           </button>
+        </>
+      }
+    >
+      <div className="space-y-2.5">
+        <div className="p-4 bg-rose-500/10 rounded-xl border border-rose-400/20 flex gap-3">
+          <Trash2 className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+          <p className="text-[12px] text-rose-600 dark:text-rose-300 leading-relaxed">
+            Are you sure you want to delete <span className="font-bold text-rose-600 dark:text-rose-300">{count} recurring schedule(s)</span>? Future transactions will no longer be generated. This action cannot be undone.
+          </p>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </ModuleModal>
   );
 }

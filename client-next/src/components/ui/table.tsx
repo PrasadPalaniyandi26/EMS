@@ -1,18 +1,18 @@
 "use client"
 
 import * as React from "react"
-
 import { cn } from "@/lib/utils"
 
 function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
     <div
       data-slot="table-container"
-      className="relative w-full overflow-x-auto bg-sharp-white/80 border border-jungle-mist rounded-xl"
+      className="relative w-full overflow-x-auto"
+      style={{ background: 'var(--shell-surface)' }}
     >
       <table
         data-slot="table"
-        className={cn("w-full caption-bottom text-[12px] border-collapse", className)}
+        className={cn("w-full caption-bottom text-[13px] border-collapse", className)}
         {...props}
       />
     </div>
@@ -23,7 +23,8 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   return (
     <thead
       data-slot="table-header"
-      className={cn("bg-juniper text-sharp-white font-bold uppercase tracking-wider sticky top-0 z-10", className)}
+      className={cn("sticky top-0 z-10", className)}
+      style={{ background: 'var(--shell-surface)', borderBottom: '1px solid var(--shell-border)' }}
       {...props}
     />
   )
@@ -57,9 +58,10 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
     <tr
       data-slot="table-row"
       className={cn(
-        "border-b border-casper/40 transition-colors hover:bg-mystic/50 cursor-pointer data-[state=selected]:bg-juniper/10",
+        "border-b transition-colors cursor-pointer table-row-hover data-[state=selected]:bg-[var(--shell-accent)]/10",
         className
       )}
+      style={{ borderColor: 'var(--shell-border)' }}
       {...props}
     />
   )
@@ -70,9 +72,10 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
     <th
       data-slot="table-head"
       className={cn(
-        "h-10 px-3 text-center align-middle font-bold whitespace-nowrap text-sharp-white text-[10px] uppercase tracking-wider border-r border-sharp-white/10 last:border-r-0 [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "h-9 px-3 text-left align-middle font-semibold whitespace-nowrap text-[11px] uppercase tracking-wider [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
         className
       )}
+      style={{ color: 'var(--shell-text-muted)' }}
       {...props}
     />
   )
@@ -83,9 +86,10 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
     <td
       data-slot="table-cell"
       className={cn(
-        "px-3 py-2.5 align-middle whitespace-nowrap text-[12px] text-charcoal border-r border-casper/30 last:border-r-0 [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "px-3 py-2 align-middle whitespace-nowrap text-[12.5px] [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
         className
       )}
+      style={{ color: 'var(--shell-text)' }}
       {...props}
     />
   )

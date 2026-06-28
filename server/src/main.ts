@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -28,19 +28,27 @@ async function bootstrap() {
 
   // Security
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+  const allowedOrigins = [
+    ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:3000'] : []),
+    ...(process.env.CLIENT_URL || '')
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean),
+  ];
   app.enableCors({
-    origin: [
-      process.env.CLIENT_URL || 'http://localhost:3000',
-      'http://localhost:3000',
-    ],
+    origin: allowedOrigins,
     credentials: true,
   });
   app.use(cookieParser());
 
-  // Rate limiting — tight limit on auth endpoints, general limit on all API
+  // Rate limiting — upload endpoints; general limit on all API
   app.use(
-    '/api/v1/auth/login',
-    rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: 'Too many login attempts. Try again in 15 minutes.' }),
+    '/api/v1/receipts/upload',
+    rateLimit({ windowMs: 60 * 1000, max: 20, message: 'Too many uploads. Please wait before uploading again.' }),
+  );
+  app.use(
+    '/api/v1/receipts/ocr',
+    rateLimit({ windowMs: 60 * 1000, max: 10, message: 'Too many OCR requests. Please wait.' }),
   );
   app.use(
     '/api',
@@ -75,11 +83,12 @@ async function bootstrap() {
     SwaggerModule.setup('api/docs', app, document);
   }
 
+  const logger = new Logger('Bootstrap');
   const port = parseInt(process.env.PORT || '5000', 10);
   await app.listen(port);
-  console.log(`🚀 EMS NestJS Server running on http://localhost:${port}`);
+  logger.log(`🚀 EMS NestJS Server running on http://localhost:${port}`);
   if (process.env.NODE_ENV !== 'production') {
-    console.log(`📖 API docs: http://localhost:${port}/api/docs`);
+    logger.log(`📖 API docs: http://localhost:${port}/api/docs`);
   }
 }
 bootstrap();

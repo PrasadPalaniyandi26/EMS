@@ -2,6 +2,9 @@ import { create } from 'zustand';
 import { api, setAccessToken, clearAccessToken } from '@/lib/api-client';
 import type { User, LoginCredentials, LoginResponse } from '@/lib/types';
 
+// Deduplication guard — prevents concurrent /auth/refresh calls from refreshSession
+let sessionRefreshPromise: Promise<void> | null = null;
+
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
@@ -29,25 +32,34 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       await api.post('/auth/logout');
     } catch {
-      // ignore
+      // ignore — still clear local session even if server call fails
     }
     clearAccessToken();
     set({ user: null, isAuthenticated: false, isLoading: false });
+    // Hard navigation kills all in-flight React Query polls before they can
+    // trigger a 401 → refresh → "Session expired" error toast.
+    if (typeof window !== 'undefined') window.location.href = '/login';
   },
 
   refreshSession: async () => {
-    try {
-      const res = await api.post<LoginResponse>('/auth/refresh');
-      setAccessToken(res.data.accessToken);
-      set({ user: res.data.user, isAuthenticated: true, isLoading: false });
-    } catch {
-      clearAccessToken();
-      set({ user: null, isAuthenticated: false, isLoading: false });
-      // Redirect to login — session is gone, no valid refresh token
-      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-        window.location.href = '/login';
+    // Deduplicate: if a refresh is already in flight, wait for it instead of making a second call
+    if (sessionRefreshPromise) return sessionRefreshPromise;
+    sessionRefreshPromise = (async () => {
+      try {
+        const res = await api.post<LoginResponse>('/auth/refresh');
+        setAccessToken(res.data.accessToken);
+        set({ user: res.data.user, isAuthenticated: true, isLoading: false });
+      } catch {
+        clearAccessToken();
+        set({ user: null, isAuthenticated: false, isLoading: false });
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+          window.location.href = '/login';
+        }
+      } finally {
+        sessionRefreshPromise = null;
       }
-    }
+    })();
+    return sessionRefreshPromise;
   },
 
   updateUser: (updates) =>

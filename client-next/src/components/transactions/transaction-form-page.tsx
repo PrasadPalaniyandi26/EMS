@@ -7,10 +7,11 @@ import api from '@/lib/api-client';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Download, Upload, Send, Search, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Download, Upload, Send, Search, X, FileText, Receipt } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/currency';
 import type { Transaction } from '@/lib/types';
 import { TransactionModal } from './transaction-modal';
+import { useConfirm } from '@/components/shared/modal-primitives';
 
 interface TransactionFormPageProps {
   transactionType: 'expense' | 'income';
@@ -24,6 +25,7 @@ export function TransactionFormPage({ transactionType, title, subtitle }: Transa
   const currency = user?.currency || 'INR';
   const { data: categories } = useCategories();
   const invalidate = useInvalidate();
+  const { confirm: confirmDialog, dialog: confirmDialogEl } = useConfirm();
 
   // Filters
   const [search, setSearch] = useState('');
@@ -102,7 +104,8 @@ export function TransactionFormPage({ transactionType, title, subtitle }: Transa
   const handleDelete = async () => {
     const ids = Array.from(selected);
     if (ids.length === 0) { toast.error('Select records to delete'); return; }
-    if (!confirm(`Delete ${ids.length} record(s)?`)) return;
+    const ok = await confirmDialog('Delete Records', `Delete ${ids.length} record(s)? This cannot be undone.`, { confirmLabel: 'Delete', destructive: true });
+    if (!ok) return;
     try {
       if (ids.length === 1) await api.delete(`/transactions/${ids[0]}`);
       else await api.post('/transactions/bulk-delete', { ids });
@@ -127,7 +130,7 @@ export function TransactionFormPage({ transactionType, title, subtitle }: Transa
 
   const getStatusColor = (status?: string) => {
     switch (status?.toLowerCase()) {
-      case 'approved': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+      case 'approved': return 'bg-indigo-100 text-indigo-700 border-indigo-200';
       case 'pending': return 'bg-amber-100 text-amber-700 border-amber-200';
       case 'rejected': return 'bg-red-100 text-red-700 border-red-200';
       default: return 'bg-stone-100 text-stone-700 border-stone-200';
@@ -137,7 +140,7 @@ export function TransactionFormPage({ transactionType, title, subtitle }: Transa
   const getCategoryColor = (name?: string) => {
     const colors: Record<string, string> = {
       education: 'bg-blue-100 text-blue-700', material: 'bg-orange-100 text-orange-700',
-      rent: 'bg-purple-100 text-purple-700', 'food & dining': 'bg-emerald-100 text-emerald-700',
+      rent: 'bg-purple-100 text-purple-700', 'food & dining': 'bg-indigo-100 text-indigo-700',
       shopping: 'bg-cyan-100 text-cyan-700', entertainment: 'bg-rose-100 text-rose-700',
     };
     return colors[(name || '').toLowerCase()] || 'bg-stone-100 text-stone-700';
@@ -145,7 +148,7 @@ export function TransactionFormPage({ transactionType, title, subtitle }: Transa
 
   return (
     <div className="flex h-full gap-6">
-      <div className="flex-1 flex flex-col space-y-4 min-w-0">
+      <div className="flex-1 flex flex-col space-y-2.5 min-w-0">
         {/* Functional Inline Filters (Search, Date, Status, Category) */}
         <div className="flex items-center justify-between bg-white rounded-lg p-3 border border-casper shadow-sm">
           <div className="flex items-center gap-3 w-full max-w-5xl">
@@ -237,26 +240,26 @@ export function TransactionFormPage({ transactionType, title, subtitle }: Transa
                     <TableCell className="text-center border-l-0" onClick={(e) => e.stopPropagation()}>
                       <Checkbox className="rounded border-casper text-juniper data-[state=checked]:bg-juniper data-[state=checked]:text-white" checked={selected.has(t.id)} onCheckedChange={() => toggleSelect(t.id)} />
                     </TableCell>
-                    <TableCell className="text-[12px] font-bold text-juniper border-casper/30">{t.reference_id || '—'}</TableCell>
-                    <TableCell className="text-[12px] font-mono text-charcoal/70 border-casper/30">—</TableCell>
-                    <TableCell className="text-[12px] font-medium text-charcoal truncate border-casper/30">
+                    <TableCell className="text-[12px] font-bold text-juniper border-zinc-200">{t.reference_id || '—'}</TableCell>
+                    <TableCell className="text-[12px] font-mono text-charcoal/70 border-zinc-200">—</TableCell>
+                    <TableCell className="text-[12px] font-medium text-charcoal truncate border-zinc-200">
                       {t.description || '—'}
                       {t.notes === 'SPLIT' && <span className="ml-2 px-1.5 py-0.5 bg-teal-100 text-teal-700 rounded text-[10px] font-bold">SPLIT</span>}
                     </TableCell>
-                    <TableCell className="text-center border-casper/30">
-                      <span className="px-2 py-0.5 bg-[#F0F4F5] text-[9px] font-bold text-juniper rounded-md uppercase border border-casper/30">
+                    <TableCell className="text-center border-zinc-200">
+                      <span className="px-2 py-0.5 bg-[#F0F4F5] text-[9px] font-bold text-juniper rounded-md uppercase border border-zinc-200">
                         {t.category_name || '—'}
                       </span>
                     </TableCell>
-                    <TableCell className="text-[12px] text-charcoal/60 text-center border-casper/30">{formatDate(t.date_recorded)}</TableCell>
-                    <TableCell className="border-casper/30">
+                    <TableCell className="text-[12px] text-charcoal/60 text-center border-zinc-200">{formatDate(t.date_recorded)}</TableCell>
+                    <TableCell className="border-zinc-200">
                       <div className="flex items-center justify-center gap-2">
                         <span className={`text-[10px] font-bold uppercase tracking-wider ${getStatusColor(t.status)}`}>
                           {t.status || '—'}
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-[12px] font-bold text-right text-charcoal border-r-0 border-casper/30">{formatCurrency(t.amount, currency)}</TableCell>
+                    <TableCell className="text-[12px] font-bold text-right text-charcoal border-r-0 border-zinc-200">{formatCurrency(t.total_amount ?? t.amount, currency)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -308,7 +311,7 @@ export function TransactionFormPage({ transactionType, title, subtitle }: Transa
           <div className="h-12 px-5 bg-juniper text-white flex justify-between items-center shrink-0">
             <div className="flex items-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-              <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] mt-0.5">Transaction Detail</h3>
+              <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] mt-0.5">Transaction Detail</h3>
             </div>
             <button onClick={() => setSelectedTxn(null)} className="text-white hover:bg-white/10 rounded p-1 transition-colors">
               <X className="w-5 h-5" />
@@ -321,23 +324,74 @@ export function TransactionFormPage({ transactionType, title, subtitle }: Transa
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                 Primary Document
               </label>
-              <div className="h-44 bg-[#F0F4F5]/40 rounded-xl border-2 border-dashed border-casper flex flex-col items-center justify-center text-juniper group cursor-pointer hover:bg-white hover:border-juniper transition-all shadow-inner">
-                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="mb-3 text-casper group-hover:scale-110 transition-transform"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>
-                <p className="text-[10px] font-bold uppercase tracking-wide">#{selectedTxn.id}_DOCUMENT.PDF</p>
-                <p className="text-[9px] text-casper mt-1 font-medium">Click to view/attach full screen</p>
-              </div>
+              {selectedTxn.receipt_path ? (
+                <div
+                  className="h-44 rounded-xl border-2 border-juniper/40 flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-juniper transition-all group"
+                  style={{ background: 'linear-gradient(135deg, rgba(74,111,83,0.08) 0%, rgba(74,111,83,0.04) 100%)' }}
+                  onClick={async () => {
+                    try {
+                      const { getAccessToken } = await import('@/lib/api-client');
+                      const token = getAccessToken();
+                      const res = await fetch(`/api/v1/receipts/${selectedTxn.receipt_path}`, {
+                        credentials: 'include',
+                        headers: token ? { Authorization: `Bearer ${token}` } : {},
+                      });
+                      const blob = await res.blob();
+                      window.open(URL.createObjectURL(blob), '_blank');
+                    } catch { toast.error('Failed to open receipt'); }
+                  }}
+                >
+                  <div className="w-14 h-14 rounded-xl bg-juniper/20 border border-juniper/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Receipt className="w-7 h-7 text-juniper" />
+                  </div>
+                  <div className="text-center px-4">
+                    <p className="text-[11px] font-bold text-juniper uppercase tracking-wide truncate max-w-[180px]">
+                      {selectedTxn.receipt_path.split('/').pop()}
+                    </p>
+                    <p className="text-[9px] mt-0.5 font-medium text-juniper/60">Click to view receipt / invoice</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-44 rounded-xl border-2 border-dashed border-zinc-300 flex flex-col items-center justify-center gap-3 bg-zinc-50">
+                  <div className="w-14 h-14 rounded-xl bg-zinc-200 border border-zinc-300 flex items-center justify-center">
+                    <FileText className="w-7 h-7 text-zinc-400" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wide">No Receipt or Invoice</p>
+                    <p className="text-[9px] text-zinc-300 mt-0.5 font-medium">No document attached</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-y-6 gap-x-5">
               <div className="col-span-2">
                 <label className="text-[10px] font-bold text-casper uppercase tracking-wider">Description</label>
-                <p className="text-[11px] break-all text-charcoal bg-[#F0F4F5]/50 p-3 rounded-lg mt-2 border border-casper/30 shadow-sm leading-relaxed">{selectedTxn.description || 'No description provided'}</p>
+                <p className="text-[11px] break-all text-charcoal bg-[#F0F4F5]/50 p-3 rounded-lg mt-2 border border-zinc-200 shadow-sm leading-relaxed">{selectedTxn.description || 'No description provided'}</p>
               </div>
-              
-              <div>
-                <label className="text-[10px] font-bold text-casper uppercase tracking-wider">Requested Amount</label>
-                <p className="text-[16px] font-black mt-1 text-charcoal">{formatCurrency(selectedTxn.amount, currency)}</p>
+
+              {/* Amount breakdown */}
+              <div className="col-span-2 rounded-xl border border-zinc-200 overflow-hidden" style={{ background: 'var(--shell-surface, #F8FAFC)' }}>
+                {selectedTxn.gst_rate != null ? (
+                  <>
+                    <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-200">
+                      <span className="text-[10px] font-bold text-casper uppercase tracking-wider">Net Amount</span>
+                      <span className="text-[13px] font-bold text-charcoal">{formatCurrency(selectedTxn.net_amount ?? selectedTxn.amount, currency)}</span>
+                    </div>
+                    <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-200">
+                      <span className="text-[10px] font-bold text-casper uppercase tracking-wider">GST ({selectedTxn.gst_rate}%)</span>
+                      <span className="text-[13px] font-bold text-charcoal">
+                        {formatCurrency((selectedTxn.total_amount ?? selectedTxn.amount) - (selectedTxn.net_amount ?? selectedTxn.amount), currency)}
+                      </span>
+                    </div>
+                  </>
+                ) : null}
+                <div className="flex items-center justify-between px-4 py-3" style={{ background: 'rgba(74,111,83,0.06)' }}>
+                  <span className="text-[10px] font-bold text-juniper uppercase tracking-wider">Total Amount</span>
+                  <span className="text-[16px] font-black text-charcoal">{formatCurrency(selectedTxn.total_amount ?? selectedTxn.amount, currency)}</span>
+                </div>
               </div>
+
               <div>
                 <label className="text-[10px] font-bold text-casper uppercase tracking-wider">Date Recorded</label>
                 <p className="text-[13px] font-bold mt-1.5 text-charcoal">{formatDate(selectedTxn.date_recorded)}</p>
@@ -354,7 +408,7 @@ export function TransactionFormPage({ transactionType, title, subtitle }: Transa
             
             {selectedTxn.notes && (
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-juniper uppercase flex items-center gap-2 border-b border-casper/30 pb-2">
+                <label className="text-[10px] font-bold text-juniper uppercase flex items-center gap-2 border-b border-zinc-200 pb-2">
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                   Notes & Context
                 </label>
@@ -363,14 +417,10 @@ export function TransactionFormPage({ transactionType, title, subtitle }: Transa
             )}
           </div>
           
-          <div className="p-5 bg-[#F0F4F5]/30 border-t border-casper flex gap-3">
-             <button className="flex-1 bg-juniper text-white py-3 rounded-lg text-[11px] font-bold uppercase tracking-widest hover:brightness-110 shadow-lg shadow-juniper/20 transition-all active:scale-95">Post to Ledger</button>
-             <button className="px-4 bg-white border border-casper text-juniper rounded-lg hover:bg-workspace-bg transition-colors shadow-sm">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
-             </button>
-          </div>
         </aside>
       )}
+
+      {confirmDialogEl}
 
       {/* Add/Edit Modal */}
       <TransactionModal

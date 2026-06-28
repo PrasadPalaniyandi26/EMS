@@ -15,9 +15,11 @@ import { BudgetsModule } from './budgets/budgets.module';
 import { ApprovalsModule } from './approvals/approvals.module';
 import { RecurringModule } from './recurring/recurring.module';
 import { AuditModule } from './audit/audit.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ReceiptsModule } from './receipts/receipts.module';
 import { HealthModule } from './health/health.module';
+import { ReportingModule } from './reporting/reporting.module';
 
 @Module({
   imports: [
@@ -36,9 +38,11 @@ import { HealthModule } from './health/health.module';
     ApprovalsModule,
     RecurringModule,
     AuditModule,
+    NotificationsModule,
     DashboardModule,
     ReceiptsModule,
     HealthModule,
+    ReportingModule,
   ],
 })
 export class AppModule {}

@@ -26,6 +26,17 @@ export class BudgetsController {
     return this.service.getSummary(userId, Number(month), Number(year));
   }
 
+  @Get('check')
+  checkBudget(
+    @CurrentUser('id') userId: number,
+    @Query('categoryId') categoryId: string,
+    @Query('amount') amount: string,
+    @Query('month') month: string,
+    @Query('year') year: string,
+  ) {
+    return this.service.checkBudget(userId, Number(categoryId), Number(amount), Number(month), Number(year));
+  }
+
   @Get('monthly-settings')
   getMonthlySettings(@CurrentUser('id') userId: number, @Query('month') month: string, @Query('year') year: string) {
     return this.service.getMonthlySettings(userId, Number(month), Number(year));

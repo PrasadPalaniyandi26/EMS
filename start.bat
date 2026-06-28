@@ -18,5 +18,5 @@ echo.
 echo Both servers are starting!
 echo   Backend:  http://localhost:5000
 echo   Frontend: http://localhost:3000
-echo   Health:   http://localhost:5000/api/health
+echo   Health:   http://localhost:5000/health
 echo.

@@ -5,6 +5,10 @@ const CURRENCY_MAP: Record<string, { locale: string; currency: string; symbol: s
   INR: { locale: 'en-IN', currency: 'INR', symbol: '₹' },
 };
 
+export const CURRENCY_SYMBOL: Record<string, string> = Object.fromEntries(
+  Object.entries(CURRENCY_MAP).map(([k, v]) => [k, v.symbol])
+);
+
 export function formatCurrency(amount: number, currencyCode = 'INR', showSymbol = true) {
   const config = CURRENCY_MAP[currencyCode] || CURRENCY_MAP.INR;
   return new Intl.NumberFormat(config.locale, {

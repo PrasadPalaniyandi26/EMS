@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, ParseIntPipe, HttpCode } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, ParseIntPipe, HttpCode, Res } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import type { Response } from 'express';
 import { TransactionsService } from './transactions.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { CreateTransactionDto, UpdateTransactionDto } from './dto/transaction.dto';
+import { CreateTransactionDto, UpdateTransactionDto, ProcessReimbursementDto, BulkProcessReimbursementDto } from './dto/transaction.dto';
 import { ApiTags } from '@nestjs/swagger';
 
 @ApiTags('transactions')
@@ -16,9 +17,34 @@ export class TransactionsController {
     return this.service.findAll(userId, query);
   }
 
+  @Get('reimbursements')
+  getReimbursementQueue(@Query() query: any) {
+    return this.service.getReimbursementQueue(query);
+  }
+
+  @Post('bulk-reimburse')
+  @HttpCode(200)
+  bulkMarkReimbursed(@Body() dto: BulkProcessReimbursementDto, @CurrentUser('id') userId: number) {
+    return this.service.bulkMarkReimbursed(dto.ids, userId, dto);
+  }
+
+  @Get('export')
+  async exportCsv(@CurrentUser('id') userId: number, @Query() query: any, @Res() res: Response) {
+    const csv = await this.service.exportCsv(userId, query);
+    const date = new Date().toISOString().split('T')[0];
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="transactions-${date}.csv"`);
+    res.send(csv);
+  }
+
   @Get(':id/splits')
   getSplits(@Param('id', ParseIntPipe) id: number) {
     return this.service.getSplits(id);
+  }
+
+  @Get(':id/approval-trail')
+  getApprovalTrail(@Param('id', ParseIntPipe) id: number) {
+    return this.service.getApprovalTrail(id);
   }
 
   @Get(':id')
@@ -47,14 +73,54 @@ export class TransactionsController {
     return this.service.bulkDelete(ids, userId);
   }
 
+  @Post('check-duplicates')
+  @HttpCode(200)
+  checkDuplicates(@Body() body: any, @CurrentUser('id') userId: number) {
+    return this.service.checkDuplicates(userId, body);
+  }
+
   @Post(':id/split')
-  split(@Param('id', ParseIntPipe) id: number, @Body('splits') splits: any[]) {
-    return this.service.split(id, splits);
+  split(@Param('id', ParseIntPipe) id: number, @Body('splits') splits: any[], @CurrentUser('id') userId: number) {
+    return this.service.split(id, splits, userId);
   }
 
   @Post(':id/submit')
   @HttpCode(200)
   submit(@Param('id', ParseIntPipe) id: number, @CurrentUser('id') userId: number) {
     return this.service.submit(id, userId);
+  }
+
+  @Post(':id/duplicate')
+  @HttpCode(201)
+  duplicate(@Param('id', ParseIntPipe) id: number, @CurrentUser('id') userId: number) {
+    return this.service.duplicate(id, userId);
+  }
+
+  @Post(':id/void')
+  @HttpCode(200)
+  void(@Param('id', ParseIntPipe) id: number, @Body('reason') reason: string, @CurrentUser('id') userId: number) {
+    return this.service.void(id, userId, reason);
+  }
+
+  @Get(':id/notes')
+  getNotes(@Param('id', ParseIntPipe) id: number) {
+    return this.service.getNotes(id);
+  }
+
+  @Post(':id/notes')
+  @HttpCode(201)
+  addNote(@Param('id', ParseIntPipe) id: number, @Body('note') note: string, @CurrentUser('id') userId: number) {
+    return this.service.addNote(id, userId, note);
+  }
+
+  @Delete('notes/:noteId')
+  deleteNote(@Param('noteId', ParseIntPipe) noteId: number, @CurrentUser('id') userId: number) {
+    return this.service.deleteNote(noteId, userId);
+  }
+
+  @Post(':id/reimburse')
+  @HttpCode(200)
+  markReimbursed(@Param('id', ParseIntPipe) id: number, @Body() dto: ProcessReimbursementDto, @CurrentUser('id') userId: number) {
+    return this.service.markReimbursed(id, userId, dto);
   }
 }

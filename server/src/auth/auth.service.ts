@@ -15,14 +15,16 @@ export class AuthService {
     let user: any;
     const ntMatch = username.match(/^NT(\d+)$/i);
     if (ntMatch) {
+      // Login by Employee ID (NT10001)
       const userId = Number(ntMatch[1]) - 10000;
       user = await this.prisma.user.findUnique({
         where: { id: userId },
         include: { roleRelation: true, userRoles: { include: { role: true } } },
       });
     } else {
-      user = await this.prisma.user.findUnique({
-        where: { username },
+      // Login by login_name (e.g. prasadp)
+      user = await this.prisma.user.findFirst({
+        where: { loginName: username },
         include: { roleRelation: true, userRoles: { include: { role: true } } },
       });
     }

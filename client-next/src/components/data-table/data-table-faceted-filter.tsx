@@ -2,9 +2,8 @@
 
 import * as React from "react"
 import { Column } from "@tanstack/react-table"
-import { Check, PlusCircle } from "lucide-react"
+import { PlusCircle } from "lucide-react"
 
-import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -37,12 +36,12 @@ export function DataTableFacetedFilter<TData, TValue>({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="h-9 border-casper border-dashed bg-white hover:bg-mystic/30">
-          <PlusCircle className="mr-2 h-4 w-4 text-juniper" />
+        <Button variant="outline" size="sm" className="h-8 rounded-lg text-[12px] font-medium" style={{ background: 'var(--shell-surface)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }}>
+          <PlusCircle className="mr-1.5 h-3.5 w-3.5 text-[var(--shell-text-muted)]" />
           {title}
           {selectedValues?.size > 0 && (
             <>
-              <Separator orientation="vertical" className="mx-2 h-4 bg-casper/30" />
+              <Separator orientation="vertical" className="mx-2 h-4" style={{ background: 'var(--shell-border)' }} />
               <Badge
                 variant="secondary"
                 className="rounded-sm px-1 font-normal lg:hidden"
@@ -53,7 +52,8 @@ export function DataTableFacetedFilter<TData, TValue>({
                 {selectedValues.size > 2 ? (
                   <Badge
                     variant="secondary"
-                    className="rounded-sm px-1 font-normal bg-juniper/10 text-juniper text-[10px]"
+                    className="rounded-sm px-1 font-normal text-[10px]"
+                    style={{ background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)', opacity: 0.85 }}
                   >
                     {selectedValues.size} selected
                   </Badge>
@@ -64,7 +64,8 @@ export function DataTableFacetedFilter<TData, TValue>({
                       <Badge
                         variant="secondary"
                         key={option.value}
-                        className="rounded-sm px-1 font-normal bg-juniper/10 text-juniper text-[10px]"
+                        className="rounded-sm px-1 font-normal text-[10px]"
+                        style={{ background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)', opacity: 0.85 }}
                       >
                         {option.label}
                       </Badge>
@@ -75,9 +76,9 @@ export function DataTableFacetedFilter<TData, TValue>({
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-[200px] bg-white border-casper shadow-xl">
-        <DropdownMenuLabel className="text-[10px] uppercase font-bold text-casper">{title}</DropdownMenuLabel>
-        <DropdownMenuSeparator className="bg-casper/20" />
+      <DropdownMenuContent align="start" className="w-[200px]">
+        <DropdownMenuLabel className="text-[10px] uppercase font-bold text-muted-foreground">{title}</DropdownMenuLabel>
+        <DropdownMenuSeparator />
         {options.map((option) => {
           const isSelected = selectedValues.has(option.value)
           return (
@@ -95,7 +96,7 @@ export function DataTableFacetedFilter<TData, TValue>({
                   filterValues.length ? filterValues : undefined
                 )
               }}
-              className="text-[12px] font-medium text-charcoal focus:bg-mystic/50"
+              className="text-[12px] font-medium"
             >
               <div className="flex items-center">
                 {option.icon && (
@@ -108,10 +109,10 @@ export function DataTableFacetedFilter<TData, TValue>({
         })}
         {selectedValues.size > 0 && (
           <>
-            <DropdownMenuSeparator className="bg-casper/20" />
+            <DropdownMenuSeparator />
             <Button
               variant="ghost"
-              className="w-full justify-center text-[11px] font-bold text-juniper hover:bg-mystic/50 h-8"
+              className="w-full justify-center text-[11px] font-bold text-[var(--shell-accent)] hover:opacity-80 h-8"
               onClick={() => column?.setFilterValue(undefined)}
             >
               Clear filters

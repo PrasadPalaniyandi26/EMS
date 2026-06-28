@@ -1,9 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api-client';
+import api, { getAccessToken } from '@/lib/api-client';
 import type {
   Category, Client, Project, Product, ProjectType, ProductType,
   Transaction, Budget, RecurringTransaction, ApprovalRequest, AuditLog,
-  Role, DashboardSummary, CategoryBreakdown, MonthlyTrend,
+  Notification, Role, DashboardSummary, CategoryBreakdown, MonthlyTrend,
   PaginatedResponse,
 } from '@/lib/types';
 
@@ -12,10 +12,32 @@ const REF_STALE = 60 * 60 * 1000;
 // Financial / user data — fetch fresh each time the query mounts
 const LIVE_STALE = 0;
 
+export const QUERY_KEYS = {
+  CATEGORIES: 'categories',
+  CLIENTS: 'clients',
+  PROJECTS: 'projects',
+  PROJECT_TYPES: 'projectTypes',
+  PRODUCTS: 'products',
+  PRODUCT_TYPES: 'productTypes',
+  TRANSACTIONS: 'transactions',
+  BUDGETS: 'budgets',
+  RECURRING: 'recurring',
+  APPROVALS: 'approvals',
+  APPROVALS_HISTORY: 'approvals-history',
+  AUDIT: 'audit',
+  NOTIFICATIONS: 'notifications',
+  ROLES: 'roles',
+  USERS: 'users',
+  DASHBOARD: 'dashboard',
+  ANALYTICS: 'analytics',
+  REPORT: 'report',
+  REIMBURSEMENTS: 'reimbursements',
+} as const;
+
 // ─── Categories ──────────────────────────────────
 export function useCategories() {
   return useQuery({
-    queryKey: ['categories'],
+    queryKey: [QUERY_KEYS.CATEGORIES],
     queryFn: () => api.get<Category[]>('/categories').then((r) => r.data),
     staleTime: REF_STALE,
   });
@@ -24,7 +46,7 @@ export function useCategories() {
 // ─── Clients ─────────────────────────────────────
 export function useClients() {
   return useQuery({
-    queryKey: ['clients'],
+    queryKey: [QUERY_KEYS.CLIENTS],
     queryFn: () => api.get<Client[]>('/clients').then((r) => r.data),
     staleTime: REF_STALE,
   });
@@ -34,7 +56,7 @@ export function useClients() {
 export function useProjects(clientId?: number) {
   const qs = clientId ? `?clientId=${clientId}` : '';
   return useQuery({
-    queryKey: ['projects', clientId],
+    queryKey: [QUERY_KEYS.PROJECTS, clientId],
     queryFn: () => api.get<Project[]>(`/projects${qs}`).then((r) => r.data),
     staleTime: REF_STALE,
   });
@@ -43,7 +65,7 @@ export function useProjects(clientId?: number) {
 export function useProjectTypes(clientId?: number) {
   const qs = clientId ? `?clientId=${clientId}` : '';
   return useQuery({
-    queryKey: ['projectTypes', clientId],
+    queryKey: [QUERY_KEYS.PROJECT_TYPES, clientId],
     queryFn: () => api.get<ProjectType[]>(`/project-types${qs}`).then((r) => r.data),
     staleTime: REF_STALE,
   });
@@ -53,7 +75,7 @@ export function useProjectTypes(clientId?: number) {
 export function useProducts(clientId?: number) {
   const qs = clientId ? `?clientId=${clientId}` : '';
   return useQuery({
-    queryKey: ['products', clientId],
+    queryKey: [QUERY_KEYS.PRODUCTS, clientId],
     queryFn: () => api.get<Product[]>(`/products${qs}`).then((r) => r.data),
     staleTime: REF_STALE,
   });
@@ -62,7 +84,7 @@ export function useProducts(clientId?: number) {
 export function useProductTypes(clientId?: number) {
   const qs = clientId ? `?clientId=${clientId}` : '';
   return useQuery({
-    queryKey: ['productTypes', clientId],
+    queryKey: [QUERY_KEYS.PRODUCT_TYPES, clientId],
     queryFn: () => api.get<ProductType[]>(`/product-types${qs}`).then((r) => r.data),
     staleTime: REF_STALE,
   });
@@ -72,7 +94,7 @@ export function useProductTypes(clientId?: number) {
 export function useTransactions(params?: Record<string, string>) {
   const qs = params ? '?' + new URLSearchParams(params).toString() : '';
   return useQuery({
-    queryKey: ['transactions', params],
+    queryKey: [QUERY_KEYS.TRANSACTIONS, params],
     queryFn: () => api.get<PaginatedResponse<Transaction>>(`/transactions${qs}`).then((r) => r.data),
     staleTime: LIVE_STALE,
   });
@@ -81,7 +103,7 @@ export function useTransactions(params?: Record<string, string>) {
 // ─── Budgets ─────────────────────────────────────
 export function useBudgets() {
   return useQuery({
-    queryKey: ['budgets'],
+    queryKey: [QUERY_KEYS.BUDGETS],
     queryFn: () => api.get<Budget[]>('/budgets').then((r) => r.data),
     staleTime: LIVE_STALE,
   });
@@ -93,17 +115,36 @@ export function useBudgetSummary(month?: number, year?: number) {
   if (year) qs.set('year', String(year));
   const q = qs.toString() ? `?${qs.toString()}` : '';
   return useQuery({
-    queryKey: ['budgets', 'summary', month, year],
+    queryKey: [QUERY_KEYS.BUDGETS, 'summary', month, year],
     queryFn: () => api.get<unknown>(`/budgets/summary${q}`).then((r) => r.data),
     staleTime: LIVE_STALE,
   });
 }
 
 // ─── Recurring ───────────────────────────────────
-export function useRecurring() {
+export function useRecurring(params?: Record<string, string>) {
+  const qs = params ? '?' + new URLSearchParams(params).toString() : '';
   return useQuery({
-    queryKey: ['recurring'],
-    queryFn: () => api.get<RecurringTransaction[]>('/recurring').then((r) => r.data),
+    queryKey: [QUERY_KEYS.RECURRING, params],
+    queryFn: () => api.get<RecurringTransaction[]>(`/recurring${qs}`).then((r) => r.data),
+    staleTime: LIVE_STALE,
+  });
+}
+
+export function useRecurringRuns(recurringId?: number) {
+  return useQuery({
+    queryKey: [QUERY_KEYS.RECURRING, 'runs', recurringId],
+    queryFn: () => api.get<any[]>(`/recurring/${recurringId}/runs`).then((r) => r.data),
+    enabled: !!recurringId,
+    staleTime: LIVE_STALE,
+  });
+}
+
+export function useApprovalTrail(transactionId?: number) {
+  return useQuery({
+    queryKey: [QUERY_KEYS.TRANSACTIONS, 'approval-trail', transactionId],
+    queryFn: () => api.get<any[]>(`/transactions/${transactionId}/approval-trail`).then((r) => r.data),
+    enabled: !!transactionId,
     staleTime: LIVE_STALE,
   });
 }
@@ -111,7 +152,7 @@ export function useRecurring() {
 // ─── Approvals ───────────────────────────────────
 export function useApprovals() {
   return useQuery({
-    queryKey: ['approvals'],
+    queryKey: [QUERY_KEYS.APPROVALS],
     queryFn: () => api.get<ApprovalRequest[]>('/approvals/pending').then((r) => r.data),
     staleTime: LIVE_STALE,
   });
@@ -119,7 +160,7 @@ export function useApprovals() {
 
 export function useApprovalsHistory(status?: string) {
   return useQuery({
-    queryKey: ['approvals-history', status],
+    queryKey: [QUERY_KEYS.APPROVALS_HISTORY, status],
     queryFn: () => {
       const qs = status ? `?status=${status}` : '';
       return api.get<ApprovalRequest[]>(`/approvals/history${qs}`).then((r) => r.data);
@@ -132,27 +173,70 @@ export function useApprovalsHistory(status?: string) {
 export function useAuditLogs(params?: Record<string, string>) {
   const qs = params ? '?' + new URLSearchParams(params).toString() : '';
   return useQuery({
-    queryKey: ['audit', params],
-    queryFn: () => api.get<AuditLog[]>(`/audit${qs}`).then((r) => r.data),
+    queryKey: [QUERY_KEYS.AUDIT, params],
+    queryFn: async () => {
+      const r = await api.get<AuditLog[]>(`/audit${qs}`);
+      return { rows: (r.data as any) ?? [], total: (r as any).meta?.total ?? 0, limit: (r as any).meta?.limit ?? 50 };
+    },
     staleTime: LIVE_STALE,
+  });
+}
+
+export function useAuditStats() {
+  return useQuery({
+    queryKey: [QUERY_KEYS.AUDIT, 'stats'],
+    queryFn: () => api.get<{ total: number; by_action: any[]; by_table: any[] }>('/audit/stats').then((r) => r.data),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// ─── Notifications ────────────────────────────────
+export function useNotifications(params?: Record<string, string>) {
+  const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+  return useQuery({
+    queryKey: [QUERY_KEYS.NOTIFICATIONS, params],
+    queryFn: async () => {
+      const r = await api.get<Notification[]>(`/notifications${qs}`);
+      // ResponseInterceptor puts rows into data and total/unread_count into meta
+      return { rows: (r.data as any) ?? [], total: (r as any).meta?.total ?? 0, unread_count: (r as any).meta?.unread_count ?? 0 };
+    },
+    enabled: !!getAccessToken(),
+    staleTime: LIVE_STALE,
+    refetchInterval: 60 * 1000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useUnreadCount() {
+  return useQuery({
+    queryKey: [QUERY_KEYS.NOTIFICATIONS, 'unread-count'],
+    queryFn: () => api.get<{ unread_count: number }>('/notifications/unread-count').then((r) => r.data),
+    enabled: !!getAccessToken(),
+    staleTime: 60 * 1000,
+    refetchInterval: 60 * 1000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
   });
 }
 
 // ─── Roles ───────────────────────────────────────
 export function useRoles() {
   return useQuery({
-    queryKey: ['roles'],
+    queryKey: [QUERY_KEYS.ROLES],
     queryFn: () => api.get<Role[]>('/roles').then((r) => r.data),
     staleTime: REF_STALE,
   });
 }
 
 // ─── Users ───────────────────────────────────────
+const USER_STALE = 2 * 60 * 1000; // 2 minutes — users change infrequently
+
 export function useUsers() {
   return useQuery({
-    queryKey: ['users'],
+    queryKey: [QUERY_KEYS.USERS],
     queryFn: () => api.get<import('@/lib/types').User[]>('/users').then((r) => r.data),
-    staleTime: LIVE_STALE,
+    staleTime: USER_STALE,
   });
 }
 
@@ -163,7 +247,7 @@ export function useDashboardSummary(dateFrom?: string, dateTo?: string) {
   if (dateTo) qs.set('dateTo', dateTo);
   const q = qs.toString() ? `?${qs.toString()}` : '';
   return useQuery({
-    queryKey: ['dashboard', 'summary', dateFrom, dateTo],
+    queryKey: [QUERY_KEYS.DASHBOARD, 'summary', dateFrom, dateTo],
     queryFn: () => api.get<DashboardSummary>(`/dashboard/summary${q}`).then((r) => r.data),
     staleTime: LIVE_STALE,
   });
@@ -175,7 +259,7 @@ export function useDashboardByCategory(dateFrom?: string, dateTo?: string) {
   if (dateTo) qs.set('dateTo', dateTo);
   const q = qs.toString() ? `?${qs.toString()}` : '';
   return useQuery({
-    queryKey: ['dashboard', 'by-category', dateFrom, dateTo],
+    queryKey: [QUERY_KEYS.DASHBOARD, 'by-category', dateFrom, dateTo],
     queryFn: () => api.get<CategoryBreakdown[]>(`/dashboard/by-category${q}`).then((r) => r.data),
     staleTime: LIVE_STALE,
   });
@@ -183,7 +267,7 @@ export function useDashboardByCategory(dateFrom?: string, dateTo?: string) {
 
 export function useMonthlyTrend() {
   return useQuery({
-    queryKey: ['dashboard', 'monthly-trend'],
+    queryKey: [QUERY_KEYS.DASHBOARD, 'monthly-trend'],
     queryFn: () => api.get<MonthlyTrend[]>('/dashboard/monthly-trend').then((r) => r.data),
     staleTime: LIVE_STALE,
   });
@@ -191,8 +275,110 @@ export function useMonthlyTrend() {
 
 export function useRecentTransactions() {
   return useQuery({
-    queryKey: ['dashboard', 'recent'],
+    queryKey: [QUERY_KEYS.DASHBOARD, 'recent'],
     queryFn: () => api.get<Transaction[]>('/dashboard/recent').then((r) => r.data),
+    staleTime: LIVE_STALE,
+  });
+}
+
+export function useBudgetUtilization() {
+  return useQuery({
+    queryKey: [QUERY_KEYS.DASHBOARD, 'budget-utilization'],
+    queryFn: () => api.get<any[]>('/dashboard/budget-utilization').then((r) => r.data),
+    staleTime: LIVE_STALE,
+  });
+}
+
+export function useApprovalCounts() {
+  return useQuery({
+    queryKey: [QUERY_KEYS.DASHBOARD, 'approval-counts'],
+    queryFn: () => api.get<any>('/dashboard/approval-counts').then((r) => r.data),
+    staleTime: LIVE_STALE,
+  });
+}
+
+export function useProjectSpend(dateFrom?: string, dateTo?: string) {
+  return useQuery({
+    queryKey: [QUERY_KEYS.DASHBOARD, 'project-spend', dateFrom, dateTo],
+    queryFn: () => api.get<any[]>(`/dashboard/project-spend${dateFrom ? `?dateFrom=${dateFrom}&dateTo=${dateTo}` : ''}`).then((r) => r.data),
+    staleTime: LIVE_STALE,
+  });
+}
+
+export function useTopSpenders(dateFrom?: string, dateTo?: string) {
+  const qs = new URLSearchParams();
+  if (dateFrom) qs.set('dateFrom', dateFrom);
+  if (dateTo)   qs.set('dateTo',   dateTo);
+  const q = qs.toString() ? `?${qs.toString()}` : '';
+  return useQuery({
+    queryKey: [QUERY_KEYS.ANALYTICS, 'top-spenders', dateFrom, dateTo],
+    queryFn: () => api.get<any[]>(`/dashboard/analytics/top-spenders${q}`).then((r) => r.data),
+    staleTime: LIVE_STALE,
+  });
+}
+
+export function useCategoryHeatmap(dateFrom?: string, dateTo?: string) {
+  const qs = new URLSearchParams();
+  if (dateFrom) qs.set('dateFrom', dateFrom);
+  if (dateTo)   qs.set('dateTo',   dateTo);
+  const q = qs.toString() ? `?${qs.toString()}` : '';
+  return useQuery({
+    queryKey: [QUERY_KEYS.ANALYTICS, 'category-heatmap', dateFrom, dateTo],
+    queryFn: () => api.get<any>(`/dashboard/analytics/category-heatmap${q}`).then((r) => r.data),
+    staleTime: LIVE_STALE,
+  });
+}
+
+export function useProjectBurn(dateFrom?: string, dateTo?: string) {
+  const qs = new URLSearchParams();
+  if (dateFrom) qs.set('dateFrom', dateFrom);
+  if (dateTo)   qs.set('dateTo',   dateTo);
+  const q = qs.toString() ? `?${qs.toString()}` : '';
+  return useQuery({
+    queryKey: [QUERY_KEYS.ANALYTICS, 'project-burn', dateFrom, dateTo],
+    queryFn: () => api.get<any[]>(`/dashboard/analytics/project-burn${q}`).then((r) => r.data),
+    staleTime: LIVE_STALE,
+  });
+}
+
+export function useProductBurn(dateFrom?: string, dateTo?: string) {
+  const qs = new URLSearchParams();
+  if (dateFrom) qs.set('dateFrom', dateFrom);
+  if (dateTo)   qs.set('dateTo',   dateTo);
+  const q = qs.toString() ? `?${qs.toString()}` : '';
+  return useQuery({
+    queryKey: [QUERY_KEYS.ANALYTICS, 'product-burn', dateFrom, dateTo],
+    queryFn: () => api.get<any[]>(`/dashboard/analytics/product-burn${q}`).then((r) => r.data),
+    staleTime: LIVE_STALE,
+  });
+}
+
+export function useReportData(type: string, params: Record<string, string>) {
+  const qs = new URLSearchParams({ type, ...params }).toString();
+  return useQuery({
+    queryKey: [QUERY_KEYS.REPORT, type, params],
+    queryFn: () => api.get<any>(`/reporting/generate?${qs}`).then((r) => r.data),
+    enabled: false,
+    staleTime: 0,
+  });
+}
+
+// ─── Transaction Notes ───────────────────────────
+export function useTransactionNotes(transactionId?: number) {
+  return useQuery({
+    queryKey: [QUERY_KEYS.TRANSACTIONS, 'notes', transactionId],
+    queryFn: () => api.get<any[]>(`/transactions/${transactionId}/notes`).then((r) => r.data),
+    enabled: !!transactionId,
+    staleTime: LIVE_STALE,
+  });
+}
+
+// ─── Reimbursements ──────────────────────────────
+export function useReimbursementQueue(params?: Record<string, string>) {
+  const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+  return useQuery({
+    queryKey: [QUERY_KEYS.REIMBURSEMENTS, params],
+    queryFn: () => api.get<any[]>(`/transactions/reimbursements${qs}`).then((r) => r.data),
     staleTime: LIVE_STALE,
   });
 }

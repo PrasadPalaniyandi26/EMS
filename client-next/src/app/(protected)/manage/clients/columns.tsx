@@ -8,7 +8,7 @@ export const columns: ColumnDef<Client>[] = [
     accessorKey: "code",
     header: "ID",
     cell: ({ row }) => (
-      <span className="font-mono text-[12px] text-juniper font-bold">
+      <span className="font-mono text-[12px] text-blue-400 font-bold">
         {(row.original as any).code || `CL-XX-${1000 + row.original.id}`}
       </span>
     ),
@@ -21,10 +21,10 @@ export const columns: ColumnDef<Client>[] = [
       const name = row.getValue("name") as string;
       return (
         <div className="flex items-center gap-3">
-          <div className="w-6 h-6 bg-juniper/20 rounded flex items-center justify-center font-bold text-[9px] text-juniper border border-juniper/20">
+          <div className="w-6 h-6 bg-[var(--shell-hover)] rounded flex items-center justify-center font-bold text-[9px] text-[var(--shell-text)] border border-[var(--shell-border)] shrink-0">
             {name.substring(0, 2).toUpperCase()}
           </div>
-          <span className="font-bold text-[12px] text-charcoal">{name}</span>
+          <span className="font-bold text-[12px] text-black dark:text-white">{name}</span>
         </div>
       );
     },
@@ -33,7 +33,7 @@ export const columns: ColumnDef<Client>[] = [
     accessorKey: "business_type",
     header: "Industry",
     cell: ({ row }) => (
-      <span className="text-[12px] text-charcoal">
+      <span className="text-[12px] text-[var(--shell-text)]">
         {row.getValue("business_type") || "—"}
       </span>
     ),
@@ -42,7 +42,7 @@ export const columns: ColumnDef<Client>[] = [
     accessorKey: "contact_name",
     header: "Contact",
     cell: ({ row }) => (
-      <span className="text-[12px] text-charcoal">
+      <span className="text-[12px] text-[var(--shell-text)]">
         {row.getValue("contact_name") || "—"}
       </span>
     ),
@@ -51,7 +51,7 @@ export const columns: ColumnDef<Client>[] = [
     id: "country",
     header: "Country",
     cell: ({ row }) => (
-      <span className="text-[12px] text-charcoal">
+      <span className="text-[12px] text-[var(--shell-text)]">
         {(row.original as any).country || "—"}
       </span>
     ),
@@ -62,11 +62,9 @@ export const columns: ColumnDef<Client>[] = [
     cell: ({ row }) => {
       const isActive = row.getValue("is_active") === 1;
       return (
-        <div className="flex justify-center">
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${isActive ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-            {isActive ? 'Active' : 'Inactive'}
-          </span>
-        </div>
+        <span className={`text-[12px] font-semibold ${isActive ? 'text-emerald-500' : 'text-[var(--shell-text-muted)]'}`}>
+          {isActive ? 'Active' : 'Inactive'}
+        </span>
       );
     },
   },

@@ -64,7 +64,7 @@ export class ClientsService {
       const cc = this.countryCode(country);
       const seq = 1000 + c.id;
       const code = `CL-${cc}-${seq}`;
-      await this.prisma.$executeRawUnsafe(`UPDATE clients SET code=$1 WHERE id=$2`, code, c.id);
+      await this.prisma.client.update({ where: { id: c.id }, data: { code } });
       return this.findById(c.id);
     } catch (error) {
       this.logger.error('Error creating client', error?.stack ?? error);

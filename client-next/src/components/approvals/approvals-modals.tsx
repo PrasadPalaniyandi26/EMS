@@ -1,32 +1,23 @@
 'use client';
 
 import React from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import {
   CheckCircle2,
   XCircle,
-  X,
   MessageSquare,
   BellRing,
   Settings,
-  UserSearch,
-  AlertTriangle,
   FileText,
-  PauseCircle,
-  History,
-  ShieldCheck,
   CornerUpLeft,
+  Wallet,
+  Ban,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/currency';
+import { ModuleModal } from '@/components/shared/module/module-modal';
+import { useAuthStore } from '@/stores/auth-store';
 
 interface ModalProps {
   isOpen: boolean;
@@ -36,318 +27,428 @@ interface ModalProps {
 }
 
 export function ApproveModal({ isOpen, onClose, onConfirm, selectedRequest }: ModalProps) {
+  const currency = useAuthStore((s) => s.user?.currency || 'INR');
   const [comment, setComment] = React.useState('');
   const [notify, setNotify] = React.useState(true);
+  const [isClaimable, setIsClaimable] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+
+  // Sync isClaimable whenever modal opens or selected request changes — prevents stale init value
+  React.useEffect(() => {
+    if (isOpen) {
+      setIsClaimable(selectedRequest?.is_claimable ?? false);
+      setComment('');
+      setNotify(true);
+      setSaving(false);
+    }
+  }, [isOpen, selectedRequest?.id]);
 
   if (!selectedRequest) return null;
 
+  const handleConfirm = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await onConfirm({ comment, notify, isClaimable });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[540px] p-0 overflow-hidden bg-sharp-white border-none shadow-[0_32px_64px_-12px_rgba(0,0,0,0.2)]">
-        <DialogHeader className="px-6 py-5 border-b border-casper/30 flex-row items-center justify-between space-y-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center border border-green-200">
-              <ShieldCheck className="w-5 h-5 text-green-600" />
-            </div>
-            <div>
-              <DialogTitle className="text-[16px] font-bold text-charcoal tracking-tight">Approve Expense Request</DialogTitle>
-              <DialogDescription className="text-[11px] text-juniper font-semibold uppercase tracking-wider">Final Authorization Required</DialogDescription>
-            </div>
-          </div>
-          <button onClick={onClose} className="text-casper hover:text-charcoal transition-colors">
-            <X size={20} />
-          </button>
-        </DialogHeader>
-
-        <div className="p-6 space-y-6">
-          <div className="rounded-lg border border-casper/40 bg-white/50 overflow-hidden">
-            <table className="w-full text-[12px]">
-              <thead className="bg-mystic/40 border-b border-casper/40 text-juniper font-bold uppercase tracking-tighter">
-                <tr>
-                  <th className="px-4 py-2 text-left">Code</th>
-                  <th className="px-4 py-2 text-left">Employee</th>
-                  <th className="px-4 py-2 text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b border-casper/20">
-                  <td className="px-4 py-3 font-bold text-charcoal">{selectedRequest.code || `#${selectedRequest.id}`}</td>
-                  <td className="px-4 py-3 font-medium text-charcoal">{selectedRequest.submitted_by_name || 'Alex Thompson'}</td>
-                  <td className="px-4 py-3 text-right font-bold text-charcoal">{formatCurrency(selectedRequest.amount, 'INR')}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-[11px] font-bold text-juniper uppercase tracking-widest flex items-center gap-2">
-              <MessageSquare size={14} /> Approval Comments (Optional)
-            </label>
-            <Textarea 
-              className="w-full h-24 p-3 bg-white border border-casper/60 rounded-lg text-[13px] placeholder:text-casper focus:ring-1 focus:ring-juniper focus:border-juniper resize-none" 
-              placeholder="Enter any notes or justification for this approval..."
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-            />
-          </div>
-
-          <div className="flex items-center justify-between bg-mystic/20 p-4 rounded-xl border border-casper/30">
-            <div className="flex items-center gap-3">
-              <BellRing className="text-juniper" size={20} />
-              <div>
-                <p className="text-[12px] font-bold text-charcoal">Notify Employee upon Approval</p>
-                <p className="text-[10px] text-juniper/70 font-medium">Automatic email will be sent to {selectedRequest.submitted_by_name || 'Alex Thompson'}</p>
-              </div>
-            </div>
-            <Switch checked={notify} onCheckedChange={setNotify} />
-          </div>
-        </div>
-
-        <div className="px-6 py-5 bg-mystic/30 border-t border-casper/30 flex items-center justify-end gap-3 font-sans">
-          <button 
+    <ModuleModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Approve Expense Request"
+      icon={<CheckCircle2 className="w-4 h-4" />}
+      maxWidth="sm:max-w-[540px]"
+      footer={
+        <>
+          <Button
+            variant="ghost"
             onClick={onClose}
-            className="px-6 py-2.5 bg-transparent text-[12px] font-bold text-juniper uppercase tracking-widest hover:bg-white/50 rounded-lg transition-all"
+            disabled={saving}
+            className="h-8 px-4 text-[11.5px] font-medium"
+            style={{ color: 'var(--shell-text-muted)' }}
           >
             Cancel
-          </button>
-          <button 
-            onClick={() => onConfirm({ comment, notify })}
-            className="px-8 py-2.5 bg-juniper text-pure-white text-[12px] font-bold uppercase tracking-widest rounded-lg shadow-lg shadow-juniper/20 hover:brightness-110 active:scale-95 transition-all"
+          </Button>
+          <button
+            onClick={handleConfirm}
+            disabled={saving}
+            className="px-8 py-2.5 btn-action-primary border border-[var(--shell-border)] text-[var(--shell-text)] text-[12px] font-bold uppercase tracking-widest rounded-lg shadow-none active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
           >
+            {saving && <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin inline-block" />}
             Confirm Approval
           </button>
+        </>
+      }
+    >
+      <div className="space-y-6">
+        <div className={`rounded-lg border overflow-x-auto ${selectedRequest.needs_reimbursement ? 'border-amber-400/40 bg-amber-500/5' : 'border-[var(--shell-border)] modal-section'}`}>
+          {selectedRequest.needs_reimbursement && (
+            <div className="flex items-center gap-2 px-4 py-2 border-b border-amber-400/30 bg-amber-500/10">
+              <Wallet className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Reimbursement Required — Employee paid out-of-pocket</span>
+            </div>
+          )}
+          <table className="w-full text-[12px]">
+            <thead className={`border-b font-bold uppercase tracking-tighter ${selectedRequest.needs_reimbursement ? 'border-amber-400/30 text-amber-600' : 'modal-section border-[var(--shell-border)] modal-label'}`}>
+              <tr>
+                <th className="px-4 py-2 text-left">Reference ID</th>
+                <th className="px-4 py-2 text-left">Employee</th>
+                <th className="px-4 py-2 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className={`border-b ${selectedRequest.needs_reimbursement ? 'border-amber-400/20' : 'border-[var(--shell-border)]'}`}>
+                <td className="px-4 py-3 font-bold font-mono text-blue-400">{selectedRequest.code || `#${selectedRequest.id}`}</td>
+                <td className="px-4 py-3 font-medium" style={{ color: 'var(--shell-text)' }}>{selectedRequest.submitted_by_name || '—'}</td>
+                <td className="px-4 py-3 text-right font-bold" style={{ color: 'var(--shell-text)' }}>{formatCurrency(selectedRequest.amount, currency)}</td>
+              </tr>
+              {selectedRequest.description && (
+                <tr>
+                  <td colSpan={3} className="px-4 py-2.5">
+                    <p className="text-[10px] font-bold modal-label uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                      <FileText size={11} /> Internal Notes
+                    </p>
+                    <p className="text-[12px]" style={{ color: 'var(--shell-text)' }}>{selectedRequest.description}</p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      </DialogContent>
-    </Dialog>
+
+        <div className="space-y-2">
+          <label className="text-[11px] font-bold modal-label uppercase tracking-widest flex items-center gap-2">
+            <MessageSquare size={14} /> Approval Comments (Optional)
+          </label>
+          <Textarea
+            className="w-full h-24 p-3 modal-input border border-[var(--shell-border)] rounded-lg text-[13px] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[var(--shell-accent)]/50 focus:border-[var(--shell-accent)]/50 resize-none"
+            placeholder="Enter any notes or justification for this approval..."
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+          />
+        </div>
+
+        {selectedRequest.gst_rate != null && (
+          <div className="flex items-center justify-between modal-section p-4 rounded-xl border border-[var(--shell-border)]">
+            <div className="flex items-center gap-3">
+              <Settings className="text-emerald-500" size={20} />
+              <div>
+                <p className="text-[12px] font-bold" style={{ color: 'var(--shell-text)' }}>Is Claimable?</p>
+                <p className="text-[10px] text-[var(--shell-text-muted)] font-medium">GST ({selectedRequest.gst_rate}%) can be claimed back from Government</p>
+              </div>
+            </div>
+            <Switch checked={isClaimable} onCheckedChange={setIsClaimable} />
+          </div>
+        )}
+
+        {selectedRequest.needs_reimbursement && (
+          <div className="flex items-center justify-between modal-section p-4 rounded-xl border border-amber-400/30 bg-amber-500/5">
+            <div className="flex items-center gap-3">
+              <Wallet className="text-amber-500" size={20} />
+              <div>
+                <p className="text-[12px] font-bold" style={{ color: 'var(--shell-text)' }}>Reimbursement Requested</p>
+                <p className="text-[10px] text-[var(--shell-text-muted)] font-medium">Employee paid out-of-pocket and needs to be reimbursed</p>
+              </div>
+            </div>
+            <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider px-2 py-1 bg-amber-500/10 rounded">Pending</span>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between modal-section p-4 rounded-xl border border-[var(--shell-border)]">
+          <div className="flex items-center gap-3">
+            <BellRing className="text-[var(--shell-accent)]" size={20} />
+            <div>
+              <p className="text-[12px] font-bold" style={{ color: 'var(--shell-text)' }}>Notify Employee upon Approval</p>
+              <p className="text-[10px] text-[var(--shell-text-muted)] font-medium">Automatic email will be sent to {selectedRequest.submitted_by_name || '—'}</p>
+            </div>
+          </div>
+          <Switch checked={notify} onCheckedChange={setNotify} />
+        </div>
+      </div>
+    </ModuleModal>
   );
 }
 
 export function RejectModal({ isOpen, onClose, onConfirm, selectedRequest }: ModalProps) {
+  const currency = useAuthStore((s) => s.user?.currency || 'INR');
   const [comment, setComment] = React.useState('');
+  const [error, setError] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+
+  React.useEffect(() => {
+    if (isOpen) { setComment(''); setError(''); setSaving(false); }
+  }, [isOpen]);
 
   if (!selectedRequest) return null;
 
+  const handleConfirm = async () => {
+    if (!comment.trim()) { setError('Rejection reason is required.'); return; }
+    if (saving) return;
+    setSaving(true);
+    try {
+      await onConfirm({ comment });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[540px] p-0 overflow-hidden bg-sharp-white border-none shadow-[0_32px_64px_-12px_rgba(0,0,0,0.2)]">
-        <DialogHeader className="px-6 py-5 border-b border-casper/30 flex-row items-center justify-between space-y-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center border border-rose-200">
-              <XCircle className="w-5 h-5 text-rose-600" />
-            </div>
-            <div>
-              <DialogTitle className="text-[16px] font-bold text-charcoal tracking-tight">Reject Expense Request</DialogTitle>
-              <DialogDescription className="text-[11px] text-rose-600 font-semibold uppercase tracking-wider">Reason for Rejection Required</DialogDescription>
-            </div>
-          </div>
-          <button onClick={onClose} className="text-casper hover:text-charcoal transition-colors">
-            <X size={20} />
-          </button>
-        </DialogHeader>
-
-        <div className="p-6 space-y-6">
-          <div className="rounded-lg border border-casper/40 bg-white/50 overflow-hidden">
-            <table className="w-full text-[12px]">
-              <thead className="bg-mystic/40 border-b border-casper/40 text-juniper font-bold uppercase tracking-tighter">
-                <tr>
-                  <th className="px-4 py-2 text-left">Code</th>
-                  <th className="px-4 py-2 text-left">Employee</th>
-                  <th className="px-4 py-2 text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b border-casper/20">
-                  <td className="px-4 py-3 font-bold text-charcoal">{selectedRequest.code || `#${selectedRequest.id}`}</td>
-                  <td className="px-4 py-3 font-medium text-charcoal">{selectedRequest.submitted_by_name || 'Alex Thompson'}</td>
-                  <td className="px-4 py-3 text-right font-bold text-charcoal">{formatCurrency(selectedRequest.amount, 'INR')}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-[11px] font-bold text-juniper uppercase tracking-widest flex items-center gap-2">
-              <MessageSquare size={14} /> Rejection Reason
-            </label>
-            <Textarea 
-              className="w-full h-24 p-3 bg-white border border-casper/60 rounded-lg text-[13px] placeholder:text-casper focus:ring-1 focus:ring-rose-500 focus:border-rose-500 resize-none" 
-              placeholder="Provide a detailed reason for rejecting this request..."
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="px-6 py-5 bg-rose-50/30 border-t border-rose-100 flex items-center justify-end gap-3 font-sans">
-          <button 
+    <ModuleModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Reject Expense Request"
+      icon={<XCircle className="w-4 h-4" />}
+      isDestructive={true}
+      maxWidth="sm:max-w-[540px]"
+      footer={
+        <>
+          <Button
+            variant="ghost"
             onClick={onClose}
-            className="px-6 py-2.5 bg-transparent text-[12px] font-bold text-juniper uppercase tracking-widest hover:bg-white/50 rounded-lg transition-all"
+            disabled={saving}
+            className="h-8 px-4 text-[11.5px] font-medium"
+            style={{ color: 'var(--shell-text-muted)' }}
           >
             Cancel
-          </button>
-          <button 
-            onClick={() => onConfirm({ comment })}
-            className="px-8 py-2.5 bg-rose-600 text-pure-white text-[12px] font-bold uppercase tracking-widest rounded-lg shadow-lg shadow-rose-600/20 hover:brightness-110 active:scale-95 transition-all"
+          </Button>
+          <button
+            onClick={handleConfirm}
+            disabled={saving}
+            className="px-8 py-2.5 bg-red-600 text-white text-[12px] font-bold uppercase tracking-widest rounded-lg hover:brightness-110 active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
           >
+            {saving && <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />}
             Confirm Rejection
           </button>
+        </>
+      }
+    >
+      <div className="space-y-6">
+        <div className="rounded-lg border border-[var(--shell-border)] modal-section overflow-x-auto">
+          <table className="w-full text-[12px]">
+            <thead className="modal-section border-b border-[var(--shell-border)] modal-label font-bold uppercase tracking-tighter">
+              <tr>
+                <th className="px-4 py-2 text-left">Reference ID</th>
+                <th className="px-4 py-2 text-left">Employee</th>
+                <th className="px-4 py-2 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b border-[var(--shell-border)]">
+                <td className="px-4 py-3 font-bold font-mono text-blue-400">{selectedRequest.code || `#${selectedRequest.id}`}</td>
+                <td className="px-4 py-3 font-medium" style={{ color: 'var(--shell-text)' }}>{selectedRequest.submitted_by_name || '—'}</td>
+                <td className="px-4 py-3 text-right font-bold" style={{ color: 'var(--shell-text)' }}>{formatCurrency(selectedRequest.amount, currency)}</td>
+              </tr>
+              {selectedRequest.description && (
+                <tr>
+                  <td colSpan={3} className="px-4 py-2.5">
+                    <p className="text-[10px] font-bold modal-label uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                      <FileText size={11} /> Internal Notes
+                    </p>
+                    <p className="text-[12px]" style={{ color: 'var(--shell-text)' }}>{selectedRequest.description}</p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      </DialogContent>
-    </Dialog>
+
+        <div className="space-y-2">
+          <label className="text-[11px] font-bold modal-label uppercase tracking-widest flex items-center gap-2">
+            <MessageSquare size={14} /> Rejection Reason <span className="text-red-500">*</span>
+          </label>
+          <Textarea
+            className={`w-full h-24 p-3 modal-input border rounded-lg text-[13px] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[var(--shell-accent)]/50 focus:border-[var(--shell-accent)]/50 resize-none ${error ? 'border-red-500' : 'border-[var(--shell-border)]'}`}
+            placeholder="Provide a detailed reason for rejecting this request..."
+            value={comment}
+            onChange={(e) => { setComment(e.target.value); if (e.target.value.trim()) setError(''); }}
+          />
+          {error && <p className="text-[11px] text-red-500 font-medium">{error}</p>}
+        </div>
+      </div>
+    </ModuleModal>
+  );
+}
+
+export function VoidModal({ isOpen, onClose, onConfirm, selectedRequest }: ModalProps) {
+  const currency = useAuthStore((s) => s.user?.currency || 'INR');
+  const [reason, setReason] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+
+  React.useEffect(() => { if (isOpen) { setReason(''); setSaving(false); } }, [isOpen]);
+
+  if (!selectedRequest) return null;
+
+  const handleConfirm = async () => {
+    if (saving) return;
+    setSaving(true);
+    try { await onConfirm({ reason }); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <ModuleModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Void Transaction"
+      icon={<Ban className="w-4 h-4" />}
+      isDestructive
+      maxWidth="sm:max-w-[540px]"
+      footer={
+        <>
+          <Button
+            variant="ghost"
+            onClick={onClose}
+            className="h-8 px-4 text-[11.5px] font-medium"
+            style={{ color: 'var(--shell-text-muted)' }}
+          >
+            Cancel
+          </Button>
+          <button
+            onClick={handleConfirm}
+            disabled={saving}
+            className="px-8 py-2.5 bg-red-600 text-white text-[12px] font-bold uppercase tracking-widest rounded-lg shadow-lg shadow-red-600/20 hover:brightness-110 active:scale-95 transition-all disabled:opacity-50"
+          >
+            {saving ? 'Voiding...' : 'Confirm Void'}
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-6">
+        <div className="rounded-lg border border-[var(--shell-border)] modal-section overflow-x-auto">
+          <table className="w-full text-[12px]">
+            <thead className="modal-section border-b border-[var(--shell-border)] modal-label font-bold uppercase tracking-tighter">
+              <tr>
+                <th className="px-4 py-2 text-left">Reference ID</th>
+                <th className="px-4 py-2 text-left">Employee</th>
+                <th className="px-4 py-2 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b border-[var(--shell-border)]">
+                <td className="px-4 py-3 font-bold font-mono text-blue-400">{selectedRequest.code || `#${selectedRequest.transaction_id}`}</td>
+                <td className="px-4 py-3 font-medium" style={{ color: 'var(--shell-text)' }}>{selectedRequest.submitted_by_name || '—'}</td>
+                <td className="px-4 py-3 text-right font-bold" style={{ color: 'var(--shell-text)' }}>{formatCurrency(selectedRequest.amount, currency)}</td>
+              </tr>
+              {selectedRequest.description && (
+                <tr>
+                  <td colSpan={3} className="px-4 py-2.5">
+                    <p className="text-[10px] font-bold modal-label uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                      <FileText size={11} /> Internal Notes
+                    </p>
+                    <p className="text-[12px]" style={{ color: 'var(--shell-text)' }}>{selectedRequest.description}</p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-[11px] font-bold modal-label uppercase tracking-widest flex items-center gap-2">
+            <MessageSquare size={14} /> Reason for Voiding (optional)
+          </label>
+          <Textarea
+            className="w-full h-24 p-3 modal-input border border-[var(--shell-border)] rounded-lg text-[13px] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-red-500/50 focus:border-red-500/50 resize-none"
+            placeholder="Explain why this approved transaction is being voided..."
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+          />
+        </div>
+
+        <div className="p-3 bg-red-500/10 border border-red-400/20 rounded-xl text-[11px] text-red-500 dark:text-red-400 font-medium">
+          The transaction will be marked <strong>VOIDED</strong>. The record is kept for audit purposes but will be excluded from reports and balances.
+        </div>
+      </div>
+    </ModuleModal>
   );
 }
 
 export function SendBackModal({ isOpen, onClose, onConfirm, selectedRequest }: ModalProps) {
+  const currency = useAuthStore((s) => s.user?.currency || 'INR');
   const [comment, setComment] = React.useState('');
+
+  React.useEffect(() => { if (isOpen) setComment(''); }, [isOpen]);
 
   if (!selectedRequest) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[540px] p-0 overflow-hidden bg-sharp-white border-none shadow-[0_32px_64px_-12px_rgba(0,0,0,0.2)]">
-        <DialogHeader className="px-6 py-5 border-b border-casper/30 flex-row items-center justify-between space-y-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center border border-blue-200">
-              <CornerUpLeft className="w-5 h-5 text-blue-600" />
-            </div>
-            <div>
-              <DialogTitle className="text-[16px] font-bold text-charcoal tracking-tight">Send Back to Employee</DialogTitle>
-              <DialogDescription className="text-[11px] text-blue-600 font-semibold uppercase tracking-wider">Return for Revision</DialogDescription>
-            </div>
-          </div>
-          <button onClick={onClose} className="text-casper hover:text-charcoal transition-colors">
-            <X size={20} />
-          </button>
-        </DialogHeader>
-
-        <div className="p-6 space-y-6">
-          <div className="rounded-lg border border-casper/40 bg-white/50 overflow-hidden">
-            <table className="w-full text-[12px]">
-              <thead className="bg-mystic/40 border-b border-casper/40 text-juniper font-bold uppercase tracking-tighter">
-                <tr>
-                  <th className="px-4 py-2 text-left">Code</th>
-                  <th className="px-4 py-2 text-left">Employee</th>
-                  <th className="px-4 py-2 text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b border-casper/20">
-                  <td className="px-4 py-3 font-bold text-charcoal">{selectedRequest.code || `#${selectedRequest.id}`}</td>
-                  <td className="px-4 py-3 font-medium text-charcoal">{selectedRequest.submitted_by_name || '—'}</td>
-                  <td className="px-4 py-3 text-right font-bold text-charcoal">{formatCurrency(selectedRequest.amount, 'INR')}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-[11px] font-bold text-juniper uppercase tracking-widest flex items-center gap-2">
-              <MessageSquare size={14} /> Reason for Sending Back
-            </label>
-            <Textarea
-              className="w-full h-24 p-3 bg-white border border-casper/60 rounded-lg text-[13px] placeholder:text-casper focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-none"
-              placeholder="Explain what the employee needs to correct or provide..."
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-            />
-          </div>
-
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-[11px] text-blue-700 font-medium">
-            The expense will return to <strong>DRAFT</strong> status and the employee can edit and resubmit it.
-          </div>
-        </div>
-
-        <div className="px-6 py-5 bg-mystic/30 border-t border-casper/30 flex items-center justify-end gap-3 font-sans">
-          <button
+    <ModuleModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Send Back to Employee"
+      icon={<CornerUpLeft className="w-4 h-4" />}
+      headerBg="bg-blue-600/80"
+      maxWidth="sm:max-w-[540px]"
+      footer={
+        <>
+          <Button
+            variant="ghost"
             onClick={onClose}
-            className="px-6 py-2.5 bg-transparent text-[12px] font-bold text-juniper uppercase tracking-widest hover:bg-white/50 rounded-lg transition-all"
+            className="h-8 px-4 text-[11.5px] font-medium"
+            style={{ color: 'var(--shell-text-muted)' }}
           >
             Cancel
-          </button>
+          </Button>
           <button
             onClick={() => onConfirm({ comment })}
-            className="px-8 py-2.5 bg-blue-600 text-pure-white text-[12px] font-bold uppercase tracking-widest rounded-lg shadow-lg shadow-blue-600/20 hover:brightness-110 active:scale-95 transition-all"
+            className="px-8 py-2.5 bg-blue-600 text-white text-[12px] font-bold uppercase tracking-widest rounded-lg shadow-lg shadow-blue-600/20 hover:brightness-110 active:scale-95 transition-all"
           >
             Send Back
           </button>
+        </>
+      }
+    >
+      <div className="space-y-6">
+        <div className="rounded-lg border border-[var(--shell-border)] modal-section overflow-x-auto">
+          <table className="w-full text-[12px]">
+            <thead className="modal-section border-b border-[var(--shell-border)] modal-label font-bold uppercase tracking-tighter">
+              <tr>
+                <th className="px-4 py-2 text-left">Reference ID</th>
+                <th className="px-4 py-2 text-left">Employee</th>
+                <th className="px-4 py-2 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b border-[var(--shell-border)]">
+                <td className="px-4 py-3 font-bold font-mono text-blue-400">{selectedRequest.code || `#${selectedRequest.id}`}</td>
+                <td className="px-4 py-3 font-medium" style={{ color: 'var(--shell-text)' }}>{selectedRequest.submitted_by_name || '—'}</td>
+                <td className="px-4 py-3 text-right font-bold" style={{ color: 'var(--shell-text)' }}>{formatCurrency(selectedRequest.amount, currency)}</td>
+              </tr>
+              {selectedRequest.description && (
+                <tr>
+                  <td colSpan={3} className="px-4 py-2.5">
+                    <p className="text-[10px] font-bold modal-label uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                      <FileText size={11} /> Internal Notes
+                    </p>
+                    <p className="text-[12px]" style={{ color: 'var(--shell-text)' }}>{selectedRequest.description}</p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      </DialogContent>
-    </Dialog>
+
+        <div className="space-y-2">
+          <label className="text-[11px] font-bold modal-label uppercase tracking-widest flex items-center gap-2">
+            <MessageSquare size={14} /> Reason for Sending Back
+          </label>
+          <Textarea
+            className="w-full h-24 p-3 modal-input border border-[var(--shell-border)] rounded-lg text-[13px] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[var(--shell-accent)]/50 focus:border-[var(--shell-accent)]/50 resize-none"
+            placeholder="Explain what the employee needs to correct or provide..."
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+          />
+        </div>
+
+        <div className="p-3 bg-blue-500/10 border border-blue-400/20 rounded-xl text-[11px] text-blue-600 dark:text-blue-300 font-medium">
+          The expense will return to <strong>DRAFT</strong> status and the employee can edit and resubmit it.
+        </div>
+      </div>
+    </ModuleModal>
   );
 }
 
-export function MoreActionsModal({ isOpen, onClose, onConfirm, selectedRequest }: ModalProps) {
-  if (!selectedRequest) return null;
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[576px] p-0 overflow-hidden bg-sharp-white border-none shadow-[0_32px_64px_-12px_rgba(0,0,0,0.2)] animate-in fade-in zoom-in duration-300">
-        <DialogHeader className="px-8 py-6 flex-row items-center justify-between border-b border-casper/20 space-y-0">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-lg bg-juniper/10 flex items-center justify-center text-juniper">
-              <Settings className="w-6 h-6" />
-            </div>
-            <div>
-              <DialogTitle className="text-[16px] font-bold text-charcoal tracking-tight">Additional Approval Actions</DialogTitle>
-              <DialogDescription className="text-[11px] text-juniper/70 font-medium uppercase tracking-wider">
-                Request: {selectedRequest.code || `#${selectedRequest.id}`} • {selectedRequest.submitted_by_name || 'Alex Thompson'}
-              </DialogDescription>
-            </div>
-          </div>
-          <button onClick={onClose} className="text-casper hover:text-juniper transition-colors">
-            <X size={20} />
-          </button>
-        </DialogHeader>
-
-        <div className="p-8 grid grid-cols-2 gap-4">
-          <div className="col-span-2 group">
-            <label className="block text-[10px] font-bold text-juniper uppercase tracking-[0.1em] mb-3">Reassign Approver</label>
-            <div className="relative">
-              <UserSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-500 w-5 h-5" />
-              <Select>
-                <SelectTrigger className="w-full pl-12 pr-4 py-3.5 h-12 bg-white border border-casper/40 rounded-xl text-[13px] font-medium text-charcoal focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none cursor-pointer">
-                  <SelectValue placeholder="Pick a new manager..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="marcus">Marcus Aurelius (Director)</SelectItem>
-                  <SelectItem value="jane">Jane Doe (VP Finance)</SelectItem>
-                  <SelectItem value="robert">Robert Chen (Department Lead)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {[
-            { id: 'flag', title: 'Flag for Audit', desc: 'Notify compliance team for high-priority review.', icon: AlertTriangle, color: 'yellow' },
-            { id: 'docs', title: 'Request Docs', desc: 'Notify employee to upload additional receipts.', icon: FileText, color: 'cyan' },
-            { id: 'hold', title: 'Hold for Review', desc: 'Pause this request in the current queue.', icon: PauseCircle, color: 'amber' },
-            { id: 'history', title: 'Action History', desc: 'View full audit log of all manual modifications.', icon: History, color: 'juniper' },
-          ].map((action) => (
-            <button 
-              key={action.id}
-              onClick={() => onConfirm(action.id)}
-              className="flex items-start gap-4 p-5 bg-white border border-casper/40 rounded-xl hover:border-juniper/50 hover:bg-mystic/30 transition-all text-left group"
-            >
-              <div className={`w-12 h-12 rounded-xl bg-${action.color}-100 flex items-center justify-center text-${action.color}-600 shrink-0 group-hover:scale-110 transition-transform ${action.color === 'juniper' ? 'bg-mystic text-juniper' : ''}`}>
-                <action.icon className="w-7 h-7" />
-              </div>
-              <div>
-                <p className="text-[13px] font-bold text-charcoal mb-1">{action.title}</p>
-                <p className="text-[11px] text-charcoal/60 leading-tight">{action.desc}</p>
-              </div>
-            </button>
-          ))}
-        </div>
-
-        <div className="px-8 py-6 bg-mystic/20 border-t border-casper/20 flex justify-end">
-          <button 
-            onClick={onClose}
-            className="px-8 py-3 rounded-xl text-[12px] font-bold uppercase tracking-widest text-juniper hover:bg-white transition-all border border-transparent hover:border-casper/50"
-          >
-            Cancel
-          </button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}

@@ -26,8 +26,9 @@ export class ApprovalsController {
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('id') userId: number,
     @Body('comments') comments?: string,
+    @Body('isClaimable') isClaimable?: boolean,
   ) {
-    return this.service.approve(id, userId, comments);
+    return this.service.approve(id, userId, comments, isClaimable);
   }
 
   @Post(':id/reject')

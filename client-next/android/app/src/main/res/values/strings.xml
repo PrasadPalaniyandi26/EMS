@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">NTEMS</string>
+    <string name="title_activity_main">NTEMS</string>
+    <string name="package_name">com.ntems.ems</string>
+    <string name="custom_url_scheme">com.ntems.ems</string>
+</resources>

@@ -19,7 +19,6 @@ export class RolesGuard implements CanActivate {
     const { user } = context.switchToHttp().getRequest();
     const userRoleName = (user?.role_name || '').toLowerCase();
     const userLegacyRole = (user?.role || '').toLowerCase();
-    // Case-insensitive check — decorator uses 'admin', DB role_name is 'Admin'
     return requiredRoles.some((r) => r.toLowerCase() === userRoleName || r.toLowerCase() === userLegacyRole);
   }
 }

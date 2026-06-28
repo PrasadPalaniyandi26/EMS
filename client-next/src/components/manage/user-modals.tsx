@@ -6,15 +6,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  X, Shield, Search, PlusCircle, Save, Trash2, Send, Eye, EyeOff, Check, Plus,
-  RefreshCw, Star, History, ShieldCheck, Lock,
+  Search, PlusCircle, Trash2, Eye, EyeOff, Check, Plus, Pencil,
+  RefreshCw, Star, ShieldCheck,
 } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useClients, useProjects, useProducts, useProjectTypes, useProductTypes } from '@/hooks/use-queries';
 import api from '@/lib/api-client';
 import { COUNTRY_LIST } from './client-modals';
+import { ModuleModal } from '@/components/shared/module/module-modal';
+import { EmailInput, PhoneInput, CurrencyInput, isValidEmail, isValidPhone } from '@/components/shared/modal-primitives';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -34,56 +35,21 @@ function getEmployeeId(userId?: number): string {
 
 const ROLE_COLORS: Record<string, { dot: string; label: string }> = {
   admin:    { dot: 'bg-red-500',     label: 'bg-red-100 text-red-700 border-red-200' },
-  finance:  { dot: 'bg-emerald-500', label: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+  finance:  { dot: 'bg-[var(--shell-accent)]', label: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
   manager:  { dot: 'bg-orange-500',  label: 'bg-orange-100 text-orange-700 border-orange-200' },
   employee: { dot: 'bg-blue-500',    label: 'bg-blue-100 text-blue-600 border-blue-200' },
 };
 
 function roleColor(name?: string) {
-  return ROLE_COLORS[(name || '').toLowerCase()] || { dot: 'bg-slate-400', label: 'bg-slate-100 text-slate-600 border-slate-200' };
-}
-
-// ─── Standard Modal Wrapper ──────────────────────────────────────────────────
-
-function Modal({
-  isOpen, onClose, title, subtitle, children, footer, maxWidth = 'sm:max-w-[860px]',
-}: {
-  isOpen: boolean; onClose: () => void; title: string; subtitle?: string;
-  children: React.ReactNode; footer?: React.ReactNode; maxWidth?: string;
-}) {
-  return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className={cn('p-0 overflow-hidden bg-[#FAF9F6] border-none shadow-2xl rounded-xl flex flex-col', maxWidth)} showCloseButton={false}>
-        <DialogHeader className="h-[48px] px-5 bg-juniper text-white flex flex-row items-center justify-between shrink-0 border-none space-y-0">
-          <div>
-            <DialogTitle className="text-[11px] font-bold uppercase tracking-[0.2em] leading-none">
-              {title}
-            </DialogTitle>
-            {subtitle && <p className="text-[8px] font-black uppercase tracking-widest opacity-60 mt-0.5">{subtitle}</p>}
-          </div>
-          <button onClick={onClose} className="text-white hover:bg-white/10 rounded p-1 transition-colors">
-            <X className="w-4 h-4" />
-          </button>
-        </DialogHeader>
-        <div className="pt-3 px-6 pb-6 max-h-[82vh] overflow-y-auto custom-scrollbar flex-1">
-          {children}
-        </div>
-        {footer && (
-          <DialogFooter className="bg-mystic/20 border-t border-casper/30 px-6 py-3 flex flex-row items-center justify-end gap-3 shrink-0">
-            {footer}
-          </DialogFooter>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
+  return ROLE_COLORS[(name || '').toLowerCase()] || { dot: 'bg-slate-400', label: 'bg-[var(--shell-hover)] text-[var(--shell-text-muted)] border-[var(--shell-border)]' };
 }
 
 // ─── Section Header ───────────────────────────────────────────────────────────
 function SectionHeader({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-2 mb-3">
-      <span className="text-[9px] font-black uppercase tracking-[0.2em] text-juniper">{label}</span>
-      <div className="h-[1px] flex-1 bg-slate-100" />
+      <span className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--shell-text-muted)]">{label}</span>
+      <div className="h-[1px] flex-1" style={{ background: 'var(--shell-border)' }} />
     </div>
   );
 }
@@ -91,11 +57,14 @@ function SectionHeader({ label }: { label: string }) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1">
-      <Label className="text-[9px] font-bold text-juniper uppercase tracking-[0.1em]">{label}</Label>
+      <Label className="text-xs font-medium modal-label normal-case tracking-normal">{label}</Label>
       {children}
     </div>
   );
 }
+
+// ─── Shared input class ───────────────────────────────────────────────────────
+const INP = 'w-full h-10 text-sm modal-input border-[var(--shell-border)] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[var(--shell-accent)]/50 focus:border-[var(--shell-accent)]/50 rounded-lg';
 
 // ─── UserModal ───────────────────────────────────────────────────────────────
 
@@ -110,7 +79,8 @@ interface UserModalProps {
 
 export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }: UserModalProps) {
   const [form, setForm] = useState({
-    first_name: '', last_name: '', email: '', contact_no: '', password: '',
+    first_name: '', last_name: '', date_of_birth: '', email: '', contact_no: '',
+    login_name: '', password: '',
     house_apt: '', address: '', city: '', country: '', postal_code: '',
     reporting_manager_id: '', department: '', clearance_level: 'Level 1',
     joining_date: '', status: 'ACTIVE',
@@ -118,8 +88,13 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
   const [selectedRoles, setSelectedRoles] = useState<{ roleId: number; isDefault: boolean }[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const [showNewDeptForm, setShowNewDeptForm] = useState(false);
+  const [loginNameManuallyEdited, setLoginNameManuallyEdited] = useState(false);
 
   const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
+
+  const deriveLoginName = (firstName: string, lastName: string) =>
+    (firstName.toLowerCase().replace(/[^a-z0-9]/g, '') +
+     (lastName?.[0] || '').toLowerCase().replace(/[^a-z0-9]/g, '')).trim();
 
   const toggleRole = (roleId: number) => {
     setSelectedRoles((prev) => {
@@ -140,9 +115,12 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
   useEffect(() => {
     if (editing) {
       const names = (editing.username || '').split(' ');
+      setLoginNameManuallyEdited(true); // in edit mode, always treat as manual
       setForm({
         first_name: names[0] || '', last_name: names.slice(1).join(' ') || '',
+        date_of_birth: (editing as any).date_of_birth ? new Date((editing as any).date_of_birth).toISOString().split('T')[0] : '',
         email: editing.email || '', contact_no: editing.contact_no || '',
+        login_name: (editing as any).login_name || deriveLoginName(names[0] || '', names.slice(1).join(' ')),
         password: '',
         house_apt: (editing as any).house_apt || '',
         address: (editing as any).address || '',
@@ -152,7 +130,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
         reporting_manager_id: (editing.manager_id ?? (editing as any).reporting_manager_id)?.toString() || '',
         department: editing.department || '', clearance_level: editing.clearance_level || 'Level 1',
         joining_date: editing.joining_date ? new Date(editing.joining_date).toISOString().split('T')[0] : '',
-        status: (() => { const s = (editing as any).user_status || ''; if (s === 'ON_HOLD') return 'On Hold'; if (s === 'INACTIVE') return 'In Active'; return s || (editing.is_active ? 'ACTIVE' : 'In Active'); })(),
+        status: (() => { const s = (editing as any).user_status || ''; if (s === 'ON_HOLD') return 'On Hold'; if (s === 'INACTIVE') return 'Inactive'; return s || (editing.is_active ? 'ACTIVE' : 'Inactive'); })(),
       });
       if (editing.roles && editing.roles.length > 0) {
         setSelectedRoles(editing.roles.map((r: any) => ({ roleId: r.role_id, isDefault: r.is_default })));
@@ -161,8 +139,10 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
       } else setSelectedRoles([]);
     } else {
       const employeeRole = roles.find((r) => r.role_name?.toLowerCase() === 'employee');
+      setLoginNameManuallyEdited(false);
       setForm({
-        first_name: '', last_name: '', email: '', contact_no: '', password: '',
+        first_name: '', last_name: '', date_of_birth: '', email: '', contact_no: '',
+        login_name: '', password: '',
         house_apt: '', address: '', city: '', country: '', postal_code: '',
         reporting_manager_id: '', department: '', clearance_level: 'Level 1',
         joining_date: new Date().toISOString().split('T')[0], status: 'ACTIVE',
@@ -179,12 +159,15 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
 
   const handleSubmit = () => {
     if (!form.first_name || !form.email) { toast.error('First Name and Email are required.'); return; }
+    if (!isValidEmail(form.email)) { toast.error('Enter a valid email address'); return; }
+    if (!isValidPhone(form.contact_no)) { toast.error('Invalid phone number. Include country code e.g. +91 98765 43210'); return; }
+    if (!form.login_name) { toast.error('User Name is required.'); return; }
     if (selectedRoles.length === 0) { toast.error('Please assign at least one role.'); return; }
     const defaultRole = selectedRoles.find((r) => r.isDefault) || selectedRoles[0];
     const statusMap: Record<string, { isActive: boolean; user_status: string }> = {
       'ACTIVE':    { isActive: true,  user_status: 'ACTIVE' },
       'On Hold':   { isActive: false, user_status: 'ON_HOLD' },
-      'In Active': { isActive: false, user_status: 'INACTIVE' },
+      'Inactive':  { isActive: false, user_status: 'INACTIVE' },
     };
     const statusData = statusMap[form.status] || { isActive: true, user_status: 'ACTIVE' };
     onSave({
@@ -199,29 +182,22 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
   const defaultRoleName = roles.find((r) => r.role_id === (selectedRoles.find((s) => s.isDefault) || selectedRoles[0])?.roleId)?.role_name;
 
   return (
-    <Modal
-      isOpen={isOpen} onClose={onClose}
+    <ModuleModal
+      isOpen={isOpen}
+      onClose={onClose}
       title={editing ? 'Edit User Profile' : 'Add New User'}
-      subtitle="SYSTEM ADMINISTRATION"
+      icon={editing ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+      onSave={handleSubmit}
+      saveLabel={editing ? 'Save Changes' : 'Add User'}
       maxWidth="sm:max-w-[1100px]"
-      footer={
-        <>
-          <Button variant="outline" onClick={onClose} className="bg-white border-casper text-juniper font-bold text-[10px] uppercase tracking-widest hover:bg-casper/10 h-9 px-5">
-            Cancel
-          </Button>
-          <Button className="bg-juniper hover:brightness-110 text-white font-bold text-[10px] uppercase tracking-widest h-9 px-6 flex items-center gap-2" onClick={handleSubmit}>
-            {editing ? <><Save className="w-3.5 h-3.5" /> Save Changes</> : <><Send className="w-3.5 h-3.5" /> Add User</>}
-          </Button>
-        </>
-      }
     >
-      <div className="space-y-4">
+      <div className="space-y-2.5">
         {/* Employee ID badge for edit mode */}
         {editing && (
-          <div className="flex items-center gap-3 bg-juniper/5 border border-juniper/20 rounded-lg px-4 py-2">
-            <span className="text-[9px] font-black uppercase tracking-widest text-juniper">Employee ID</span>
-            <span className="font-mono text-[13px] font-black text-juniper">{getEmployeeId(editing.id)}</span>
-            <span className={cn('ml-auto px-2 py-0.5 rounded text-[9px] font-black uppercase border', roleColor(editing.role_name).label)}>
+          <div className="flex items-center gap-3 modal-toggle-track rounded-lg px-4 py-2">
+            <span className="text-[9px] font-black uppercase tracking-widest text-[var(--shell-text-muted)]">Employee ID</span>
+            <span className="font-mono text-[13px] font-black text-blue-600 dark:text-blue-400">{getEmployeeId(editing.id)}</span>
+            <span className="ml-auto px-2 py-0.5 rounded text-[9px] font-black uppercase border border-[var(--shell-border)] text-[var(--shell-text)]">
               {editing.role_name || 'Staff'}
             </span>
           </div>
@@ -231,62 +207,120 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
         <div className="grid grid-cols-3 gap-x-6 gap-y-3 items-start">
 
           {/* COL 1 — Personal & Contact */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-juniper">Personal & Contact</span>
-              <div className="h-[1px] flex-1 bg-slate-100" />
-            </div>
+          <div className="space-y-2.5">
             <Field label="First Name">
-              <Input className="w-full h-8 text-[12px] bg-white border-casper/50 focus:ring-1 focus:ring-juniper focus:border-juniper rounded-lg" placeholder="Jonathan" value={form.first_name} onChange={(e) => set('first_name', e.target.value)} />
+              <Input className={INP} placeholder="Jonathan" value={form.first_name}
+                onChange={(e) => set('first_name', e.target.value)}
+                onBlur={() => {
+                  if (!loginNameManuallyEdited && !editing)
+                    set('login_name', deriveLoginName(form.first_name, form.last_name));
+                }}
+              />
             </Field>
             <Field label="Last Name">
-              <Input className="w-full h-8 text-[12px] bg-white border-casper/50 focus:ring-1 focus:ring-juniper focus:border-juniper rounded-lg" placeholder="Doe" value={form.last_name} onChange={(e) => set('last_name', e.target.value)} />
+              <Input className={INP} placeholder="Doe" value={form.last_name}
+                onChange={(e) => set('last_name', e.target.value)}
+                onBlur={(e) => {
+                  if (!loginNameManuallyEdited && !editing)
+                    set('login_name', deriveLoginName(form.first_name, e.target.value));
+                }}
+              />
+            </Field>
+            <Field label="Date of Birth">
+              <Input className={INP} type="date" value={form.date_of_birth} onChange={(e) => set('date_of_birth', e.target.value)} />
             </Field>
             <Field label="Email Address">
-              <Input className="w-full h-8 text-[12px] bg-white border-casper/50 focus:ring-1 focus:ring-juniper focus:border-juniper rounded-lg" type="email" placeholder="j.doe@company.com" value={form.email} readOnly={!!editing} onChange={(e) => set('email', e.target.value)} />
+              <EmailInput value={form.email} onChange={(v) => set('email', v)} placeholder="j.doe@company.com" readOnly={!!editing} required />
             </Field>
             <Field label="Contact No">
-              <Input className="w-full h-8 text-[12px] bg-white border-casper/50 focus:ring-1 focus:ring-juniper focus:border-juniper rounded-lg" placeholder="+91 98765 43210" value={form.contact_no} onChange={(e) => set('contact_no', e.target.value)} />
+              <PhoneInput value={form.contact_no} onChange={(v) => set('contact_no', v)} placeholder="+91 98765 43210" />
+            </Field>
+            <Field label="User Name">
+              <Input
+                className={INP}
+                placeholder="Auto-generated"
+                value={form.login_name}
+                onChange={(e) => {
+                  const v = e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '');
+                  setLoginNameManuallyEdited(true);
+                  set('login_name', v);
+                }}
+              />
             </Field>
             <Field label={editing ? 'New Password' : 'Password *'}>
               <div className="flex gap-1.5">
                 <div className="relative flex-1">
-                  <Input className="w-full h-8 text-[12px] bg-white border-casper/50 focus:ring-1 focus:ring-juniper focus:border-juniper rounded-lg pr-8" type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={form.password} onChange={(e) => set('password', e.target.value)} />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-juniper transition-colors">
+                  <Input className={INP + ' pr-8'} type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={form.password} onChange={(e) => set('password', e.target.value)} />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] transition-colors">
                     {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                   </button>
                 </div>
-                <button type="button" onClick={handleGenPassword} title="Auto-generate password" className="h-8 px-2 bg-juniper/10 border border-juniper/30 rounded-lg text-juniper hover:bg-juniper/20 transition-colors shrink-0">
+                <button type="button" onClick={handleGenPassword} title="Auto-generate password" className="h-8 px-2 modal-divider border border-[var(--shell-border)] rounded-lg modal-label hover:bg-[var(--shell-hover)] transition-colors shrink-0">
                   <RefreshCw className="w-3.5 h-3.5" />
                 </button>
               </div>
             </Field>
-            {/* Status segmented */}
-            <div className="space-y-1 pt-1">
-              <Label className="text-[9px] font-bold text-juniper uppercase tracking-[0.1em]">Status</Label>
-              <div className="flex p-1 bg-[#FAF9F6] border border-casper/50 rounded-lg gap-1">
-                {(['ACTIVE', 'On Hold', 'In Active']).map((s) => (
-                  <button key={s} onClick={() => set('status', s)}
-                    className={cn('flex-1 py-1.5 text-center text-[9px] font-bold uppercase tracking-wider rounded-md transition-all', form.status === s ? 'bg-juniper text-white shadow-sm' : 'text-casper hover:text-charcoal')}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
 
           {/* COL 2 — Employment & Access */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-juniper">Employment & Access</span>
-              <div className="h-[1px] flex-1 bg-slate-100" />
+          <div className="space-y-2.5">
+            <div className="space-y-1">
+              <Label className="text-xs font-medium modal-label normal-case tracking-normal">Department</Label>
+              <Select value={form.department} onValueChange={(v) => set('department', v)}>
+                <SelectTrigger className={INP}>
+                  <SelectValue placeholder="Select Department" />
+                </SelectTrigger>
+                <SelectContent>
+                  {['Engineering', 'Finance', 'Operations', 'Human Resource', 'Logistics', 'Sales'].map((d) => (
+                    <SelectItem key={d} value={d}>{d}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <button type="button" onClick={() => setShowNewDeptForm(!showNewDeptForm)} className="flex items-center gap-1.5 text-[9px] font-bold text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] mt-1">
+                <PlusCircle className="w-3 h-3" /> CREATE NEW DEPARTMENT
+              </button>
+              {showNewDeptForm && (
+                <div className="mt-2 p-3 border border-[var(--shell-border)] rounded-lg space-y-2" style={{ background: 'var(--shell-bg)' }}>
+                  <Input className={INP} placeholder="Department name" />
+                </div>
+              )}
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs font-medium modal-label normal-case tracking-normal">Roles Assigned</Label>
+              <div className="border border-[var(--shell-border)] rounded-lg overflow-hidden divide-y" style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)' }}>
+                {roles.map((r) => {
+                  const isChecked = selectedRoles.some((s) => s.roleId === r.role_id);
+                  const isDefault = selectedRoles.find((s) => s.roleId === r.role_id)?.isDefault ?? false;
+                  const rc = roleColor(r.role_name);
+                  return (
+                    <div key={r.role_id} className={cn('flex items-center px-3 py-2 transition-colors', isChecked ? 'modal-section' : 'hover:modal-section')} style={{ borderColor: 'var(--shell-border)' }}>
+                      <div onClick={() => toggleRole(r.role_id)} className={cn('w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-all cursor-pointer shrink-0 mr-2.5', isChecked ? 'bg-[var(--shell-accent)] border-[var(--shell-accent)]' : 'border-[var(--shell-border)]')}>
+                        {isChecked && <Check className="w-2 h-2 text-white" />}
+                      </div>
+                      <div className={cn('w-2 h-2 rounded-full shrink-0 mr-2', rc.dot)} />
+                      <span onClick={() => toggleRole(r.role_id)} className={cn('text-[11px] font-bold uppercase tracking-wide select-none flex-1 cursor-pointer', isChecked ? 'text-[var(--shell-text)]' : 'text-[var(--shell-text-muted)]')}>
+                        {r.role_name}
+                      </span>
+                      {isChecked && (
+                        <button type="button" onClick={() => setDefaultRole(r.role_id)} className="ml-2 transition-colors">
+                          <Star className={cn('w-3 h-3', isDefault ? 'fill-amber-400 text-amber-400' : 'text-[var(--shell-text-muted)] hover:text-amber-300')} />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {defaultRoleName && (
+                <p className="text-[9px] text-[var(--shell-text-muted)] pt-0.5">
+                  <span className="text-[var(--shell-accent)] font-bold">{defaultRoleName}</span> is the default active role <span className="text-amber-400">★</span>
+                </p>
+              )}
             </div>
             <Field label="Reporting Manager">
               <div className="relative w-full">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300 z-10 pointer-events-none" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--shell-text-muted)] z-10 pointer-events-none" />
                 <Select value={form.reporting_manager_id} onValueChange={(v) => set('reporting_manager_id', v)}>
-                  <SelectTrigger className="w-full pl-8 h-8 text-[12px] bg-white border-casper/50 focus:ring-1 focus:ring-juniper focus:border-juniper rounded-lg">
+                  <SelectTrigger className={INP + ' pl-8'}>
                     <SelectValue placeholder="Search manager..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -296,80 +330,24 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
               </div>
             </Field>
             <Field label="Joining Date">
-              <Input className="w-full h-8 text-[12px] bg-white border-casper/50 focus:ring-1 focus:ring-juniper focus:border-juniper rounded-lg" type="date" value={form.joining_date} onChange={(e) => set('joining_date', e.target.value)} />
+              <Input className={INP} type="date" value={form.joining_date} onChange={(e) => set('joining_date', e.target.value)} />
             </Field>
-            <div className="space-y-1">
-              <Label className="text-[9px] font-bold text-juniper uppercase tracking-[0.1em]">Department</Label>
-              <Select value={form.department} onValueChange={(v) => set('department', v)}>
-                <SelectTrigger className="w-full h-8 text-[12px] bg-white border-casper/50 focus:ring-1 focus:ring-juniper focus:border-juniper rounded-lg">
-                  <SelectValue placeholder="Select Department" />
-                </SelectTrigger>
-                <SelectContent>
-                  {['Engineering', 'Finance', 'Operations', 'Human Resource', 'Logistics', 'Sales'].map((d) => (
-                    <SelectItem key={d} value={d}>{d}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <button type="button" onClick={() => setShowNewDeptForm(!showNewDeptForm)} className="flex items-center gap-1.5 text-[9px] font-bold text-juniper hover:underline mt-1">
-                <PlusCircle className="w-3 h-3" /> CREATE NEW DEPARTMENT
-              </button>
-              {showNewDeptForm && (
-                <div className="mt-2 p-3 bg-slate-50 border border-slate-100 rounded-lg space-y-2">
-                  <Input className="h-8 text-[12px] border-casper/30 bg-white rounded" placeholder="Department name" />
-                </div>
-              )}
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[9px] font-bold text-juniper uppercase tracking-[0.1em]">Roles Assigned</Label>
-              <div className="border border-casper/40 rounded-lg bg-white overflow-hidden divide-y divide-casper/20">
-                {roles.map((r) => {
-                  const isChecked = selectedRoles.some((s) => s.roleId === r.role_id);
-                  const isDefault = selectedRoles.find((s) => s.roleId === r.role_id)?.isDefault ?? false;
-                  const rc = roleColor(r.role_name);
-                  return (
-                    <div key={r.role_id} className={cn('flex items-center px-3 py-2 transition-colors', isChecked ? 'bg-slate-50' : 'hover:bg-slate-50/50')}>
-                      <div onClick={() => toggleRole(r.role_id)} className={cn('w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-all cursor-pointer shrink-0 mr-2.5', isChecked ? 'bg-juniper border-juniper' : 'border-casper/60')}>
-                        {isChecked && <Check className="w-2 h-2 text-white" />}
-                      </div>
-                      <div className={cn('w-2 h-2 rounded-full shrink-0 mr-2', rc.dot)} />
-                      <span onClick={() => toggleRole(r.role_id)} className={cn('text-[11px] font-bold uppercase tracking-wide select-none flex-1 cursor-pointer', isChecked ? 'text-charcoal' : 'text-slate-400')}>
-                        {r.role_name}
-                      </span>
-                      {isChecked && (
-                        <button type="button" onClick={() => setDefaultRole(r.role_id)} className="ml-2 transition-colors">
-                          <Star className={cn('w-3 h-3', isDefault ? 'fill-amber-400 text-amber-400' : 'text-casper hover:text-amber-300')} />
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              {defaultRoleName && (
-                <p className="text-[9px] text-slate-400 pt-0.5">
-                  <span className="text-juniper font-bold">{defaultRoleName}</span> is the default active role <span className="text-amber-400">★</span>
-                </p>
-              )}
-            </div>
           </div>
 
           {/* COL 3 — Address */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-juniper">Address</span>
-              <div className="h-[1px] flex-1 bg-slate-100" />
-            </div>
+          <div className="space-y-2.5">
             <Field label="Street">
-              <Input className="w-full h-8 text-[12px] bg-white border-casper/50 focus:ring-1 focus:ring-juniper focus:border-juniper rounded-lg" placeholder="123 Main Street" value={form.house_apt} onChange={(e) => set('house_apt', e.target.value)} />
+              <Input className={INP} placeholder="123 Main Street" value={form.house_apt} onChange={(e) => set('house_apt', e.target.value)} />
             </Field>
             <Field label="Address (optional)">
-              <Input className="w-full h-8 text-[12px] bg-white border-casper/50 focus:ring-1 focus:ring-juniper focus:border-juniper rounded-lg" placeholder="Apt / Suite / Building" value={form.address} onChange={(e) => set('address', e.target.value)} />
+              <Input className={INP} placeholder="Apt / Suite / Building" value={form.address} onChange={(e) => set('address', e.target.value)} />
             </Field>
             <Field label="City">
-              <Input className="w-full h-8 text-[12px] bg-white border-casper/50 focus:ring-1 focus:ring-juniper focus:border-juniper rounded-lg" placeholder="Mumbai" value={form.city} onChange={(e) => set('city', e.target.value)} />
+              <Input className={INP} placeholder="Mumbai" value={form.city} onChange={(e) => set('city', e.target.value)} />
             </Field>
             <Field label="Country">
               <Select value={form.country} onValueChange={(v) => set('country', v)}>
-                <SelectTrigger className="w-full h-8 text-[12px] bg-white border-casper/50 focus:ring-1 focus:ring-juniper focus:border-juniper rounded-lg">
+                <SelectTrigger className={INP}>
                   <SelectValue placeholder="Select country" />
                 </SelectTrigger>
                 <SelectContent className="max-h-56">
@@ -380,12 +358,30 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
               </Select>
             </Field>
             <Field label="Postal Code">
-              <Input className="w-full h-8 text-[12px] bg-white border-casper/50 focus:ring-1 focus:ring-juniper focus:border-juniper rounded-lg" placeholder="400001" value={form.postal_code} onChange={(e) => set('postal_code', e.target.value)} />
+              <Input className={INP} placeholder="400001" value={form.postal_code} onChange={(e) => set('postal_code', e.target.value)} />
             </Field>
+            {/* Status segmented */}
+            <div className="space-y-1 pt-1">
+              <Label className="text-xs font-medium modal-label normal-case tracking-normal">Status</Label>
+              <div className="flex p-1 modal-toggle-track rounded-xl gap-1">
+                {([
+                  { s: 'ACTIVE',   active: 'text-emerald-500 border border-emerald-500 shadow-sm' },
+                  { s: 'On Hold',  active: 'text-amber-500 border border-amber-400 shadow-sm' },
+                  { s: 'Inactive', active: 'text-rose-400 border border-rose-400 shadow-sm' },
+                ] as const).map(({ s, active: activeClass }) => (
+                  <button key={s} type="button" onClick={() => set('status', s)}
+                    className={cn('flex-1 py-1.5 text-center text-[9px] font-bold uppercase tracking-wider rounded-md transition-all',
+                      form.status === s ? activeClass : 'text-[var(--shell-text-muted)] border border-transparent hover:text-[var(--shell-text)]')}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </Modal>
+    </ModuleModal>
   );
 }
 
@@ -401,6 +397,7 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
   const [form, setForm] = useState({ client_id: '', category: 'Project', type_id: '', code: '' });
   const setF = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
 
+  // Only load type/code data once a client is selected
   const clientId = form.client_id ? Number(form.client_id) : undefined;
   const typeId = form.type_id ? Number(form.type_id) : undefined;
 
@@ -425,7 +422,7 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
     try {
       const res = await api.get(`/users/${user.id}/allocations`);
       setAllocations(res.data as any[]);
-    } catch { } finally { setLoading(false); }
+    } catch { setAllocations([]); } finally { setLoading(false); }
   };
 
   useEffect(() => {
@@ -456,7 +453,7 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
       await fetchAllocations();
       setF('code', '');
     } catch (err: any) {
-      const msg = err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Failed to add allocation.';
+      const msg = err?.message || 'Failed to add allocation.';
       toast.error(msg);
     } finally { setSaving(false); }
   };
@@ -476,125 +473,117 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
     setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
 
+  const INP2 = 'h-10 text-sm modal-input border-[var(--shell-border)] text-[var(--shell-text)] focus:ring-1 focus:ring-[var(--shell-accent)]/50 rounded-lg w-full';
+
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[900px] p-0 overflow-hidden bg-[#FAF9F6] border-none shadow-2xl rounded-xl flex flex-col" showCloseButton={false}>
-        {/* Header — Add Client theme */}
-        <DialogHeader className="h-[52px] px-5 bg-juniper text-white flex flex-row items-center justify-between shrink-0 border-none space-y-0">
-          <div>
-            <DialogTitle className="text-[12px] font-bold uppercase tracking-[0.2em] leading-none">
-              Resource Allocation — {user?.username || ''}
-            </DialogTitle>
-            <p className="text-[8px] font-black uppercase tracking-widest opacity-60 mt-0.5">EMPLOYMENT TRACKING</p>
+    <ModuleModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={`Resource Allocation — ${user?.username || ''}`}
+      icon={<Pencil className="w-4 h-4" />}
+      maxWidth="sm:max-w-[900px]"
+      footer={
+        <Button variant="ghost" onClick={onClose} className="h-8 px-4 text-[11.5px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>Close</Button>
+      }
+    >
+      <div className="space-y-2.5">
+        {/* Add form — 4 equal-width fields in one row, no section box */}
+        <div className="grid grid-cols-4 gap-2">
+          <div className="space-y-1">
+            <Label className="text-xs font-medium modal-label normal-case tracking-normal">Client</Label>
+            <Select value={form.client_id} onValueChange={(v) => setF('client_id', v)}>
+              <SelectTrigger className={INP2}>
+                <SelectValue placeholder="Select client" />
+              </SelectTrigger>
+              <SelectContent>
+                {(clients as any[] || []).map((c: any) => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
-          <button onClick={onClose} className="text-white hover:bg-white/10 rounded p-1 transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </DialogHeader>
-
-        <div className="pt-4 px-6 pb-4 max-h-[82vh] overflow-y-auto custom-scrollbar flex-1 space-y-4">
-          {/* Add form — 4 equal-width fields in one row, no section box */}
-          <div className="grid grid-cols-4 gap-2">
-            <div className="space-y-1">
-              <Label className="text-[9px] font-bold text-juniper uppercase tracking-[0.1em]">Client</Label>
-              <Select value={form.client_id} onValueChange={(v) => setF('client_id', v)}>
-                <SelectTrigger className="h-9 text-[12px] bg-white border-casper/50 focus:ring-1 focus:ring-juniper rounded-lg w-full">
-                  <SelectValue placeholder="Select client" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(clients as any[] || []).map((c: any) => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[9px] font-bold text-juniper uppercase tracking-[0.1em]">Category</Label>
-              <Select value={form.category} onValueChange={(v) => setF('category', v)}>
-                <SelectTrigger className="h-9 text-[12px] bg-white border-casper/50 focus:ring-1 focus:ring-juniper rounded-lg w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Project">Project</SelectItem>
-                  <SelectItem value="Product">Product</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[9px] font-bold text-juniper uppercase tracking-[0.1em]">Type</Label>
-              <Select value={form.type_id} onValueChange={(v) => setF('type_id', v)} disabled={typeOptions.length === 0}>
-                <SelectTrigger className="h-9 text-[12px] bg-white border-casper/50 focus:ring-1 focus:ring-juniper rounded-lg w-full">
-                  <SelectValue placeholder={!form.client_id ? 'Select client first' : typeOptions.length === 0 ? 'No types available' : 'Select type'} />
-                </SelectTrigger>
-                <SelectContent>
-                  {typeOptions.map((t: any) => <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[9px] font-bold text-juniper uppercase tracking-[0.1em]">{form.category} Code</Label>
-              <Select value={form.code} onValueChange={(v) => setF('code', v)} disabled={codeOptions.length === 0}>
-                <SelectTrigger className="h-9 text-[12px] bg-white border-casper/50 focus:ring-1 focus:ring-juniper rounded-lg w-full">
-                  <SelectValue placeholder={codeOptions.length === 0 ? 'Select type first' : 'Select code'} />
-                </SelectTrigger>
-                <SelectContent>
-                  {codeOptions.map((o: any) => <SelectItem key={o.id} value={o.label}>{o.label} — {o.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-1">
+            <Label className="text-xs font-medium modal-label normal-case tracking-normal">Category</Label>
+            <Select value={form.category} onValueChange={(v) => setF('category', v)}>
+              <SelectTrigger className={INP2}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Project">Project</SelectItem>
+                <SelectItem value="Product">Product</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-
-          {/* Action row */}
-          <div className="flex items-center justify-between">
-            <div className="flex gap-2">
-              <Button className="bg-juniper hover:brightness-110 text-white font-bold text-[10px] uppercase h-8 px-4 rounded-lg flex items-center gap-1.5 shadow-md shadow-juniper/10" onClick={handleAddAllocation} disabled={saving}>
-                <Plus className="w-3.5 h-3.5" /> Add Allocation
-              </Button>
-              <Button variant="outline" className="border-rose-200 text-rose-500 hover:bg-rose-50 font-bold text-[10px] uppercase h-8 px-4 rounded-lg flex items-center gap-1.5" onClick={handleRemove} disabled={saving || selected.size === 0}>
-                <Trash2 className="w-3.5 h-3.5" /> Remove
-              </Button>
-            </div>
-            <span className="text-[9px] font-bold text-juniper uppercase tracking-widest">{allocations.length} Allocation{allocations.length !== 1 ? 's' : ''}</span>
+          <div className="space-y-1">
+            <Label className="text-xs font-medium modal-label normal-case tracking-normal">Type</Label>
+            <Select value={form.type_id} onValueChange={(v) => setF('type_id', v)} disabled={typeOptions.length === 0}>
+              <SelectTrigger className={INP2}>
+                <SelectValue placeholder={!form.client_id ? 'Select client first' : typeOptions.length === 0 ? 'No types available' : 'Select type'} />
+              </SelectTrigger>
+              <SelectContent>
+                {typeOptions.map((t: any) => <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
-
-          {/* Table */}
-          <div className="border border-casper/30 rounded-xl overflow-hidden bg-white shadow-sm">
-            <table className="w-full text-left">
-              <thead className="bg-juniper text-white">
-                <tr className="text-[9px] font-black uppercase tracking-widest">
-                  <th className="w-10 px-4 py-3 text-center">
-                    <input type="checkbox" className="size-3.5 rounded border-white/50" onChange={(e) => setSelected(e.target.checked ? new Set(allocations.map((a) => a.id)) : new Set())} checked={selected.size === allocations.length && allocations.length > 0} />
-                  </th>
-                  <th className="px-4 py-3">Client</th>
-                  <th className="px-4 py-3">Category</th>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Code</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-casper/20 text-[12px]">
-                {loading ? (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-300 italic">Loading...</td></tr>
-                ) : allocations.length === 0 ? (
-                  <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-300 italic font-medium">No allocations yet.</td></tr>
-                ) : allocations.map((a) => (
-                  <tr key={a.id} className={cn('hover:bg-slate-50/50 transition-colors', selected.has(a.id) ? 'bg-juniper/5' : '')}>
-                    <td className="px-4 py-3 text-center">
-                      <input type="checkbox" className="size-3.5 rounded border-slate-300" checked={selected.has(a.id)} onChange={() => toggleSelect(a.id)} />
-                    </td>
-                    <td className="px-4 py-3 font-bold text-charcoal">{a.client_name}</td>
-                    <td className="px-4 py-3 text-slate-500">{a.category}</td>
-                    <td className="px-4 py-3 text-slate-500">{a.type}</td>
-                    <td className="px-4 py-3 font-mono text-juniper font-bold">{a.code}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-1">
+            <Label className="text-xs font-medium modal-label normal-case tracking-normal">{form.category} Code</Label>
+            <Select value={form.code} onValueChange={(v) => setF('code', v)} disabled={codeOptions.length === 0}>
+              <SelectTrigger className={INP2}>
+                <SelectValue placeholder={codeOptions.length === 0 ? 'Select type first' : 'Select code'} />
+              </SelectTrigger>
+              <SelectContent>
+                {codeOptions.map((o: any) => <SelectItem key={o.id} value={o.label}>{o.label} — {o.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
-        <DialogFooter className="bg-mystic/20 border-t border-casper/30 px-6 py-3 flex flex-row items-center justify-end gap-3 shrink-0">
-          <Button variant="outline" onClick={onClose} className="bg-white border-casper text-juniper font-bold text-[10px] uppercase tracking-widest hover:bg-casper/10 h-9 px-5">Close</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        {/* Action row */}
+        <div className="flex items-center justify-between">
+          <div className="flex gap-2">
+            <Button className="btn-action-primary border border-[var(--shell-border)] text-[var(--shell-text)] font-bold text-[10px] uppercase h-8 px-4 rounded-lg flex items-center gap-1.5" onClick={handleAddAllocation} disabled={saving}>
+              <Plus className="w-3.5 h-3.5" /> Add Allocation
+            </Button>
+            <Button variant="outline" className="border-rose-400/40 text-rose-400 hover:bg-rose-400/10 font-bold text-[10px] uppercase h-8 px-4 rounded-lg flex items-center gap-1.5" onClick={handleRemove} disabled={saving || selected.size === 0}>
+              <Trash2 className="w-3.5 h-3.5" /> Remove
+            </Button>
+          </div>
+          <span className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest">{allocations.length} Allocation{allocations.length !== 1 ? 's' : ''}</span>
+        </div>
+
+        {/* Table */}
+        <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden shadow-sm" style={{ background: 'var(--shell-surface)' }}>
+          <table className="w-full text-left">
+            <thead className="dialog-header">
+              <tr className="text-[9px] font-black uppercase tracking-widest">
+                <th className="w-10 px-4 py-3 text-center">
+                  <input type="checkbox" className="size-3.5 rounded border-[var(--shell-border)]" onChange={(e) => setSelected(e.target.checked ? new Set(allocations.map((a) => a.id)) : new Set())} checked={selected.size === allocations.length && allocations.length > 0} />
+                </th>
+                <th className="px-4 py-3">Client</th>
+                <th className="px-4 py-3">Category</th>
+                <th className="px-4 py-3">Type</th>
+                <th className="px-4 py-3">Code</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--shell-border)] text-[12px]">
+              {loading ? (
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-[var(--shell-text-muted)] italic">Loading...</td></tr>
+              ) : allocations.length === 0 ? (
+                <tr><td colSpan={5} className="px-4 py-10 text-center text-[var(--shell-text-muted)] italic font-medium">No allocations yet.</td></tr>
+              ) : allocations.map((a) => (
+                <tr key={a.id} className={cn('transition-colors', selected.has(a.id) ? 'bg-[var(--shell-accent)]/10' : 'hover:modal-section')}>
+                  <td className="px-4 py-3 text-center">
+                    <input type="checkbox" className="size-3.5 rounded border-[var(--shell-border)]" checked={selected.has(a.id)} onChange={() => toggleSelect(a.id)} />
+                  </td>
+                  <td className="px-4 py-3 font-bold text-[var(--shell-text)]">{a.client_name}</td>
+                  <td className="px-4 py-3 modal-label">{a.category}</td>
+                  <td className="px-4 py-3 modal-label">{a.type}</td>
+                  <td className="px-4 py-3 font-mono text-blue-600 dark:text-blue-400 font-bold">{a.code}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </ModuleModal>
   );
 }
 
@@ -611,6 +600,35 @@ const MODULES = [
   { name: 'Approvals & Workflow', category: 'Governance' },
   { name: 'Organization & Users', category: 'Governance' },
   { name: 'Reports & Audit', category: 'Governance' },
+];
+
+// Mirrors sidebar NAV_GROUPS structure
+const MODULE_GROUPS = [
+  {
+    label: 'MAIN',
+    color: '#C9A84C',
+    items: ['Dashboard & Analytics'],
+  },
+  {
+    label: 'TRANSACTION',
+    color: '#C9A84C',
+    items: ['Approvals & Workflow', 'Expense Management', 'Income Tracking'],
+  },
+  {
+    label: 'OPERATIONS',
+    color: '#C9A84C',
+    items: ['Client Database', 'Projects & Milestones', 'Products & BOM'],
+  },
+  {
+    label: 'MANAGE',
+    color: '#C9A84C',
+    items: ['Organization & Users', 'Budgets & Forecasts'],
+  },
+  {
+    label: 'ANALYTICS',
+    color: '#C9A84C',
+    items: ['Reports & Audit'],
+  },
 ];
 
 const PERMISSIONS = ['View', 'Create', 'Edit', 'Delete', 'Approve'];
@@ -638,7 +656,7 @@ const ROLE_TEMPLATES: Record<string, PermMap> = {
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
-  Core: 'text-juniper', Finance: 'text-emerald-600', Operations: 'text-blue-600', Governance: 'text-amber-600',
+  Core: 'modal-label', Finance: 'text-emerald-600 dark:text-emerald-500', Operations: 'text-blue-600 dark:text-blue-400', Governance: 'text-amber-600 dark:text-amber-400',
 };
 
 export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; onClose: () => void; user: any }) {
@@ -706,22 +724,21 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
     }
   };
 
-  const categories = [...new Set(MODULES.map((m) => m.category))];
+  const INP3 = 'pl-6 h-10 text-sm modal-input border-[var(--shell-border)] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] rounded-lg';
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Permissions — ${user?.username || ''}`} subtitle="ACCESS POLICY CONFIGURATION" maxWidth="sm:max-w-[1100px]"
-      footer={
-        <div className="flex items-center justify-between w-full">
-          <div className="flex items-center gap-2 text-juniper text-[10px] font-bold italic">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            Audit log entry will be created on save.
-          </div>
-          <div className="flex gap-3">
-            <Button variant="outline" onClick={onClose} className="bg-white border-casper text-juniper font-bold text-[10px] uppercase tracking-widest h-9 px-5">Discard</Button>
-            <Button className="bg-juniper hover:brightness-110 text-white font-bold text-[10px] uppercase tracking-widest h-9 px-6 flex items-center gap-2" onClick={handleSave} disabled={saving}>
-              <Save className="w-3.5 h-3.5" /> {saving ? 'Saving...' : 'Save Permissions'}
-            </Button>
-          </div>
+    <ModuleModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={`Permissions — ${user?.username || ''}`}
+      icon={<ShieldCheck className="w-4 h-4" />}
+      onSave={handleSave}
+      saveLabel={saving ? 'Saving...' : 'Save Permissions'}
+      maxWidth="sm:max-w-[1100px]"
+      footerLeft={
+        <div className="flex items-center gap-2 text-[var(--shell-text-muted)] text-[10px] font-bold italic">
+          <ShieldCheck className="w-3.5 h-3.5" />
+          Audit log entry will be created on save.
         </div>
       }
     >
@@ -729,14 +746,15 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
         {/* Left: Matrix */}
         <div className="flex-1 min-w-0">
           {/* Role template selector */}
-          <div className="flex items-center gap-3 mb-4 pb-4 border-b border-slate-100">
-            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest shrink-0">Apply Template:</span>
+          <div className="flex items-center gap-3 mb-4 pb-4 border-b border-[var(--shell-border)]">
+            <span className="text-[9px] font-black text-[var(--shell-text-muted)] uppercase tracking-widest shrink-0">Apply Template:</span>
             <div className="flex gap-2 flex-wrap">
               {Object.keys(ROLE_TEMPLATES).map((t) => {
                 const c = roleColor(t);
                 return (
                   <button key={t} onClick={() => applyTemplate(t)}
-                    className={cn('px-3 py-1 rounded-lg text-[10px] font-black uppercase border transition-all', template === t ? `${c.label} shadow-sm` : 'bg-white text-slate-400 border-slate-200 hover:border-casper')}
+                    className={cn('px-3 py-1 rounded-lg text-[10px] font-black uppercase border transition-all', template === t ? 'modal-input border-[var(--shell-border)] text-[var(--shell-text)] shadow-sm' : 'text-[var(--shell-text-muted)] border-[var(--shell-border)] hover:text-[var(--shell-text)]')}
+                    style={template !== t ? { background: 'var(--shell-bg)' } : {}}
                   >
                     <span className={cn('inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle', c.dot)} />
                     {t}
@@ -746,97 +764,108 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
             </div>
           </div>
 
-          {/* Permission matrix grouped by category */}
-          <div className="border border-casper/30 rounded-xl overflow-hidden shadow-sm bg-white">
-            <table className="w-full text-left border-collapse table-fixed">
-              <thead className="bg-[#F8FAFB] border-b border-casper/20">
-                <tr className="text-[9px] font-black text-juniper uppercase tracking-widest">
-                  <th className="px-4 py-3 w-[220px]">Module</th>
-                  {PERMISSIONS.map((p) => <th key={p} className="py-3 text-center w-[60px]">{p}</th>)}
-                  <th className="py-3 text-center w-[50px]">All</th>
-                </tr>
-              </thead>
-              <tbody>
-                {categories.map((cat) => (
-                  <>
-                    <tr key={`cat-${cat}`} className="bg-slate-50/70">
-                      <td colSpan={7} className={cn('px-4 py-1.5 text-[9px] font-black uppercase tracking-widest', CATEGORY_COLORS[cat] || 'text-slate-400')}>
-                        {cat}
-                      </td>
-                    </tr>
-                    {MODULES.filter((m) => m.category === cat).map((mod) => {
-                      const modPerms = perms[mod.name] || [false, false, false, false, false];
-                      const allOn = modPerms.every(Boolean);
-                      return (
-                        <tr key={mod.name} className="hover:bg-slate-50/50 transition-colors border-t border-slate-50 group">
-                          <td className="px-4 py-2.5 text-[11px] font-bold text-charcoal group-hover:text-juniper transition-colors">{mod.name}</td>
-                          {modPerms.map((on, i) => (
-                            <td key={i} className="py-2.5 text-center">
-                              <div onClick={() => togglePerm(mod.name, i)}
-                                className={cn('w-4 h-4 mx-auto rounded border-2 flex items-center justify-center cursor-pointer transition-all', on ? 'bg-juniper border-juniper' : 'border-slate-200 bg-white hover:border-juniper/40')}
-                              >
-                                {on && <Check className="w-2.5 h-2.5 text-white" />}
-                              </div>
-                            </td>
-                          ))}
-                          <td className="py-2.5 text-center">
-                            <div onClick={() => toggleAllModule(mod.name)}
-                              className={cn('w-4 h-4 mx-auto rounded border-2 flex items-center justify-center cursor-pointer transition-all', allOn ? 'bg-amber-400 border-amber-400' : 'border-slate-200 bg-white hover:border-amber-300')}
-                            >
-                              {allOn && <Check className="w-2.5 h-2.5 text-white" />}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </>
-                ))}
-              </tbody>
-            </table>
+          {/* Permission matrix — sidebar-mirrored tree view */}
+          <div className="overflow-x-auto rounded-xl">
+          <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden shadow-sm min-w-[480px]" style={{ background: 'var(--shell-surface)' }}>
+            {/* Column header */}
+            <div className="dialog-header flex items-center text-[9px] font-black uppercase tracking-widest">
+              <div className="flex-1 px-4 py-3">Module</div>
+              {PERMISSIONS.map((p) => (
+                <div key={p} className="w-[70px] py-3 text-center shrink-0">{p}</div>
+              ))}
+              <div className="w-[56px] py-3 text-center shrink-0">All</div>
+            </div>
+
+            {MODULE_GROUPS.map((group, gi) => (
+              <div key={group.label} className={gi > 0 ? 'border-t border-[var(--shell-border)]' : ''}>
+                {/* Group label */}
+                <div className="px-4 py-1.5 flex items-center gap-2" style={{ background: 'var(--shell-hover)' }}>
+                  <span className="text-[9px] font-black uppercase tracking-[0.2em]" style={{ color: '#C9A84C' }}>
+                    {group.label}
+                  </span>
+                  <div className="h-px flex-1" style={{ background: 'var(--shell-border)' }} />
+                </div>
+
+                {/* Module rows */}
+                {group.items.map((modName) => {
+                  const modPerms = perms[modName] || [false, false, false, false, false];
+                  const allOn = modPerms.every(Boolean);
+                  return (
+                    <div key={modName} className="flex items-center hover:modal-section transition-colors border-t border-[var(--shell-border)] group">
+                      <div className="flex-1 flex items-center gap-2 pl-7 pr-4 py-2.5 min-w-0">
+                        <div className="w-px h-3 shrink-0" style={{ background: 'var(--shell-border)' }} />
+                        <div className="w-3 h-px shrink-0" style={{ background: 'var(--shell-border)' }} />
+                        <span className="text-[11px] font-semibold text-[var(--shell-text)] truncate">
+                          {modName}
+                        </span>
+                      </div>
+                      {modPerms.map((on, i) => (
+                        <div key={i} className="w-[70px] py-2.5 flex items-center justify-center shrink-0">
+                          <div
+                            onClick={() => togglePerm(modName, i)}
+                            className={cn('w-4 h-4 rounded border-2 flex items-center justify-center cursor-pointer transition-all',
+                              on ? 'bg-[var(--shell-accent)] border-[var(--shell-accent)]' : 'border-[var(--shell-border)] hover:border-[var(--shell-accent)]/50')}
+                            style={!on ? { background: 'var(--shell-bg)' } : {}}
+                          >
+                            {on && <Check className="w-2.5 h-2.5 text-white" />}
+                          </div>
+                        </div>
+                      ))}
+                      <div className="w-[56px] py-2.5 flex items-center justify-center shrink-0">
+                        <div
+                          onClick={() => toggleAllModule(modName)}
+                          className={cn('w-4 h-4 rounded border-2 flex items-center justify-center cursor-pointer transition-all',
+                            allOn ? 'bg-amber-400 border-amber-400' : 'border-[var(--shell-border)] hover:border-amber-400/50')}
+                          style={!allOn ? { background: 'var(--shell-bg)' } : {}}
+                        >
+                          {allOn && <Check className="w-2.5 h-2.5 text-white" />}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
           </div>
         </div>
 
         {/* Right: Config panel */}
-        <div className="w-[220px] shrink-0 space-y-4">
+        <div className="w-[220px] shrink-0 space-y-2.5">
           {/* Approval Thresholds */}
-          <div className="border border-casper/30 rounded-xl overflow-hidden bg-white shadow-sm">
-            <div className="bg-[#F8FAFB] px-4 py-2.5 border-b border-casper/20">
-              <span className="text-[9px] font-black uppercase tracking-widest text-juniper">Approval Limits</span>
+          <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden shadow-sm" style={{ background: 'var(--shell-surface)' }}>
+            <div className="dialog-header px-4 py-2.5">
+              <span className="text-[9px] font-black uppercase tracking-widest">Approval Limits</span>
             </div>
-            <div className="p-4 space-y-3">
+            <div className="p-4 space-y-2.5">
               <div className="space-y-1">
-                <Label className="text-[9px] font-bold text-slate-400 uppercase">Single Transaction</Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-juniper text-[11px] font-bold">₹</span>
-                  <Input className="pl-6 h-8 text-[12px] border-casper/30 bg-stone-50 rounded-lg" value={thresholds.single} onChange={(e) => setThresholds((p) => ({ ...p, single: e.target.value }))} />
-                </div>
+                <Label className="text-xs font-medium modal-label uppercase">Single Transaction</Label>
+                <CurrencyInput value={thresholds.single} onChange={(v) => setThresholds((p) => ({ ...p, single: v }))} className={INP3} />
               </div>
               <div className="space-y-1">
-                <Label className="text-[9px] font-bold text-slate-400 uppercase">Monthly Ceiling</Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-juniper text-[11px] font-bold">₹</span>
-                  <Input className="pl-6 h-8 text-[12px] border-casper/30 bg-stone-50 rounded-lg" value={thresholds.monthly} onChange={(e) => setThresholds((p) => ({ ...p, monthly: e.target.value }))} />
-                </div>
+                <Label className="text-xs font-medium modal-label uppercase">Monthly Ceiling</Label>
+                <CurrencyInput value={thresholds.monthly} onChange={(v) => setThresholds((p) => ({ ...p, monthly: v }))} className={INP3} />
               </div>
             </div>
           </div>
 
           {/* Data Scope */}
-          <div className="border border-casper/30 rounded-xl overflow-hidden bg-white shadow-sm">
-            <div className="bg-[#F8FAFB] px-4 py-2.5 border-b border-casper/20">
-              <span className="text-[9px] font-black uppercase tracking-widest text-juniper">Data Visibility</span>
+          <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden shadow-sm" style={{ background: 'var(--shell-surface)' }}>
+            <div className="dialog-header px-4 py-2.5">
+              <span className="text-[9px] font-black uppercase tracking-widest">Data Visibility</span>
             </div>
             <div className="p-3 space-y-2">
               {['Own Records', 'Department', 'Global'].map((s) => (
                 <button key={s} onClick={() => setScope(s)}
                   className={cn('w-full text-left px-3 py-2 rounded-lg text-[11px] font-bold transition-all flex items-center gap-2',
-                    scope === s ? 'bg-juniper text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100')}
+                    scope === s ? 'bg-[var(--shell-accent)] text-white' : 'text-[var(--shell-text-muted)] hover:text-[var(--shell-text)]')}
+                  style={scope !== s ? { background: 'var(--shell-bg)' } : {}}
                 >
-                  <div className={cn('w-2 h-2 rounded-full shrink-0', scope === s ? 'bg-white' : 'bg-slate-300')} />
+                  <div className={cn('w-2 h-2 rounded-full shrink-0', scope === s ? 'bg-white' : 'bg-[var(--shell-border)]')} />
                   {s}
                 </button>
               ))}
-              <p className="text-[9px] text-slate-400 font-bold leading-relaxed pt-1 italic">
+              <p className="text-[9px] text-[var(--shell-text-muted)] font-bold leading-relaxed pt-1 italic">
                 {scope === 'Own Records' && 'User sees only their own transactions and records.'}
                 {scope === 'Department' && 'Access limited to their department branch.'}
                 {scope === 'Global' && 'Full access across all departments and records.'}
@@ -845,9 +874,9 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
           </div>
 
           {/* Summary */}
-          <div className="border border-casper/30 rounded-xl overflow-hidden bg-white shadow-sm">
-            <div className="bg-[#F8FAFB] px-4 py-2.5 border-b border-casper/20">
-              <span className="text-[9px] font-black uppercase tracking-widest text-juniper">Summary</span>
+          <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden shadow-sm" style={{ background: 'var(--shell-surface)' }}>
+            <div className="dialog-header px-4 py-2.5">
+              <span className="text-[9px] font-black uppercase tracking-widest">Summary</span>
             </div>
             <div className="p-4 space-y-2">
               {PERMISSIONS.map((p, i) => {
@@ -856,11 +885,11 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
                 return (
                   <div key={p}>
                     <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase">{p}</span>
-                      <span className="text-[9px] font-black text-juniper">{count}/{MODULES.length}</span>
+                      <span className="text-xs font-medium text-[var(--shell-text-muted)] uppercase">{p}</span>
+                      <span className="text-[9px] font-black text-[var(--shell-accent)]">{count}/{MODULES.length}</span>
                     </div>
-                    <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-juniper rounded-full transition-all duration-300" style={{ width: `${pct}%` }} />
+                    <div className="w-full h-1 modal-toggle-track rounded-full overflow-hidden">
+                      <div className="h-full bg-[var(--shell-accent)] rounded-full transition-all duration-300" style={{ width: `${pct}%` }} />
                     </div>
                   </div>
                 );
@@ -869,6 +898,6 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
           </div>
         </div>
       </div>
-    </Modal>
+    </ModuleModal>
   );
 }

@@ -1,7 +1,7 @@
 /**
  * Row Mapper Utility
  * Adds UPPERCASE aliases for all snake_case properties.
- * Bridges Prisma camelCase → repo snake_case → frontend UPPERCASE.
+ * Bridges Prisma camelCase → snake_case → frontend UPPERCASE.
  */
 export function addUppercaseAliases<T extends Record<string, any>>(obj: T): T & Record<string, any> {
   if (!obj || typeof obj !== 'object') return obj;

@@ -24,6 +24,7 @@ export interface User {
   postal_code?: string | null;
   user_status?: string;
   user_status_label?: string;
+  date_of_birth?: string | null;
 }
 
 export interface Role {
@@ -106,6 +107,12 @@ export interface Transaction {
   user_id: number;
   type: 'income' | 'expense';
   amount: number;
+  net_amount?: number;
+  total_amount?: number;
+  gst_rate?: number | null;
+  gst_included?: boolean;
+  is_claimable?: boolean;
+  needs_reimbursement?: boolean;
   description: string;
   date_recorded: string;
   category_id: number;
@@ -123,6 +130,31 @@ export interface Transaction {
   context_type?: string;
   status?: string;
   notes?: string;
+  currency?: string;
+  created_at?: string;
+  updated_at?: string;
+  submitted_at?: string;
+  submitted_by_id?: number;
+  submitted_by_name?: string;
+  approved_by_id?: number;
+  approved_by_name?: string;
+  approved_by_role?: string;
+  approved_at?: string;
+  rejected_by_id?: number;
+  rejected_by_name?: string;
+  rejected_by_role?: string;
+  rejected_at?: string;
+  sent_back_by_id?: number;
+  sent_back_by_name?: string;
+  sent_back_by_role?: string;
+  sent_back_at?: string;
+  is_split?: number;
+  context_code?: string;
+  reimbursement_status?: string | null;
+  reimbursed_at?: string | null;
+  reimbursed_by_name?: string | null;
+  reimbursement_reference?: string | null;
+  reimbursement_note?: string | null;
 }
 
 export interface Budget {
@@ -138,8 +170,13 @@ export interface Budget {
 
 export interface RecurringTransaction {
   id: number;
+  code?: string;
   user_id: number;
   amount: number;
+  net_amount?: number;
+  total_amount?: number;
+  gst_rate?: number | null;
+  gst_included?: boolean;
   description: string;
   category_id: number;
   category_name?: string;
@@ -147,16 +184,65 @@ export interface RecurringTransaction {
   frequency: string;
   next_run_date: string;
   next_run?: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  last_run_date?: string | null;
   is_active: number;
+  status?: string;
+  payment_method?: string;
+  project_id?: number | null;
+  project_name?: string | null;
+  client_id?: number | null;
+  client_name?: string | null;
+  product_id?: number | null;
+  product_name?: string | null;
+  receipt_path?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface ApprovalRequest {
   id: number;
+  record_type?: 'transaction' | 'recurring';
   transaction_id: number;
+  recurring_id?: number;
   approver_id: number;
+  level_num?: number;
   status: string;
+  transaction_status?: string;
   comments?: string;
   created_at: string;
+  reference_id?: string;
+  type?: string;
+  amount?: number;
+  net_amount?: number;
+  total_amount?: number;
+  gst_rate?: number | null;
+  is_claimable?: boolean;
+  needs_reimbursement?: boolean;
+  is_split?: number;
+  date_recorded?: string;
+  category_name?: string;
+  description?: string;
+  receipt_path?: string;
+  submitted_by?: string;
+  submitted_by_name?: string;
+  submitted_by_id?: number;
+  submitted_at?: string;
+  approved_by_name?: string;
+  approved_by_role?: string;
+  approved_at?: string;
+  rejected_by_name?: string;
+  rejected_by_role?: string;
+  rejected_at?: string;
+  sent_back_by_name?: string;
+  sent_back_by_role?: string;
+  sent_back_at?: string;
+  reimbursement_status?: string | null;
+  reimbursed_at?: string | null;
+  reimbursed_by_name?: string | null;
+  reimbursement_reference?: string | null;
+  reimbursement_note?: string | null;
   transaction?: Transaction;
 }
 
@@ -164,11 +250,24 @@ export interface AuditLog {
   id: number;
   table_name: string;
   record_id: number;
+  reference_id?: string;
   action: string;
   changed_by: number;
   username?: string;
   old_values?: string;
   new_values?: string;
+  changed_at: string;
+}
+
+export interface Notification {
+  id: number;
+  type: string;
+  title: string;
+  message?: string;
+  entity_type?: string;
+  entity_id?: number;
+  reference_id?: string;
+  is_read: boolean;
   created_at: string;
 }
 

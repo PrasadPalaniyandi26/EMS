@@ -6,60 +6,47 @@ import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
-import { DataTableFacetedFilter } from "./data-table-faceted-filter"
-
 interface DataTableToolbarProps<TData> {
   table: Table<TData>
-  facetedFilters?: {
-    columnId: string
-    title: string
-    options: {
-      label: string
-      value: string
-      icon?: React.ComponentType<{ className?: string }>
-    }[]
-  }[]
+  actions?: React.ReactNode
+  extra?: React.ReactNode
 }
 
 export function DataTableToolbar<TData>({
   table,
-  facetedFilters = [],
+  actions,
+  extra,
 }: DataTableToolbarProps<TData>) {
+  if (!table) return null;
   const isFiltered = table.getState().columnFilters.length > 0 || !!table.getState().globalFilter
 
   return (
-    <div className="flex items-center justify-end pb-2">
-      <div className="flex items-center space-x-2 ml-auto">
-        <div className="relative w-[280px]">
+    <div className="flex flex-wrap items-center justify-between gap-2 w-full">
+      {/* Left: action buttons */}
+      {actions && (
+        <div className="flex items-center gap-2 shrink-0 self-center flex-wrap">
+          {actions}
+        </div>
+      )}
+
+      {/* Right: search + reset */}
+      <div className="flex items-center gap-2 ml-auto self-center">
+        <div className="relative w-full sm:w-[220px] min-w-[140px]">
           <Input
-            placeholder="Intelligent search..."
+            placeholder="Search..."
             value={(table.getState().globalFilter as string) ?? ""}
-            onChange={(event) =>
-              table.setGlobalFilter(event.target.value)
-            }
-            className="h-9 w-full bg-white border-casper rounded-lg pl-3 pr-8 text-[12px] placeholder-casper focus-visible:ring-1 focus-visible:ring-juniper focus-visible:border-juniper"
+            onChange={(event) => table.setGlobalFilter(event.target.value)}
+            className="h-8 w-full rounded-full pl-4 pr-7 text-[12.5px] focus-visible:ring-1"
+            style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)', color: 'var(--shell-text)' }}
           />
           {((table.getState().globalFilter as string) ?? "") && (
             <button
               onClick={() => table.setGlobalFilter("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-casper hover:text-charcoal rounded-md transition-colors"
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 transition-colors"
+              style={{ color: 'var(--shell-text-muted)' }}
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="h-3 w-3" />
             </button>
-          )}
-        </div>
-        
-        <div className="flex items-center gap-2">
-          {facetedFilters.map(
-            (filter) =>
-              table.getColumn(filter.columnId) && (
-                <DataTableFacetedFilter
-                  key={filter.columnId}
-                  column={table.getColumn(filter.columnId)}
-                  title={filter.title}
-                  options={filter.options}
-                />
-              )
           )}
         </div>
 
@@ -67,15 +54,18 @@ export function DataTableToolbar<TData>({
           <Button
             variant="ghost"
             onClick={() => {
-              table.resetColumnFilters()
-              table.setGlobalFilter("")
+              table.resetColumnFilters();
+              table.setGlobalFilter("");
             }}
-            className="h-9 px-3 text-[11px] font-bold text-juniper hover:bg-mystic/50"
+            className="h-8 px-3 text-[12px] font-medium rounded-lg"
+            style={{ color: 'var(--shell-text-muted)' }}
           >
             Reset
-            <X className="ml-2 h-3.5 w-3.5" />
+            <X className="ml-1.5 h-3 w-3" />
           </Button>
         )}
+
+        {extra}
       </div>
     </div>
   )

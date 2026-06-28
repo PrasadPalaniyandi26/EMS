@@ -3,22 +3,22 @@
 import { useEffect, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
+import { useSidebarStore } from '@/stores/sidebar-store';
 import { getAccessToken } from '@/lib/api-client';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Footer } from '@/components/layout/footer';
 import { TopBar } from '@/components/layout/topbar';
+import { BottomNav } from '@/components/layout/bottom-nav';
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading, refreshSession } = useAuthStore();
+  const { slim } = useSidebarStore();
   const router = useRouter();
 
   useEffect(() => {
-    // Only try refresh if we don't already have a token
-    // (e.g., page reload — the in-memory token is lost but cookie may still be valid)
     if (!getAccessToken()) {
       refreshSession();
     } else {
-      // Token already exists (just logged in), mark as done loading
       useAuthStore.setState({ isLoading: false });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -32,8 +32,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#F0F4F5]">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-juniper border-t-transparent" />
+      <div className="flex h-screen items-center justify-center" style={{ background: 'var(--shell-bg)' }}>
+        <div className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--shell-accent)] border-t-transparent" />
       </div>
     );
   }
@@ -41,14 +41,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
   if (!isAuthenticated) return null;
 
   return (
-    <div className="relative min-h-screen">
+    <div className={`relative min-h-dvh ${slim ? 'layout-slim' : ''}`}>
       <Sidebar />
       <TopBar />
       <main className="main-workspace">
         {children}
       </main>
-      {/* <Footer /> */}
+      <Footer />
+      <BottomNav />
     </div>
   );
 }
-

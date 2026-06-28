@@ -1,6 +1,6 @@
 import type { ApiResponse } from './types';
 
-const API_BASE = '/api/v1';
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '/api/v1';
 
 let accessToken: string | null = null;
 let refreshPromise: Promise<string> | null = null;
@@ -28,6 +28,7 @@ export async function refreshAccessToken(): Promise<string> {
     .then(async (res) => {
       if (!res.ok) throw new Error('Refresh failed');
       const data = await res.json();
+      if (!data.data?.accessToken) throw new Error('Invalid refresh response');
       accessToken = data.data.accessToken;
       return accessToken!;
     })
@@ -55,8 +56,8 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
 
   let res = await fetch(url, { ...options, headers, credentials: 'include' });
 
-  // If 401, try refreshing
-  if (res.status === 401 && accessToken) {
+  // If 401, try refreshing (even if accessToken is null — page reload clears it but cookie is still valid)
+  if (res.status === 401) {
     try {
       await refreshAccessToken();
       headers['Authorization'] = `Bearer ${accessToken}`;
@@ -105,6 +106,9 @@ export const api = {
 
   put: <T>(endpoint: string, body?: unknown) =>
     apiRequest<T>(endpoint, { method: 'PUT', body: body instanceof FormData ? body : JSON.stringify(body) }),
+
+  patch: <T>(endpoint: string, body?: unknown) =>
+    apiRequest<T>(endpoint, { method: 'PATCH', body: body instanceof FormData ? body : JSON.stringify(body) }),
 
   delete: <T>(endpoint: string) =>
     apiRequest<T>(endpoint, { method: 'DELETE' }),

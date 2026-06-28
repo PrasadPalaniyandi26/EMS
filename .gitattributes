@@ -1,0 +1,27 @@
+# Normalize line endings on commit; checkout uses platform default for text files
+* text=auto
+
+# Shell scripts must always have LF — CRLF breaks bash on Linux/macOS
+*.sh text eol=lf
+
+# Batch scripts must always have CRLF — required by cmd.exe on Windows
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Gradle wrapper scripts
+gradlew text eol=lf
+gradlew.bat text eol=crlf
+
+# Binaries — no line-ending conversion
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.ttf binary
+*.woff binary
+*.woff2 binary
+*.zip binary
+*.apk binary
+*.ipa binary

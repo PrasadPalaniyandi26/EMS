@@ -1,12 +1,14 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import * as crypto from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
 
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private audit: AuditService) {}
 
   private normalizeStatus(raw?: string): string {
     if (!raw) return 'ACTIVE';
@@ -17,7 +19,7 @@ export class UsersService {
   }
 
   private mapUser(user: any) {
-    return ({
+    return {
       id: user.id,
       username: user.username,
       email: user.email,
@@ -37,46 +39,44 @@ export class UsersService {
         role_name: ur.role?.name,
         is_default: ur.isDefault,
       })),
-      contact_no: user.contact_no ?? null,
-      house_apt: user.house_apt ?? null,
+      contact_no: user.contactNo ?? null,
+      house_apt: user.houseApt ?? null,
       address: user.address ?? null,
       city: user.city ?? null,
       country: user.country ?? null,
-      postal_code: user.postal_code ?? null,
-      user_status: user.user_status || (user.isActive ? 'ACTIVE' : 'INACTIVE'),
-      user_status_label: user.user_status === 'ON_HOLD' ? 'On Hold' : user.user_status === 'INACTIVE' ? 'Inactive' : 'Active',
-    });
+      postal_code: user.postalCode ?? null,
+      user_status: !user.isActive ? 'INACTIVE' : (user.userStatus ? this.normalizeStatus(user.userStatus) : 'ACTIVE'),
+      user_status_label: !user.isActive ? 'Inactive' : (this.normalizeStatus(user.userStatus) === 'ON_HOLD' ? 'On Hold' : 'Active'),
+      date_of_birth: user.dateOfBirth ?? null,
+      login_name: user.loginName ?? null,
+    };
   }
+
+  private readonly userInclude = {
+    roleRelation: true,
+    manager: true,
+    userRoles: { include: { role: true } },
+  } as const;
 
   async findAll() {
     const users = await this.prisma.user.findMany({
-      include: { roleRelation: true, manager: true, userRoles: { include: { role: true } } },
+      include: this.userInclude,
       orderBy: { createdAt: 'desc' },
     });
-    const ids = users.map((u) => u.id);
-    const extras = ids.length > 0
-      ? await this.prisma.$queryRawUnsafe(
-          `SELECT id, contact_no, house_apt, address, city, country, postal_code, user_status FROM users WHERE id = ANY($1::int[])`,
-          ids,
-        ) as any[]
-      : [];
-    const extraMap = Object.fromEntries(extras.map((e) => [e.id, e]));
-    return users.map((u) => this.mapUser({ ...u, ...extraMap[u.id] }));
+    return users.map((u) => this.mapUser(u));
   }
 
   async findById(id: number) {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      include: { roleRelation: true, manager: true, userRoles: { include: { role: true } } },
+      include: this.userInclude,
     });
     if (!user) throw new HttpException('User not found.', HttpStatus.NOT_FOUND);
-    const extras = await this.prisma.$queryRaw<any[]>`SELECT contact_no, house_apt, address, city, country, postal_code, user_status FROM users WHERE id = ${id}`;
-    const extra = extras[0] || {};
-    return this.mapUser({ ...user, ...extra });
+    return this.mapUser(user);
   }
 
   async create(dto: any) {
-    const password = dto.password || 'Temporary123!';
+    const password = dto.password || crypto.randomBytes(12).toString('base64url');
     const hash = await bcrypt.hash(password, 10);
     try {
       const user = await this.prisma.user.create({
@@ -86,39 +86,41 @@ export class UsersService {
           passwordHash: hash,
           role: dto.role || 'user',
           roleId: dto.role_id ? Number(dto.role_id) : (dto.roleId ? Number(dto.roleId) : null),
-          managerId: dto.reporting_manager_id ? Number(dto.reporting_manager_id) : (dto.manager_id ? Number(dto.manager_id) : (dto.managerId ? Number(dto.managerId) : null)),
+          managerId: dto.reporting_manager_id ? Number(dto.reporting_manager_id) : (dto.manager_id ? Number(dto.manager_id) : null),
           department: dto.department || null,
           clearanceLevel: dto.clearance_level || dto.clearanceLevel || 'Level 1',
-          joiningDate: dto.joining_date ? new Date(dto.joining_date) : (dto.joiningDate ? new Date(dto.joiningDate) : null),
+          joiningDate: dto.joining_date ? new Date(dto.joining_date) : null,
+          contactNo: dto.contact_no || null,
+          houseApt: dto.house_apt || null,
+          address: dto.address || null,
+          city: dto.city || null,
+          country: dto.country || null,
+          postalCode: dto.postal_code || null,
+          userStatus: this.normalizeStatus(dto.status),
+          dateOfBirth: dto.date_of_birth ? new Date(dto.date_of_birth) : null,
+          loginName: dto.login_name ? dto.login_name.toLowerCase().trim() : null,
         },
       });
 
-      // Assign roles from dto.roles[] or default to Employee role
       if (dto.roles && Array.isArray(dto.roles) && dto.roles.length > 0) {
         await this.setUserRoles(user.id, dto.roles);
       } else if (user.roleId) {
-        // Create a default UserRole entry from the assigned roleId
         await this.prisma.userRole.create({
           data: { userId: user.id, roleId: user.roleId, isDefault: true },
         });
       }
 
-      await this.prisma.$executeRaw`
-        UPDATE users SET
-          contact_no = ${dto.contact_no || null},
-          house_apt = ${dto.house_apt || null},
-          address = ${dto.address || null},
-          city = ${dto.city || null},
-          country = ${dto.country || null},
-          postal_code = ${dto.postal_code || null},
-          user_status = ${this.normalizeStatus(dto.status)}
-        WHERE id = ${user.id}
-      `;
-
-      return this.findById(user.id);
+      const created = await this.findById(user.id);
+      this.audit.log({
+        tableName: 'users', recordId: user.id,
+        action: 'CREATE', changedBy: user.id,
+        newValues: { username: created.username, email: created.email, role_name: created.role_name },
+      }).catch((e: any) => this.logger.warn('Audit log failed on user create', e?.message));
+      return created;
     } catch (err: any) {
       if (err.code === 'P2002') {
-        const field = err.meta?.target?.includes('email') ? 'email' : 'username';
+        const target = err.meta?.target || '';
+        const field = target.includes('email') ? 'email' : target.includes('login_name') ? 'username (login name)' : 'username';
         throw new HttpException(`A user with this ${field} already exists.`, HttpStatus.CONFLICT);
       }
       this.logger.error('Error creating user', err?.stack ?? err);
@@ -126,7 +128,8 @@ export class UsersService {
     }
   }
 
-  async update(id: number, dto: any) {
+  async update(id: number, dto: any, changedBy?: number) {
+    const oldSnapshot = await this.findById(id).catch(() => null);
     const data: any = {};
     if (dto.username !== undefined) data.username = dto.username;
     if (dto.email !== undefined) data.email = dto.email;
@@ -149,35 +152,43 @@ export class UsersService {
     if (dto.isActive !== undefined) data.isActive = Boolean(dto.isActive);
     else if (dto.is_active !== undefined) data.isActive = Boolean(dto.is_active);
 
+    if (dto.contact_no !== undefined) data.contactNo = dto.contact_no || null;
+    if (dto.house_apt !== undefined) data.houseApt = dto.house_apt || null;
+    if (dto.address !== undefined) data.address = dto.address || null;
+    if (dto.city !== undefined) data.city = dto.city || null;
+    if (dto.country !== undefined) data.country = dto.country || null;
+    if (dto.postal_code !== undefined) data.postalCode = dto.postal_code || null;
+    if (dto.status !== undefined || dto.user_status !== undefined)
+      data.userStatus = this.normalizeStatus(dto.status || dto.user_status);
+    if (dto.date_of_birth !== undefined)
+      data.dateOfBirth = dto.date_of_birth ? new Date(dto.date_of_birth) : null;
+
+    if (dto.login_name !== undefined)
+      data.loginName = dto.login_name ? dto.login_name.toLowerCase().trim() : null;
+
     if (dto.password) {
-      const hash = await bcrypt.hash(dto.password, 10);
-      data.passwordHash = hash;
+      data.passwordHash = await bcrypt.hash(dto.password, 10);
     }
 
     try {
       await this.prisma.user.update({ where: { id }, data });
 
-      // Sync roles if provided
       if (dto.roles && Array.isArray(dto.roles) && dto.roles.length > 0) {
         await this.setUserRoles(id, dto.roles);
       }
 
-      await this.prisma.$executeRaw`
-        UPDATE users SET
-          contact_no = ${dto.contact_no || null},
-          house_apt = ${dto.house_apt || null},
-          address = ${dto.address || null},
-          city = ${dto.city || null},
-          country = ${dto.country || null},
-          postal_code = ${dto.postal_code || null},
-          user_status = ${this.normalizeStatus(dto.status || dto.user_status)}
-        WHERE id = ${id}
-      `;
-
-      return this.findById(id);
+      const updated = await this.findById(id);
+      this.audit.log({
+        tableName: 'users', recordId: id,
+        action: 'UPDATE', changedBy: changedBy ?? id,
+        oldValues: oldSnapshot, newValues: updated,
+      }).catch((e: any) => this.logger.warn('Audit log failed on user update', e?.message));
+      return updated;
     } catch (err: any) {
       if (err.code === 'P2002') {
-        throw new HttpException('Username or email already in use.', HttpStatus.CONFLICT);
+        const target = err.meta?.target || '';
+        const field = target.includes('email') ? 'email' : target.includes('login_name') ? 'username (login name)' : 'username';
+        throw new HttpException(`A user with this ${field} already exists.`, HttpStatus.CONFLICT);
       }
       this.logger.error(`Error updating user ${id}`, err?.stack ?? err);
       throw err;
@@ -222,8 +233,15 @@ export class UsersService {
     }
   }
 
-  async delete(id: number) {
+  async delete(id: number, changedBy?: number) {
+    const existing = await this.prisma.user.findUnique({ where: { id }, select: { username: true, email: true } });
     await this.prisma.user.update({ where: { id }, data: { isActive: false } });
+    this.audit.log({
+      tableName: 'users', recordId: id,
+      action: 'DELETE', changedBy: changedBy ?? id,
+      oldValues: { username: existing?.username, is_active: true },
+      newValues: { is_active: false, status: 'DEACTIVATED' },
+    }).catch((e: any) => this.logger.warn('Audit log failed on user deactivate', e?.message));
     return { message: 'User deactivated.' };
   }
 
@@ -241,21 +259,47 @@ export class UsersService {
     }));
   }
 
+  async findManagersAndAdmins() {
+    // Find users who have MANAGER or ADMIN in any assigned role (user_roles),
+    // OR as their default role. Filter by userStatus != INACTIVE.
+    // Raw SQL needed here because the filter spans a join across user_roles + roles.
+    const rows = await this.prisma.$queryRawUnsafe<any[]>(`
+      SELECT DISTINCT u.id, u.username, u.email, u.role, def_r.role_name
+      FROM users u
+      LEFT JOIN roles def_r ON u.role_id = def_r.role_id
+      WHERE u.user_status != 'INACTIVE'
+        AND (
+          def_r.role_name IN ('MANAGER', 'ADMIN')
+          OR EXISTS (
+            SELECT 1 FROM user_roles ur
+            JOIN roles r ON ur.role_id = r.role_id
+            WHERE ur.user_id = u.id AND r.role_name IN ('MANAGER', 'ADMIN')
+          )
+        )
+      ORDER BY u.username
+    `);
+    return rows.map((u) => ({
+      id: u.id,
+      username: u.username,
+      email: u.email,
+      role: u.role,
+      role_name: u.role_name,
+    }));
+  }
+
   async getPermissions(userId: number) {
-    const rows = await this.prisma.$queryRaw<any[]>`
-      SELECT permissions, single_limit, monthly_limit, data_scope FROM user_permissions WHERE user_id = ${userId}
-    `;
-    if (rows.length === 0) return null;
-    const r = rows[0];
+    const perm = await this.prisma.userPermission.findUnique({ where: { userId } });
+    if (!perm) return null;
     return {
-      permissions: r.permissions,
-      single_limit: Number(r.single_limit),
-      monthly_limit: Number(r.monthly_limit),
-      data_scope: r.data_scope,
+      permissions: perm.permissions,
+      single_limit: Number(perm.singleLimit),
+      monthly_limit: Number(perm.monthlyLimit),
+      data_scope: perm.dataScope,
     };
   }
 
   async setPermissions(userId: number, data: any) {
+    // Raw SQL needed: Prisma doesn't support ON CONFLICT upsert with ::jsonb cast cleanly
     await this.prisma.$executeRawUnsafe(
       `INSERT INTO user_permissions (user_id, permissions, single_limit, monthly_limit, data_scope)
        VALUES ($1, $2::jsonb, $3, $4, $5)
@@ -274,14 +318,13 @@ export class UsersService {
     return this.getPermissions(userId);
   }
 
-  // --- User Allocations ---
   async findAllAllocations(userId: number) {
     const allocations = await this.prisma.userAllocation.findMany({
       where: { userId },
       include: { client: true },
       orderBy: { createdAt: 'desc' },
     });
-    return allocations.map(a => ({
+    return allocations.map((a) => ({
       id: a.id,
       user_id: a.userId,
       client_id: a.clientId,
@@ -306,10 +349,9 @@ export class UsersService {
     }
 
     try {
-      const a = await this.prisma.userAllocation.create({
+      return await this.prisma.userAllocation.create({
         data: { userId, clientId, category, type: data.type || category, code },
       });
-      return a;
     } catch (error) {
       this.logger.error('Error creating allocation', error?.stack ?? error);
       throw new HttpException(error?.message || 'Failed to create allocation', HttpStatus.BAD_REQUEST);

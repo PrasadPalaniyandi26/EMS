@@ -1,15 +1,17 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useHeaderStore } from '@/stores/header-store';
+import { useAuthStore } from '@/stores/auth-store';
 import { useClients, useProducts, useProductTypes, useUsers, useInvalidate } from '@/hooks/use-queries';
 import api from '@/lib/api-client';
+import { CURRENCY_SYMBOL } from '@/lib/currency';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import {
-  PlusCircle, Pencil, Trash2, X, ListTree, CalendarClock,
+  Plus, PlusCircle, Pencil, Trash2, X, ListTree, CalendarClock,
   Package, Search, ChevronDown, ArrowUpRight,
   CircleDollarSign, Layers,
 } from 'lucide-react';
@@ -28,12 +30,13 @@ import {
 } from "@tanstack/react-table";
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
+import { CurrencyInput } from '@/components/shared/modal-primitives';
 
 // ─── Style tokens ─────────────────────────────────────────────────────────────
-const LABEL = 'block text-[10px] font-bold text-juniper uppercase tracking-[0.1em] mb-1';
-const INPUT = 'w-full bg-white border border-casper/50 rounded-lg h-10 px-3 text-[13px] text-charcoal font-medium focus:outline-none focus:ring-1 focus:ring-juniper/50 placeholder:text-casper/60';
-const SELECT_CLS = 'w-full bg-white border border-casper/50 rounded-lg h-10 px-3 text-[13px] text-charcoal font-medium focus:outline-none focus:ring-1 focus:ring-juniper/50 appearance-none pr-8';
-const TEXTAREA = 'w-full bg-white border border-casper/50 rounded-lg px-3 py-2 text-[13px] text-charcoal font-medium focus:outline-none focus:ring-1 focus:ring-juniper/50 placeholder:text-casper/60 resize-none';
+const LABEL = 'block text-[10px] font-bold text-[var(--shell-text-muted)] normal-case tracking-normal mb-1';
+const INPUT = 'w-full bg-[var(--shell-surface)] border border-[var(--shell-border)] rounded-lg h-10 px-3 text-[13px] text-[var(--shell-text)] font-medium focus:outline-none focus:ring-1 focus:ring-[var(--shell-accent)]/50 placeholder:text-[var(--shell-text-muted)]';
+const SELECT_CLS = 'w-full bg-[var(--shell-surface)] border border-[var(--shell-border)] rounded-lg h-10 px-3 text-[13px] text-[var(--shell-text)] font-medium focus:outline-none focus:ring-1 focus:ring-[var(--shell-accent)]/50 appearance-none pr-8';
+const TEXTAREA = 'w-full bg-[var(--shell-surface)] border border-[var(--shell-border)] rounded-lg px-3 py-2 text-[13px] text-[var(--shell-text)] font-medium focus:outline-none focus:ring-1 focus:ring-[var(--shell-accent)]/50 placeholder:text-[var(--shell-text-muted)] resize-none';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 interface ProductForm {
@@ -69,12 +72,12 @@ const defaultSchedule = (): ScheduleForm => ({
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function ModalHeader({ icon, title, onClose }: { icon: React.ReactNode; title: string; onClose: () => void }) {
   return (
-    <div className="h-[52px] bg-juniper flex items-center justify-between px-5 shrink-0">
+    <div className="h-[52px] bg-[var(--shell-surface)] flex items-center justify-between px-5 shrink-0">
       <div className="flex items-center gap-2.5">
-        <span className="text-white/80">{icon}</span>
-        <h2 className="text-white text-[12px] font-bold tracking-[0.15em] uppercase">{title}</h2>
+        <span className="text-[var(--shell-text-muted)]">{icon}</span>
+        <h2 className="text-black dark:text-white text-[12px] font-bold tracking-[0.15em] uppercase">{title}</h2>
       </div>
-      <button onClick={onClose} className="text-white/70 hover:text-white transition-colors">
+      <button onClick={onClose} className="text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] transition-colors">
         <X className="h-4 w-4" />
       </button>
     </div>
@@ -83,11 +86,11 @@ function ModalHeader({ icon, title, onClose }: { icon: React.ReactNode; title: s
 
 function SegmentedControl({ options, value, onChange }: { options: string[]; value: string; onChange: (v: string) => void }) {
   return (
-    <div className="flex p-1 bg-[#FAF9F6] border border-casper/50 rounded-lg gap-1">
+    <div className="flex p-1 bg-[var(--shell-hover)] border border-[var(--shell-border)] rounded-xl gap-1">
       {options.map(opt => (
         <button key={opt} type="button" onClick={() => onChange(opt)}
           className={`flex-1 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${
-            value === opt ? 'bg-juniper text-white shadow-sm' : 'text-casper hover:text-charcoal'
+            value === opt ? 'bg-[var(--shell-surface)] text-white border border-[var(--shell-border)] shadow-sm' : 'text-[var(--shell-text-muted)] hover:text-[var(--shell-text-muted)]'
           }`}>
           {opt}
         </button>
@@ -106,8 +109,12 @@ function SelectField({ className, children, ...props }: React.SelectHTMLAttribut
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
+
+
 export default function ProductsPage() {
   const setHeader = useHeaderStore((s) => s.setHeader);
+  const user = useAuthStore((s) => s.user);
+  const currencySymbol = CURRENCY_SYMBOL[user?.currency || 'INR'] || '₹';
   const { data: clients } = useClients();
   const { data: usersData } = useUsers();
   const allUsers = Array.isArray(usersData) ? usersData : [];
@@ -154,24 +161,6 @@ export default function ProductsPage() {
 
   const selectedRows = table.getSelectedRowModel().rows;
   const selectedProduct = selectedRows.length > 0 ? selectedRows[0].original : null;
-
-  const facetedFilters = useMemo(() => [
-    {
-      columnId: 'type_name',
-      title: 'Type',
-      options: Array.from(new Set((products || []).map(p => p.type_name).filter(Boolean))).map(n => ({ label: n!, value: n! })),
-    },
-    {
-      columnId: 'client_name',
-      title: 'Client',
-      options: Array.from(new Set((products || []).map(p => p.client_name).filter(Boolean))).map(n => ({ label: n!, value: n! })),
-    },
-    {
-      columnId: 'status',
-      title: 'Status',
-      options: ['R&D', 'Prototype', 'Assembly', 'Quality', 'Market Ready', 'Active', 'Inactive'].map(v => ({ label: v, value: v })),
-    },
-  ], [products]);
 
   // ── Add type ──
   const handleAddType = async () => {
@@ -249,158 +238,149 @@ export default function ProductsPage() {
   return (
     <ModuleShell
       showPanel={!!selectedProduct}
-      actionsRow={
-        <>
-          <div className="flex items-center gap-3">
-            <button onClick={openAdd}
-              className="flex items-center gap-2 px-3 py-1.5 bg-white border border-casper rounded-md text-[11px] font-bold text-[#121212] uppercase tracking-wider hover:bg-slate-50 transition-colors shadow-sm">
-              <PlusCircle className="h-4 w-4 text-emerald-600" /> Add Product
-            </button>
-            <button disabled={selectedRows.length !== 1} onClick={openEdit}
-              className="flex items-center gap-2 px-3 py-1.5 bg-white border border-casper rounded-md text-[11px] font-bold text-[#121212] uppercase tracking-wider hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-40">
-              <Pencil className="h-4 w-4 text-blue-500" /> Edit
-            </button>
-            <button disabled={selectedRows.length !== 1} onClick={openBOM}
-              className="flex items-center gap-2 px-3 py-1.5 bg-white border border-casper rounded-md text-[11px] font-bold text-[#121212] uppercase tracking-wider hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-40">
-              <ListTree className="h-4 w-4 text-teal-600" /> BOM
-            </button>
-            <button onClick={openSchedule}
-              className="flex items-center gap-2 px-3 py-1.5 bg-white border border-casper rounded-md text-[11px] font-bold text-[#121212] uppercase tracking-wider hover:bg-slate-50 transition-colors shadow-sm">
-              <CalendarClock className="h-4 w-4 text-violet-600" /> Schedule
-            </button>
-            <button disabled={selectedRows.length === 0} onClick={() => setDeleteId(selectedRows[0].original.id)}
-              className="flex items-center gap-2 px-3 py-1.5 bg-white border border-casper rounded-md text-[11px] font-bold text-[#121212] uppercase tracking-wider hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-40">
-              <Trash2 className="h-4 w-4 text-rose-500" /> Delete
-            </button>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-              {products?.length || 0} Total Products
-            </span>
-          </div>
-        </>
-      }
       searchRow={
-        <DataTableToolbar table={table} facetedFilters={facetedFilters} />
+        <DataTableToolbar
+          table={table}
+          actions={
+            <>
+              <button className="btn-action" onClick={openAdd}>
+                <Plus className="h-4 w-4 text-green-600" /> Add
+              </button>
+              <button className="btn-action" disabled={selectedRows.length !== 1} onClick={openEdit}>
+                <Pencil className="h-4 w-4 text-blue-500" /> Edit
+              </button>
+              <button className="btn-action" disabled={selectedRows.length !== 1} onClick={openBOM}>
+                <ListTree className="h-4 w-4 text-teal-600" /> BOM
+              </button>
+              <button className="btn-action" onClick={openSchedule}>
+                <CalendarClock className="h-4 w-4 text-violet-600" /> Schedule
+              </button>
+              <button className="btn-action" disabled={selectedRows.length === 0} onClick={() => setDeleteId(selectedRows[0].original.id)}>
+                <Trash2 className="h-4 w-4 text-rose-500" /> Delete
+              </button>
+            </>
+          }
+        />
       }
       intelligencePanel={
-        selectedProduct && (
           <ModuleIntelligencePanel
             title="Product Intelligence"
             onClose={() => setRowSelection({})}
+            hasSelection={!!selectedProduct}
           >
+            {selectedProduct && (<>
             {/* Identity card */}
-            <div className="bg-white/40 backdrop-blur-[6px] border border-white/40 rounded-[12px] p-5 shadow-sm space-y-4">
+            <div className="bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)] p-4 space-y-2.5">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="font-extrabold text-[15px] text-[#121212] leading-tight">{selectedProduct.name}</h4>
-                  <p className="text-[10px] font-bold text-juniper uppercase tracking-widest mt-0.5">
+                  <h4 className="font-extrabold text-[15px] text-black dark:text-white leading-tight">{selectedProduct.name}</h4>
+                  <p className="text-[10px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest mt-0.5">
                     {selectedProduct.code || `PRD-${String(selectedProduct.id).padStart(3, '0')}`}
                   </p>
                 </div>
-                <span className="p-2 bg-juniper/10 rounded-lg text-juniper">
+                <span className="p-2 bg-[var(--shell-hover)] rounded-lg text-[var(--shell-text-muted)]">
                   <Package className="h-5 w-5" />
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-3 pt-2">
-                <div className="p-3 bg-white/60 rounded-lg border border-casper/30">
-                  <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Type</p>
-                  <p className="text-sm font-black text-charcoal truncate">{selectedProduct.type_name || '—'}</p>
+                <div className="p-3 bg-[var(--shell-hover)] rounded-lg border border-[var(--shell-border)]">
+                  <p className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase mb-1">Type</p>
+                  <p className="text-sm font-black text-[var(--shell-text-muted)] truncate">{selectedProduct.type_name || '—'}</p>
                 </div>
-                <div className="p-3 bg-white/60 rounded-lg border border-casper/30">
-                  <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Client</p>
-                  <p className="text-sm font-black text-juniper truncate">{selectedProduct.client_name || '—'}</p>
+                <div className="p-3 bg-[var(--shell-hover)] rounded-lg border border-[var(--shell-border)]">
+                  <p className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase mb-1">Client</p>
+                  <p className="text-sm font-black text-[var(--shell-accent)] truncate">{selectedProduct.client_name || '—'}</p>
                 </div>
               </div>
               {selectedProduct.description && (
-                <p className="text-[11px] text-slate-500 leading-relaxed border-t border-casper/30 pt-3">{selectedProduct.description}</p>
+                <p className="text-[11px] text-[var(--shell-text-muted)] leading-relaxed border-t border-[var(--shell-border)] pt-3">{selectedProduct.description}</p>
               )}
             </div>
 
             {/* Production metrics */}
-            <div className="bg-white/40 backdrop-blur-[6px] border border-white/40 rounded-[12px] p-5 shadow-sm space-y-4">
-              <h4 className="text-[11px] font-bold text-[#121212] uppercase tracking-wider flex items-center gap-2">
-                <CircleDollarSign className="h-4 w-4 text-juniper" /> Production Metrics
+            <div className="bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)] p-4 space-y-2.5">
+              <h4 className="text-[11px] font-bold text-black dark:text-white uppercase tracking-wider flex items-center gap-2">
+                <CircleDollarSign className="h-4 w-4 text-[var(--shell-text-muted)]" /> Production Metrics
               </h4>
               <div className="space-y-3">
                 <div>
                   <div className="flex justify-between text-[10px] font-bold mb-1.5 uppercase tracking-wider">
-                    <span className="text-slate-500">Quality Score</span>
-                    <span className="text-emerald-600">94%</span>
+                    <span className="text-[var(--shell-text-muted)]">Quality Score</span>
+                    <span className="text-emerald-500">94%</span>
                   </div>
-                  <div className="w-full h-1.5 bg-slate-200/50 rounded-full overflow-hidden">
-                    <div className="w-[94%] h-full bg-emerald-500 rounded-full" />
+                  <div className="w-full h-1.5 bg-[var(--shell-hover)] rounded-full overflow-hidden">
+                    <div className="w-[94%] h-full bg-[var(--shell-accent)] rounded-full" />
                   </div>
                 </div>
                 <div>
                   <div className="flex justify-between text-[10px] font-bold mb-1.5 uppercase tracking-wider">
-                    <span className="text-slate-500">Production Efficiency</span>
-                    <span className="text-juniper">78%</span>
+                    <span className="text-[var(--shell-text-muted)]">Production Efficiency</span>
+                    <span className="text-[var(--shell-accent)]">78%</span>
                   </div>
-                  <div className="w-full h-1.5 bg-slate-200/50 rounded-full overflow-hidden">
-                    <div className="w-[78%] h-full bg-juniper rounded-full" />
+                  <div className="w-full h-1.5 bg-[var(--shell-hover)] rounded-full overflow-hidden">
+                    <div className="w-[78%] h-full bg-[var(--shell-accent)] rounded-full" />
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Production lifecycle */}
-            <div className="bg-white/40 backdrop-blur-[6px] border border-white/40 rounded-[12px] p-5 shadow-sm">
+            <div className="bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)] p-4">
               <div className="flex items-center justify-between mb-4">
-                <h4 className="text-[11px] font-bold text-[#121212] uppercase tracking-wider flex items-center gap-2">
-                  <Layers className="h-4 w-4 text-juniper" /> Lifecycle Stage
+                <h4 className="text-[11px] font-bold text-black dark:text-white uppercase tracking-wider flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-[var(--shell-text-muted)]" /> Lifecycle Stage
                 </h4>
               </div>
               <div className="flex items-center gap-1">
                 {['R&D', 'Proto', 'Assembly', 'QA', 'Ready'].map((stage, i) => (
                   <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                    <div className={`w-full h-1.5 rounded-full ${i <= 1 ? 'bg-juniper' : 'bg-slate-200'}`} />
-                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">{stage}</span>
+                    <div className={`w-full h-1.5 rounded-full ${i <= 1 ? 'bg-[var(--shell-accent)]' : 'bg-[var(--shell-hover)]'}`} />
+                    <span className="text-[8px] font-bold text-[var(--shell-text-muted)] uppercase tracking-tighter">{stage}</span>
                   </div>
                 ))}
               </div>
             </div>
 
             {/* Unit run output trend */}
-            <div className="bg-white/40 backdrop-blur-[6px] border border-white/40 rounded-[12px] p-5 shadow-sm">
+            <div className="bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)] p-4">
               <div className="flex items-center justify-between mb-4">
-                <h4 className="text-[11px] font-bold text-[#121212] uppercase tracking-wider">Unit Output Trend</h4>
-                <p className="text-[9px] font-bold text-emerald-600 uppercase">+8% Monthly</p>
+                <h4 className="text-[11px] font-bold text-black dark:text-white uppercase tracking-wider">Unit Output Trend</h4>
+                <p className="text-[9px] font-bold text-emerald-500 uppercase">+8% Monthly</p>
               </div>
               <div className="h-24 w-full flex items-end justify-between px-1 gap-1">
                 {[30, 45, 38, 60, 52, 75, 68].map((h, i) => (
                   <div key={i} style={{ height: `${h}%` }}
-                    className={`w-full rounded-t-sm transition-all duration-500 ${i === 5 ? 'bg-juniper' : 'bg-juniper/20'}`} />
+                    className={`w-full rounded-t-sm transition-all duration-500 ${i === 5 ? 'bg-[var(--shell-accent)]' : 'bg-[var(--shell-hover)]'}`} />
                 ))}
               </div>
-              <div className="flex justify-between mt-2 text-[8px] font-bold text-slate-400 uppercase tracking-tighter">
+              <div className="flex justify-between mt-2 text-[8px] font-bold text-[var(--shell-text-muted)] uppercase tracking-tighter">
                 <span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span>
               </div>
             </div>
 
             {/* Quick actions */}
-            <div className="bg-white/40 backdrop-blur-[6px] border border-white/40 rounded-[12px] p-5 shadow-sm space-y-3">
-              <h4 className="text-[11px] font-bold text-[#121212] uppercase tracking-wider">Quick Actions</h4>
-              <button onClick={openBOM} className="w-full flex items-center justify-between p-3 bg-white/60 border border-casper/30 rounded-lg hover:bg-white transition-colors group">
+            <div className="bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)] p-4 space-y-3">
+              <h4 className="text-[11px] font-bold text-black dark:text-white uppercase tracking-wider">Quick Actions</h4>
+              <button onClick={openBOM} className="w-full flex items-center justify-between p-3 bg-[var(--shell-hover)] border border-[var(--shell-border)] rounded-lg hover:bg-[var(--shell-hover)] transition-colors group">
                 <div className="flex items-center gap-2">
                   <ListTree className="h-4 w-4 text-teal-600" />
-                  <span className="text-[11px] font-bold text-charcoal">Manage BOM</span>
+                  <span className="text-[11px] font-bold text-[var(--shell-text-muted)]">Manage BOM</span>
                 </div>
-                <ArrowUpRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-juniper transition-colors" />
+                <ArrowUpRight className="h-3.5 w-3.5 text-[var(--shell-text-muted)] group-hover:text-[var(--shell-accent)] transition-colors" />
               </button>
-              <button onClick={openSchedule} className="w-full flex items-center justify-between p-3 bg-white/60 border border-casper/30 rounded-lg hover:bg-white transition-colors group">
+              <button onClick={openSchedule} className="w-full flex items-center justify-between p-3 bg-[var(--shell-hover)] border border-[var(--shell-border)] rounded-lg hover:bg-[var(--shell-hover)] transition-colors group">
                 <div className="flex items-center gap-2">
                   <CalendarClock className="h-4 w-4 text-violet-600" />
-                  <span className="text-[11px] font-bold text-charcoal">Schedule Production</span>
+                  <span className="text-[11px] font-bold text-[var(--shell-text-muted)]">Schedule Production</span>
                 </div>
-                <ArrowUpRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-juniper transition-colors" />
+                <ArrowUpRight className="h-3.5 w-3.5 text-[var(--shell-text-muted)] group-hover:text-[var(--shell-accent)] transition-colors" />
               </button>
             </div>
+            </>)}
           </ModuleIntelligencePanel>
-        )
       }
     >
-      <DataTable columns={columns} data={products || []} tableInstance={table} />
+      <DataTable columns={columns} data={products || []} tableInstance={table} emptyMessage="No products found. Click Add to create one." />
 
       {/* ══ ADD / EDIT PRODUCT (shared layout) ══ */}
       {[
@@ -408,14 +388,14 @@ export default function ProductsPage() {
         { open: editOpen, onClose: () => setEditOpen(false), isEdit: true },
       ].map(({ open, onClose, isEdit }) => (
         <Dialog key={isEdit ? 'edit' : 'add'} open={open} onOpenChange={onClose}>
-          <DialogContent className="sm:max-w-[860px] w-[95vw] p-0 overflow-hidden border-none shadow-2xl flex flex-col bg-[#FAF9F6] rounded-xl" showCloseButton={false}>
+          <DialogContent className="sm:max-w-[860px] w-[95vw] p-0 overflow-hidden border-none shadow-2xl flex flex-col bg-[var(--shell-surface)] rounded-xl" showCloseButton={false}>
             <ModalHeader
               icon={isEdit ? <Pencil className="h-4 w-4" /> : <Package className="h-4 w-4" />}
               title={isEdit ? 'Edit Product' : 'Add New Product'}
               onClose={onClose}
             />
-            <div className="pt-3 px-6 pb-4 max-h-[82vh] overflow-y-auto custom-scrollbar flex-1 space-y-4">
-              <div className="grid grid-cols-2 gap-x-6">
+            <div className="pt-2 px-4 pb-3 max-h-[82vh] overflow-y-auto custom-scrollbar flex-1 space-y-2.5">
+              <div className="grid grid-cols-2 gap-x-4">
                 {/* LEFT — Product Name, Client, Product Type */}
                 <div className="space-y-3">
                   <div><label className={LABEL}>Product Name *</label>
@@ -434,14 +414,14 @@ export default function ProductsPage() {
                     <button
                       type="button"
                       onClick={() => { setShowNewType(!showNewType); setNewTypeName(''); }}
-                      className="flex items-center gap-1.5 text-[9px] font-bold text-juniper hover:underline mt-1"
+                      className="flex items-center gap-1.5 text-[9px] font-bold text-indigo-600 hover:underline mt-1"
                     >
                       <PlusCircle className="w-3 h-3" /> {showNewType ? 'CANCEL' : 'CREATE NEW TYPE'}
                     </button>
                     {showNewType && (
                       <div className="mt-1 flex gap-2">
                         <input
-                          className="h-8 text-[12px] bg-white border border-casper/40 rounded-lg flex-1 px-3 focus:outline-none focus:ring-1 focus:ring-juniper/50"
+                          className="h-8 text-[12px] rounded-lg flex-1 px-3 focus:outline-none focus:ring-1" style={{ background: 'var(--shell-surface)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)', border: '1px solid var(--shell-border)' }}
                           placeholder="e.g. Robotic Assembly"
                           value={newTypeName}
                           onChange={e => setNewTypeName(e.target.value)}
@@ -450,7 +430,7 @@ export default function ProductsPage() {
                         <button
                           type="button"
                           onClick={handleAddType}
-                          className="h-8 px-3 bg-juniper hover:brightness-110 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest"
+                          className="h-8 px-3 bg-[var(--shell-accent)] hover:bg-indigo-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest"
                         >
                           Add
                         </button>
@@ -475,8 +455,9 @@ export default function ProductsPage() {
                     </SelectField></div>
                   <div><label className={LABEL}>Model / Version</label>
                     <input className={INPUT} placeholder="e.g. v2.1.0" value={form.model} onChange={e => setForm({ ...form, model: e.target.value })} /></div>
-                  <div><label className={LABEL}>Est. Unit Cost ($)</label>
-                    <input className={INPUT} type="number" min="0" step="0.01" placeholder="0.00" value={form.unitCost} onChange={e => setForm({ ...form, unitCost: e.target.value })} /></div>
+                  <div><label className={LABEL}>Est. Unit Cost</label>
+                    <CurrencyInput value={form.unitCost} onChange={(v) => setForm({ ...form, unitCost: v })} />
+                  </div>
                 </div>
               </div>
               <div>
@@ -488,9 +469,9 @@ export default function ProductsPage() {
                 <textarea className={`${TEXTAREA} w-full`} rows={3} placeholder="Describe the manufacturing process..." value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
               </div>
             </div>
-            <div className="px-5 py-3.5 border-t border-casper/20 bg-mystic/20 flex justify-end gap-3 shrink-0">
-              <button onClick={onClose} className="h-9 px-5 text-[11px] font-bold uppercase tracking-wider text-casper hover:text-charcoal transition-colors">Cancel</button>
-              <button onClick={() => handleSave(isEdit)} className="h-9 px-6 bg-juniper hover:brightness-110 text-white rounded-lg text-[11px] font-bold uppercase tracking-wider shadow-sm">
+            <div className="px-5 py-3.5 border-t border-[var(--shell-border)] bg-[var(--shell-surface)] flex justify-end gap-3 shrink-0">
+              <button onClick={onClose} className="h-9 px-5 text-[11px] font-bold uppercase tracking-wider text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] transition-colors">Cancel</button>
+              <button onClick={() => handleSave(isEdit)} className="h-9 px-6 bg-[var(--shell-surface)] hover:bg-[#566070] text-white rounded-lg text-[11px] font-bold uppercase tracking-wider border border-[var(--shell-border)] shadow-sm">
                 {isEdit ? 'Save Changes' : 'Create Product'}
               </button>
             </div>
@@ -500,59 +481,59 @@ export default function ProductsPage() {
 
       {/* ══ BOM MODAL ══ */}
       <Dialog open={bomOpen} onOpenChange={setBomOpen}>
-        <DialogContent className="sm:max-w-[860px] w-[95vw] p-0 overflow-hidden border-none shadow-2xl flex flex-col rounded-xl bg-[#FAF9F6]" showCloseButton={false}>
+        <DialogContent className="sm:max-w-[860px] w-[95vw] p-0 overflow-hidden border-none shadow-2xl flex flex-col rounded-xl bg-[var(--shell-surface)]" showCloseButton={false}>
           <ModalHeader icon={<ListTree className="h-4 w-4" />} title="Bill of Materials" onClose={() => setBomOpen(false)} />
           <div className="pt-3 px-5 pb-4 overflow-y-auto max-h-[82vh] flex-1 space-y-3">
             <div className="grid grid-cols-3 gap-x-5 gap-y-3">
               <div><label className={LABEL}>Assembly Name</label>
-                <input className="w-full h-8 text-[12px] bg-[#F0F4F5] border border-casper/50 rounded-lg px-3 text-charcoal font-medium cursor-not-allowed focus:outline-none" readOnly value={selectedProduct?.name || '—'} /></div>
+                <input className="w-full h-8 text-[12px] bg-[var(--shell-hover)] border border-[var(--shell-border)] rounded-lg px-3 text-[var(--shell-text-muted)] font-medium cursor-not-allowed focus:outline-none" readOnly value={selectedProduct?.name || '—'} /></div>
               <div><label className={LABEL}>BOM Version</label>
-                <input className="w-full h-8 text-[12px] bg-white border border-casper/50 rounded-lg px-3 text-charcoal font-medium focus:outline-none focus:ring-1 focus:ring-juniper/50" placeholder="e.g. v1.0.0" defaultValue="v1.0.0" /></div>
+                <input className="w-full h-8 text-[12px] bg-[var(--shell-surface)] border border-[var(--shell-border)] rounded-lg px-3 text-[var(--shell-text)] font-medium focus:outline-none focus:ring-1 focus:ring-[var(--shell-accent)]/50" placeholder="e.g. v1.0.0" defaultValue="v1.0.0" /></div>
               <div><label className={LABEL}>Effective Date</label>
-                <input className="w-full h-8 text-[12px] bg-white border border-casper/50 rounded-lg px-3 text-charcoal font-medium focus:outline-none focus:ring-1 focus:ring-juniper/50" type="date" /></div>
+                <input className="w-full h-8 text-[12px] bg-[var(--shell-surface)] border border-[var(--shell-border)] rounded-lg px-3 text-[var(--shell-text)] font-medium focus:outline-none focus:ring-1 focus:ring-[var(--shell-accent)]/50" type="date" /></div>
             </div>
             <div><label className={LABEL}>Revision Notes</label>
-              <input className="w-full h-8 text-[12px] bg-white border border-casper/50 rounded-lg px-3 text-charcoal font-medium focus:outline-none focus:ring-1 focus:ring-juniper/50" placeholder="Optional notes..." /></div>
+              <input className="w-full h-8 text-[12px] bg-[var(--shell-surface)] border border-[var(--shell-border)] rounded-lg px-3 text-[var(--shell-text)] font-medium focus:outline-none focus:ring-1 focus:ring-[var(--shell-accent)]/50" placeholder="Optional notes..." /></div>
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-casper" />
-                <input className="w-full pl-8 h-8 bg-white border border-casper/50 rounded-lg text-[12px] focus:outline-none focus:ring-1 focus:ring-juniper/50 font-medium placeholder:text-casper/60"
+                <input className="w-full pl-8 h-8 bg-[var(--shell-surface)] border border-[var(--shell-border)] rounded-lg text-[12px] text-[var(--shell-text)] focus:outline-none focus:ring-1 focus:ring-[var(--shell-accent)]/50 font-medium placeholder:text-[var(--shell-text-muted)]"
                   placeholder="Search components..." value={bomSearch} onChange={e => setBomSearch(e.target.value)} />
               </div>
               <div className="relative">
-                <select className="h-8 pl-3 pr-7 bg-white border border-casper/50 rounded-lg text-[12px] font-medium text-charcoal focus:outline-none appearance-none">
+                <select className="h-8 pl-3 pr-7 bg-[var(--shell-surface)] border border-[var(--shell-border)] rounded-lg text-[12px] font-medium text-[var(--shell-text)] focus:outline-none appearance-none">
                   <option value="">All Categories</option>
                   <option>Mechanical</option><option>Electronics</option><option>Consumables</option>
                 </select>
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-casper pointer-events-none" />
               </div>
-              <button className="flex items-center gap-1.5 h-8 px-3 bg-juniper hover:brightness-110 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider">
+              <button className="flex items-center gap-1.5 h-8 px-3 bg-[var(--shell-accent)] hover:bg-indigo-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider">
                 <PlusCircle className="h-3 w-3" /> Add Component
               </button>
-              <button className="flex items-center gap-1.5 h-8 px-3 bg-white border border-casper text-charcoal hover:bg-slate-50 rounded-lg text-[10px] font-bold uppercase tracking-wider">
+              <button className="flex items-center gap-1.5 h-8 px-3 bg-[var(--shell-hover)] border border-[var(--shell-border)] text-[var(--shell-text-muted)] hover:bg-[var(--shell-hover)] rounded-lg text-[10px] font-bold uppercase tracking-wider">
                 Import
               </button>
             </div>
-            <div className="flex items-center justify-between bg-white border border-casper/40 rounded-lg px-4 py-2">
+            <div className="flex items-center justify-between bg-[var(--shell-hover)] border border-[var(--shell-border)] rounded-lg px-4 py-2">
               <div>
-                <p className="text-[9px] font-bold text-casper uppercase tracking-widest">Total Items</p>
-                <p className="text-lg font-black text-charcoal">{bomItems.length}</p>
+                <p className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest">Total Items</p>
+                <p className="text-lg font-black text-black dark:text-white">{bomItems.length}</p>
               </div>
               <div className="h-6 w-px bg-casper/30" />
               <div className="text-right">
-                <p className="text-[9px] font-bold text-casper uppercase tracking-widest">Total BOM Cost</p>
-                <p className="text-lg font-black text-juniper">${bomTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                <p className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest">Total BOM Cost</p>
+                <p className="text-lg font-black text-[var(--shell-accent)]">{currencySymbol}{bomTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
               </div>
             </div>
-            <div className="border border-casper/40 rounded-lg overflow-hidden">
+            <div className="border border-[var(--shell-border)] rounded-lg overflow-hidden">
               <table className="w-full text-[12px] border-collapse">
-                <thead className="bg-juniper text-white">
+                <thead className="dialog-header">
                   <tr>
-                    <th className="px-3 py-2 text-center text-[9px] font-bold tracking-wider uppercase border-r border-white/10 w-24">Item Code</th>
-                    <th className="px-3 py-2 text-left text-[9px] font-bold tracking-wider uppercase border-r border-white/10">Component Name</th>
-                    <th className="px-3 py-2 text-center text-[9px] font-bold tracking-wider uppercase border-r border-white/10 w-20">Qty</th>
-                    <th className="px-3 py-2 text-center text-[9px] font-bold tracking-wider uppercase border-r border-white/10 w-16">Unit</th>
-                    <th className="px-3 py-2 text-right text-[9px] font-bold tracking-wider uppercase border-r border-white/10 w-28">Unit Cost</th>
+                    <th className="px-3 py-2 text-center text-[9px] font-bold tracking-wider uppercase border-r border-[var(--shell-border)] w-24">Item Code</th>
+                    <th className="px-3 py-2 text-left text-[9px] font-bold tracking-wider uppercase border-r border-[var(--shell-border)]">Component Name</th>
+                    <th className="px-3 py-2 text-center text-[9px] font-bold tracking-wider uppercase border-r border-[var(--shell-border)] w-20">Qty</th>
+                    <th className="px-3 py-2 text-center text-[9px] font-bold tracking-wider uppercase border-r border-[var(--shell-border)] w-16">Unit</th>
+                    <th className="px-3 py-2 text-right text-[9px] font-bold tracking-wider uppercase border-r border-[var(--shell-border)] w-28">Unit Cost</th>
                     <th className="px-3 py-2 text-right text-[9px] font-bold tracking-wider uppercase w-28">Line Total</th>
                   </tr>
                 </thead>
@@ -560,40 +541,41 @@ export default function ProductsPage() {
                   {bomItems
                     .filter(i => !bomSearch || i.name.toLowerCase().includes(bomSearch.toLowerCase()) || i.code.toLowerCase().includes(bomSearch.toLowerCase()))
                     .map(item => (
-                      <tr key={item.id} className="hover:bg-slate-50/60">
-                        <td className="px-3 py-2 text-center border-r border-casper/20">
-                          <span className="font-mono font-black text-[11px] text-juniper">{item.code}</span></td>
-                        <td className="px-3 py-2 font-medium text-charcoal border-r border-casper/20">{item.name}</td>
-                        <td className="px-3 py-2 text-center border-r border-casper/20">
-                          <input className="w-14 h-6 text-center border border-casper/50 rounded text-[11px] font-bold text-charcoal focus:outline-none focus:ring-1 focus:ring-juniper/50"
+                      <tr key={item.id} className="hover:bg-[var(--shell-hover)]">
+                        <td className="px-3 py-2 text-center border-r border-zinc-100">
+                          <span className="font-mono font-black text-[11px] text-[var(--shell-accent)]">{item.code}</span></td>
+                        <td className="px-3 py-2 font-medium text-[var(--shell-text-muted)] border-r border-zinc-100">{item.name}</td>
+                        <td className="px-3 py-2 text-center border-r border-zinc-100">
+                          <input className="w-14 h-6 text-center bg-[var(--shell-surface)] border border-[var(--shell-border)] rounded text-[11px] font-bold text-[var(--shell-text)] focus:outline-none focus:ring-1 focus:ring-[var(--shell-accent)]/50"
                             type="number" min="0" value={item.qty}
-                            onChange={e => setBomItems(prev => prev.map(i => i.id === item.id ? { ...i, qty: Number(e.target.value) } : i))} /></td>
-                        <td className="px-3 py-2 text-center border-r border-casper/20 text-casper font-bold text-[10px] uppercase">{item.unit}</td>
-                        <td className="px-3 py-2 text-right border-r border-casper/20 font-medium text-charcoal">${item.unitCost.toFixed(2)}</td>
-                        <td className="px-3 py-2 text-right font-bold text-juniper">${(item.qty * item.unitCost).toFixed(2)}</td>
+                            onChange={e => setBomItems(prev => prev.map(i => i.id === item.id ? { ...i, qty: Number(e.target.value) } : i))}
+                            onKeyDown={(e) => { if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault(); }} /></td>
+                        <td className="px-3 py-2 text-center border-r border-zinc-100 text-[var(--shell-text-muted)] font-bold text-[10px] uppercase">{item.unit}</td>
+                        <td className="px-3 py-2 text-right border-r border-zinc-100 font-medium text-[var(--shell-text-muted)]">{currencySymbol}{item.unitCost.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-right font-bold text-[var(--shell-accent)]">{currencySymbol}{(item.qty * item.unitCost).toFixed(2)}</td>
                       </tr>
                     ))}
                 </tbody>
               </table>
             </div>
           </div>
-          <div className="px-5 py-3 border-t border-casper/20 bg-mystic/20 flex justify-end gap-3 shrink-0">
-            <button onClick={() => setBomOpen(false)} className="h-9 px-5 text-[11px] font-bold uppercase tracking-wider text-casper hover:text-charcoal transition-colors">Close</button>
+          <div className="px-5 py-3 border-t border-[var(--shell-border)] bg-[var(--shell-surface)] flex justify-end gap-3 shrink-0">
+            <button onClick={() => setBomOpen(false)} className="h-9 px-5 text-[11px] font-bold uppercase tracking-wider text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] transition-colors">Close</button>
             <button onClick={() => { toast.success('BOM saved'); setBomOpen(false); }}
-              className="h-9 px-6 bg-juniper hover:brightness-110 text-white rounded-lg text-[11px] font-bold uppercase tracking-wider shadow-sm">Save BOM</button>
+              className="h-9 px-6 bg-[var(--shell-accent)] hover:bg-indigo-600 text-white rounded-lg text-[11px] font-bold uppercase tracking-wider shadow-sm">Save BOM</button>
           </div>
         </DialogContent>
       </Dialog>
 
       {/* ══ SCHEDULE PRODUCTION ══ */}
       <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
-        <DialogContent className="sm:max-w-[860px] w-[95vw] p-0 overflow-hidden border-none shadow-2xl flex flex-col rounded-xl bg-[#FAF9F6]" showCloseButton={false}>
+        <DialogContent className="sm:max-w-[860px] w-[95vw] p-0 overflow-hidden border-none shadow-2xl flex flex-col rounded-xl bg-[var(--shell-surface)]" showCloseButton={false}>
           <ModalHeader icon={<CalendarClock className="h-4 w-4" />} title="Schedule Production Run" onClose={() => setScheduleOpen(false)} />
           <div className="pt-3 px-5 pb-4 overflow-y-auto max-h-[82vh] flex-1 space-y-3">
             <div className="grid grid-cols-3 gap-x-5 gap-y-3">
               <div><label className={LABEL}>Product Name</label>
                 <div className="relative">
-                  <input className="w-full h-8 text-[12px] bg-white border border-casper/50 rounded-lg px-3 pr-8 text-charcoal font-medium focus:outline-none focus:ring-1 focus:ring-juniper/50 placeholder:text-casper/60" placeholder="Search products..."
+                  <input className="w-full h-8 text-[12px] bg-[var(--shell-surface)] border border-[var(--shell-border)] rounded-lg px-3 pr-8 text-[var(--shell-text)] font-medium focus:outline-none focus:ring-1 focus:ring-[var(--shell-accent)]/50 placeholder:text-[var(--shell-text-muted)]" placeholder="Search products..."
                     value={scheduleForm.productId ? ((products || []).find(p => String(p.id) === scheduleForm.productId)?.name || scheduleForm.productId) : ''}
                     onChange={e => setScheduleForm({ ...scheduleForm, productId: e.target.value })} />
                   <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-3 w-3 text-casper" />
@@ -611,7 +593,7 @@ export default function ProductsPage() {
                   <option value="v0.9.0">v0.9.0 (Legacy)</option>
                 </SelectField></div>
               <div><label className={LABEL}>Batch Quantity</label>
-                <input className="w-full h-8 text-[12px] bg-white border border-casper/50 rounded-lg px-3 text-charcoal font-medium focus:outline-none focus:ring-1 focus:ring-juniper/50" type="number" min="1" value={scheduleForm.batchQty} onChange={e => setScheduleForm({ ...scheduleForm, batchQty: e.target.value })} /></div>
+                <input className="w-full h-8 text-[12px] bg-[var(--shell-surface)] border border-[var(--shell-border)] rounded-lg px-3 text-[var(--shell-text)] font-medium focus:outline-none focus:ring-1 focus:ring-[var(--shell-accent)]/50" type="number" min="1" value={scheduleForm.batchQty} onChange={e => setScheduleForm({ ...scheduleForm, batchQty: e.target.value })} onKeyDown={(e) => { if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault(); }} /></div>
               <div><label className={LABEL}>Production Line</label>
                 <SelectField value={scheduleForm.productionLine} onChange={e => setScheduleForm({ ...scheduleForm, productionLine: e.target.value })}
                   className="!h-8 !text-[12px]">
@@ -626,36 +608,36 @@ export default function ProductsPage() {
                   {allUsers.map((u: any) => <option key={u.id} value={u.id}>{u.name || u.username}</option>)}
                 </SelectField></div>
               <div><label className={LABEL}>Start Date</label>
-                <input className="w-full h-8 text-[12px] bg-white border border-casper/50 rounded-lg px-3 text-charcoal font-medium focus:outline-none focus:ring-1 focus:ring-juniper/50" type="date" value={scheduleForm.startDate} onChange={e => setScheduleForm({ ...scheduleForm, startDate: e.target.value })} /></div>
+                <input className="w-full h-8 text-[12px] bg-[var(--shell-surface)] border border-[var(--shell-border)] rounded-lg px-3 text-[var(--shell-text)] font-medium focus:outline-none focus:ring-1 focus:ring-[var(--shell-accent)]/50" type="date" value={scheduleForm.startDate} onChange={e => setScheduleForm({ ...scheduleForm, startDate: e.target.value })} /></div>
               <div><label className={LABEL}>Target Completion</label>
-                <input className="w-full h-8 text-[12px] bg-white border border-casper/50 rounded-lg px-3 text-charcoal font-medium focus:outline-none focus:ring-1 focus:ring-juniper/50" type="date" value={scheduleForm.endDate} onChange={e => setScheduleForm({ ...scheduleForm, endDate: e.target.value })} /></div>
+                <input className="w-full h-8 text-[12px] bg-[var(--shell-surface)] border border-[var(--shell-border)] rounded-lg px-3 text-[var(--shell-text)] font-medium focus:outline-none focus:ring-1 focus:ring-[var(--shell-accent)]/50" type="date" value={scheduleForm.endDate} onChange={e => setScheduleForm({ ...scheduleForm, endDate: e.target.value })} /></div>
             </div>
             <div><label className={LABEL}>Run Priority</label>
               <SegmentedControl options={['Standard', 'Urgent', 'Critical']} value={scheduleForm.priority} onChange={v => setScheduleForm({ ...scheduleForm, priority: v as any })} /></div>
-            <div className="flex items-center justify-between bg-white border border-casper/40 rounded-lg px-4 py-2">
-              <div><p className="text-[9px] font-bold text-casper uppercase tracking-widest">Material Readiness</p><p className="text-base font-black text-charcoal">—</p></div>
+            <div className="flex items-center justify-between bg-[var(--shell-hover)] border border-[var(--shell-border)] rounded-lg px-4 py-2">
+              <div><p className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest">Material Readiness</p><p className="text-base font-black text-black dark:text-white">—</p></div>
               <div className="h-6 w-px bg-casper/30" />
-              <div><p className="text-[9px] font-bold text-casper uppercase tracking-widest">Estimated Labor</p><p className="text-base font-black text-charcoal">—</p></div>
+              <div><p className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest">Estimated Labor</p><p className="text-base font-black text-black dark:text-white">—</p></div>
               <div className="h-6 w-px bg-casper/30" />
-              <div className="text-right"><p className="text-[9px] font-bold text-casper uppercase tracking-widest">Projected Run Cost</p><p className="text-base font-black text-juniper">—</p></div>
+              <div className="text-right"><p className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest">Projected Run Cost</p><p className="text-base font-black text-[var(--shell-accent)]">—</p></div>
             </div>
             <div><label className={LABEL}>Pre-Run Checklist</label>
               <div className="space-y-1.5">
                 {([['checkMaterial', 'Material Staging Verified'], ['checkEquipment', 'Equipment Calibration Complete'], ['checkQC', 'QC Personnel Assigned']] as const).map(([key, label]) => (
-                  <div key={key} className="flex items-center gap-3 px-3 py-2 bg-white border border-casper/40 rounded-lg">
+                  <div key={key} className="flex items-center gap-3 px-3 py-2 bg-[var(--shell-hover)] border border-[var(--shell-border)] rounded-lg">
                     <Checkbox id={key} checked={scheduleForm[key]}
                       onCheckedChange={v => setScheduleForm({ ...scheduleForm, [key]: !!v })}
-                      className="border-casper data-[state=checked]:bg-juniper data-[state=checked]:text-white" />
-                    <label htmlFor={key} className="text-[11px] font-medium text-charcoal cursor-pointer select-none">{label}</label>
+                      className="border-[var(--shell-border)] data-[state=checked]:bg-[var(--shell-accent)] data-[state=checked]:text-white" />
+                    <label htmlFor={key} className="text-[11px] font-medium text-[var(--shell-text-muted)] cursor-pointer select-none">{label}</label>
                   </div>
                 ))}
               </div>
             </div>
           </div>
-          <div className="px-5 py-3 border-t border-casper/20 bg-mystic/20 flex justify-end gap-3 shrink-0">
-            <button onClick={() => setScheduleOpen(false)} className="h-9 px-5 text-[11px] font-bold uppercase tracking-wider text-casper hover:text-charcoal transition-colors">Cancel</button>
+          <div className="px-5 py-3 border-t border-[var(--shell-border)] bg-[var(--shell-surface)] flex justify-end gap-3 shrink-0">
+            <button onClick={() => setScheduleOpen(false)} className="h-9 px-5 text-[11px] font-bold uppercase tracking-wider text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] transition-colors">Cancel</button>
             <button onClick={() => { toast.success('Production run scheduled'); setScheduleOpen(false); }}
-              className="flex items-center gap-2 h-9 px-6 bg-juniper hover:brightness-110 text-white rounded-lg text-[11px] font-bold uppercase tracking-wider shadow-sm">
+              className="flex items-center gap-2 h-9 px-6 bg-[var(--shell-accent)] hover:bg-indigo-600 text-white rounded-lg text-[11px] font-bold uppercase tracking-wider shadow-sm">
               <CalendarClock className="h-3.5 w-3.5" /> Initiate Run
             </button>
           </div>
@@ -665,16 +647,16 @@ export default function ProductsPage() {
       {/* ══ DELETE CONFIRM ══ */}
       {deleteId && (
         <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-          <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-casper shadow-2xl flex flex-col" showCloseButton={false}>
-            <div className="flex items-center justify-between p-4 border-b border-casper bg-[#F0F4F5]">
+          <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-[var(--shell-border)] shadow-2xl flex flex-col bg-[var(--shell-surface)]" showCloseButton={false}>
+            <div className="flex items-center justify-between p-4 border-b border-[var(--shell-border)] bg-[var(--shell-surface)]">
               <h3 className="text-sm font-black text-rose-600 uppercase tracking-widest">Destructive Action</h3>
             </div>
-            <p className="text-xs text-slate-500 p-4">
+            <p className="text-xs text-[var(--shell-text-muted)] p-4">
               Are you sure you want to permanently delete this product? This action cannot be undone.
             </p>
             <div className="flex items-center gap-3 mt-2 p-4 pt-0">
-              <Button variant="outline" className="flex-1 text-[11px] font-bold border-casper" onClick={() => setDeleteId(null)}>Cancel</Button>
-              <Button className="flex-1 bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold shadow-lg shadow-rose-600/20" onClick={handleDelete}>Yes, Delete</Button>
+              <Button variant="outline" className="flex-1 text-[11px] font-bold border-[var(--shell-border)] text-[var(--shell-text-muted)]" onClick={() => setDeleteId(null)}>Cancel</Button>
+              <Button variant="destructive" className="flex-1 text-[11px] font-bold" onClick={handleDelete}>Yes, Delete</Button>
             </div>
           </DialogContent>
         </Dialog>

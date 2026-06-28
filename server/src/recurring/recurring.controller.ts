@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, ParseIntPipe } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { RecurringService } from './recurring.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -10,7 +10,7 @@ import { ApiTags } from '@nestjs/swagger';
 export class RecurringController {
   constructor(private service: RecurringService) {}
 
-  @Get() findAll(@CurrentUser('id') userId: number) { return this.service.findAll(userId); }
+  @Get() findAll(@CurrentUser('id') userId: number, @Query() query: any) { return this.service.findAll(userId, query); }
   @Get(':id') findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser('id') userId: number) {
     return this.service.findById(userId, id);
   }
@@ -20,6 +20,24 @@ export class RecurringController {
   }
   @Delete(':id') delete(@Param('id', ParseIntPipe) id: number, @CurrentUser('id') userId: number) {
     return this.service.delete(userId, id);
+  }
+  @Post(':id/submit') submit(@Param('id', ParseIntPipe) id: number, @CurrentUser('id') userId: number) {
+    return this.service.submit(userId, id);
+  }
+  @Post(':id/approve') approve(@Param('id', ParseIntPipe) id: number, @CurrentUser('id') userId: number) {
+    return this.service.approve(userId, id);
+  }
+  @Post(':id/reject') reject(@Param('id', ParseIntPipe) id: number, @Body() body: any, @CurrentUser('id') userId: number) {
+    return this.service.reject(userId, id, body?.comments);
+  }
+  @Post(':id/pause') pause(@Param('id', ParseIntPipe) id: number, @CurrentUser('id') userId: number) {
+    return this.service.pause(userId, id);
+  }
+  @Post(':id/resume') resume(@Param('id', ParseIntPipe) id: number, @Body() body: any, @CurrentUser('id') userId: number) {
+    return this.service.resume(userId, id, body);
+  }
+  @Get(':id/runs') getRunHistory(@Param('id', ParseIntPipe) id: number, @CurrentUser('id') userId: number) {
+    return this.service.getRunHistory(userId, id);
   }
   @Post('run-check') runCheck() { return this.service.processDue(); }
 }

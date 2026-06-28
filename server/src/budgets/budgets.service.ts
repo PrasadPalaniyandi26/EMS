@@ -5,46 +5,40 @@ import { PrismaService } from '../prisma/prisma.service';
 export class BudgetsService {
   constructor(private prisma: PrismaService) {}
 
-  private async fetchBudgets(extraWhere = '', params: any[] = []) {
-    const sql = `
-      SELECT b.*, b.name, b.department, b.owner_id, b.financial_year, b.details,
-             b.start_date, b.end_date, b.strict_enforcement, b.auto_rollover,
-             c.name AS category_name, c.icon AS category_icon,
-             u.username AS owner_name
-      FROM budgets b
-      LEFT JOIN categories c ON c.id = b.category_id
-      LEFT JOIN users u ON u.id = b.owner_id
-      ${extraWhere}
-      ORDER BY b.period_year DESC, b.period_month DESC, b.id DESC
-    `;
-    const rows = await (params.length > 0
-      ? this.prisma.$queryRawUnsafe(sql, ...params)
-      : this.prisma.$queryRawUnsafe(sql)) as any[];
-    return rows.map((b: any) => ({
-      id: b.id, code: b.code, user_id: b.user_id,
+  private mapBudget(b: any) {
+    return ({
+      id: b.id, code: b.code, user_id: b.userId,
       name: b.name || '', department: b.department || '', owner_id: b.owner_id,
-      owner_name: b.owner_name || '', financial_year: b.financial_year,
+      owner_name: b.users_budgets_owner_idTousers?.username || '', financial_year: b.financial_year,
       details: b.details || '', start_date: b.start_date, end_date: b.end_date,
       strict: b.strict_enforcement ?? true, rollover: b.auto_rollover ?? false,
-      category_id: b.category_id, category_name: b.category_name, category_icon: b.category_icon,
+      category_id: b.categoryId, category_name: b.category?.name, category_icon: b.category?.icon,
       amount: b.amount, allocated: b.amount,
-      period_month: b.period_month, period_year: b.period_year,
-      is_active: b.is_active ? 1 : 0, created_at: b.created_at, updated_at: b.updated_at,
-    }));
+      period_month: b.periodMonth, period_year: b.periodYear,
+      is_active: b.isActive ? 1 : 0, created_at: b.createdAt, updated_at: b.updatedAt,
+    });
   }
 
   async findAll(userId: number, filters: any = {}) {
-    const conditions = [`b.user_id = $1`];
-    const params: any[] = [userId];
-    if (!filters.includeInactive) conditions.push(`b.is_active = true`);
-    if (filters.month) { params.push(Number(filters.month)); conditions.push(`b.period_month = $${params.length}`); }
-    if (filters.year) { params.push(Number(filters.year)); conditions.push(`b.period_year = $${params.length}`); }
-    return this.fetchBudgets(`WHERE ${conditions.join(' AND ')}`, params);
+    const rows = await this.prisma.budget.findMany({
+      where: {
+        userId,
+        ...(!filters.includeInactive && { isActive: true }),
+        ...(filters.month && { periodMonth: Number(filters.month) }),
+        ...(filters.year && { periodYear: Number(filters.year) }),
+      },
+      include: { category: true, users_budgets_owner_idTousers: true },
+      orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }, { id: 'desc' }],
+    });
+    return rows.map((b) => this.mapBudget(b));
   }
 
   async findById(id: number, userId: number) {
-    const rows = await this.fetchBudgets(`WHERE b.id = $1 AND b.user_id = $2`, [id, userId]);
-    return rows[0] || null;
+    const b = await this.prisma.budget.findFirst({
+      where: { id, userId },
+      include: { category: true, users_budgets_owner_idTousers: true },
+    });
+    return b ? this.mapBudget(b) : null;
   }
 
   async create(userId: number, data: any) {
@@ -55,24 +49,19 @@ export class BudgetsService {
         amount: Number(data.allocated || data.amount || 0),
         periodMonth: Number(data.period_month || data.periodMonth || new Date().getMonth() + 1),
         periodYear: Number(data.financial_year || data.period_year || data.periodYear || new Date().getFullYear()),
+        name: data.name || null,
+        department: data.department || null,
+        owner_id: data.owner_id ? Number(data.owner_id) : null,
+        financial_year: Number(data.financial_year || new Date().getFullYear()),
+        details: data.details || null,
+        start_date: data.start_date ? new Date(data.start_date) : null,
+        end_date: data.end_date ? new Date(data.end_date) : null,
+        strict_enforcement: data.strict !== false,
+        auto_rollover: data.rollover === true,
       },
     });
     const code = `BUD-${String(10000 + b.id).padStart(5, '0')}`;
-    await this.prisma.$executeRawUnsafe(
-      `UPDATE budgets SET code=$1, name=$2, department=$3, owner_id=$4, financial_year=$5,
-       details=$6, start_date=$7::date, end_date=$8::date, strict_enforcement=$9, auto_rollover=$10 WHERE id=$11`,
-      code,
-      data.name || null,
-      data.department || null,
-      data.owner_id ? Number(data.owner_id) : null,
-      Number(data.financial_year || new Date().getFullYear()),
-      data.details || null,
-      data.start_date || null,
-      data.end_date || null,
-      data.strict !== false,
-      data.rollover === true,
-      b.id,
-    );
+    await this.prisma.budget.update({ where: { id: b.id }, data: { code } });
     return this.findById(b.id, userId);
   }
 
@@ -80,29 +69,22 @@ export class BudgetsService {
     await this.prisma.budget.updateMany({
       where: { id, userId },
       data: {
-        categoryId: data.categoryId ? Number(data.categoryId) : undefined,
-        amount: data.allocated !== undefined ? Number(data.allocated) : (data.amount !== undefined ? Number(data.amount) : undefined),
-        periodMonth: data.period_month ? Number(data.period_month) : (data.periodMonth ? Number(data.periodMonth) : undefined),
+        ...(data.categoryId !== undefined && { categoryId: data.categoryId ? Number(data.categoryId) : null }),
+        ...(data.allocated !== undefined ? { amount: Number(data.allocated) } : data.amount !== undefined ? { amount: Number(data.amount) } : {}),
+        ...(data.period_month !== undefined || data.periodMonth !== undefined ? { periodMonth: Number(data.period_month || data.periodMonth) } : {}),
+        ...(data.isActive !== undefined && { isActive: Boolean(data.isActive) }),
+        name: data.name || null,
+        department: data.department || null,
+        owner_id: data.owner_id ? Number(data.owner_id) : null,
+        financial_year: Number(data.financial_year || new Date().getFullYear()),
         periodYear: data.financial_year ? Number(data.financial_year) : (data.periodYear ? Number(data.periodYear) : undefined),
-        isActive: data.isActive !== undefined ? Boolean(data.isActive) : undefined,
+        details: data.details || null,
+        start_date: data.start_date ? new Date(data.start_date) : null,
+        end_date: data.end_date ? new Date(data.end_date) : null,
+        strict_enforcement: data.strict !== false,
+        auto_rollover: data.rollover === true,
       },
     });
-    await this.prisma.$executeRawUnsafe(
-      `UPDATE budgets SET name=$1, department=$2, owner_id=$3, financial_year=$4,
-       details=$5, start_date=$6::date, end_date=$7::date, strict_enforcement=$8, auto_rollover=$9
-       WHERE id=$10 AND user_id=$11`,
-      data.name || null,
-      data.department || null,
-      data.owner_id ? Number(data.owner_id) : null,
-      Number(data.financial_year || new Date().getFullYear()),
-      data.details || null,
-      data.start_date || null,
-      data.end_date || null,
-      data.strict !== false,
-      data.rollover === true,
-      id,
-      userId,
-    );
     return this.findById(id, userId);
   }
 
@@ -168,6 +150,39 @@ export class BudgetsService {
       });
     }
     return this.getMonthlySettings(userId, Number(data.periodMonth), Number(data.periodYear));
+  }
+
+  async checkBudget(userId: number, categoryId: number, amount: number, month: number, year: number) {
+    const budget = await this.prisma.budget.findFirst({
+      where: { userId, categoryId, periodMonth: month, periodYear: year, isActive: true },
+    });
+    if (!budget) return { has_budget: false };
+
+    const startOfMonth = new Date(year, month - 1, 1);
+    const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
+    const spent = await this.prisma.transaction.aggregate({
+      where: {
+        userId, categoryId, type: 'expense',
+        status: { in: ['APPROVED', 'PENDING_MANAGER', 'PENDING_FINANCE'] },
+        dateRecorded: { gte: startOfMonth, lte: endOfMonth },
+      },
+      _sum: { amount: true },
+    });
+
+    const allocated = parseFloat(Number(budget.amount).toFixed(2));
+    const spentAmount = parseFloat(Number(spent._sum.amount || 0).toFixed(2));
+    const remaining = parseFloat((allocated - spentAmount).toFixed(2));
+    const afterThis = parseFloat((remaining - amount).toFixed(2));
+
+    return {
+      has_budget: true,
+      allocated,
+      spent: spentAmount,
+      remaining,
+      after_this_expense: afterThis,
+      will_exceed: afterThis < 0,
+      utilization_pct: allocated > 0 ? parseFloat(((spentAmount / allocated) * 100).toFixed(1)) : 0,
+    };
   }
 
   async getSummary(userId: number, month: number, year: number) {

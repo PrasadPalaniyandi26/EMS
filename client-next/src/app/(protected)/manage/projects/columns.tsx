@@ -2,13 +2,14 @@
 
 import { ColumnDef } from "@tanstack/react-table"
 import { Project } from "@/lib/types"
+import { formatCurrency } from "@/lib/currency"
 
 export const columns: ColumnDef<Project>[] = [
   {
     accessorKey: "code",
     header: "Project ID",
     cell: ({ row }) => (
-      <span className="font-mono text-[12px] text-juniper font-bold">
+      <span className="font-mono text-[12px] text-blue-400 font-bold">
         {row.getValue("code") || `PRJ-${String(row.original.id).padStart(3, '0')}`}
       </span>
     ),
@@ -17,27 +18,18 @@ export const columns: ColumnDef<Project>[] = [
     accessorKey: "name",
     header: "Project Name",
     cell: ({ row }) => (
-      <div className="max-w-[240px]">
-        <p className="font-bold text-[13px] text-charcoal leading-tight">{row.getValue("name")}</p>
-        <p className="text-[10px] text-casper font-medium truncate">
-          {(row.original as any).description || "No scope defined"}
-        </p>
-      </div>
+      <span className="font-bold text-[13px] text-black dark:text-white leading-tight">
+        {row.getValue("name")}
+      </span>
     ),
   },
   {
     accessorKey: "type_name",
     header: "Type",
     cell: ({ row }) => (
-      <div className="flex justify-center">
-        {row.getValue("type_name") ? (
-          <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-[9px] font-bold border border-blue-100 uppercase tracking-tighter">
-            {row.getValue("type_name")}
-          </span>
-        ) : (
-          <span className="text-casper">—</span>
-        )}
-      </div>
+      <span className="text-[12px] text-blue-600 dark:text-blue-300 font-medium">
+        {row.getValue("type_name") || <span className="text-black/30 dark:text-white/35">—</span>}
+      </span>
     ),
   },
   {
@@ -45,12 +37,14 @@ export const columns: ColumnDef<Project>[] = [
     header: "Lead",
     cell: ({ row }) => {
       const lead = (row.original as any).lead || "Sarah Jenkins";
+      const leadParts = lead.trim().split(/\s+/);
+      const leadInitials = leadParts.length >= 2 ? (leadParts[0][0] + leadParts[leadParts.length - 1][0]).toUpperCase() : leadParts[0].slice(0, 2).toUpperCase();
       return (
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-[#F0F4F5] flex items-center justify-center text-[10px] font-black text-juniper uppercase border border-casper/30">
-            {lead[0]}
+          <div className="w-6 h-6 rounded-full bg-[var(--shell-hover)] flex items-center justify-center text-[10px] font-black text-[var(--shell-accent)] uppercase border border-[var(--shell-border)] shrink-0">
+            {leadInitials}
           </div>
-          <span className="text-[12px] font-semibold text-charcoal">{lead}</span>
+          <span className="text-[12px] font-semibold text-black/70 dark:text-white/80">{lead}</span>
         </div>
       );
     },
@@ -60,19 +54,17 @@ export const columns: ColumnDef<Project>[] = [
     header: "Status",
     cell: ({ row }) => {
       const status = (row.original as any).status || "Active";
-      const statusCls: Record<string, string> = {
-        'Active':    'bg-emerald-100 text-emerald-700 border-emerald-200',
-        'Proposed':  'bg-slate-100 text-slate-600 border-slate-200',
-        'On-Hold':   'bg-amber-100 text-amber-700 border-amber-200',
-        'Completed': 'bg-blue-100 text-blue-700 border-blue-200',
-        'Canceled':  'bg-rose-100 text-rose-700 border-rose-200',
+      const statusColor: Record<string, string> = {
+        'Active':    'text-emerald-500',
+        'Proposed':  'text-black/40 dark:text-white/50',
+        'On-Hold':   'text-amber-400',
+        'Completed': 'text-blue-400',
+        'Canceled':  'text-rose-400',
       };
       return (
-        <div className="flex justify-center">
-          <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-tight border ${statusCls[status] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
-            {status}
-          </span>
-        </div>
+        <span className={`text-[12px] font-semibold ${statusColor[status] || 'text-black/40 dark:text-white/50'}`}>
+          {status}
+        </span>
       );
     },
   },
@@ -80,8 +72,8 @@ export const columns: ColumnDef<Project>[] = [
     accessorKey: "budget",
     header: () => <div className="text-right">Est. Budget</div>,
     cell: ({ row }) => (
-      <div className="text-[12px] font-bold text-right text-juniper">
-        ${(row.original as any).budget || "0.00"}
+      <div className="text-[12px] font-bold text-right text-[var(--shell-accent)]">
+        {formatCurrency(Number((row.original as any).budget || 0), 'INR')}
       </div>
     ),
   },

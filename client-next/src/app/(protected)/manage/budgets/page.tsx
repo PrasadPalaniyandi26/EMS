@@ -4,9 +4,9 @@ import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useBudgets, useInvalidate } from '@/hooks/use-queries';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Send, Download } from 'lucide-react';
+import { Plus, Pencil, Trash2, Send } from 'lucide-react';
 import { formatCurrency } from '@/lib/currency';
-import { AddBudgetModal, ExportBudgetModal, SubmitBudgetModal, DeleteBudgetModal } from '@/components/budgets/budget-modals';
+import { AddBudgetModal, SubmitBudgetModal, DeleteBudgetModal } from '@/components/budgets/budget-modals';
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { columns, OrgBudget } from "./columns";
@@ -35,7 +35,6 @@ export default function BudgetsPage() {
   const [sorting, setSorting] = useState<SortingState>([]);
 
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [isExportOpen, setIsExportOpen] = useState(false);
   const [isSubmitOpen, setIsSubmitOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<any>(null);
@@ -62,8 +61,9 @@ export default function BudgetsPage() {
   const selectedCount = selectedRows.length;
 
   useEffect(() => {
-    setActiveRow(selectedRows.length === 1 ? selectedRows[0].original : null);
-  }, [selectedRows]);
+    const rows = table.getFilteredSelectedRowModel().rows;
+    setActiveRow(rows.length === 1 ? rows[0].original : null);
+  }, [rowSelection]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setHeader('Budget Management', 'Resource allocation and spend tracking');
@@ -83,7 +83,7 @@ export default function BudgetsPage() {
       setEditingRow(null);
       setRowSelection({});
     } catch (err: any) {
-      const msg = err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Failed to save budget.';
+      const msg = err?.message || 'Failed to save budget.';
       toast.error(msg);
     }
   };
@@ -115,77 +115,67 @@ export default function BudgetsPage() {
   return (
     <ModuleShell
       showPanel={!!activeRow}
-      actionsRow={
-        <>
-          <div className="flex items-center gap-3">
-            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-casper rounded-lg shadow-sm text-[11px] font-bold text-charcoal hover:bg-slate-50 transition-all" onClick={openAdd}>
-              <Plus className="h-[16px] w-[16px] text-green-600" /> Add Budget
-            </button>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-casper rounded-lg shadow-sm text-[11px] font-bold text-charcoal hover:bg-slate-50 transition-all disabled:opacity-40" onClick={openEdit} disabled={selectedCount !== 1}>
-              <Pencil className="h-[16px] w-[16px] text-blue-600" /> Edit
-            </button>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-casper rounded-lg shadow-sm text-[11px] font-bold text-charcoal hover:bg-slate-50 transition-all disabled:opacity-40" onClick={() => { if (selectedCount !== 1) { toast.error('Select exactly one budget to submit'); return; } setIsSubmitOpen(true); }} disabled={selectedCount !== 1}>
-              <Send className="h-[16px] w-[16px] text-juniper" /> Allocation
-            </button>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-casper rounded-lg shadow-sm text-[11px] font-bold text-charcoal hover:bg-slate-50 transition-all disabled:opacity-40" onClick={() => { if (selectedCount === 0) { toast.error('Select budgets to delete'); return; } setIsDeleteOpen(true); }} disabled={selectedCount === 0}>
-              <Trash2 className="h-[16px] w-[16px] text-red-500" /> Delete {selectedCount > 0 ? `(${selectedCount})` : ''}
-            </button>
-          </div>
-          <div className="flex items-center gap-2">
-            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-casper rounded-lg shadow-sm text-[11px] font-bold text-charcoal hover:bg-mystic transition-all" onClick={() => setIsExportOpen(true)}>
-              <Download className="h-[16px] w-[16px] text-juniper" /> Export
-            </button>
-          </div>
-        </>
-      }
       searchRow={
         <DataTableToolbar
           table={table}
-          facetedFilters={[
-            { columnId: 'department', title: 'Department', options: facetedDepts },
-          ]}
+          actions={
+            <>
+              <button className="btn-action" onClick={openAdd}>
+                <Plus className="h-4 w-4 text-green-600" /> Add
+              </button>
+              <button className="btn-action" onClick={openEdit} disabled={selectedCount !== 1}>
+                <Pencil className="h-4 w-4 text-blue-600" /> Edit
+              </button>
+              <button className="btn-action" onClick={() => { if (selectedCount !== 1) { toast.error('Select exactly one budget to submit'); return; } setIsSubmitOpen(true); }} disabled={selectedCount !== 1}>
+                <Send className="h-4 w-4 text-currency" /> Allocation
+              </button>
+              <button className="btn-action" onClick={() => { if (selectedCount === 0) { toast.error('Select budgets to delete'); return; } setIsDeleteOpen(true); }} disabled={selectedCount === 0}>
+                <Trash2 className="h-4 w-4 text-red-500" /> Delete{selectedCount > 0 ? ` (${selectedCount})` : ''}
+              </button>
+            </>
+          }
         />
       }
       intelligencePanel={
-        activeRow && (
-          <ModuleIntelligencePanel title="Budget Details" onClose={() => setRowSelection({})}>
-            <div className="flex-1 space-y-6">
-              <div className="bg-white/40 backdrop-blur-[6px] border border-white/40 rounded-[12px] p-5 shadow-sm">
-                <label className="text-[10px] font-bold text-juniper uppercase">Utilization</label>
+          <ModuleIntelligencePanel title="Budget Details" onClose={() => setRowSelection({})} hasSelection={!!activeRow}>
+            {activeRow && (
+            <div className="flex-1 space-y-3">
+              <div className="bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)] p-4">
+                <label className="text-[10px] font-bold text-[var(--shell-text-muted)] uppercase">Utilization</label>
                 {(() => {
                   const pct = activeRow.amount > 0 ? Math.min(((activeRow.spent || 0) / Number(activeRow.amount)) * 100, 100) : 0;
                   return (
                     <div className="flex items-center gap-4 mt-3">
-                      <div className="flex-1 h-3 bg-casper/30 rounded-full overflow-hidden">
-                        <div className={`h-full ${pct > 90 ? 'bg-rose-500' : 'bg-juniper'}`} style={{ width: `${pct}%` }} />
+                      <div className="flex-1 h-3 bg-[var(--shell-hover)] rounded-full overflow-hidden">
+                        <div className={`h-full ${pct > 90 ? 'bg-rose-500' : 'bg-[var(--shell-accent)]'}`} style={{ width: `${pct}%` }} />
                       </div>
-                      <span className="text-xs font-bold text-charcoal">{pct.toFixed(0)}%</span>
+                      <span className="text-xs font-bold text-black dark:text-white">{pct.toFixed(0)}%</span>
                     </div>
                   );
                 })()}
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-white/40 backdrop-blur-[6px] border border-white/40 rounded-[12px] shadow-sm">
-                  <label className="text-[9px] font-bold text-casper uppercase block tracking-wider">Allocated</label>
-                  <p className="text-[14px] font-bold text-[#121212] mt-1">{formatCurrency(Number(activeRow.amount), currency)}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)]">
+                  <label className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase block tracking-wider">Allocated</label>
+                  <p className="text-[14px] font-bold text-black dark:text-white mt-1">{formatCurrency(Number(activeRow.amount), currency)}</p>
                 </div>
-                <div className="p-4 bg-white/40 backdrop-blur-[6px] border border-white/40 rounded-[12px] shadow-sm">
-                  <label className="text-[9px] font-bold text-casper uppercase block tracking-wider">Department</label>
-                  <p className="text-[12px] font-bold text-[#121212] mt-1">{activeRow.department || '—'}</p>
+                <div className="p-4 bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)]">
+                  <label className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase block tracking-wider">Department</label>
+                  <p className="text-[12px] font-bold text-black dark:text-white mt-1">{activeRow.department || '—'}</p>
                 </div>
               </div>
               {activeRow.details && (
-                <div className="p-4 bg-white/40 backdrop-blur-[6px] border border-white/40 rounded-[12px] shadow-sm">
-                  <label className="text-[9px] font-bold text-casper uppercase block tracking-wider mb-2">Details</label>
-                  <p className="text-[11px] text-charcoal leading-relaxed">{activeRow.details}</p>
+                <div className="p-4 bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)]">
+                  <label className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase block tracking-wider mb-2">Details</label>
+                  <p className="text-[11px] text-[var(--shell-text-muted)] leading-relaxed">{activeRow.details}</p>
                 </div>
               )}
             </div>
+            )}
           </ModuleIntelligencePanel>
-        )
       }
     >
-      <DataTable columns={columns(currency)} data={allBudgets} tableInstance={table} />
+      <DataTable columns={columns(currency)} data={allBudgets} tableInstance={table} emptyMessage="No budgets configured. Click Add to create one." />
 
       <AddBudgetModal
         isOpen={isAddOpen}
@@ -200,7 +190,6 @@ export default function BudgetsPage() {
         onSubmit={() => { invalidate('budgets'); setIsSubmitOpen(false); setRowSelection({}); }}
       />
 
-      <ExportBudgetModal isOpen={isExportOpen} onClose={() => setIsExportOpen(false)} />
 
       <DeleteBudgetModal
         isOpen={isDeleteOpen}
