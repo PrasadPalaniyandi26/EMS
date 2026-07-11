@@ -2,6 +2,8 @@ import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, Pars
 import { AuthGuard } from '@nestjs/passport';
 import { RecurringService } from './recurring.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
 import { ApiTags } from '@nestjs/swagger';
 
 @ApiTags('recurring')
@@ -24,10 +26,12 @@ export class RecurringController {
   @Post(':id/submit') submit(@Param('id', ParseIntPipe) id: number, @CurrentUser('id') userId: number) {
     return this.service.submit(userId, id);
   }
-  @Post(':id/approve') approve(@Param('id', ParseIntPipe) id: number, @CurrentUser('id') userId: number) {
+  @Post(':id/approve') @UseGuards(RolesGuard) @Roles('manager', 'finance', 'admin')
+  approve(@Param('id', ParseIntPipe) id: number, @CurrentUser('id') userId: number) {
     return this.service.approve(userId, id);
   }
-  @Post(':id/reject') reject(@Param('id', ParseIntPipe) id: number, @Body() body: any, @CurrentUser('id') userId: number) {
+  @Post(':id/reject') @UseGuards(RolesGuard) @Roles('manager', 'finance', 'admin')
+  reject(@Param('id', ParseIntPipe) id: number, @Body() body: any, @CurrentUser('id') userId: number) {
     return this.service.reject(userId, id, body?.comments);
   }
   @Post(':id/pause') pause(@Param('id', ParseIntPipe) id: number, @CurrentUser('id') userId: number) {
@@ -39,5 +43,6 @@ export class RecurringController {
   @Get(':id/runs') getRunHistory(@Param('id', ParseIntPipe) id: number, @CurrentUser('id') userId: number) {
     return this.service.getRunHistory(userId, id);
   }
-  @Post('run-check') runCheck() { return this.service.processDue(); }
+  @Post('run-check') @UseGuards(RolesGuard) @Roles('admin')
+  runCheck() { return this.service.processDue(); }
 }

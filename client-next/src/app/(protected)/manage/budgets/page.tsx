@@ -38,6 +38,8 @@ export default function BudgetsPage() {
   const [isSubmitOpen, setIsSubmitOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const table = useReactTable({
     data: allBudgets,
@@ -70,6 +72,8 @@ export default function BudgetsPage() {
   }, [setHeader]);
 
   const handleSave = async (form: any) => {
+    if (saving) return;
+    setSaving(true);
     try {
       if (editingRow) {
         await api.put(`/budgets/${editingRow.id}`, form);
@@ -85,6 +89,8 @@ export default function BudgetsPage() {
     } catch (err: any) {
       const msg = err?.message || 'Failed to save budget.';
       toast.error(msg);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -96,6 +102,8 @@ export default function BudgetsPage() {
   };
 
   const confirmDelete = async () => {
+    if (deleting) return;
+    setDeleting(true);
     try {
       await Promise.all(selectedRows.map((r) => api.delete(`/budgets/${r.original.id}`)));
       toast.success('Budget(s) deleted.');
@@ -104,6 +112,8 @@ export default function BudgetsPage() {
       setRowSelection({});
     } catch {
       toast.error('Failed to delete budget(s).');
+    } finally {
+      setDeleting(false);
     }
   };
 

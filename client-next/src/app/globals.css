@@ -136,50 +136,120 @@
   --sidebar-ring:      #3b82f6;  /* blue-500   */
 }
 
-/* ─── Dark theme: slate blue ──────────────────────────────────────── */
+/* ─── Dark theme: glassmorphism ────────────────────────────────────── */
 .dark {
-  /* Shell */
-  --shell-bg:          #090f1c;  /* deeper slate — more contrast against surface */
-  --shell-surface:     #1e293b;
-  --shell-border:      #334155;
-  --shell-text:        #f1f5f9;
-  --shell-text-muted:  #94a3b8;
-  --shell-accent:      #3b82f6;
+  /* Shell — translucent frosted surfaces over a deep gradient backdrop */
+  --shell-bg:          #070c17;
+  --shell-surface:     rgba(34,47,71,0.65);
+  --shell-border:      rgba(148,163,184,0.18);
+  --shell-text:        #f4f7fc;
+  --shell-text-muted:  #9aa7c4;
+  --shell-accent:      #60a5fa;
   --shell-accent-fg:   #ffffff;
-  --shell-hover:       rgba(255,255,255,0.08);
+  --shell-hover:       rgba(255,255,255,0.07);
 
   /* shadcn tokens */
-  --background:        #090f1c;
-  --foreground:        #f1f5f9;
-  --card:              #1e293b;
-  --card-foreground:   #f1f5f9;
-  --popover:           #1e293b;
-  --popover-foreground:#f1f5f9;
-  --primary:           #3b82f6;
+  --background:        #070c17;
+  --foreground:        #f4f7fc;
+  --card:              rgba(34,47,71,0.65);
+  --card-foreground:   #f4f7fc;
+  --popover:           rgba(30,41,59,0.75);
+  --popover-foreground:#f4f7fc;
+  --primary:           #60a5fa;
   --primary-foreground:#ffffff;
-  --secondary:         #1e293b;
-  --secondary-foreground:#f1f5f9;
-  --muted:             #1e293b;
-  --muted-foreground:  #94a3b8;
-  --accent:            #334155;
-  --accent-foreground: #f1f5f9;
+  --secondary:         rgba(30,41,59,0.55);
+  --secondary-foreground:#f4f7fc;
+  --muted:             rgba(30,41,59,0.55);
+  --muted-foreground:  #9aa7c4;
+  --accent:            rgba(148,163,184,0.16);
+  --accent-foreground: #f4f7fc;
   --destructive:       #f87171;
-  --border:            #334155;
-  --input:             #334155;
-  --ring:              #3b82f6;
-  --chart-1:           #3b82f6;
+  --border:            rgba(148,163,184,0.18);
+  --input:             rgba(148,163,184,0.18);
+  --ring:              #60a5fa;
+  --chart-1:           #60a5fa;
   --chart-2:           #22d3ee;
   --chart-3:           #34d399;
   --chart-4:           #fb923c;
   --chart-5:           #f87171;
-  --sidebar:           #1e293b;
-  --sidebar-foreground:#94a3b8;
-  --sidebar-primary:   #3b82f6;
+  --sidebar:           rgba(30,41,59,0.55);
+  --sidebar-foreground:#9aa7c4;
+  --sidebar-primary:   #60a5fa;
   --sidebar-primary-foreground:#ffffff;
-  --sidebar-accent:    #334155;
-  --sidebar-accent-foreground:#f1f5f9;
-  --sidebar-border:    #334155;
-  --sidebar-ring:      #3b82f6;
+  --sidebar-accent:    rgba(148,163,184,0.16);
+  --sidebar-accent-foreground:#f4f7fc;
+  --sidebar-border:    rgba(148,163,184,0.18);
+  --sidebar-ring:      #60a5fa;
+}
+
+/* Ambient gradient glow behind the glass surfaces — gives the blur something to catch */
+.dark body {
+  background-image:
+    radial-gradient(1100px 600px at 85% -10%, rgba(99,102,241,0.28), transparent 60%),
+    radial-gradient(900px 550px at 8% 110%, rgba(34,211,238,0.16), transparent 60%),
+    radial-gradient(700px 400px at 50% 40%, rgba(59,130,246,0.06), transparent 70%);
+  background-attachment: fixed;
+}
+
+/* Frosted-glass blur — fixed chrome & floating overlays only.
+   Content cards deliberately skip the blur: nothing scrolls behind them,
+   and blurring dozens of static nodes is pure GPU cost. */
+.dark .menu-fixed,
+.dark .fixed-top,
+.dark .footer-fixed,
+.dark .content-right-sidebar,
+.dark [data-slot="dialog-content"],
+.dark [data-slot="popover-content"],
+.dark [data-slot="select-content"],
+.dark [data-slot="dropdown-menu-content"] {
+  backdrop-filter: blur(20px) saturate(160%);
+}
+.dark [data-slot="dialog-overlay"] {
+  backdrop-filter: blur(4px);
+}
+/* Frosted modal surface — bg-background is opaque, so swap in the translucent popover tone */
+.dark [data-slot="dialog-content"] {
+  background: var(--popover);
+}
+
+/* Elevation + glass edge on content surfaces: a hairline top highlight makes the
+   glass read as glass, and a deep soft shadow lifts cards off the backdrop.
+   [style*="shell-surface"] catches the inline-styled cards on dashboard/hub pages. */
+.dark .rounded-xl[style*="shell-surface"],
+.dark [data-slot="card"],
+.dark .glass-card,
+.dark .glass-panel,
+.dark .table-container {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 10px 30px -12px rgba(0, 0, 0, 0.6);
+}
+
+/* Accent punch on primary actions and active nav */
+.dark .btn-action-primary {
+  box-shadow: 0 4px 16px -4px color-mix(in srgb, var(--shell-accent) 55%, transparent);
+}
+.dark .nav-active {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--shell-accent) 25%, transparent);
+}
+
+/* Light mode: soft ambient tint + layered elevation on the same surfaces */
+html:not(.dark) body {
+  background-image:
+    radial-gradient(1000px 500px at 85% -10%, rgba(59,130,246,0.07), transparent 60%),
+    radial-gradient(800px 450px at 5% 110%, rgba(14,165,233,0.05), transparent 60%);
+}
+html:not(.dark) .rounded-xl[style*="shell-surface"],
+html:not(.dark) [data-slot="card"],
+html:not(.dark) .glass-card,
+html:not(.dark) .glass-panel,
+html:not(.dark) .table-container {
+  box-shadow:
+    0 1px 2px rgba(16, 24, 40, 0.05),
+    0 4px 12px -2px rgba(16, 24, 40, 0.08);
+}
+html:not(.dark) .btn-action-primary {
+  box-shadow: 0 2px 8px -2px color-mix(in srgb, var(--shell-accent) 45%, transparent);
 }
 
 @layer base {
@@ -204,6 +274,15 @@
     box-shadow: 0 0 0 9999px var(--shell-surface) inset !important;
     -webkit-text-fill-color: var(--shell-text) !important;
     caret-color: var(--shell-text);
+  }
+  /* Dark surface is translucent — autofill needs an opaque fill (the inset-shadow
+     trick composites over the browser's yellow autofill layer, so alpha lets it bleed) */
+  .dark input:-webkit-autofill,
+  .dark input:-webkit-autofill:hover,
+  .dark input:-webkit-autofill:focus,
+  .dark input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 9999px #192336 inset !important;
+    box-shadow: 0 0 0 9999px #192336 inset !important;
   }
 }
 

@@ -11,13 +11,13 @@ export class ApprovalsController {
   constructor(private service: ApprovalsService) {}
 
   @Get('pending')
-  getPending(@CurrentUser() user: any) {
-    return this.service.getPending(user.id, user.role_name);
+  getPending(@CurrentUser('id') userId: number) {
+    return this.service.getPending(userId);
   }
 
   @Get('history')
-  getHistory(@CurrentUser() user: any, @Query('status') status?: string) {
-    return this.service.getHistory(user.id, user.role_name, status);
+  getHistory(@CurrentUser('id') userId: number) {
+    return this.service.getHistory(userId);
   }
 
   @Post(':id/approve')

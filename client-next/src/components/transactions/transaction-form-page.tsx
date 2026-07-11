@@ -330,9 +330,9 @@ export function TransactionFormPage({ transactionType, title, subtitle }: Transa
                   style={{ background: 'linear-gradient(135deg, rgba(74,111,83,0.08) 0%, rgba(74,111,83,0.04) 100%)' }}
                   onClick={async () => {
                     try {
-                      const { getAccessToken } = await import('@/lib/api-client');
+                      const { getAccessToken, API_BASE } = await import('@/lib/api-client');
                       const token = getAccessToken();
-                      const res = await fetch(`/api/v1/receipts/${selectedTxn.receipt_path}`, {
+                      const res = await fetch(`${API_BASE}/receipts/${selectedTxn.receipt_path}`, {
                         credentials: 'include',
                         headers: token ? { Authorization: `Bearer ${token}` } : {},
                       });

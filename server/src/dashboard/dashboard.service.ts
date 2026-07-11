@@ -1,12 +1,14 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { COMMITTED_STATUSES, committedStatusSql } from '../common/constants/transaction-status';
 
 @Injectable()
 export class DashboardService {
   constructor(private prisma: PrismaService) {}
 
   async getSummary(userId: number, dateFrom?: string, dateTo?: string) {
-    const where: any = { userId };
+    const where: any = { userId, status: { in: COMMITTED_STATUSES } };
     if (dateFrom || dateTo) {
       where.dateRecorded = {};
       if (dateFrom) where.dateRecorded.gte = new Date(dateFrom);
@@ -37,7 +39,7 @@ export class DashboardService {
   }
 
   async getByCategory(userId: number, dateFrom?: string, dateTo?: string) {
-    const where: any = { userId };
+    const where: any = { userId, status: { in: COMMITTED_STATUSES } };
     if (dateFrom || dateTo) {
       where.dateRecorded = {};
       if (dateFrom) where.dateRecorded.gte = new Date(dateFrom);
@@ -85,6 +87,7 @@ export class DashboardService {
       FROM transactions
       WHERE user_id = ${userId}
         AND date_recorded >= ${cutoff}
+        AND status IN ${Prisma.raw(committedStatusSql)}
       GROUP BY yr, mo, type
       ORDER BY yr, mo
     `;
@@ -131,7 +134,7 @@ export class DashboardService {
 
     const spent = await this.prisma.transaction.groupBy({
       by: ['categoryId'],
-      where: { userId, type: 'expense', categoryId: { in: categoryIds }, dateRecorded: { gte: start, lte: end } },
+      where: { userId, type: 'expense', status: { in: COMMITTED_STATUSES }, categoryId: { in: categoryIds }, dateRecorded: { gte: start, lte: end } },
       _sum: { amount: true },
     });
     const spentMap = Object.fromEntries(spent.map((s) => [s.categoryId, Number(s._sum?.amount) || 0]));
@@ -163,9 +166,7 @@ export class DashboardService {
     ]);
 
     let pendingMyAction = 0;
-    if (isFinance) {
-      pendingMyAction = await this.prisma.approvalRequest.count({ where: { approverId: userId, status: 'PENDING' } });
-    } else if (isManager) {
+    if (isFinance || isManager) {
       pendingMyAction = await this.prisma.approvalRequest.count({ where: { approverId: userId, status: 'PENDING' } });
     }
 
@@ -173,7 +174,7 @@ export class DashboardService {
   }
 
   async getProjectSpend(userId: number, dateFrom?: string, dateTo?: string) {
-    const where: any = { userId, type: 'expense', projectId: { not: null } };
+    const where: any = { userId, type: 'expense', status: { in: COMMITTED_STATUSES }, projectId: { not: null } };
     if (dateFrom || dateTo) {
       where.dateRecorded = {};
       if (dateFrom) where.dateRecorded.gte = new Date(dateFrom);
@@ -203,8 +204,35 @@ export class DashboardService {
 
   // ── Spend Analytics ────────────────────────────────────────────────────────
 
-  async getTopSpenders(dateFrom?: string, dateTo?: string) {
-    const where: any = { type: 'expense' };
+  // Resolves which users the caller may see across cross-user analytics.
+  // Returns null = all users (no restriction); number[] = restrict to these IDs.
+  // data_scope (set per-user by an admin) is authoritative; role is the fallback
+  // when no permission row exists: Admin/Finance → All, Manager → Department, else Self.
+  private async resolveVisibleUserIds(userId: number, roleName: string): Promise<number[] | null> {
+    const perm = await this.prisma.userPermission.findUnique({ where: { userId } });
+    const role = (roleName || '').toUpperCase();
+    const fallback = role === 'ADMIN' || role === 'FINANCE' ? 'All' : role === 'MANAGER' ? 'Department' : 'Self';
+    const scope = perm?.dataScope || fallback;
+
+    if (scope === 'All') return null;
+    if (scope === 'Self') return [userId];
+    // Department → the user plus everyone in their reporting tree.
+    const rows = await this.prisma.$queryRawUnsafe<{ id: number }[]>(
+      `WITH RECURSIVE tree AS (
+         SELECT id FROM users WHERE id = $1
+         UNION ALL
+         SELECT u.id FROM users u JOIN tree t ON u.manager_id = t.id
+       )
+       SELECT id FROM tree`,
+      userId,
+    );
+    return rows.map((r) => r.id);
+  }
+
+  async getTopSpenders(userId: number, roleName: string, dateFrom?: string, dateTo?: string) {
+    const visibleIds = await this.resolveVisibleUserIds(userId, roleName);
+    const where: any = { type: 'expense', status: { in: COMMITTED_STATUSES } };
+    if (visibleIds !== null) where.userId = { in: visibleIds };
     if (dateFrom || dateTo) {
       where.dateRecorded = {};
       if (dateFrom) where.dateRecorded.gte = new Date(dateFrom);
@@ -237,11 +265,13 @@ export class DashboardService {
     }));
   }
 
-  async getCategoryHeatmap(dateFrom?: string, dateTo?: string) {
+  async getCategoryHeatmap(userId: number, roleName: string, dateFrom?: string, dateTo?: string) {
+    const visibleIds = await this.resolveVisibleUserIds(userId, roleName);
     const cutoff = dateFrom ? new Date(dateFrom) : (() => {
       const d = new Date(); d.setMonth(d.getMonth() - 11); d.setDate(1); d.setHours(0, 0, 0, 0); return d;
     })();
     const endDate = dateTo ? new Date(dateTo) : new Date();
+    const userClause = visibleIds === null ? Prisma.empty : Prisma.sql`AND t.user_id = ANY(${visibleIds})`;
 
     const rows = await this.prisma.$queryRaw<{ yr: number; mo: number; cat: string; total: number }[]>`
       SELECT
@@ -254,6 +284,8 @@ export class DashboardService {
       WHERE t.type = 'expense'
         AND t.date_recorded >= ${cutoff}
         AND t.date_recorded <= ${endDate}
+        AND t.status IN ${Prisma.raw(committedStatusSql)}
+        ${userClause}
       GROUP BY yr, mo, cat
       ORDER BY yr, mo, total DESC
     `;
@@ -289,8 +321,10 @@ export class DashboardService {
     };
   }
 
-  async getProjectBurn(dateFrom?: string, dateTo?: string) {
-    const where: any = { type: 'expense', projectId: { not: null } };
+  async getProjectBurn(userId: number, roleName: string, dateFrom?: string, dateTo?: string) {
+    const visibleIds = await this.resolveVisibleUserIds(userId, roleName);
+    const where: any = { type: 'expense', status: { in: COMMITTED_STATUSES }, projectId: { not: null } };
+    if (visibleIds !== null) where.userId = { in: visibleIds };
     if (dateFrom || dateTo) {
       where.dateRecorded = {};
       if (dateFrom) where.dateRecorded.gte = new Date(dateFrom);
@@ -328,8 +362,10 @@ export class DashboardService {
     });
   }
 
-  async getProductBurn(dateFrom?: string, dateTo?: string) {
-    const where: any = { type: 'expense', productId: { not: null } };
+  async getProductBurn(userId: number, roleName: string, dateFrom?: string, dateTo?: string) {
+    const visibleIds = await this.resolveVisibleUserIds(userId, roleName);
+    const where: any = { type: 'expense', status: { in: COMMITTED_STATUSES }, productId: { not: null } };
+    if (visibleIds !== null) where.userId = { in: visibleIds };
     if (dateFrom || dateTo) {
       where.dateRecorded = {};
       if (dateFrom) where.dateRecorded.gte = new Date(dateFrom);
@@ -369,7 +405,7 @@ export class DashboardService {
 
   async getRecent(userId: number) {
     const transactions = await this.prisma.transaction.findMany({
-      where: { userId },
+      where: { userId, status: { notIn: ['DELETED', 'VOIDED'] } },
       include: { category: true },
       orderBy: [{ dateRecorded: 'desc' }, { id: 'desc' }],
       take: 10,

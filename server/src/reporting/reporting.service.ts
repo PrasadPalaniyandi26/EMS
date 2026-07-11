@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { COUNTABLE_STATUSES, COMMITTED_STATUSES, countableStatusSql } from '../common/constants/transaction-status';
 
 @Injectable()
 export class ReportingService {
@@ -43,7 +44,7 @@ export class ReportingService {
 
   // null = all users; number[] = restrict to these IDs
   private buildWhere(userIds: number[] | null, type?: string, dateFrom?: Date, dateTo?: Date) {
-    const where: any = {};
+    const where: any = { status: { in: COUNTABLE_STATUSES } };
     if (userIds !== null) where.userId = { in: userIds };
     if (type) where.type = type;
     if (dateFrom || dateTo) {
@@ -62,9 +63,6 @@ export class ReportingService {
     if (dateFrom) { params.push(dateFrom); dateClause += ` AND t.date_recorded >= $${params.length}`; }
     if (dateTo)   { params.push(dateTo);   dateClause += ` AND t.date_recorded <= $${params.length}`; }
 
-    let recurUserClause = '';
-    if (userIds !== null) { recurUserClause = ` AND r.user_id = ANY($1::int[])`; }
-
     const rows = await this.prisma.$queryRawUnsafe<any[]>(`
       SELECT
         c.name AS category,
@@ -75,19 +73,7 @@ export class ReportingService {
         ROUND(SUM(COALESCE(t.total_amount, t.amount))::numeric, 2)::float AS total_amount
       FROM transactions t
       LEFT JOIN categories c ON t.category_id = c.id
-      WHERE t.type = 'expense'${userClause}${dateClause}
-      GROUP BY c.name
-      UNION ALL
-      SELECT
-        c.name AS category,
-        COUNT(*)::int AS transactions,
-        ROUND(SUM(r.amount)::numeric, 2)::float AS net_amount,
-        NULL::float AS gst_rate,
-        0::int AS claimable_count,
-        ROUND(SUM(r.amount)::numeric, 2)::float AS total_amount
-      FROM recurring_transactions r
-      LEFT JOIN categories c ON r.category_id = c.id
-      WHERE r.type = 'expense' AND r.status = 'APPROVED' AND r.is_active = true${recurUserClause}
+      WHERE t.type = 'expense' AND t.status IN ${countableStatusSql}${userClause}${dateClause}
       GROUP BY c.name
     `, ...params);
 
@@ -131,9 +117,6 @@ export class ReportingService {
     if (dateFrom) { params.push(dateFrom); dateClause += ` AND t.date_recorded >= $${params.length}`; }
     if (dateTo)   { params.push(dateTo);   dateClause += ` AND t.date_recorded <= $${params.length}`; }
 
-    let recurUserClause = '';
-    if (userIds !== null) { recurUserClause = ` AND r.user_id = ANY($1::int[])`; }
-
     const rows = await this.prisma.$queryRawUnsafe<any[]>(`
       SELECT
         c.name AS category,
@@ -144,19 +127,7 @@ export class ReportingService {
         ROUND(SUM(COALESCE(t.total_amount, t.amount))::numeric, 2)::float AS total_amount
       FROM transactions t
       LEFT JOIN categories c ON t.category_id = c.id
-      WHERE t.type = 'income'${userClause}${dateClause}
-      GROUP BY c.name
-      UNION ALL
-      SELECT
-        c.name AS category,
-        COUNT(*)::int AS transactions,
-        ROUND(SUM(r.amount)::numeric, 2)::float AS net_amount,
-        NULL::float AS gst_rate,
-        0::int AS claimable_count,
-        ROUND(SUM(r.amount)::numeric, 2)::float AS total_amount
-      FROM recurring_transactions r
-      LEFT JOIN categories c ON r.category_id = c.id
-      WHERE r.type = 'income' AND r.status = 'APPROVED' AND r.is_active = true${recurUserClause}
+      WHERE t.type = 'income' AND t.status IN ${countableStatusSql}${userClause}${dateClause}
       GROUP BY c.name
     `, ...params);
 
@@ -198,22 +169,16 @@ export class ReportingService {
       this.prisma.transaction.aggregate({ where: this.buildWhere(userIds, 'expense', dateFrom, dateTo), _sum: { amount: true } }),
     ]);
 
-    // Recurring totals (APPROVED + active)
-    const recurUserClause = userIds !== null ? ` AND user_id = ANY(ARRAY[${userIds.join(',')}]::int[])` : '';
-    const [recurIncome, recurExpense] = await Promise.all([
-      this.prisma.$queryRawUnsafe<{ total: number }[]>(
-        `SELECT COALESCE(SUM(amount), 0)::float AS total FROM recurring_transactions WHERE type = 'income' AND status = 'APPROVED' AND is_active = true${recurUserClause}`,
-      ),
-      this.prisma.$queryRawUnsafe<{ total: number }[]>(
-        `SELECT COALESCE(SUM(amount), 0)::float AS total FROM recurring_transactions WHERE type = 'expense' AND status = 'APPROVED' AND is_active = true${recurUserClause}`,
-      ),
-    ]);
-
-    // Monthly breakdown — transactions + recurring (recurring counted in current month)
+    // Monthly breakdown — actuals only (recurring schedules are already materialized
+    // into real transactions by the cron, so counting them again would double-count).
     const cutoff = dateFrom || (() => { const d = new Date(); d.setMonth(d.getMonth() - 11); d.setDate(1); return d; })();
     const endDate = dateTo || new Date();
     const params: any[] = [cutoff, endDate];
-    const userFilter = userIds !== null ? ` AND user_id = ANY(ARRAY[${userIds.join(',')}]::int[])` : '';
+    let userFilter = '';
+    if (userIds !== null) {
+      params.push(userIds);
+      userFilter = ` AND user_id = ANY($${params.length}::int[])`;
+    }
     const monthRows = await this.prisma.$queryRawUnsafe<{ yr: number; mo: number; type: string; total: number }[]>(`
       SELECT
         EXTRACT(YEAR FROM date_recorded)::int AS yr,
@@ -222,7 +187,8 @@ export class ReportingService {
         SUM(amount)::float AS total
       FROM transactions
       WHERE date_recorded >= $1
-        AND date_recorded <= $2${userFilter}
+        AND date_recorded <= $2
+        AND status IN ${countableStatusSql}${userFilter}
       GROUP BY yr, mo, type
       ORDER BY yr, mo
     `, ...params);
@@ -235,14 +201,8 @@ export class ReportingService {
       if (r.type === 'expense') map[key].expense += Number(r.total);
     }
 
-    // Add recurring amounts to current month
-    const curKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
-    if (!map[curKey]) map[curKey] = { income: 0, expense: 0 };
-    map[curKey].income  += Number((recurIncome[0] as any)?.total || 0);
-    map[curKey].expense += Number((recurExpense[0] as any)?.total || 0);
-
-    const totalIncome  = parseFloat(((Number(incomeAgg._sum.amount) || 0)  + Number((recurIncome[0] as any)?.total || 0)).toFixed(2));
-    const totalExpense = parseFloat(((Number(expenseAgg._sum.amount) || 0) + Number((recurExpense[0] as any)?.total || 0)).toFixed(2));
+    const totalIncome  = parseFloat((Number(incomeAgg._sum.amount) || 0).toFixed(2));
+    const totalExpense = parseFloat((Number(expenseAgg._sum.amount) || 0).toFixed(2));
 
     return {
       title: 'Profit & Loss Statement',
@@ -273,27 +233,15 @@ export class ReportingService {
     const end = new Date(year, month, 0, 23, 59, 59);
     const catIds = budgets.map((b) => b.categoryId).filter((id): id is number => id !== null);
 
-    const [spent, recurSpent] = await Promise.all([
-      this.prisma.transaction.groupBy({
-        by: ['categoryId'],
-        where: { userId, type: 'expense', categoryId: { in: catIds }, dateRecorded: { gte: start, lte: end } },
-        _sum: { amount: true },
-      }),
-      catIds.length
-        ? this.prisma.$queryRawUnsafe<{ category_id: number; total: number }[]>(
-            `SELECT category_id, COALESCE(SUM(amount), 0)::float AS total
-             FROM recurring_transactions
-             WHERE user_id = $1 AND type = 'expense' AND status = 'APPROVED' AND is_active = true
-               AND category_id = ANY($2::int[])
-             GROUP BY category_id`,
-            userId, catIds,
-          )
-        : Promise.resolve([]),
-    ]);
+    // Committed spend (approved + in-flight) to match budget enforcement and the
+    // dashboard budget card. Recurring schedules are already materialized into real
+    // transactions by the cron, so they are captured by the groupBy below.
+    const spent = await this.prisma.transaction.groupBy({
+      by: ['categoryId'],
+      where: { userId, type: 'expense', status: { in: COMMITTED_STATUSES }, categoryId: { in: catIds }, dateRecorded: { gte: start, lte: end } },
+      _sum: { amount: true },
+    });
     const spentMap: Record<number, number> = Object.fromEntries(spent.map((s) => [s.categoryId, Number(s._sum?.amount) || 0]));
-    for (const r of recurSpent) {
-      spentMap[r.category_id] = (spentMap[r.category_id] || 0) + Number(r.total);
-    }
 
     const rows = budgets.map((b) => {
       const budget = parseFloat(Number(b.amount).toFixed(2));
@@ -320,26 +268,21 @@ export class ReportingService {
   }
 
   private async transactionLedger(userId: number[] | null, dateFrom?: Date, dateTo?: Date, type?: 'income' | 'expense') {
+    // Ledger is a line-item listing (no totals), so it shows every real transaction
+    // with its Status, excluding only soft-deleted/voided rows. Recurring schedules
+    // are omitted here — the cron already materializes them into real transactions.
+    const LEDGER_CAP = 2000;
     const where = this.buildWhere(userId, type, dateFrom, dateTo);
-    const [txns, recurRows] = await Promise.all([
-      this.prisma.transaction.findMany({
-        where,
-        include: { category: true, client: true, project: true },
-        orderBy: [{ dateRecorded: 'desc' }, { id: 'desc' }],
-        take: 2000,
-      }),
-      (() => {
-        const rWhere: any = { status: 'APPROVED', isActive: true };
-        if (userId !== null) rWhere.userId = { in: userId };
-        if (type) rWhere.type = type;
-        return this.prisma.recurringTransaction.findMany({
-          where: rWhere,
-          include: { category: true, client: true, project: true },
-          orderBy: { nextRunDate: 'desc' },
-          take: 500,
-        });
-      })(),
-    ]);
+    where.status = { notIn: ['DELETED', 'VOIDED'] };
+    // Fetch one extra row to detect whether the result set was truncated by the cap.
+    const txns = await this.prisma.transaction.findMany({
+      where,
+      include: { category: true, client: true, project: true },
+      orderBy: [{ dateRecorded: 'desc' }, { id: 'desc' }],
+      take: LEDGER_CAP + 1,
+    });
+    const truncated = txns.length > LEDGER_CAP;
+    if (truncated) txns.length = LEDGER_CAP;
 
     const txnRows = txns.map((t) => ({
       Date: t.dateRecorded.toISOString().slice(0, 10),
@@ -358,30 +301,15 @@ export class ReportingService {
       'Total Amount': parseFloat(Number(t.totalAmount ?? t.amount).toFixed(2)),
     }));
 
-    const recurLedger = recurRows.map((r) => ({
-      Date: r.nextRunDate.toISOString().slice(0, 10),
-      Type: (r as any).type || 'expense',
-      Source: 'Recurring',
-      Description: r.description || '',
-      Category: r.category?.name || '',
-      Client: r.client?.name || '',
-      Project: r.project?.name || '',
-      'Payment Method': r.paymentMethod || '',
-      Reference: (r as any).code || '',
-      Status: 'APPROVED',
-      'Net Amount': parseFloat(Number(r.amount).toFixed(2)),
-      'GST %': null,
-      Claimable: 'No',
-      'Total Amount': parseFloat(Number(r.amount).toFixed(2)),
-    }));
-
-    const allRows = [...txnRows, ...recurLedger].sort((a, b) => b.Date.localeCompare(a.Date));
+    const allRows = txnRows.sort((a, b) => b.Date.localeCompare(a.Date));
 
     return {
       title: `Transaction Ledger${type ? ` (${type})` : ''}`,
       columns: ['Date', 'Type', 'Source', 'Description', 'Category', 'Client', 'Project', 'Payment Method', 'Reference', 'Status', 'Net Amount', 'GST %', 'Claimable', 'Total Amount'],
       rows: allRows,
       totals: {},
+      truncated,
+      ...(truncated ? { note: `Showing the most recent ${LEDGER_CAP} entries. Narrow the date range to see older records.` } : {}),
     };
   }
 
@@ -405,7 +333,7 @@ export class ReportingService {
       LEFT JOIN categories c ON t.category_id = c.id
       WHERE t.is_claimable = true
         AND t.type = 'expense'
-        AND t.status NOT IN ('DELETED', 'VOIDED')${userClause}${dateClause}
+        AND t.status IN ${countableStatusSql}${userClause}${dateClause}
       GROUP BY c.name
       ORDER BY gst_amount DESC
     `, ...params);
@@ -501,6 +429,8 @@ export class ReportingService {
     if (categoryType === 'project') where.projectId = { not: null };
     else if (categoryType === 'product') where.productId = { not: null };
 
+    // Actuals only — recurring schedules are already materialized into real
+    // transactions by the cron, so they are captured by the groupBy below.
     const rows = await this.prisma.transaction.groupBy({
       by: ['clientId', 'categoryId'],
       where,
@@ -508,28 +438,10 @@ export class ReportingService {
       _count: true,
     });
 
-    const rWhere: any = { status: 'APPROVED', isActive: true, clientId: { not: null } };
-    if (userId !== null) rWhere.userId = { in: userId };
-    if (txnType) rWhere.type = txnType;
-    if (categoryType === 'project') rWhere.projectId = { not: null };
-    else if (categoryType === 'product') rWhere.productId = { not: null };
-    const recurRows = await this.prisma.recurringTransaction.groupBy({
-      by: ['clientId', 'categoryId'],
-      where: rWhere,
-      _sum: { amount: true },
-      _count: true,
-    });
-
-    // Merge transaction + recurring by clientId+categoryId key
     const mergedCS: Record<string, { clientId: number | null; categoryId: number | null; count: number; amount: number }> = {};
     for (const r of rows) {
       const k = `${r.clientId}-${r.categoryId}`;
       mergedCS[k] = { clientId: r.clientId, categoryId: r.categoryId, count: r._count, amount: Number(r._sum.amount) || 0 };
-    }
-    for (const r of recurRows) {
-      const k = `${r.clientId}-${r.categoryId}`;
-      if (mergedCS[k]) { mergedCS[k].count += r._count; mergedCS[k].amount += Number(r._sum.amount) || 0; }
-      else mergedCS[k] = { clientId: r.clientId, categoryId: r.categoryId, count: r._count, amount: Number(r._sum.amount) || 0 };
     }
 
     const allRows = Object.values(mergedCS);

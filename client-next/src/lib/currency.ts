@@ -26,7 +26,7 @@ export function formatDate(dateStr: string | Date | null) {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-type DatePreset = 'today' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'calYear' | 'finYear';
+type DatePreset = 'today' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'thisQuarter' | 'calYear' | 'finYear';
 
 function fmt(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -60,6 +60,10 @@ export function getDateRange(preset: DatePreset): { from: string; to: string } {
       const s = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       const e = new Date(today.getFullYear(), today.getMonth(), 0);
       return { from: fmt(s), to: fmt(e) };
+    }
+    case 'thisQuarter': {
+      const q = Math.floor(today.getMonth() / 3);
+      return { from: fmt(new Date(today.getFullYear(), q * 3, 1)), to: fmt(new Date(today.getFullYear(), q * 3 + 3, 0)) };
     }
     case 'calYear': {
       return { from: fmt(new Date(today.getFullYear(), 0, 1)), to: fmt(new Date(today.getFullYear(), 11, 31)) };

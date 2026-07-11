@@ -43,10 +43,11 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordSaving, setPasswordSaving] = useState(false);
 
-  const { data: auditLogsData, isLoading: auditLoading } = useAuditLogs();
-  const auditLogs = auditLogsData?.rows ?? [];
   const [auditPage, setAuditPage] = useState(0);
   const AUDIT_PAGE_SIZE = 50;
+  const { data: auditLogsData, isLoading: auditLoading } = useAuditLogs({ page: String(auditPage + 1), limit: String(AUDIT_PAGE_SIZE) });
+  const auditLogs = auditLogsData?.rows ?? [];
+  const auditTotal = auditLogsData?.total ?? 0;
 
   const validateEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
   const validatePhone = (v: string) => !v || /^\+?[0-9\s\-().]{7,20}$/.test(v);
@@ -59,11 +60,18 @@ export default function SettingsPage() {
 
     setProfileSaving(true);
     try {
-      // Update phone and login_name via self-profile endpoint
+      // Update name, phone and login_name via self-profile endpoint
+      const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
       const profilePayload: any = { contact_no: phone || null };
+      if (fullName) profilePayload.username = fullName;
       if (loginName) profilePayload.login_name = loginName.toLowerCase();
-      await api.put('/users/me/profile', profilePayload);
-      updateUser({ contact_no: phone || null, login_name: loginName || null } as any);
+      const pRes = await api.put('/users/me/profile', profilePayload);
+      const updated = (pRes as any).data;
+      updateUser({
+        contact_no: updated?.contact_no ?? (phone || null),
+        login_name: updated?.login_name ?? (loginName || null),
+        username: updated?.username ?? user?.username,
+      } as any);
 
       // Update email separately if changed
       if (email !== user?.email) {
@@ -80,13 +88,14 @@ export default function SettingsPage() {
   };
 
   const handleChangePassword = async () => {
+    if (!currentPassword) { toast.error('Current password is required.'); return; }
     if (!newPassword) { toast.error('New password is required.'); return; }
     if (newPassword.length < 6) { toast.error('Password must be at least 6 characters.'); return; }
     if (newPassword !== confirmPassword) { toast.error('Passwords do not match.'); return; }
 
     setPasswordSaving(true);
     try {
-      await api.put('/users/me/profile', { password: newPassword });
+      await api.put('/users/me/profile', { password: newPassword, currentPassword });
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -146,11 +155,11 @@ export default function SettingsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className={LBL}>First Name</Label>
-                  <Input className={INP} value={firstName} disabled />
+                  <Input className={INP} value={firstName} onChange={(e) => setFirstName(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
                   <Label className={LBL}>Last Name</Label>
-                  <Input className={INP} value={lastName} disabled />
+                  <Input className={INP} value={lastName} onChange={(e) => setLastName(e.target.value)} />
                 </div>
               </div>
 
@@ -209,6 +218,11 @@ export default function SettingsPage() {
             <CardHeader><CardTitle className="text-[14px]">Change Password</CardTitle></CardHeader>
             <CardContent className="space-y-4 max-w-md">
               <div className="space-y-1.5">
+                <Label className={LBL}>Current Password</Label>
+                <Input className={INP} type="password" placeholder="Enter current password"
+                  value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
                 <Label className={LBL}>New Password</Label>
                 <Input className={INP} type="password" placeholder="Min. 6 characters"
                   value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
@@ -244,7 +258,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-[14px]">Audit Log</CardTitle>
-              <span className="text-[11px] text-muted-foreground">{auditLogs.length} entries</span>
+              <span className="text-[11px] text-muted-foreground">{auditTotal} entries</span>
             </CardHeader>
             <CardContent>
               {auditLoading ? (
@@ -265,7 +279,7 @@ export default function SettingsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {auditLogs.slice(auditPage * AUDIT_PAGE_SIZE, (auditPage + 1) * AUDIT_PAGE_SIZE).map((log: any) => (
+                      {auditLogs.map((log: any) => (
                         <TableRow key={log.id}>
                           <TableCell className="font-medium">{log.action}</TableCell>
                           <TableCell>{log.table_name}</TableCell>
@@ -278,14 +292,14 @@ export default function SettingsPage() {
                   {auditLogs.length === 0 && (
                     <p className="py-6 text-center text-muted-foreground">No audit entries yet.</p>
                   )}
-                  {auditLogs.length > AUDIT_PAGE_SIZE && (
+                  {auditTotal > AUDIT_PAGE_SIZE && (
                     <div className="flex items-center justify-between pt-3 border-t border-[var(--shell-border)] mt-2">
                       <span className="text-[11px] text-muted-foreground">
-                        Showing {auditPage * AUDIT_PAGE_SIZE + 1}–{Math.min((auditPage + 1) * AUDIT_PAGE_SIZE, auditLogs.length)} of {auditLogs.length}
+                        Showing {auditPage * AUDIT_PAGE_SIZE + 1}–{Math.min((auditPage + 1) * AUDIT_PAGE_SIZE, auditTotal)} of {auditTotal}
                       </span>
                       <div className="flex gap-1.5">
                         <Button variant="outline" size="sm" className="h-7 text-[11px]" disabled={auditPage === 0} onClick={() => setAuditPage(p => p - 1)}>Previous</Button>
-                        <Button variant="outline" size="sm" className="h-7 text-[11px]" disabled={(auditPage + 1) * AUDIT_PAGE_SIZE >= auditLogs.length} onClick={() => setAuditPage(p => p + 1)}>Next</Button>
+                        <Button variant="outline" size="sm" className="h-7 text-[11px]" disabled={(auditPage + 1) * AUDIT_PAGE_SIZE >= auditTotal} onClick={() => setAuditPage(p => p + 1)}>Next</Button>
                       </div>
                     </div>
                   )}

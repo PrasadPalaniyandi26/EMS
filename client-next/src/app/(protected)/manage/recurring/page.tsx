@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useRecurring, useCategories, useInvalidate, useRecurringRuns } from '@/hooks/use-queries';
-import api, { getAccessToken } from '@/lib/api-client';
+import api, { getAccessToken, API_BASE } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -315,7 +315,7 @@ export default function RecurringPage() {
   const handleViewReceipt = async (receiptPath: string) => {
     try {
       const token = getAccessToken();
-      const res = await fetch(`/api/v1/receipts/${receiptPath}`, {
+      const res = await fetch(`${API_BASE}/receipts/${receiptPath}`, {
         credentials: 'include',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });

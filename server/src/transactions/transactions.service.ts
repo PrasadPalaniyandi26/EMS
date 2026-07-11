@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ROLES } from '../common/constants/roles';
+import { COMMITTED_STATUSES } from '../common/constants/transaction-status';
 import { buildGstFields } from '../common/utils/gst';
 
 @Injectable()
@@ -152,6 +153,73 @@ export class TransactionsService {
     return !!found;
   }
 
+  // Enforce per-user spend limits (single + monthly) and strict category budgets.
+  // Runs at submit time for expenses only — the moment the spend is committed into
+  // the approval pipeline. Limits/budgets are computed against COMMITTED_STATUSES
+  // (approved + in-flight), matching how "spent" is shown on the dashboard/budgets.
+  private async enforceSpendPolicy(txn: { id: number; type: string | null; amount: any; totalAmount?: any; categoryId: number | null; dateRecorded: Date }, userId: number) {
+    if (txn.type !== 'expense') return;
+    const amount = Number(txn.totalAmount ?? txn.amount) || 0;
+    const d = txn.dateRecorded;
+    const month = d.getMonth() + 1;
+    const year = d.getFullYear();
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 0, 23, 59, 59, 999);
+
+    // ── Per-user spend limits ──
+    const perm = await this.prisma.userPermission.findUnique({ where: { userId } });
+    if (perm) {
+      const singleLimit = perm.singleLimit != null ? Number(perm.singleLimit) : null;
+      if (singleLimit != null && singleLimit > 0 && amount > singleLimit) {
+        throw new HttpException(
+          `This expense (₹${amount.toFixed(2)}) exceeds your single-transaction limit of ₹${singleLimit.toFixed(2)}.`,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      const monthlyLimit = perm.monthlyLimit != null ? Number(perm.monthlyLimit) : null;
+      if (monthlyLimit != null && monthlyLimit > 0) {
+        const agg = await this.prisma.transaction.aggregate({
+          where: {
+            userId, type: 'expense', status: { in: COMMITTED_STATUSES },
+            dateRecorded: { gte: start, lte: end }, NOT: { id: txn.id },
+          },
+          _sum: { amount: true },
+        });
+        const committed = Number(agg._sum.amount) || 0;
+        if (committed + amount > monthlyLimit) {
+          throw new HttpException(
+            `This expense would bring your committed spend this month to ₹${(committed + amount).toFixed(2)}, exceeding your monthly limit of ₹${monthlyLimit.toFixed(2)}.`,
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+      }
+    }
+
+    // ── Strict category budget ──
+    if (txn.categoryId != null) {
+      const budget = await this.prisma.budget.findFirst({
+        where: { userId, categoryId: txn.categoryId, periodMonth: month, periodYear: year, isActive: true },
+      });
+      if (budget && budget.strict_enforcement) {
+        const spentAgg = await this.prisma.transaction.aggregate({
+          where: {
+            userId, type: 'expense', categoryId: txn.categoryId, status: { in: COMMITTED_STATUSES },
+            dateRecorded: { gte: start, lte: end }, NOT: { id: txn.id },
+          },
+          _sum: { amount: true },
+        });
+        const spent = Number(spentAgg._sum.amount) || 0;
+        const allocated = Number(budget.amount) || 0;
+        if (spent + amount > allocated) {
+          throw new HttpException(
+            `This expense would exceed the strict budget for this category (allocated ₹${allocated.toFixed(2)}, already committed ₹${spent.toFixed(2)}).`,
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+      }
+    }
+  }
+
   // Submit a transaction for approval
   // Finance submitting expense or income → PENDING_FINANCE (self-assigned, can self-approve)
   // Manager/Admin submitting expense or income → PENDING_FINANCE (skips manager level)
@@ -166,6 +234,8 @@ export class TransactionsService {
     if (!['DRAFT', 'SENT_BACK'].includes(txn.status || '')) {
       throw new HttpException(`Cannot submit transaction with status '${txn.status}'.`, HttpStatus.BAD_REQUEST);
     }
+
+    await this.enforceSpendPolicy(txn, userId);
 
     const submitter = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -376,7 +446,7 @@ export class TransactionsService {
 
   async delete(id: number, userId: number) {
     const existing = await this.prisma.transaction.findFirst({ where: { id, userId } });
-    if (existing && ['APPROVED', 'REJECTED'].includes(existing.status || '')) {
+    if (existing && ['APPROVED', 'REJECTED', 'PENDING_MANAGER', 'PENDING_FINANCE'].includes(existing.status || '')) {
       throw new HttpException(`Cannot delete a transaction with status '${existing.status}'.`, HttpStatus.BAD_REQUEST);
     }
     const result = await this.prisma.transaction.updateMany({ where: { id, userId }, data: { status: 'DELETED' } });
@@ -414,7 +484,14 @@ export class TransactionsService {
     return { deleted: result.count, records: existing.map((e) => ({ id: e.id, reference_id: e.referenceId })) };
   }
 
-  async getApprovalTrail(transactionId: number) {
+  async getApprovalTrail(transactionId: number, userId?: number) {
+    if (userId) {
+      const isOwner = await this.prisma.transaction.findFirst({ where: { id: transactionId, userId }, select: { id: true } });
+      if (!isOwner) {
+        const hasRole = await this.prisma.userRole.findFirst({ where: { userId, role: { name: { in: [ROLES.FINANCE, ROLES.MANAGER, ROLES.ADMIN] } } } });
+        if (!hasRole) throw new HttpException('Access denied.', HttpStatus.FORBIDDEN);
+      }
+    }
     const requests = await this.prisma.approvalRequest.findMany({
       where: { transactionId },
       include: { approver: true },
@@ -431,7 +508,14 @@ export class TransactionsService {
     }));
   }
 
-  async getSplits(transactionId: number) {
+  async getSplits(transactionId: number, userId?: number) {
+    if (userId) {
+      const isOwner = await this.prisma.transaction.findFirst({ where: { id: transactionId, userId }, select: { id: true } });
+      if (!isOwner) {
+        const hasRole = await this.prisma.userRole.findFirst({ where: { userId, role: { name: { in: [ROLES.FINANCE, ROLES.MANAGER, ROLES.ADMIN] } } } });
+        if (!hasRole) throw new HttpException('Access denied.', HttpStatus.FORBIDDEN);
+      }
+    }
     const splits = await this.prisma.transactionSplit.findMany({
       where: { transactionId },
       include: { category: true, client: true, project: true, product: true },
@@ -639,11 +723,14 @@ export class TransactionsService {
         reimbursementNote: dto.note ?? null,
       },
     });
-    this.audit.log({
-      tableName: 'transactions', recordId: 0,
-      action: 'UPDATE', changedBy: userId,
-      newValues: { bulk_reimbursed: eligibleIds, status: dto.status, reimbursed_by: username, reference: dto.reference },
-    }).catch((e) => this.logger.error('audit failed', e));
+    for (const t of eligible) {
+      this.audit.log({
+        tableName: 'transactions', recordId: t.id, referenceId: t.referenceId ?? undefined,
+        action: 'UPDATE', changedBy: userId,
+        oldValues: { reimbursement_status: null },
+        newValues: { reimbursement_status: dto.status, reimbursed_by: username, reference: dto.reference, bulk: true },
+      }).catch((e) => this.logger.error('audit failed', e));
+    }
 
     // Notify each unique owner about their reimbursed transactions
     const owners = await this.prisma.transaction.findMany({

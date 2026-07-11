@@ -46,22 +46,22 @@ export class DashboardController {
   }
 
   @Get('analytics/top-spenders')
-  getTopSpenders(@Query('dateFrom') dateFrom?: string, @Query('dateTo') dateTo?: string) {
-    return this.service.getTopSpenders(dateFrom, dateTo);
+  getTopSpenders(@CurrentUser('id') userId: number, @CurrentUser('role_name') roleName: string, @Query('dateFrom') dateFrom?: string, @Query('dateTo') dateTo?: string) {
+    return this.service.getTopSpenders(userId, roleName, dateFrom, dateTo);
   }
 
   @Get('analytics/category-heatmap')
-  getCategoryHeatmap(@Query('dateFrom') dateFrom?: string, @Query('dateTo') dateTo?: string) {
-    return this.service.getCategoryHeatmap(dateFrom, dateTo);
+  getCategoryHeatmap(@CurrentUser('id') userId: number, @CurrentUser('role_name') roleName: string, @Query('dateFrom') dateFrom?: string, @Query('dateTo') dateTo?: string) {
+    return this.service.getCategoryHeatmap(userId, roleName, dateFrom, dateTo);
   }
 
   @Get('analytics/project-burn')
-  getProjectBurn(@Query('dateFrom') dateFrom?: string, @Query('dateTo') dateTo?: string) {
-    return this.service.getProjectBurn(dateFrom, dateTo);
+  getProjectBurn(@CurrentUser('id') userId: number, @CurrentUser('role_name') roleName: string, @Query('dateFrom') dateFrom?: string, @Query('dateTo') dateTo?: string) {
+    return this.service.getProjectBurn(userId, roleName, dateFrom, dateTo);
   }
 
   @Get('analytics/product-burn')
-  getProductBurn(@Query('dateFrom') dateFrom?: string, @Query('dateTo') dateTo?: string) {
-    return this.service.getProductBurn(dateFrom, dateTo);
+  getProductBurn(@CurrentUser('id') userId: number, @CurrentUser('role_name') roleName: string, @Query('dateFrom') dateFrom?: string, @Query('dateTo') dateTo?: string) {
+    return this.service.getProductBurn(userId, roleName, dateFrom, dateTo);
   }
 }

@@ -3,12 +3,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
-import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api-client';
 import { formatCurrency, getDateRange } from '@/lib/currency';
 import {
   BarChart3, FileText, TrendingDown, TrendingUp, Scale, Target,
-  ArrowLeftRight, Users, Download, FileSpreadsheet, Sheet,
+  ArrowLeftRight, Users, Download, Sheet,
   ChevronDown, Loader2, Search, Receipt, Wallet,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -25,6 +24,8 @@ interface ReportResult {
   columns: string[];
   rows: Record<string, any>[];
   totals: Record<string, any>;
+  truncated?: boolean;
+  note?: string;
 }
 
 // ── Report catalogue ─────────────────────────────────────────────────────────
@@ -42,7 +43,7 @@ const REPORTS = [
 const DATE_PRESETS = [
   { label: 'This Month', key: 'thisMonth' },
   { label: 'Last Month', key: 'lastMonth' },
-  { label: 'This Quarter', key: 'calYear' },
+  { label: 'This Quarter', key: 'thisQuarter' },
   { label: 'Financial Year', key: 'finYear' },
   { label: 'Calendar Year', key: 'calYear' },
   { label: 'Custom', key: 'custom' },
@@ -337,6 +338,15 @@ export default function ReportingPage() {
               </button>
             </div>
           </div>
+
+          {/* Truncation notice */}
+          {result.truncated && (
+            <div className="px-4 py-2 text-[11.5px] font-medium flex items-center gap-2"
+              style={{ background: 'rgba(245,158,11,0.12)', color: '#b45309', borderBottom: '1px solid var(--shell-border)' }}>
+              <span>⚠</span>
+              <span>{result.note || 'Some records were omitted because the result set is large. Narrow the filters to see the rest.'}</span>
+            </div>
+          )}
 
           {/* Table */}
           <div className="overflow-x-auto" ref={tableRef}>

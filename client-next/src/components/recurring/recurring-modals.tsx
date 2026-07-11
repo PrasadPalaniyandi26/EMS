@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useCallback } from 'react';
-import { amountLabel, restoreEnteredAmount } from '@/lib/gst';
+import { amountLabel, restoreEnteredAmount, GST_RATES } from '@/lib/gst';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -179,7 +179,7 @@ export function RecurringModal({
                 onChange={(e) => setForm({ ...form, gst_rate: e.target.value })}
               >
                 <option value="">No GST</option>
-                {['6%', '9%', '12%', '18%'].map((r) => (
+                {GST_RATES.map((r) => (
                   <option key={r} value={r}>{r}</option>
                 ))}
               </select>

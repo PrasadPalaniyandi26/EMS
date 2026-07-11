@@ -267,7 +267,7 @@ export default function ProjectsPage() {
       {deleteId && (
         <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
           <DialogContent 
-            className="sm:max-w-[450px] p-0 overflow-hidden border-casper shadow-2xl flex flex-col"
+            className="sm:max-w-[450px] p-0 overflow-hidden border-[var(--shell-border)] shadow-2xl flex flex-col"
             showCloseButton={false}
           >
             <div className="flex items-center justify-between p-4 border-b border-[var(--shell-border)] bg-[var(--shell-surface)]">

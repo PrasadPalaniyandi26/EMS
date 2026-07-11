@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { COMMITTED_STATUSES } from '../common/constants/transaction-status';
 
 @Injectable()
 export class BudgetsService {
   constructor(private prisma: PrismaService) {}
 
-  private mapBudget(b: any) {
+  private mapBudget(b: any, spent = 0) {
     return ({
       id: b.id, code: b.code, user_id: b.userId,
       name: b.name || '', department: b.department || '', owner_id: b.owner_id,
@@ -13,7 +14,7 @@ export class BudgetsService {
       details: b.details || '', start_date: b.start_date, end_date: b.end_date,
       strict: b.strict_enforcement ?? true, rollover: b.auto_rollover ?? false,
       category_id: b.categoryId, category_name: b.category?.name, category_icon: b.category?.icon,
-      amount: b.amount, allocated: b.amount,
+      amount: b.amount, allocated: b.amount, spent,
       period_month: b.periodMonth, period_year: b.periodYear,
       is_active: b.isActive ? 1 : 0, created_at: b.createdAt, updated_at: b.updatedAt,
     });
@@ -30,7 +31,32 @@ export class BudgetsService {
       include: { category: true, users_budgets_owner_idTousers: true },
       orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }, { id: 'desc' }],
     });
-    return rows.map((b) => this.mapBudget(b));
+    if (rows.length === 0) return [];
+
+    // Group budgets by period so spend is computed against the correct month window per row.
+    const periods = new Map<string, { month: number; year: number; categoryIds: number[] }>();
+    for (const b of rows) {
+      if (!b.categoryId) continue;
+      const key = `${b.periodYear}-${b.periodMonth}`;
+      if (!periods.has(key)) periods.set(key, { month: b.periodMonth, year: b.periodYear, categoryIds: [] });
+      periods.get(key)!.categoryIds.push(b.categoryId);
+    }
+
+    const spentMap: Record<string, number> = {};
+    await Promise.all(Array.from(periods.values()).map(async ({ month, year, categoryIds }) => {
+      const start = new Date(year, month - 1, 1);
+      const end = new Date(year, month, 0, 23, 59, 59, 999);
+      const agg = await this.prisma.transaction.groupBy({
+        by: ['categoryId'],
+        where: { userId, categoryId: { in: categoryIds }, type: 'expense', status: { in: COMMITTED_STATUSES }, dateRecorded: { gte: start, lte: end } },
+        _sum: { amount: true },
+      });
+      for (const a of agg) {
+        spentMap[`${year}-${month}-${a.categoryId}`] = parseFloat(Number(a._sum.amount).toFixed(2)) || 0;
+      }
+    }));
+
+    return rows.map((b) => this.mapBudget(b, b.categoryId ? (spentMap[`${b.periodYear}-${b.periodMonth}-${b.categoryId}`] || 0) : 0));
   }
 
   async findById(id: number, userId: number) {
@@ -42,26 +68,29 @@ export class BudgetsService {
   }
 
   async create(userId: number, data: any) {
-    const b = await this.prisma.budget.create({
-      data: {
-        userId,
-        categoryId: data.categoryId ? Number(data.categoryId) : null,
-        amount: Number(data.allocated || data.amount || 0),
-        periodMonth: Number(data.period_month || data.periodMonth || new Date().getMonth() + 1),
-        periodYear: Number(data.financial_year || data.period_year || data.periodYear || new Date().getFullYear()),
-        name: data.name || null,
-        department: data.department || null,
-        owner_id: data.owner_id ? Number(data.owner_id) : null,
-        financial_year: Number(data.financial_year || new Date().getFullYear()),
-        details: data.details || null,
-        start_date: data.start_date ? new Date(data.start_date) : null,
-        end_date: data.end_date ? new Date(data.end_date) : null,
-        strict_enforcement: data.strict !== false,
-        auto_rollover: data.rollover === true,
-      },
+    const b = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.budget.create({
+        data: {
+          userId,
+          categoryId: data.categoryId ? Number(data.categoryId) : null,
+          amount: Number(data.allocated || data.amount || 0),
+          periodMonth: Number(data.period_month || data.periodMonth || new Date().getMonth() + 1),
+          periodYear: Number(data.financial_year || data.period_year || data.periodYear || new Date().getFullYear()),
+          name: data.name || null,
+          department: data.department || null,
+          owner_id: data.owner_id ? Number(data.owner_id) : null,
+          financial_year: Number(data.financial_year || new Date().getFullYear()),
+          details: data.details || null,
+          start_date: data.start_date ? new Date(data.start_date) : null,
+          end_date: data.end_date ? new Date(data.end_date) : null,
+          strict_enforcement: data.strict !== false,
+          auto_rollover: data.rollover === true,
+        },
+      });
+      const code = `BUD-${String(10000 + created.id).padStart(5, '0')}`;
+      await tx.budget.update({ where: { id: created.id }, data: { code } });
+      return created;
     });
-    const code = `BUD-${String(10000 + b.id).padStart(5, '0')}`;
-    await this.prisma.budget.update({ where: { id: b.id }, data: { code } });
     return this.findById(b.id, userId);
   }
 
@@ -104,7 +133,7 @@ export class BudgetsService {
     const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
     const expensesAgg = await this.prisma.transaction.groupBy({
       by: ['categoryId'],
-      where: { userId, categoryId: { in: categoryIds }, type: 'expense', dateRecorded: { gte: startOfMonth, lte: endOfMonth } },
+      where: { userId, categoryId: { in: categoryIds }, type: 'expense', status: { in: COMMITTED_STATUSES }, dateRecorded: { gte: startOfMonth, lte: endOfMonth } },
       _sum: { amount: true },
     });
     const expenseMap: Record<number, number> = {};
@@ -163,7 +192,7 @@ export class BudgetsService {
     const spent = await this.prisma.transaction.aggregate({
       where: {
         userId, categoryId, type: 'expense',
-        status: { in: ['APPROVED', 'PENDING_MANAGER', 'PENDING_FINANCE'] },
+        status: { in: COMMITTED_STATUSES },
         dateRecorded: { gte: startOfMonth, lte: endOfMonth },
       },
       _sum: { amount: true },
@@ -192,7 +221,7 @@ export class BudgetsService {
     const startOfPrevMonth = new Date(prevYear, prevMonth - 1, 1);
     const endOfPrevMonth = new Date(prevYear, prevMonth, 0, 23, 59, 59, 999);
     const prevMonthAgg = await this.prisma.transaction.groupBy({
-      by: ['type'], where: { userId, dateRecorded: { gte: startOfPrevMonth, lte: endOfPrevMonth } },
+      by: ['type'], where: { userId, status: { in: COMMITTED_STATUSES }, dateRecorded: { gte: startOfPrevMonth, lte: endOfPrevMonth } },
       _sum: { amount: true },
     });
     let prevMonthIncome = 0, prevMonthExpense = 0;
@@ -201,7 +230,7 @@ export class BudgetsService {
       if (r.type === 'expense') prevMonthExpense = Number(r._sum.amount) || 0;
     });
     const recurringAgg = await this.prisma.recurringTransaction.aggregate({
-      where: { userId, isActive: true }, _sum: { amount: true },
+      where: { userId, isActive: true, nextRunDate: { gte: new Date(year, month - 1, 1) } }, _sum: { amount: true },
     });
     return { settings, prevMonthIncome, prevMonthExpense, recurringTotal: Number(recurringAgg._sum.amount) || 0 };
   }

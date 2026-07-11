@@ -44,7 +44,8 @@ export class UsersController {
     for (const key of allowed) {
       if (dto[key] !== undefined) safe[key] = dto[key];
     }
-    return this.usersService.update(userId, safe, userId);
+    if (dto.currentPassword !== undefined) safe.currentPassword = dto.currentPassword;
+    return this.usersService.updateOwnProfile(userId, safe);
   }
 
   @Put(':id')
@@ -77,12 +78,22 @@ export class UsersController {
   }
 
   @Put(':id/currency')
-  async updateCurrency(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateCurrencyDto) {
+  async updateCurrency(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateCurrencyDto,
+    @CurrentUser('id') currentUserId: number,
+  ) {
+    if (id !== currentUserId) throw new ForbiddenException('Cannot update another user\'s currency.');
     return this.usersService.updateCurrency(id, dto.currency);
   }
 
   @Put(':id/email')
-  async updateEmail(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateEmailDto) {
+  async updateEmail(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateEmailDto,
+    @CurrentUser('id') currentUserId: number,
+  ) {
+    if (id !== currentUserId) throw new ForbiddenException('Cannot update another user\'s email.');
     return this.usersService.updateEmail(id, dto.email);
   }
 

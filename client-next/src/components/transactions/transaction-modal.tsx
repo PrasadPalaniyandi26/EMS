@@ -3,16 +3,14 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useCategories, useClients, useProjects, useProducts, useInvalidate } from '@/hooks/use-queries';
-import api, { getAccessToken } from '@/lib/api-client';
+import api, { getAccessToken, API_BASE } from '@/lib/api-client';
 import { CURRENCY_SYMBOL } from '@/lib/currency';
 import { toast } from 'sonner';
 import { Plus, Pencil, Eye, Trash2, UploadCloud, FileText, Loader2, Sparkles } from 'lucide-react';
 import type { Transaction } from '@/lib/types';
 import { ModuleModal } from '@/components/shared/module/module-modal';
 import { CurrencyInput } from '@/components/shared/modal-primitives';
-import { computeTotalAmount, restoreEnteredAmount, amountLabel } from '@/lib/gst';
-
-const GST_RATES = ['6%', '9%', '12%', '18%'];
+import { computeTotalAmount, restoreEnteredAmount, amountLabel, GST_RATES } from '@/lib/gst';
 
 const sanitizeText = (v: unknown): string => {
   if (typeof v !== 'string') return '';
@@ -50,7 +48,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [receiptNumber, setReceiptNumber] = useState('');
   const [amount, setAmount] = useState('');
-  const [gstRate, setGstRate] = useState('');
+  const [gstRate, setGstRate] = useState('5%');
   const [gstAdded, setGstAdded] = useState(false);
   const [needsReimbursement, setNeedsReimbursement] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -134,7 +132,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
       setPaymentMethod('cash');
       setReceiptNumber('');
       setAmount('');
-      setGstRate('18%');
+      setGstRate('5%');
       setGstAdded(true);
       setNeedsReimbursement(false);
       setFile(null);
@@ -216,7 +214,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
     } else if (editing?.receipt_path) {
       try {
         const token = getAccessToken();
-        const res = await fetch(`/api/v1/receipts/${editing.receipt_path}`, {
+        const res = await fetch(`${API_BASE}/receipts/${editing.receipt_path}`, {
           credentials: 'include',
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });

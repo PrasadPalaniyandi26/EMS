@@ -48,7 +48,11 @@ export default function ExpensePage() {
 
   const { data: categories } = useCategories();
   const { data: projects } = useProjects();
-  const { data: txnData, isLoading } = useTransactions({ type: 'expense' });
+  // This workspace shows only active expenses (APPROVED/REJECTED are excluded below and
+  // live in Approvals history), so the row count is naturally bounded. Request a high
+  // limit instead of the default 20 so the full active set is available to the
+  // client-side table + faceted filters rather than just the latest 20 records.
+  const { data: txnData, isLoading } = useTransactions({ type: 'expense', limit: '500' });
   // Data — exclude APPROVED/REJECTED (those belong to Approvals history)
   const EXCLUDED_STATUSES = ['APPROVED', 'REJECTED'];
   const rawTransactions = useMemo(() => {
@@ -590,10 +594,10 @@ export default function ExpensePage() {
                       <span className="flex items-center gap-1.5 px-2 py-0.5 bg-teal-50 border border-teal-200 rounded-full text-[9px] font-bold text-teal-700 uppercase tracking-wider">
                         <Layers className="w-3 h-3" /> Split Expense
                       </span>
-                      <button onClick={openSplit} className="text-[10px] font-bold text-juniper hover:underline uppercase tracking-wider">Re-split →</button>
+                      <button onClick={openSplit} className="text-[10px] font-bold text-[var(--shell-accent)] hover:underline uppercase tracking-wider">Re-split →</button>
                     </div>
                     {splitDetailsLoading ? (
-                      <p className="text-[11px] text-casper font-medium">Loading split details...</p>
+                      <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">Loading split details...</p>
                     ) : splitDetails.length > 0 ? (
                       <div className="space-y-2">
                         {splitDetails.map((s: any, i: number) => {
@@ -602,7 +606,7 @@ export default function ExpensePage() {
                             <div key={s.id ?? i}>
                               <div className="flex items-center justify-between mb-0.5">
                                 <div className="flex items-center gap-1.5 min-w-0">
-                                  <span className="shrink-0 w-3.5 h-3.5 rounded-full bg-juniper/10 text-juniper text-[9px] font-black flex items-center justify-center">{i + 1}</span>
+                                  <span className="shrink-0 w-3.5 h-3.5 rounded-full bg-[var(--shell-accent)]/10 text-[var(--shell-accent)] text-[9px] font-black flex items-center justify-center">{i + 1}</span>
                                   <span className="text-[11px] font-bold text-black dark:text-white truncate">{s.category_name || `Split ${i + 1}`}</span>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0 ml-2">
@@ -627,7 +631,7 @@ export default function ExpensePage() {
                         </div>
                       </div>
                     ) : (
-                      <p className="text-[11px] text-casper font-medium">No split details available.</p>
+                      <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">No split details available.</p>
                     )}
                   </div>
                 ) : (
@@ -876,7 +880,7 @@ export default function ExpensePage() {
           try {
             await api.post(`/transactions/bulk-reimburse`, { ids: [processTxnId], ...dto });
             toast.success(dto.status === 'PAID' ? 'Marked as reimbursed' : 'Put on hold');
-            invalidate('transactions');
+            invalidate('transactions', 'reimbursements');
             setProcessOpen(false);
           } catch (e: any) {
             toast.error(e?.message || 'Failed to process payment');

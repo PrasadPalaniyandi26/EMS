@@ -245,25 +245,8 @@ export class UsersService {
     return { message: 'User deactivated.' };
   }
 
-  async findUsersByRole(roleName: string) {
-    const users = await this.prisma.user.findMany({
-      where: { roleRelation: { name: roleName }, isActive: true },
-      include: { roleRelation: true },
-    });
-    return users.map((u) => ({
-      id: u.id,
-      username: u.username,
-      email: u.email,
-      role: u.role,
-      role_name: u.roleRelation?.name,
-    }));
-  }
-
   async findManagersAndAdmins() {
-    // Find users who have MANAGER or ADMIN in any assigned role (user_roles),
-    // OR as their default role. Filter by userStatus != INACTIVE.
-    // Raw SQL needed here because the filter spans a join across user_roles + roles.
-    const rows = await this.prisma.$queryRawUnsafe<any[]>(`
+    const rows = await this.prisma.$queryRaw<any[]>`
       SELECT DISTINCT u.id, u.username, u.email, u.role, def_r.role_name
       FROM users u
       LEFT JOIN roles def_r ON u.role_id = def_r.role_id
@@ -277,7 +260,7 @@ export class UsersService {
           )
         )
       ORDER BY u.username
-    `);
+    `;
     return rows.map((u) => ({
       id: u.id,
       username: u.username,
@@ -285,6 +268,25 @@ export class UsersService {
       role: u.role,
       role_name: u.role_name,
     }));
+  }
+
+  async updateOwnProfile(userId: number, dto: any) {
+    if (dto.password) {
+      if (!dto.currentPassword) {
+        throw new HttpException('Current password is required to set a new password.', HttpStatus.BAD_REQUEST);
+      }
+      const existing = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { passwordHash: true },
+      });
+      const matches = existing?.passwordHash
+        ? await bcrypt.compare(dto.currentPassword, existing.passwordHash)
+        : false;
+      if (!matches) {
+        throw new HttpException('Current password is incorrect.', HttpStatus.UNAUTHORIZED);
+      }
+    }
+    return this.update(userId, dto, userId);
   }
 
   async getPermissions(userId: number) {

@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ROLES } from '../common/constants/roles';
+import { financeSelfApprovalAllowed } from '../common/config/approval-policy';
 
 // Approval levels:
 //   Level 1 = Manager approval  → status PENDING_MANAGER
@@ -140,7 +141,7 @@ export class ApprovalsService {
     };
   }
 
-  async getPending(approverId: number, _jwtRoleName?: string) {
+  async getPending(approverId: number) {
     const [isManager, isFinance] = await Promise.all([
       this.userHasRole(approverId, ROLES.MANAGER),
       this.userHasRole(approverId, ROLES.FINANCE),
@@ -214,23 +215,23 @@ export class ApprovalsService {
     return results;
   }
 
-  async getHistory(userId: number, _jwtRoleName?: string, statusFilter?: string) {
+  async getHistory(userId: number) {
     const [isFinance, isManager] = await Promise.all([
       this.userHasRole(userId, ROLES.FINANCE),
       this.userHasRole(userId, ROLES.MANAGER),
     ]);
 
     if (!isFinance && !isManager) {
-      // Employee: own APPROVED and REJECTED submissions
+      // Employee: own APPROVED, REJECTED, and SENT_BACK submissions
       const [txRequests, recRequests] = await Promise.all([
         this.prisma.approvalRequest.findMany({
-          where: { transactionId: { not: null }, transaction: { userId, status: { in: ['APPROVED', 'REJECTED'] } } },
+          where: { transactionId: { not: null }, transaction: { userId, status: { in: ['APPROVED', 'REJECTED', 'SENT_BACK'] } } },
           include: { transaction: { include: { category: true, user: true } } },
           orderBy: { createdAt: 'desc' },
           distinct: ['transactionId'],
         }),
         this.prisma.approvalRequest.findMany({
-          where: { recurringTransactionId: { not: null }, recurringTransaction: { userId, status: { in: ['APPROVED', 'REJECTED'] } } },
+          where: { recurringTransactionId: { not: null }, recurringTransaction: { userId, status: { in: ['APPROVED', 'REJECTED', 'SENT_BACK'] } } },
           include: this.recurringInclude,
           orderBy: { createdAt: 'desc' },
           distinct: ['recurringTransactionId'],
@@ -343,12 +344,27 @@ export class ApprovalsService {
       throw new HttpException(`Cannot approve a schedule with status '${recStatus}'.`, HttpStatus.BAD_REQUEST);
     }
 
-    // ── Regular transaction approval (unchanged) ──
-    const isSelfFinanceApproval =
-      req.transaction?.userId === approverId &&
-      req.transaction?.status === 'PENDING_FINANCE';
-    if (req.transaction?.userId === approverId && !isSelfFinanceApproval) {
-      throw new HttpException('Cannot approve your own submission.', HttpStatus.FORBIDDEN);
+    // ── Regular transaction approval ──
+    // Finance self-approval is gated by the FINANCE_SELF_APPROVAL policy. When the
+    // policy blocks it, fall back to allowing self-approval only if no other active
+    // Finance user exists (otherwise the expense could never be approved).
+    const isOwnSubmission = req.transaction?.userId === approverId;
+    const isFinanceStage = req.transaction?.status === 'PENDING_FINANCE';
+    let selfFinanceAllowed = financeSelfApprovalAllowed();
+    if (!selfFinanceAllowed && isOwnSubmission && isFinanceStage) {
+      const otherFinance = await this.prisma.user.findFirst({
+        where: { isActive: true, id: { not: approverId }, userRoles: { some: { role: { name: ROLES.FINANCE } } } },
+      });
+      if (!otherFinance) selfFinanceAllowed = true;
+    }
+    const isSelfFinanceApproval = isOwnSubmission && isFinanceStage && selfFinanceAllowed;
+    if (isOwnSubmission && !isSelfFinanceApproval) {
+      throw new HttpException(
+        isFinanceStage
+          ? 'Finance self-approval is disabled. This expense must be approved by another Finance user.'
+          : 'Cannot approve your own submission.',
+        HttpStatus.FORBIDDEN,
+      );
     }
 
     const txStatus = req.transaction?.status;
@@ -365,7 +381,7 @@ export class ApprovalsService {
       const financeUsers = await this.prisma.user.findMany({
         where: {
           isActive: true,
-          id: { not: req.transaction?.user?.id ?? 0 },
+          id: { notIn: [approverId, req.transaction?.user?.id ?? 0] },
           OR: [
             { roleRelation: { name: ROLES.FINANCE } },
             { userRoles: { some: { role: { name: ROLES.FINANCE } } } },
@@ -519,12 +535,11 @@ export class ApprovalsService {
         data: { approverId, status: 'REJECTED', comments: comments || null, actionDate: new Date(), resolvedAt: new Date() },
       });
       if (claimed.count === 0) throw new HttpException('Request already processed.', HttpStatus.CONFLICT);
-      await tx.transaction.update({ where: { id: req.transactionId! }, data: { status: 'REJECTED' } });
+      await tx.transaction.update({
+        where: { id: req.transactionId! },
+        data: { status: 'REJECTED', rejectedById: rejectorInfo.id, rejectedByName: rejectorInfo.name, rejectedByRole: rejectorInfo.role, rejectedAt: new Date() },
+      });
     });
-    await this.prisma.transaction.update({
-      where: { id: req.transactionId! },
-      data: { rejectedById: rejectorInfo.id, rejectedByName: rejectorInfo.name, rejectedByRole: rejectorInfo.role, rejectedAt: new Date() },
-    }).catch((e: any) => this.logger.warn('Background task failed', e?.message));
     const refIdR = req.transaction?.referenceId;
     const submitterIdR = req.transaction?.userId;
     this.audit.log({
@@ -596,12 +611,11 @@ export class ApprovalsService {
         where: { transactionId: req.transactionId!, status: 'PENDING' },
         data: { status: 'SENT_BACK', comments: comments || null, actionDate: new Date(), resolvedAt: new Date() },
       });
-      await tx.transaction.update({ where: { id: req.transactionId! }, data: { status: 'SENT_BACK' } });
+      await tx.transaction.update({
+        where: { id: req.transactionId! },
+        data: { status: 'SENT_BACK', sentBackById: actorInfo.id, sentBackByName: actorInfo.name, sentBackByRole: actorInfo.role, sentBackAt: new Date() },
+      });
     });
-    await this.prisma.transaction.update({
-      where: { id: req.transactionId! },
-      data: { sentBackById: actorInfo.id, sentBackByName: actorInfo.name, sentBackByRole: actorInfo.role, sentBackAt: new Date() },
-    }).catch((e: any) => this.logger.warn('Background task failed', e?.message));
     const refIdSB = (req as any).transaction?.referenceId;
     const notifyUserId: number | null = (req as any).transaction?.userId ?? null;
     this.audit.log({

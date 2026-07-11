@@ -4,7 +4,7 @@ import { useRef, useState, useMemo, useEffect } from 'react';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useTransactions, useCategories, useClients, useProjects, useInvalidate, useApprovalTrail } from '@/hooks/use-queries';
-import api, { getAccessToken } from '@/lib/api-client';
+import api, { getAccessToken, API_BASE } from '@/lib/api-client';
 import { formatCurrency, formatDate, CURRENCY_SYMBOL } from '@/lib/currency';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -54,7 +54,11 @@ export default function IncomePage() {
   const { data: clients } = useClients();
   const { data: categories } = useCategories();
   const { data: projects } = useProjects();
-  const { data: txnData, isLoading } = useTransactions({ type: 'income' });
+  // This workspace shows only active income (APPROVED/REJECTED are excluded below and
+  // live in Approvals history), so the row count is naturally bounded. Request a high
+  // limit instead of the default 20 so the full active set is available to the
+  // client-side table + faceted filters rather than just the latest 20 records.
+  const { data: txnData, isLoading } = useTransactions({ type: 'income', limit: '500' });
 
   const EXCLUDED_STATUSES = ['APPROVED', 'REJECTED'];
   const LOCKED_STATUSES = ['APPROVED', 'REJECTED'];
@@ -161,7 +165,7 @@ export default function IncomePage() {
     if (selectedTxn?.receipt_path) {
       try {
         const token = getAccessToken();
-        const res = await fetch(`/api/v1/receipts/${selectedTxn.receipt_path}`, {
+        const res = await fetch(`${API_BASE}/receipts/${selectedTxn.receipt_path}`, {
           credentials: 'include',
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
@@ -536,10 +540,10 @@ export default function IncomePage() {
                       <span className="flex items-center gap-1.5 px-2 py-0.5 bg-teal-50 border border-teal-200 rounded-full text-[9px] font-bold text-teal-700 uppercase tracking-wider">
                         <Layers className="w-3 h-3" /> Split Income
                       </span>
-                      <button onClick={openSplit} className="text-[10px] font-bold text-juniper hover:underline uppercase tracking-wider">Re-split →</button>
+                      <button onClick={openSplit} className="text-[10px] font-bold text-[var(--shell-accent)] hover:underline uppercase tracking-wider">Re-split →</button>
                     </div>
                     {splitDetailsLoading ? (
-                      <p className="text-[11px] text-casper font-medium">Loading split details...</p>
+                      <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">Loading split details...</p>
                     ) : splitDetails.length > 0 ? (
                       <div className="space-y-2">
                         {splitDetails.map((s: any, i: number) => {
@@ -548,7 +552,7 @@ export default function IncomePage() {
                             <div key={s.id ?? i}>
                               <div className="flex items-center justify-between mb-0.5">
                                 <div className="flex items-center gap-1.5 min-w-0">
-                                  <span className="shrink-0 w-3.5 h-3.5 rounded-full bg-juniper/10 text-juniper text-[9px] font-black flex items-center justify-center">{i + 1}</span>
+                                  <span className="shrink-0 w-3.5 h-3.5 rounded-full bg-[var(--shell-accent)]/10 text-[var(--shell-accent)] text-[9px] font-black flex items-center justify-center">{i + 1}</span>
                                   <span className="text-[11px] font-bold text-black dark:text-white truncate">{s.category_name || `Split ${i + 1}`}</span>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0 ml-2">
@@ -573,7 +577,7 @@ export default function IncomePage() {
                         </div>
                       </div>
                     ) : (
-                      <p className="text-[11px] text-casper font-medium">No split details available.</p>
+                      <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">No split details available.</p>
                     )}
                   </div>
                 ) : (

@@ -38,9 +38,13 @@ export function ModuleShell({
 
   const panelVisible = panelOpen;
 
+  const originalOnClose = intelligencePanel
+    ? (intelligencePanel as React.ReactElement<any>)?.props?.onClose
+    : undefined;
+
   const panel = intelligencePanel
     ? React.cloneElement(intelligencePanel as React.ReactElement<any>, {
-        onClose: handleClose,
+        onClose: () => { handleClose(); originalOnClose?.(); },
         hasSelection: !!showPanel,
       })
     : null;
@@ -90,7 +94,7 @@ export function ModuleShell({
               panelVisible
                 ? "translate-y-0 max-h-[80dvh]"
                 : "translate-y-full max-h-[80dvh]",
-              "flex flex-col overflow-hidden shadow-2xl lg:shadow-sm",
+              "flex flex-col overflow-hidden shadow-2xl lg:shadow-sm backdrop-blur-xl",
             )}
             style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}
           >

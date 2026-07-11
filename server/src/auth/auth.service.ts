@@ -60,9 +60,11 @@ export class AuthService {
       expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
     } as object);
 
-    // Store refresh token hash
+    // Store refresh token hash — clear expired tokens to prevent unbounded accumulation
+    // (only expired ones, so logging in on one device doesn't kill sessions on others)
     const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
     const decoded = this.jwtService.decode(refreshToken) as any;
+    await this.prisma.refreshToken.deleteMany({ where: { userId: user.id, expiresAt: { lt: new Date() } } });
     await this.prisma.refreshToken.create({
       data: {
         userId: user.id,

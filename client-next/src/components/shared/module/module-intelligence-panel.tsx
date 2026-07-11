@@ -9,14 +9,13 @@ interface PanelTab {
 }
 
 interface ModuleIntelligencePanelProps {
-  children: React.ReactNode;      // shown in first/default tab when no tabs prop
+  children: React.ReactNode;
   title: string;
   icon?: React.ReactNode;
   onClose: () => void;
-  width?: string;
   className?: string;
   hasSelection?: boolean;
-  tabs?: PanelTab[];              // optional tabs — if provided, renders tabbed view when hasSelection
+  tabs?: PanelTab[];
 }
 
 const EMPTY_STATES: Record<string, { icon: React.ReactNode; heading: string; body: string; tips: string[] }> = {
@@ -75,7 +74,6 @@ export function ModuleIntelligencePanel({
   title,
   icon = <Activity className="h-3 w-3" />,
   onClose,
-  width,
   className,
   hasSelection,
   tabs,
@@ -110,7 +108,7 @@ export function ModuleIntelligencePanel({
 
       {/* Tab bar — only when hasSelection and tabs provided */}
       {hasSelection && tabs && tabs.length > 0 && (
-        <div className="flex px-4 gap-1 py-1.5 shrink-0" style={{ borderBottom: '1px solid var(--shell-border)', background: 'var(--shell-surface)' }}>
+        <div className="flex px-4 gap-1 py-1.5 shrink-0 backdrop-blur-xl" style={{ borderBottom: '1px solid var(--shell-border)', background: 'var(--shell-surface)' }}>
           {tabs.map(tab => (
             <button
               key={tab.id}

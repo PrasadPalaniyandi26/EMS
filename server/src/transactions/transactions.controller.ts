@@ -3,6 +3,8 @@ import { AuthGuard } from '@nestjs/passport';
 import type { Response } from 'express';
 import { TransactionsService } from './transactions.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
 import { CreateTransactionDto, UpdateTransactionDto, ProcessReimbursementDto, BulkProcessReimbursementDto } from './dto/transaction.dto';
 import { ApiTags } from '@nestjs/swagger';
 
@@ -18,6 +20,8 @@ export class TransactionsController {
   }
 
   @Get('reimbursements')
+  @UseGuards(RolesGuard)
+  @Roles('finance', 'admin')
   getReimbursementQueue(@Query() query: any) {
     return this.service.getReimbursementQueue(query);
   }
@@ -38,13 +42,13 @@ export class TransactionsController {
   }
 
   @Get(':id/splits')
-  getSplits(@Param('id', ParseIntPipe) id: number) {
-    return this.service.getSplits(id);
+  getSplits(@Param('id', ParseIntPipe) id: number, @CurrentUser('id') userId: number) {
+    return this.service.getSplits(id, userId);
   }
 
   @Get(':id/approval-trail')
-  getApprovalTrail(@Param('id', ParseIntPipe) id: number) {
-    return this.service.getApprovalTrail(id);
+  getApprovalTrail(@Param('id', ParseIntPipe) id: number, @CurrentUser('id') userId: number) {
+    return this.service.getApprovalTrail(id, userId);
   }
 
   @Get(':id')
@@ -60,6 +64,11 @@ export class TransactionsController {
   @Put(':id')
   update(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateTransactionDto, @CurrentUser('id') userId: number) {
     return this.service.update(id, userId, body);
+  }
+
+  @Delete('notes/:noteId')
+  deleteNote(@Param('noteId', ParseIntPipe) noteId: number, @CurrentUser('id') userId: number) {
+    return this.service.deleteNote(noteId, userId);
   }
 
   @Delete(':id')
@@ -98,6 +107,8 @@ export class TransactionsController {
 
   @Post(':id/void')
   @HttpCode(200)
+  @UseGuards(RolesGuard)
+  @Roles('finance', 'admin')
   void(@Param('id', ParseIntPipe) id: number, @Body('reason') reason: string, @CurrentUser('id') userId: number) {
     return this.service.void(id, userId, reason);
   }
@@ -111,11 +122,6 @@ export class TransactionsController {
   @HttpCode(201)
   addNote(@Param('id', ParseIntPipe) id: number, @Body('note') note: string, @CurrentUser('id') userId: number) {
     return this.service.addNote(id, userId, note);
-  }
-
-  @Delete('notes/:noteId')
-  deleteNote(@Param('noteId', ParseIntPipe) noteId: number, @CurrentUser('id') userId: number) {
-    return this.service.deleteNote(noteId, userId);
   }
 
   @Post(':id/reimburse')

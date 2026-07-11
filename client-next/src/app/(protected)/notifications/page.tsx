@@ -177,10 +177,11 @@ export default function NotificationsPage() {
 
   const handleDeleteSelected = async () => {
     if (selected.size === 0) return;
+    const count = selected.size;
     try {
-      for (const id of selected) await api.delete(`/notifications/${id}`);
+      await Promise.all(Array.from(selected).map((id) => api.delete(`/notifications/${id}`)));
       invalidate('notifications'); setSelected(new Set());
-      toast.success(`${selected.size} notification(s) deleted`);
+      toast.success(`${count} notification(s) deleted`);
     } catch { toast.error('Failed to delete'); }
   };
 

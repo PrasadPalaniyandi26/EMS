@@ -77,7 +77,7 @@ export class ReceiptsController {
 
   @Get(':filename')
   download(@Param('filename') filename: string, @Res() res: Response) {
-    if (!/^[\w\-. ]+$/.test(filename)) {
+    if (!/^\w[\w\-. ]*$/.test(filename)) {
       throw new BadRequestException('Invalid filename.');
     }
     // Check Receipts first, then Invoices

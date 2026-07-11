@@ -164,7 +164,16 @@ export class RecurringService {
   }
 
   async delete(userId: number, id: number) {
+    const existing = await this.prisma.recurringTransaction.findFirst({ where: { id, userId } });
     const result = await this.prisma.recurringTransaction.deleteMany({ where: { id, userId } });
+    if (result.count > 0 && existing) {
+      this.audit.log({
+        tableName: 'recurring_transactions', recordId: id,
+        action: 'DELETE', changedBy: userId,
+        oldValues: { id, code: (existing as any).code, status: (existing as any).status },
+        newValues: { deleted: true },
+      }).catch((e: any) => this.logger.warn('Audit log failed on recurring delete', e?.message));
+    }
     return result.count > 0;
   }
 
@@ -278,11 +287,9 @@ export class RecurringService {
       this.userHasRole(approverId, ROLES.FINANCE),
     ]);
 
-    const approver = await this.prisma.user.findUnique({ where: { id: approverId } });
+    const approver = await this.prisma.user.findUnique({ where: { id: approverId }, include: { roleRelation: true } });
     const approverName = approver?.username || 'Unknown';
-    const approverRole = approver?.roleId
-      ? ((await this.prisma.role.findUnique({ where: { id: approver.roleId } }))?.name || null)
-      : null;
+    const approverRole = approver?.roleRelation?.name || null;
     const code = (rec as any).code || `#${id}`;
 
     if (recStatus === 'PENDING_MANAGER') {
@@ -378,11 +385,9 @@ export class RecurringService {
     if (recStatus === 'PENDING_MANAGER' && !rejIsManager) throw new HttpException('Only Managers can reject at this stage.', HttpStatus.FORBIDDEN);
     if (recStatus === 'PENDING_FINANCE' && !rejIsFinance) throw new HttpException('Only Finance can reject at this stage.', HttpStatus.FORBIDDEN);
 
-    const approver = await this.prisma.user.findUnique({ where: { id: approverId } });
+    const approver = await this.prisma.user.findUnique({ where: { id: approverId }, include: { roleRelation: true } });
     const approverName = approver?.username || 'Unknown';
-    const approverRole = approver?.roleId
-      ? ((await this.prisma.role.findUnique({ where: { id: approver.roleId } }))?.name || null)
-      : null;
+    const approverRole = approver?.roleRelation?.name || null;
     const code = (rec as any).code || `#${id}`;
 
     const req = await this.prisma.approvalRequest.findFirst({
@@ -424,11 +429,9 @@ export class RecurringService {
     if (recStatus === 'PENDING_MANAGER' && !sbIsManager) throw new HttpException('Only Managers can send back at this stage.', HttpStatus.FORBIDDEN);
     if (recStatus === 'PENDING_FINANCE' && !sbIsFinance) throw new HttpException('Only Finance can send back at this stage.', HttpStatus.FORBIDDEN);
 
-    const approver = await this.prisma.user.findUnique({ where: { id: approverId } });
+    const approver = await this.prisma.user.findUnique({ where: { id: approverId }, include: { roleRelation: true } });
     const approverName = approver?.username || 'Unknown';
-    const approverRole = approver?.roleId
-      ? ((await this.prisma.role.findUnique({ where: { id: approver.roleId } }))?.name || null)
-      : null;
+    const approverRole = approver?.roleRelation?.name || null;
     const code = (rec as any).code || `#${id}`;
 
     await this.prisma.$transaction(async (tx) => {
@@ -483,8 +486,8 @@ export class RecurringService {
 
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
-          await this.prisma.$transaction([
-            this.prisma.transaction.create({
+          await this.prisma.$transaction(async (tx) => {
+            const created = await tx.transaction.create({
               data: {
                 userId: r.userId, type: (r as any).type || 'expense',
                 amount: (r as any).totalAmount ?? r.amount,
@@ -492,18 +495,23 @@ export class RecurringService {
                 totalAmount: (r as any).totalAmount ?? r.amount,
                 gstRate: (r as any).gstRate ?? null,
                 gstIncluded: (r as any).gstIncluded ?? false,
-                dateRecorded: now,
+                // Scheduled date, not run time — catch-up runs after downtime must land
+                // in the period the transaction was due, or monthly reports shift
+                dateRecorded: r.nextRunDate,
                 categoryId: r.categoryId, description: `[AUTO] ${r.description || ''}`,
                 paymentMethod: r.paymentMethod || 'cash', clientId: r.clientId,
                 projectId: r.projectId, productId: r.productId, contextType: r.contextType || 'project',
                 currency: r.currency || 'INR', status: 'APPROVED',
                 recurringTransactionId: r.id,
               },
-            }),
-            this.prisma.recurringTransaction.update({
+            });
+            const seq = String(10000 + created.id).padStart(5, '0');
+            const referenceId = ((r as any).type || 'expense') === 'expense' ? `EXP-${seq}` : `INC-${seq}`;
+            await tx.transaction.update({ where: { id: created.id }, data: { referenceId } });
+            await tx.recurringTransaction.update({
               where: { id: r.id }, data: { nextRunDate: nextDate, lastRunDate: now },
-            }),
-          ]);
+            });
+          });
           processed++;
           lastErr = null;
           break;

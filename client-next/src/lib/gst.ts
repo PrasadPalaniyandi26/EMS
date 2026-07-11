@@ -3,6 +3,9 @@
  * Used by transaction-modal, recurring page, and any future form that handles GST.
  */
 
+/** Selectable GST rates — single source of truth for all GST dropdowns. */
+export const GST_RATES = ['0%', '3%', '5%', '6%', '9%', '12%', '18%', '40%'];
+
 /**
  * Parses a GST rate string (e.g. "18%" → 18, "" → null).
  */
