@@ -8,7 +8,7 @@ import {
   useDashboardSummary, useDashboardByCategory, useMonthlyTrend,
   useRecentTransactions, useBudgetUtilization, useApprovalCounts, useProjectSpend,
 } from '@/hooks/use-queries';
-import { formatCurrency, getDateRange } from '@/lib/currency';
+import { formatCurrency, getDateRange, parseApiDate } from '@/lib/currency';
 import {
   TrendingUp, TrendingDown, Wallet, ArrowLeftRight,
   ClipboardCheck, Target, Plus, BarChart3, CheckCircle2,
@@ -18,7 +18,7 @@ import {
   Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 
-const COLORS = ['#6366F1', '#818CF8', '#A5B4FC', '#F59E0B', '#10B981', '#3B82F6', '#EC4899', '#8B5CF6', '#14B8A6', '#F97316'];
+const COLORS = ['var(--chart-1)', 'var(--chart-4)', 'var(--chart-3)', 'var(--warning)', 'var(--chart-2)', 'var(--chart-5)', 'var(--info)', 'var(--success)'];
 
 const presets = [
   { label: 'This Week', key: 'thisWeek' as const },
@@ -105,29 +105,29 @@ export default function DashboardPage() {
   }, [budgetUtil]);
 
   const kpis = [
-    { label: 'Total Income', value: fmt(summary?.totalIncome || 0), icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-500/10', loading: summaryLoading },
-    { label: 'Total Expenses', value: fmt(summary?.totalExpenses || 0), icon: TrendingDown, color: 'text-rose-400', bg: 'bg-rose-400/10', loading: summaryLoading },
-    { label: 'Net Balance', value: fmt(summary?.balance || 0), icon: Wallet, color: 'text-blue-400', bg: 'bg-blue-400/10', loading: summaryLoading },
-    { label: 'Transactions', value: String(summary?.transactionCount || 0), icon: ArrowLeftRight, color: 'text-amber-400', bg: 'bg-amber-400/10', loading: summaryLoading },
-    { label: 'Pending Approvals', value: String(pendingApprovals), icon: ClipboardCheck, color: 'text-violet-400', bg: 'bg-violet-400/10', loading: false, link: '/approvals' },
-    { label: 'Budget Used', value: budgetPct !== null ? `${budgetPct}%` : '—', icon: Target, color: budgetPct !== null && budgetPct > 90 ? 'text-rose-400' : 'text-cyan-400', bg: budgetPct !== null && budgetPct > 90 ? 'bg-rose-400/10' : 'bg-cyan-400/10', loading: budgetLoading, link: '/manage/budgets' },
+    { label: 'Total Income', value: fmt(summary?.totalIncome || 0), icon: TrendingUp, color: 'text-[var(--success)]', bg: 'bg-[color-mix(in_srgb,var(--success)_10%,transparent)]', loading: summaryLoading },
+    { label: 'Total Expenses', value: fmt(summary?.totalExpenses || 0), icon: TrendingDown, color: 'text-[var(--danger)]', bg: 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)]', loading: summaryLoading },
+    { label: 'Net Balance', value: fmt(summary?.balance || 0), icon: Wallet, color: 'text-[var(--info)]', bg: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]', loading: summaryLoading },
+    { label: 'Transactions', value: String(summary?.transactionCount || 0), icon: ArrowLeftRight, color: 'text-[var(--warning)]', bg: 'bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]', loading: summaryLoading },
+    { label: 'Pending Approvals', value: String(pendingApprovals), icon: ClipboardCheck, color: 'text-[var(--info)]', bg: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]', loading: false, link: '/approvals' },
+    { label: 'Budget Used', value: budgetPct !== null ? `${budgetPct}%` : '—', icon: Target, color: budgetPct !== null && budgetPct > 90 ? 'text-[var(--danger)]' : 'text-[var(--info)]', bg: budgetPct !== null && budgetPct > 90 ? 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)]' : 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]', loading: budgetLoading, link: '/manage/budgets' },
   ];
 
   const approvalStages = [
-    { label: 'Draft', count: (approvalCounts as any)?.draft ?? 0, color: '#94a3b8' },
-    { label: 'Pending Manager', count: (approvalCounts as any)?.pendingManager ?? 0, color: '#F59E0B' },
-    { label: 'Pending Finance', count: (approvalCounts as any)?.pendingFinance ?? 0, color: '#6366F1' },
-    { label: 'Approved', count: (approvalCounts as any)?.approved ?? 0, color: '#10B981' },
-    { label: 'Rejected', count: (approvalCounts as any)?.rejected ?? 0, color: '#F43F5E' },
+    { label: 'Draft', count: (approvalCounts as any)?.draft ?? 0, color: 'var(--status-draft)' },
+    { label: 'Pending Manager', count: (approvalCounts as any)?.pendingManager ?? 0, color: 'var(--status-pending-manager)' },
+    { label: 'Pending Finance', count: (approvalCounts as any)?.pendingFinance ?? 0, color: 'var(--status-pending-finance)' },
+    { label: 'Approved', count: (approvalCounts as any)?.approved ?? 0, color: 'var(--status-approved)' },
+    { label: 'Rejected', count: (approvalCounts as any)?.rejected ?? 0, color: 'var(--status-rejected)' },
   ];
 
   const quickActions = [
-    { label: '+ Expense', href: '/expense', color: 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20' },
-    { label: '+ Income', href: '/income', color: 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20' },
-    { label: 'Approvals', href: '/approvals', color: 'bg-violet-500/10 text-violet-400 hover:bg-violet-500/20' },
-    { label: 'Reports', href: '/reporting', color: 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20' },
-    { label: 'Transactions', href: '/transactions', color: 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20' },
-    { label: 'Budgets', href: '/manage/budgets', color: 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20' },
+    { label: '+ Expense', href: '/expense', color: 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_20%,transparent)]' },
+    { label: '+ Income', href: '/income', color: 'bg-[color-mix(in_srgb,var(--success)_10%,transparent)] text-[var(--success)] hover:bg-[color-mix(in_srgb,var(--success)_20%,transparent)]' },
+    { label: 'Approvals', href: '/approvals', color: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)] text-[var(--info)] hover:bg-[color-mix(in_srgb,var(--info)_20%,transparent)]' },
+    { label: 'Reports', href: '/reporting', color: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)] text-[var(--info)] hover:bg-[color-mix(in_srgb,var(--info)_20%,transparent)]' },
+    { label: 'Transactions', href: '/transactions', color: 'bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] text-[var(--warning)] hover:bg-[color-mix(in_srgb,var(--warning)_20%,transparent)]' },
+    { label: 'Budgets', href: '/manage/budgets', color: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)] text-[var(--info)] hover:bg-[color-mix(in_srgb,var(--info)_20%,transparent)]' },
   ];
 
   const surface = { background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' };
@@ -141,6 +141,8 @@ export default function DashboardPage() {
           {presets.map((p) => (
             <button
               key={p.label}
+              type="button"
+              aria-pressed={activePreset === p.label}
               onClick={() => handlePreset(p.key, p.label)}
               className="px-2.5 py-1.5 rounded-full text-[11px] font-semibold transition-all"
               style={activePreset === p.label
@@ -153,12 +155,12 @@ export default function DashboardPage() {
           ))}
         </div>
         <div className="flex items-center gap-2 ml-auto">
-          <input type="date" value={dateFrom}
+          <input type="date" aria-label="From date" value={dateFrom}
             onChange={(e) => { setDateFrom(e.target.value); setActivePreset('Custom'); }}
             className="rounded-lg px-3 py-1.5 text-[12px] border outline-none"
             style={{ background: 'var(--shell-bg)', color: 'var(--shell-text)', borderColor: 'var(--shell-border)' }} />
           <span className="text-[11px]" style={{ color: 'var(--shell-text-muted)' }}>—</span>
-          <input type="date" value={dateTo}
+          <input type="date" aria-label="To date" value={dateTo}
             onChange={(e) => { setDateTo(e.target.value); setActivePreset('Custom'); }}
             className="rounded-lg px-3 py-1.5 text-[12px] border outline-none"
             style={{ background: 'var(--shell-bg)', color: 'var(--shell-text)', borderColor: 'var(--shell-border)' }} />
@@ -172,12 +174,15 @@ export default function DashboardPage() {
           return (
             <div
               key={k.label}
+              role={k.link ? "link" : undefined}
+              tabIndex={k.link ? 0 : undefined}
               onClick={() => k.link && router.push(k.link)}
-              className={`rounded-xl p-4 flex items-center justify-between ${k.link ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+              onKeyDown={(e) => { if (k.link && e.key === "Enter") router.push(k.link); }}
+              className={`rounded-xl p-4 flex items-center justify-between ${k.link ? 'cursor-pointer hover:opacity-80 transition-opacity focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]' : ''}`}
               style={surface}
             >
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] uppercase tracking-widest font-semibold mb-1 truncate" style={{ color: 'var(--shell-text-muted)' }}>{k.label}</p>
+                <p className="text-[11px] uppercase tracking-widest font-semibold mb-1 truncate" style={{ color: 'var(--shell-text-muted)' }}>{k.label}</p>
                 {k.loading
                   ? <SkeletonRect w="60px" h="24px" className="mt-1" />
                   : <p className="text-[18px] font-black leading-none truncate" style={{ color: 'var(--shell-text)' }}>{k.value}</p>
@@ -199,16 +204,16 @@ export default function DashboardPage() {
             {trendLoading ? <SkeletonRect h="260px" /> : trendData.length > 0 ? (
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={trendData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.1)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--shell-border)" strokeOpacity={0.5} />
                   <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'var(--shell-text-muted)' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: 'var(--shell-text-muted)' }} axisLine={false} tickLine={false} />
                   <Tooltip
                     contentStyle={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)', borderRadius: 8, fontSize: 12, color: 'var(--shell-text)' }}
-                    cursor={{ fill: 'rgba(128,128,128,0.08)' }}
+                    cursor={{ fill: 'var(--shell-hover)' }}
                   />
                   <Legend wrapperStyle={{ fontSize: 12, color: 'var(--shell-text-muted)' }} />
-                  <Bar dataKey="income" fill="#6366F1" radius={[4, 4, 0, 0]} name="Income" />
-                  <Bar dataKey="expenses" fill="#F43F5E" radius={[4, 4, 0, 0]} name="Expenses" />
+                  <Bar dataKey="income" fill="var(--success)" radius={[4, 4, 0, 0]} name="Income" />
+                  <Bar dataKey="expenses" fill="var(--danger)" radius={[4, 4, 0, 0]} name="Expenses" />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -251,7 +256,7 @@ export default function DashboardPage() {
             ) : (budgetUtil || []).length > 0 ? (
               (budgetUtil as any[]).map((b) => {
                 const pct = Math.min(b.pct, 100);
-                const color = b.pct >= 100 ? '#F43F5E' : b.pct >= 80 ? '#F59E0B' : '#10B981';
+                const color = b.pct >= 100 ? 'var(--danger)' : b.pct >= 80 ? 'var(--warning)' : 'var(--success)';
                 return (
                   <div key={b.category_id}>
                     <div className="flex items-center justify-between mb-1">
@@ -280,14 +285,14 @@ export default function DashboardPage() {
             {projectLoading ? <SkeletonRect h="200px" /> : (projectSpend || []).length > 0 ? (
               <ResponsiveContainer width="100%" height={Math.max(160, (projectSpend as any[]).length * 42)}>
                 <BarChart data={projectSpend as any[]} layout="vertical" margin={{ left: 0, right: 16 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.1)" horizontal={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--shell-border)" strokeOpacity={0.5} horizontal={false} />
                   <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--shell-text-muted)' }} axisLine={false} tickLine={false} />
                   <YAxis type="category" dataKey="project_name" tick={{ fontSize: 11, fill: 'var(--shell-text-muted)' }} axisLine={false} tickLine={false} width={100} />
                   <Tooltip
                     formatter={(val) => fmt(typeof val === 'number' ? val : 0)}
                     contentStyle={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)', borderRadius: 8, fontSize: 12, color: 'var(--shell-text)' }}
                   />
-                  <Bar dataKey="spent" fill="#6366F1" radius={[0, 4, 4, 0]} name="Spent" />
+                  <Bar dataKey="spent" fill="var(--info)" radius={[0, 4, 4, 0]} name="Spent" />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -334,20 +339,20 @@ export default function DashboardPage() {
                 {(recentTxns || []).map((txn: any) => (
                   <div key={txn.id} className="flex items-center justify-between rounded-xl px-3 py-2.5 transition-colors" style={{ background: 'var(--shell-hover)', border: '1px solid var(--shell-border)' }}>
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${txn.type === 'income' ? 'bg-emerald-500/10' : 'bg-rose-400/10'}`}>
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${txn.type === 'income' ? 'bg-[color-mix(in_srgb,var(--success)_10%,transparent)]' : 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)]'}`}>
                         {txn.type === 'income'
-                          ? <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
-                          : <TrendingDown className="h-3.5 w-3.5 text-rose-400" />
+                          ? <TrendingUp className="h-3.5 w-3.5 text-[var(--success)]" />
+                          : <TrendingDown className="h-3.5 w-3.5 text-[var(--danger)]" />
                         }
                       </div>
                       <div className="min-w-0">
                         <p className="text-[12.5px] font-semibold truncate" style={{ color: 'var(--shell-text)' }}>{txn.description || txn.category_name}</p>
-                        <p className="text-[10.5px]" style={{ color: 'var(--shell-text-muted)' }}>
-                          {new Date(txn.date_recorded).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        <p className="text-[11px]" style={{ color: 'var(--shell-text-muted)' }}>
+                          {parseApiDate(txn.date_recorded)?.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                         </p>
                       </div>
                     </div>
-                    <span className={`text-[13px] font-black shrink-0 ml-3 ${txn.type === 'income' ? 'text-emerald-500' : 'text-rose-400'}`}>
+                    <span className={`text-[13px] font-black shrink-0 ml-3 ${txn.type === 'income' ? 'text-[var(--success)]' : 'text-[var(--danger)]'}`}>
                       {txn.type === 'income' ? '+' : '-'}{formatCurrency(txn.amount, currency)}
                     </span>
                   </div>

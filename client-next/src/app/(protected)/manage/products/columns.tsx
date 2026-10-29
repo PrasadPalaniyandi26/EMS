@@ -5,11 +5,11 @@ import type { Product } from "@/lib/types"
 
 const statusColor: Record<string, string> = {
   'R&D':          'text-black/40 dark:text-white/50',
-  'Prototype':    'text-yellow-600 dark:text-yellow-400',
-  'Assembly':     'text-amber-600 dark:text-amber-400',
-  'Quality':      'text-blue-600 dark:text-blue-400',
+  'Prototype':    'text-[var(--warning)]',
+  'Assembly':     'text-[var(--warning)]',
+  'Quality':      'text-[var(--info)]',
   'Market Ready': 'text-[var(--shell-accent)]',
-  'Active':       'text-emerald-600 dark:text-emerald-500',
+  'Active':       'text-[var(--success)]',
   'Inactive':     'text-[var(--shell-text-muted)]',
 }
 
@@ -18,7 +18,7 @@ export const columns: ColumnDef<Product>[] = [
     accessorKey: "code",
     header: "ID",
     cell: ({ row }) => (
-      <span className="font-mono text-[11px] text-blue-400 font-black">
+      <span className="font-mono text-[11px] text-[var(--info)] font-black">
         {row.getValue("code") || `PRD-${String(row.original.id).padStart(3, '0')}`}
       </span>
     ),
@@ -50,7 +50,7 @@ export const columns: ColumnDef<Product>[] = [
       return (
         <div className="flex items-center gap-2">
           {lead !== "—" && (
-            <div className="w-5 h-5 rounded-full bg-[var(--shell-hover)] flex items-center justify-center text-[9px] font-bold text-[var(--shell-accent)] border border-[var(--shell-border)] shrink-0">
+            <div className="w-5 h-5 rounded-full bg-[var(--shell-hover)] flex items-center justify-center text-[11px] font-bold text-[var(--shell-accent)] border border-[var(--shell-border)] shrink-0">
               {lead[0]?.toUpperCase()}
             </div>
           )}
@@ -63,7 +63,7 @@ export const columns: ColumnDef<Product>[] = [
     accessorKey: "type_name",
     header: "Type",
     cell: ({ row }) => (
-      <span className="text-[12px] text-blue-600 dark:text-blue-300 font-medium">
+      <span className="text-[12px] text-[var(--info)] font-medium">
         {row.getValue("type_name") || <span className="text-black/30 dark:text-white/35">—</span>}
       </span>
     ),

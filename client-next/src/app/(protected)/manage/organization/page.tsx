@@ -23,7 +23,6 @@ import {
 } from 'lucide-react';
 import type { User } from '@/lib/types';
 import { 
-  useReactTable, 
   getCoreRowModel, 
   getFilteredRowModel, 
   getPaginationRowModel, 
@@ -34,6 +33,7 @@ import {
   VisibilityState,
   RowSelectionState
 } from "@tanstack/react-table";
+import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { DataTable } from '@/components/data-table/data-table';
@@ -41,6 +41,7 @@ import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
 import { columns } from './columns';
 import { UserModal, AllocationModal, PermissionsModal } from '@/components/manage/user-modals';
 import { cn } from '@/lib/utils';
+import { parseApiDate } from '@/lib/currency';
 import { useConfirm } from '@/components/shared/modal-primitives';
 
 export default function OrganizationPage() {
@@ -82,7 +83,7 @@ export default function OrganizationPage() {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [globalFilter, setGlobalFilter] = useState('');
 
-  const table = useReactTable({
+  const table = useDataTable({
     data: users,
     columns: userColumns,
     state: {
@@ -161,19 +162,19 @@ export default function OrganizationPage() {
           actions={
             <>
               <button className="btn-action" onClick={() => { setEditingUser(null); setUserModalOpen(true); }} disabled={!isAdmin} title={!isAdmin ? 'Admin access required' : undefined}>
-                <Plus className="h-4 w-4 text-green-600" /> Add
+                <Plus className="h-4 w-4 text-[var(--success)]" /> Add
               </button>
               <button className="btn-action" onClick={() => { if (selectedUser) { setEditingUser(selectedUser); setUserModalOpen(true); } }} disabled={!selectedId || !isAdmin} title={!isAdmin ? 'Admin access required' : undefined}>
-                <Pencil className="h-4 w-4 text-blue-600" /> Edit
+                <Pencil className="h-4 w-4 text-[var(--info)]" /> Edit
               </button>
-              <button className="btn-action" onClick={() => setAllocationModalOpen(true)} disabled={!selectedId}>
-                <Briefcase className="h-4 w-4 text-blue-400" /> Allocation
+              <button className="btn-action" onClick={() => setAllocationModalOpen(true)} disabled={!selectedId || !isAdmin} title={!isAdmin ? 'Admin access required' : undefined}>
+                <Briefcase className="h-4 w-4 text-[var(--info)]" /> Allocation
               </button>
               <button className="btn-action" onClick={() => setPermissionsModalOpen(true)} disabled={!selectedId || !isAdmin} title={!isAdmin ? 'Admin access required' : undefined}>
-                <Shield className="h-4 w-4 text-amber-500" /> Permissions
+                <Shield className="h-4 w-4 text-[var(--warning)]" /> Permissions
               </button>
               <button className="btn-action" onClick={handleDeactivate} disabled={!selectedId || !isAdmin} title={!isAdmin ? 'Admin access required' : undefined}>
-                <UserX className="h-4 w-4 text-rose-500" /> Deactivate
+                <UserX className="h-4 w-4 text-[var(--danger)]" /> Deactivate
               </button>
             </>
           }
@@ -195,21 +196,21 @@ export default function OrganizationPage() {
                     style={{ background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' }}>
                     {(() => { const p = selectedUser.username.trim().split(/\s+/); return p.length >= 2 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : p[0].slice(0, 2).toUpperCase(); })()}
                   </div>
-                  <div className={`absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full border-2 shadow ${selectedUser.user_status === 'ON_HOLD' ? 'bg-amber-400' : selectedUser.user_status === 'INACTIVE' || selectedUser.is_active === 0 ? 'bg-rose-400' : 'bg-emerald-400'}`}
+                  <div className={`absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full border-2 shadow ${selectedUser.user_status === 'ON_HOLD' ? 'bg-[var(--warning)]' : selectedUser.user_status === 'INACTIVE' || selectedUser.is_active === 0 ? 'bg-[var(--danger)]' : 'bg-[var(--success)]'}`}
                     style={{ borderColor: 'var(--shell-surface)' }} />
                 </div>
                 <div className="min-w-0">
                   <h3 className="text-[14px] font-bold leading-tight truncate" style={{ color: 'var(--shell-text)' }}>{selectedUser.username}</h3>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.15em] mt-0.5" style={{ color: 'var(--shell-accent)' }}>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.15em] mt-0.5" style={{ color: 'var(--shell-accent)' }}>
                     NT{10000 + selectedUser.id}
                   </p>
                   <div className="flex flex-wrap gap-1 mt-1.5">
                     {(selectedUser.roles && selectedUser.roles.length > 0 ? selectedUser.roles : [{ role_name: selectedUser.role_name, is_default: true }]).map((r, i) => {
-                      const colors: Record<string, string> = { admin: 'bg-red-100 text-red-700', finance: 'bg-indigo-100 text-indigo-700', manager: 'bg-orange-100 text-orange-700', employee: 'bg-blue-100 text-blue-600' };
+                      const colors: Record<string, string> = { admin: 'bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] text-[var(--danger)]', finance: 'bg-[color-mix(in_srgb,var(--info)_12%,transparent)] text-[var(--info)]', manager: 'bg-[color-mix(in_srgb,var(--warning)_12%,transparent)] text-[var(--warning)]', employee: 'bg-[color-mix(in_srgb,var(--info)_12%,transparent)] text-[var(--info)]' };
                       const key = (r.role_name || '').toLowerCase();
                       const cls = colors[key] || 'bg-[var(--shell-hover)] text-[var(--shell-text-muted)]';
                       return (
-                        <span key={i} className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${cls}`}>
+                        <span key={i} className={`px-1.5 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider ${cls}`}>
                           {r.role_name}{r.is_default && ' ★'}
                         </span>
                       );
@@ -221,42 +222,42 @@ export default function OrganizationPage() {
               {/* Contact & Location — 2 column */}
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-lg p-3 space-y-2" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
-                  <p className="text-[9px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--shell-text-muted)' }}>Contact</p>
+                  <p className="text-[11px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--shell-text-muted)' }}>Contact</p>
                   <div className="flex items-start gap-2">
                     <Mail className="w-3 h-3 shrink-0 mt-0.5" style={{ color: 'var(--shell-text-muted)' }} />
-                    <span className="text-[10px] break-all leading-tight" style={{ color: 'var(--shell-text)' }}>{selectedUser.email}</span>
+                    <span className="text-[11px] break-all leading-tight" style={{ color: 'var(--shell-text)' }}>{selectedUser.email}</span>
                   </div>
                   {selectedUser.contact_no && (
                     <div className="flex items-center gap-2">
                       <Phone className="w-3 h-3 shrink-0" style={{ color: 'var(--shell-text-muted)' }} />
-                      <span className="text-[10px]" style={{ color: 'var(--shell-text)' }}>{selectedUser.contact_no}</span>
+                      <span className="text-[11px]" style={{ color: 'var(--shell-text)' }}>{selectedUser.contact_no}</span>
                     </div>
                   )}
                   <div className="flex items-center gap-2 pt-1" style={{ borderTop: '1px solid var(--shell-border)' }}>
                     <Building2 className="w-3 h-3 shrink-0" style={{ color: 'var(--shell-text-muted)' }} />
-                    <span className="text-[10px] font-semibold" style={{ color: 'var(--shell-text)' }}>{selectedUser.department || 'Unassigned'}</span>
+                    <span className="text-[11px] font-semibold" style={{ color: 'var(--shell-text)' }}>{selectedUser.department || 'Unassigned'}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <UserIcon className="w-3 h-3 shrink-0" style={{ color: 'var(--shell-text-muted)' }} />
-                    <span className="text-[10px] font-semibold" style={{ color: 'var(--shell-text)' }}>{selectedUser.manager_name || managerName(selectedUser.manager_id ?? undefined) || '—'}</span>
+                    <span className="text-[11px] font-semibold" style={{ color: 'var(--shell-text)' }}>{selectedUser.manager_name || managerName(selectedUser.manager_id ?? undefined) || '—'}</span>
                   </div>
                 </div>
                 <div className="rounded-lg p-3 space-y-2" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
-                  <p className="text-[9px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--shell-text-muted)' }}>Location</p>
-                  {selectedUser.house_apt && <p className="text-[10px]" style={{ color: 'var(--shell-text)' }}>{selectedUser.house_apt}</p>}
-                  {selectedUser.address && <p className="text-[10px]" style={{ color: 'var(--shell-text)' }}>{selectedUser.address}</p>}
-                  {selectedUser.city && <p className="text-[10px] font-semibold" style={{ color: 'var(--shell-text)' }}>{selectedUser.city}{selectedUser.postal_code ? ` — ${selectedUser.postal_code}` : ''}</p>}
-                  {selectedUser.country && <p className="text-[10px]" style={{ color: 'var(--shell-text-muted)' }}>{selectedUser.country}</p>}
+                  <p className="text-[11px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--shell-text-muted)' }}>Location</p>
+                  {selectedUser.house_apt && <p className="text-[11px]" style={{ color: 'var(--shell-text)' }}>{selectedUser.house_apt}</p>}
+                  {selectedUser.address && <p className="text-[11px]" style={{ color: 'var(--shell-text)' }}>{selectedUser.address}</p>}
+                  {selectedUser.city && <p className="text-[11px] font-semibold" style={{ color: 'var(--shell-text)' }}>{selectedUser.city}{selectedUser.postal_code ? ` — ${selectedUser.postal_code}` : ''}</p>}
+                  {selectedUser.country && <p className="text-[11px]" style={{ color: 'var(--shell-text-muted)' }}>{selectedUser.country}</p>}
                   {!selectedUser.address && !selectedUser.city && (
-                    <p className="text-[10px] italic" style={{ color: 'var(--shell-text-muted)' }}>No address on file</p>
+                    <p className="text-[11px] italic" style={{ color: 'var(--shell-text-muted)' }}>No address on file</p>
                   )}
                   <div className="flex items-center gap-2 pt-1" style={{ borderTop: '1px solid var(--shell-border)' }}>
                     <Calendar className="w-3 h-3 shrink-0" style={{ color: 'var(--shell-text-muted)' }} />
-                    <span className="text-[10px]" style={{ color: 'var(--shell-text)' }}>{selectedUser.joining_date ? new Date(selectedUser.joining_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not set'}</span>
+                    <span className="text-[11px]" style={{ color: 'var(--shell-text)' }}>{selectedUser.joining_date ? parseApiDate(selectedUser.joining_date)?.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not set'}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="w-3 h-3 shrink-0" style={{ color: 'var(--shell-text-muted)' }} />
-                    <span className="text-[10px] font-semibold" style={{ color: 'var(--shell-accent)' }}>{selectedUser.clearance_level || 'Level 1'}</span>
+                    <span className="text-[11px] font-semibold" style={{ color: 'var(--shell-accent)' }}>{selectedUser.clearance_level || 'Level 1'}</span>
                   </div>
                 </div>
               </div>
@@ -264,47 +265,32 @@ export default function OrganizationPage() {
               {/* Active Allocations */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5" style={{ color: 'var(--shell-text-muted)' }}>
+                  <h4 className="text-[11px] font-bold uppercase tracking-widest flex items-center gap-1.5" style={{ color: 'var(--shell-text-muted)' }}>
                     <FolderOpen className="w-3 h-3" /> Active Allocations
                   </h4>
-                  <span className="text-[9px] font-bold" style={{ color: 'var(--shell-accent)' }}>{panelAllocations.length}</span>
+                  <span className="text-[11px] font-bold" style={{ color: 'var(--shell-accent)' }}>{panelAllocations.length}</span>
                 </div>
                 <div className="space-y-1.5">
                   {panelAllocations.length === 0 ? (
-                    <p className="text-[10px] italic text-center py-3" style={{ color: 'var(--shell-text-muted)' }}>No allocations assigned</p>
+                    <p className="text-[11px] italic text-center py-3" style={{ color: 'var(--shell-text-muted)' }}>No allocations assigned</p>
                   ) : panelAllocations.slice(0, 5).map((a) => (
                     <div key={a.id} className="rounded-lg p-2.5" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
                       <div className="flex items-center justify-between mb-0.5">
                         <span className="text-[11px] font-semibold leading-none truncate flex-1 mr-2" style={{ color: 'var(--shell-text)' }}>{a.code}</span>
-                        <span className="text-[9px] font-bold uppercase shrink-0" style={{ color: 'var(--shell-text-muted)' }}>{a.type}</span>
+                        <span className="text-[11px] font-bold uppercase shrink-0" style={{ color: 'var(--shell-text-muted)' }}>{a.type}</span>
                       </div>
-                      <span className="text-[9px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>{a.client_name} · {a.category}</span>
+                      <span className="text-[11px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>{a.client_name} · {a.category}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Performance */}
-              <div className="grid grid-cols-3 gap-2">
-                <div className="rounded-lg p-2.5 text-center" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
-                  <p className="text-[9px] uppercase font-bold tracking-widest mb-1" style={{ color: 'var(--shell-text-muted)' }}>Tasks</p>
-                  <p className="text-base font-bold" style={{ color: 'var(--shell-text)' }}>12</p>
-                </div>
-                <div className="rounded-lg p-2.5 text-center" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
-                  <p className="text-[9px] uppercase font-bold tracking-widest mb-1" style={{ color: 'var(--shell-text-muted)' }}>Done</p>
-                  <p className="text-base font-bold" style={{ color: 'var(--shell-accent)' }}>9</p>
-                </div>
-                <div className="rounded-lg p-2.5 text-center" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
-                  <p className="text-[9px] uppercase font-bold tracking-widest mb-1" style={{ color: 'var(--shell-text-muted)' }}>Score</p>
-                  <p className="text-base font-bold" style={{ color: 'var(--shell-accent)' }}>A+</p>
-                </div>
-              </div>
-
               {/* Quick actions */}
+              {isAdmin && (
               <div className="grid grid-cols-2 gap-2 pt-2" style={{ borderTop: '1px solid var(--shell-border)' }}>
                 <button
                   onClick={() => setAllocationModalOpen(true)}
-                  className="flex items-center justify-center gap-2 py-2 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-colors"
+                  className="flex items-center justify-center gap-2 py-2 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition-colors"
                   style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)', color: 'var(--shell-text)' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--shell-accent)'; (e.currentTarget as HTMLElement).style.color = 'var(--shell-accent)'; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--shell-border)'; (e.currentTarget as HTMLElement).style.color = 'var(--shell-text)'; }}
@@ -313,7 +299,7 @@ export default function OrganizationPage() {
                 </button>
                 <button
                   onClick={() => setPermissionsModalOpen(true)}
-                  className="flex items-center justify-center gap-2 py-2 rounded-lg text-[10px] font-semibold uppercase tracking-wider text-white transition-all"
+                  className="flex items-center justify-center gap-2 py-2 rounded-lg text-[11px] font-semibold uppercase tracking-wider text-white transition-all"
                   style={{ background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.88'; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
@@ -321,6 +307,7 @@ export default function OrganizationPage() {
                   <Shield className="w-3.5 h-3.5" /> Permissions
                 </button>
               </div>
+              )}
             </div>
             )}
           </ModuleIntelligencePanel>

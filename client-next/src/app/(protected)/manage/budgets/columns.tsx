@@ -20,7 +20,7 @@ export const columns = (currency: string): ColumnDef<OrgBudget, any>[] => [
     accessorKey: "code",
     header: "ID",
     cell: ({ row }) => (
-      <span className="font-mono text-[11px] text-blue-400 font-black">
+      <span className="font-mono text-[11px] text-[var(--info)] font-black">
         {row.getValue("code") || `BUD-${String(row.original.id).padStart(3, '0')}`}
       </span>
     ),
@@ -35,7 +35,7 @@ export const columns = (currency: string): ColumnDef<OrgBudget, any>[] => [
           {row.getValue("name") || '—'}
         </p>
         {(row.original as any).details && (
-          <p className="text-[10px] text-black/40 dark:text-white/45 font-medium truncate max-w-[200px]">{(row.original as any).details}</p>
+          <p className="text-[11px] text-black/40 dark:text-white/45 font-medium truncate max-w-[200px]">{(row.original as any).details}</p>
         )}
       </div>
     ),
@@ -53,7 +53,7 @@ export const columns = (currency: string): ColumnDef<OrgBudget, any>[] => [
     accessorKey: "category_name",
     header: "Category",
     cell: ({ row }) => (
-      <span className="text-[12px] text-indigo-600 dark:text-indigo-300 font-medium">
+      <span className="text-[12px] text-[var(--info)] font-medium">
         {row.getValue("category_name") || "General"}
       </span>
     ),
@@ -84,7 +84,7 @@ export const columns = (currency: string): ColumnDef<OrgBudget, any>[] => [
     cell: ({ row }) => {
       const active = (row.original as any).is_active;
       return (
-        <span className={`text-[12px] font-semibold ${active ? 'text-emerald-500' : 'text-black/30 dark:text-white/40'}`}>
+        <span className={`text-[12px] font-semibold ${active ? 'text-[var(--success)]' : 'text-black/30 dark:text-white/40'}`}>
           {active ? 'Active' : 'Inactive'}
         </span>
       );

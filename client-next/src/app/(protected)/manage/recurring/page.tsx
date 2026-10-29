@@ -22,7 +22,7 @@ import {
   XCircle,
   FileText,
 } from 'lucide-react';
-import { formatCurrency, formatDate } from '@/lib/currency';
+import { formatCurrency, formatDate, parseApiDate, toLocalYMD } from '@/lib/currency';
 import { restoreEnteredAmount } from '@/lib/gst';
 import type { RecurringTransaction } from '@/lib/types';
 import { RecurringModal, PauseRecurringModal, ResumeRecurringModal, DeleteRecurringModal } from '@/components/recurring/recurring-modals';
@@ -36,11 +36,11 @@ import {
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
-  useReactTable,
   SortingState,
   ColumnFiltersState,
   VisibilityState,
 } from "@tanstack/react-table";
+import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 
@@ -92,7 +92,7 @@ export default function RecurringPage() {
     gst_included: false,
     category_id: '',
     frequency: 'monthly',
-    next_run: new Date().toISOString().split('T')[0],
+    next_run: toLocalYMD(),
     end_date: '',
     open_ended: false,
     is_active: true,
@@ -108,7 +108,7 @@ export default function RecurringPage() {
     setHeader('Recurring', 'Automated Subscription & Periodic Expense Management');
   }, [setHeader]);
 
-  const table = useReactTable({
+  const table = useDataTable({
     data: recurring,
     columns: columns(currency),
     state: {
@@ -148,7 +148,7 @@ export default function RecurringPage() {
     gst_included: false,
     category_id: '',
     frequency: 'monthly',
-    next_run: new Date().toISOString().split('T')[0],
+    next_run: toLocalYMD(),
     end_date: '',
     open_ended: false,
     is_active: true,
@@ -411,10 +411,10 @@ export default function RecurringPage() {
             canManage ? (
               <>
                 <button className="btn-action" onClick={openAdd}>
-                  <Plus className="h-4 w-4 text-green-600" /> Add
+                  <Plus className="h-4 w-4 text-[var(--success)]" /> Add
                 </button>
                 <button className="btn-action" onClick={openEdit} disabled={selectedCount !== 1}>
-                  <Pencil className="h-4 w-4 text-blue-600" /> Edit
+                  <Pencil className="h-4 w-4 text-[var(--info)]" /> Edit
                 </button>
                 <button
                   className="btn-action"
@@ -430,14 +430,14 @@ export default function RecurringPage() {
                       onClick={handleApprove}
                       disabled={selectedCount !== 1 || ((selectedRows[0]?.original as any)?.status || '').toUpperCase() !== 'PENDING_FINANCE'}
                     >
-                      <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Approve
+                      <CheckCircle2 className="h-4 w-4 text-[var(--success)]" /> Approve
                     </button>
                     <button
                       className="btn-action"
                       onClick={handleReject}
                       disabled={selectedCount !== 1 || ((selectedRows[0]?.original as any)?.status || '').toUpperCase() !== 'PENDING_FINANCE'}
                     >
-                      <XCircle className="h-4 w-4 text-red-400" /> Reject
+                      <XCircle className="h-4 w-4 text-[var(--danger)]" /> Reject
                     </button>
                   </>
                 )}
@@ -446,17 +446,17 @@ export default function RecurringPage() {
                   onClick={() => handleToggleStatus('pause')}
                   disabled={selectedCount !== 1 || ((selectedRows[0]?.original as any)?.status || '').toUpperCase() !== 'APPROVED' || !(selectedRows[0]?.original as any)?.is_active}
                 >
-                  <PauseCircle className="h-4 w-4 text-yellow-500" /> Pause
+                  <PauseCircle className="h-4 w-4 text-[var(--warning)]" /> Pause
                 </button>
                 <button
                   className="btn-action"
                   onClick={() => handleToggleStatus('resume')}
                   disabled={selectedCount !== 1 || ((selectedRows[0]?.original as any)?.status || '').toUpperCase() !== 'APPROVED' || !!(selectedRows[0]?.original as any)?.is_active}
                 >
-                  <PlayCircle className="h-4 w-4 text-cyan-500" /> Resume
+                  <PlayCircle className="h-4 w-4 text-[var(--info)]" /> Resume
                 </button>
                 <button className="btn-action" onClick={handleDelete} disabled={selectedCount === 0}>
-                  <Trash2 className="h-4 w-4 text-red-500" /> Delete{selectedCount > 0 ? ` (${selectedCount})` : ''}
+                  <Trash2 className="h-4 w-4 text-[var(--danger)]" /> Delete{selectedCount > 0 ? ` (${selectedCount})` : ''}
                 </button>
               </>
             ) : null
@@ -473,67 +473,67 @@ export default function RecurringPage() {
             <div className="flex-1 space-y-8">
               <div className="bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)] p-4 space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-bold text-[var(--shell-text-muted)] uppercase">Schedule Info</label>
+                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase">Schedule Info</label>
                   {(activeRow as any).status === 'APPROVED' ? (
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${activeRow.is_active ? 'bg-green-500/20 text-green-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full uppercase ${activeRow.is_active ? 'bg-[color-mix(in_srgb,var(--success)_20%,transparent)] text-[var(--success)]' : 'bg-[color-mix(in_srgb,var(--warning)_20%,transparent)] text-[var(--warning)]'}`}>
                       {activeRow.is_active ? 'Active' : 'Inactive'}
                     </span>
                   ) : (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase bg-black/10 dark:bg-white/10 text-black/50 dark:text-white/50">
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full uppercase bg-black/10 dark:bg-white/10 text-black/50 dark:text-white/50">
                       {((activeRow as any).status || 'DRAFT').replace('_', ' ')}
                     </span>
                   )}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <p className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase mb-0.5">Frequency</p>
+                    <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase mb-0.5">Frequency</p>
                     <p className="text-[12px] font-bold text-black dark:text-white capitalize">{activeRow.frequency || '—'}</p>
                   </div>
                   <div>
-                    <p className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase mb-0.5">Next Run</p>
+                    <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase mb-0.5">Next Run</p>
                     <p className="text-[12px] font-bold text-black dark:text-white">
                       {activeRow.next_run_date
-                        ? new Date(activeRow.next_run_date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+                        ? parseApiDate(activeRow.next_run_date)?.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
                         : '—'}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase mb-0.5">Last Run</p>
+                    <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase mb-0.5">Last Run</p>
                     <p className="text-[12px] font-bold text-black dark:text-white">
                       {(activeRow as any).last_run_date
-                        ? new Date((activeRow as any).last_run_date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+                        ? parseApiDate((activeRow as any).last_run_date)?.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
                         : 'Not yet run'}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase mb-0.5">Type</p>
+                    <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase mb-0.5">Type</p>
                     <p className="text-[12px] font-bold text-black dark:text-white capitalize">{(activeRow as any).type || 'expense'}</p>
                   </div>
                   <div>
-                    <p className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase mb-0.5">Start Date</p>
+                    <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase mb-0.5">Start Date</p>
                     <p className="text-[12px] font-bold text-black dark:text-white">
                       {(activeRow as any).start_date
-                        ? new Date((activeRow as any).start_date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
-                        : new Date((activeRow as any).next_run_date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+                        ? parseApiDate((activeRow as any).start_date)?.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+                        : parseApiDate((activeRow as any).next_run_date)?.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase mb-0.5">End Date</p>
+                    <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase mb-0.5">End Date</p>
                     <p className="text-[12px] font-bold text-black dark:text-white">
                       {(activeRow as any).end_date
-                        ? new Date((activeRow as any).end_date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+                        ? parseApiDate((activeRow as any).end_date)?.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
                         : <span className="text-[var(--shell-text-muted)] font-normal italic">Open-Ended</span>}
                     </p>
                   </div>
                   {(activeRow as any).client_name && (
                     <div className="col-span-2">
-                      <p className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase mb-0.5">Client</p>
+                      <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase mb-0.5">Client</p>
                       <p className="text-[12px] font-bold text-black dark:text-white">{(activeRow as any).client_name}</p>
                     </div>
                   )}
                   {(activeRow as any).project_name && (
                     <div className="col-span-2">
-                      <p className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase mb-0.5">Project</p>
+                      <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase mb-0.5">Project</p>
                       <p className="text-[12px] font-bold text-black dark:text-white">{(activeRow as any).project_name}</p>
                     </div>
                   )}
@@ -542,7 +542,7 @@ export default function RecurringPage() {
 
               {(activeRow as any).receipt_path && (
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[var(--shell-text-muted)] uppercase border-b border-[var(--shell-border)] pb-1.5 flex items-center gap-2">
+                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase border-b border-[var(--shell-border)] pb-1.5 flex items-center gap-2">
                     <FileText className="w-3.5 h-3.5" /> Supporting Document
                   </label>
                   <div
@@ -552,29 +552,29 @@ export default function RecurringPage() {
                   >
                     <FileText className="w-4 h-4 text-[var(--shell-accent)] shrink-0" />
                     <p className="text-[11px] font-bold text-[var(--shell-accent)] truncate">{(activeRow as any).receipt_path.split('/').pop()}</p>
-                    <p className="text-[9px] text-[var(--shell-accent)]/60 ml-auto shrink-0">Click to view</p>
+                    <p className="text-[11px] text-[var(--shell-accent)]/60 ml-auto shrink-0">Click to view</p>
                   </div>
                 </div>
               )}
 
               <div className="space-y-2.5">
-                <label className="text-[10px] font-bold text-[var(--shell-text-muted)] uppercase border-b border-[var(--shell-border)] pb-2 flex items-center gap-2">
+                <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase border-b border-[var(--shell-border)] pb-2 flex items-center gap-2">
                   <CreditCard className="w-4 h-4" /> Payment Info
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)] p-3">
-                    <p className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase">Method</p>
+                    <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase">Method</p>
                     <p className="text-[12px] font-bold text-black dark:text-white capitalize">{(activeRow as any).payment_method || '—'}</p>
                   </div>
                   <div className="bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)] p-3">
-                    <p className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase">Auto-Run</p>
+                    <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase">Auto-Run</p>
                     <p className="text-[12px] font-bold text-black dark:text-white">{activeRow.is_active ? 'Enabled' : 'Paused'}</p>
                   </div>
                   {(activeRow as any).gst_rate && (
                     <div className="col-span-2 bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)] p-3">
-                      <p className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase mb-1">GST</p>
+                      <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase mb-1">GST</p>
                       <p className="text-[12px] font-bold text-black dark:text-white">{(activeRow as any).gst_rate}% · {(activeRow as any).gst_included ? 'Included in amount' : 'Added on top'}</p>
-                      <p className="text-[10px] text-[var(--shell-text-muted)] mt-0.5">
+                      <p className="text-[11px] text-[var(--shell-text-muted)] mt-0.5">
                         Net {formatCurrency((activeRow as any).net_amount ?? (activeRow as any).amount, currency)} · Total {formatCurrency((activeRow as any).total_amount ?? (activeRow as any).amount, currency)}
                       </p>
                     </div>
@@ -583,7 +583,7 @@ export default function RecurringPage() {
               </div>
 
               <div className="space-y-2.5">
-                <label className="text-[10px] font-bold text-[var(--shell-text-muted)] uppercase border-b border-[var(--shell-border)] pb-2 flex items-center gap-2">
+                <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase border-b border-[var(--shell-border)] pb-2 flex items-center gap-2">
                   <History className="w-4 h-4" /> Run History
                 </label>
                 <div className="rounded-xl overflow-hidden border border-[var(--shell-border)] bg-[var(--shell-hover)]">
@@ -604,10 +604,10 @@ export default function RecurringPage() {
                         {runHistory.map((run: any) => (
                           <tr key={run.id}>
                             <td className="px-3 py-2 text-[var(--shell-text-muted)]">
-                              {run.date_recorded ? new Date(run.date_recorded).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                              {run.date_recorded ? parseApiDate(run.date_recorded)?.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
                             </td>
                             <td className="px-3 py-2 text-center">
-                              <span className="text-emerald-500 font-bold uppercase text-[9px] px-1.5 py-0.5 bg-[var(--shell-accent)]/20 rounded">
+                              <span className="text-[var(--success)] font-bold uppercase text-[11px] px-1.5 py-0.5 bg-[var(--shell-accent)]/20 rounded">
                                 {run.status === 'APPROVED' ? 'Success' : run.status}
                               </span>
                             </td>

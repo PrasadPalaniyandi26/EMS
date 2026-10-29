@@ -70,13 +70,13 @@ export function ProcessReimbursementModal({
       icon={<CreditCard className="w-4 h-4" />}
       onSave={handleSave}
       saveLabel={saving ? 'Processing...' : 'Confirm'}
-      maxWidth="sm:max-w-[460px]"
+      size="sm"
     >
       <div className="space-y-4 p-1">
         <div className="space-y-1.5">
-          <label className="text-[10px] font-bold modal-label block">Status</label>
+          <label htmlFor="reimb-status" className="text-[11px] font-bold modal-label block">Status</label>
           <Select value={status} onValueChange={(v) => setStatus(v as 'PAID' | 'ON_HOLD')}>
-            <SelectTrigger className="modal-input border border-[var(--shell-border)] rounded-lg h-9 text-xs text-[var(--shell-text)] shadow-sm">
+            <SelectTrigger id="reimb-status" className="modal-input border border-[var(--shell-border)] rounded-lg h-9 text-xs text-[var(--shell-text)] shadow-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -87,27 +87,27 @@ export function ProcessReimbursementModal({
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-[10px] font-bold modal-label block">
+          <label htmlFor="reimb-reference" className="text-[11px] font-bold modal-label block">
             Payment Reference
-            {status === 'PAID' && <span className="text-red-400 ml-0.5">*</span>}
-            {status === 'ON_HOLD' && <span className="text-[9px] font-normal text-[var(--shell-text-muted)] ml-1">(optional)</span>}
+            {status === 'PAID' && <span className="text-[var(--danger)] ml-0.5">*</span>}
+            {status === 'ON_HOLD' && <span className="text-[11px] font-normal text-[var(--shell-text-muted)] ml-1">(optional)</span>}
           </label>
-          <Input
+          <Input id="reimb-reference" aria-required={status === "PAID"} aria-invalid={referenceError ? true : undefined}
             className="modal-input border border-[var(--shell-border)] rounded-lg h-9 text-xs text-[var(--shell-text)] shadow-sm"
             placeholder="UTR / Cheque No / Bank Ref"
             value={reference}
             onChange={(e) => { setReference(e.target.value); setReferenceError(''); }}
           />
           {referenceError && (
-            <p className="text-[11px] text-red-500 mt-0.5">{referenceError}</p>
+            <p role="alert" className="text-[11px] text-[var(--danger)] mt-0.5">{referenceError}</p>
           )}
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-[10px] font-bold modal-label block">
-            Note <span className="text-[9px] font-normal text-[var(--shell-text-muted)]">(optional)</span>
+          <label htmlFor="reimb-note" className="text-[11px] font-bold modal-label block">
+            Note <span className="text-[11px] font-normal text-[var(--shell-text-muted)]">(optional)</span>
           </label>
-          <Textarea
+          <Textarea id="reimb-note"
             className="modal-input border border-[var(--shell-border)] rounded-lg text-xs text-[var(--shell-text)] shadow-sm resize-none"
             rows={2}
             placeholder="Additional notes about this payment..."

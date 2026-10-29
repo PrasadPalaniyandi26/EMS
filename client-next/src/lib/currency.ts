@@ -19,10 +19,24 @@ export function formatCurrency(amount: number, currencyCode = 'INR', showSymbol 
   }).format(amount || 0);
 }
 
+// Postgres DATE columns reach the client as "2026-09-23T00:00:00.000Z" (or "2026-09-23"). That is a calendar
+// day, not an instant: parsing it with new Date() and reading it in local time shows the previous day in
+// any timezone behind UTC (the Americas). Treat it as the same calendar day at local midnight instead.
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}(T00:00:00(\.0+)?Z)?$/;
+
+export function parseApiDate(value: string | Date | null | undefined): Date | null {
+  if (!value) return null;
+  if (typeof value === 'string' && DATE_ONLY.test(value)) {
+    const [y, m, d] = value.slice(0, 10).split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+  const parsed = new Date(value);
+  return isNaN(parsed.getTime()) ? null : parsed;
+}
+
 export function formatDate(dateStr: string | Date | null) {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return '';
+  const d = parseApiDate(dateStr);
+  if (!d) return '';
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
@@ -30,6 +44,33 @@ type DatePreset = 'today' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' 
 
 function fmt(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Today's (or the given instant's) calendar date in the user's own timezone, as yyyy-MM-dd.
+// new Date().toISOString().split('T')[0] gives the UTC date instead, which is wrong for part of every day.
+export function toLocalYMD(d: Date = new Date()) {
+  return fmt(d);
+}
+
+function validYMD(y: number, m: number, d: number) {
+  const dt = new Date(y, m - 1, d);
+  return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d ? fmt(dt) : '';
+}
+
+// Receipt OCR text → yyyy-MM-dd ('' if unreadable). Numeric dates are day-first (en-GB / India);
+// a value like 03/25/2026 is read month-first because 25 cannot be a month.
+export function parseOcrDate(raw: string) {
+  const s = raw.trim();
+  let m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  if (m) return validYMD(+m[1], +m[2], +m[3]);
+  m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2}|\d{4})$/);
+  if (m) {
+    const a = +m[1], b = +m[2];
+    const y = m[3].length === 2 ? 2000 + +m[3] : +m[3];
+    return b > 12 && a <= 12 ? validYMD(y, a, b) : validYMD(y, b, a);
+  }
+  const free = new Date(s); // e.g. "5 Mar 2026"
+  return isNaN(free.getTime()) ? '' : fmt(free);
 }
 
 export function getDateRange(preset: DatePreset): { from: string; to: string } {

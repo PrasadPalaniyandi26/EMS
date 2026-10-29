@@ -12,6 +12,14 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
+// Standard dialog widths. The app had nine ad-hoc widths (460-1100px); these four cover them.
+export const MODAL_SIZES = {
+  sm: 'sm:max-w-[500px]',
+  md: 'sm:max-w-[680px]',
+  lg: 'sm:max-w-[880px]',
+  xl: 'sm:max-w-[1100px]',
+} as const;
+
 interface ModuleModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -19,6 +27,8 @@ interface ModuleModalProps {
   children: React.ReactNode;
   footer?: React.ReactNode;
   footerLeft?: React.ReactNode;
+  size?: keyof typeof MODAL_SIZES;
+  /** Escape hatch for a one-off width; prefer `size` */
   maxWidth?: string;
   icon?: React.ReactNode;
   headerBg?: string;
@@ -34,7 +44,8 @@ export function ModuleModal({
   children,
   footer,
   footerLeft,
-  maxWidth = "sm:max-w-[660px]",
+  size = 'md',
+  maxWidth,
   icon,
   headerBg,
   onSave,
@@ -77,8 +88,8 @@ export function ModuleModal({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         className={cn(
-          "p-0 gap-0 overflow-hidden border shadow-2xl rounded-xl flex flex-col modal-glow mx-4 sm:mx-0",
-          maxWidth
+          "p-0 gap-0 overflow-hidden border shadow-2xl rounded-xl flex flex-col modal-glow",
+          maxWidth ?? MODAL_SIZES[size]
         )}
         style={{
           background: 'var(--shell-surface)',

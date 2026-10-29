@@ -8,7 +8,7 @@ import { formatCurrency, getDateRange } from '@/lib/currency';
 import {
   BarChart3, FileText, TrendingDown, TrendingUp, Scale, Target,
   ArrowLeftRight, Users, Download, Sheet,
-  ChevronDown, Loader2, Search, Receipt, Wallet,
+  ChevronDown, Loader2, Search, Receipt, Wallet, AlertTriangle,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -30,14 +30,14 @@ interface ReportResult {
 
 // ── Report catalogue ─────────────────────────────────────────────────────────
 const REPORTS = [
-  { id: 'expense-summary', label: 'Expense Summary', icon: TrendingDown, desc: 'Total spend grouped by category', color: 'text-rose-400', bg: 'bg-rose-400/10' },
-  { id: 'income-summary', label: 'Income Summary', icon: TrendingUp, desc: 'Total income grouped by category', color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-  { id: 'pl-statement', label: 'P&L Statement', icon: Scale, desc: 'Monthly income vs expenses, net balance', color: 'text-blue-400', bg: 'bg-blue-400/10' },
-  { id: 'budget-vs-actual', label: 'Budget vs Actual', icon: Target, desc: 'Budget allocation vs real spend per category', color: 'text-amber-400', bg: 'bg-amber-400/10' },
-  { id: 'transaction-ledger', label: 'Transaction Ledger', icon: ArrowLeftRight, desc: 'Full list of all transactions with all fields', color: 'text-violet-400', bg: 'bg-violet-400/10' },
-  { id: 'client-summary', label: 'Client Summary', icon: Users, desc: 'Expense & Income for Project & Product', color: 'text-cyan-400', bg: 'bg-cyan-400/10' },
-  { id: 'claimable-gst', label: 'Claimable GST', icon: Receipt, desc: 'GST claimable on expense transactions by category', color: 'text-orange-400', bg: 'bg-orange-400/10' },
-  { id: 'reimbursement-register', label: 'Reimbursement Register', icon: Wallet, desc: 'All reimbursed expenses with payment details, by employee', color: 'text-indigo-400', bg: 'bg-indigo-400/10' },
+  { id: 'expense-summary', label: 'Expense Summary', icon: TrendingDown, desc: 'Total spend grouped by category', color: 'text-[var(--danger)]', bg: 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)]' },
+  { id: 'income-summary', label: 'Income Summary', icon: TrendingUp, desc: 'Total income grouped by category', color: 'text-[var(--success)]', bg: 'bg-[color-mix(in_srgb,var(--success)_10%,transparent)]' },
+  { id: 'pl-statement', label: 'P&L Statement', icon: Scale, desc: 'Monthly income vs expenses, net balance', color: 'text-[var(--info)]', bg: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]' },
+  { id: 'budget-vs-actual', label: 'Budget vs Actual', icon: Target, desc: 'Budget allocation vs real spend per category', color: 'text-[var(--warning)]', bg: 'bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]' },
+  { id: 'transaction-ledger', label: 'Transaction Ledger', icon: ArrowLeftRight, desc: 'Full list of all transactions with all fields', color: 'text-[var(--info)]', bg: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]' },
+  { id: 'client-summary', label: 'Client Summary', icon: Users, desc: 'Expense & Income for Project & Product', color: 'text-[var(--info)]', bg: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]' },
+  { id: 'claimable-gst', label: 'Claimable GST', icon: Receipt, desc: 'GST claimable on expense transactions by category', color: 'text-[var(--warning)]', bg: 'bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]' },
+  { id: 'reimbursement-register', label: 'Reimbursement Register', icon: Wallet, desc: 'All reimbursed expenses with payment details, by employee', color: 'text-[var(--info)]', bg: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]' },
 ];
 
 const DATE_PRESETS = [
@@ -209,6 +209,8 @@ export default function ReportingPage() {
             return (
               <button
                 key={r.id}
+                type="button"
+                aria-pressed={active}
                 onClick={() => { setSelectedType(r.id); setResult(null); }}
                 title={r.desc}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-md text-[12px] font-medium transition-all border"
@@ -229,13 +231,13 @@ export default function ReportingPage() {
 
           {isBudgetReport ? (
             <>
-              <select value={month} onChange={(e) => setMonth(e.target.value)}
+              <select aria-label="Month" value={month} onChange={(e) => setMonth(e.target.value)}
                 className={selectClass} style={selectStyle}>
                 {Array.from({ length: 12 }, (_, i) => (
                   <option key={i + 1} value={i + 1}>{new Date(2000, i).toLocaleString('default', { month: 'long' })}</option>
                 ))}
               </select>
-              <select value={year} onChange={(e) => setYear(e.target.value)}
+              <select aria-label="Year" value={year} onChange={(e) => setYear(e.target.value)}
                 className={selectClass} style={selectStyle}>
                 {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((y) => (
                   <option key={y} value={y}>{y}</option>
@@ -247,24 +249,24 @@ export default function ReportingPage() {
               {/* Date presets + date range inline */}
               <div className="flex flex-wrap items-center gap-1.5">
                 {DATE_PRESETS.map((p) => (
-                  <button key={p.label} onClick={() => handlePreset(p.label, p.key)}
+                  <button key={p.label} type="button" aria-pressed={datePreset === p.label} onClick={() => handlePreset(p.label, p.key)}
                     className="px-2.5 py-1.5 rounded-full text-[11px] font-semibold transition-all"
                     style={datePreset === p.label
                       ? { background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' }
                       : { background: 'var(--shell-hover)', color: 'var(--shell-text-muted)' }
                     }>{p.label}</button>
                 ))}
-                <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setDatePreset('Custom'); }}
+                <input type="date" aria-label="From date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setDatePreset('Custom'); }}
                   className="rounded-lg px-3 py-1.5 text-[12px] border outline-none"
                   style={{ background: 'var(--shell-bg)', color: 'var(--shell-text)', borderColor: 'var(--shell-border)' }} />
                 <span className="text-[11px]" style={{ color: 'var(--shell-text-muted)' }}>—</span>
-                <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setDatePreset('Custom'); }}
+                <input type="date" aria-label="To date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setDatePreset('Custom'); }}
                   className="rounded-lg px-3 py-1.5 text-[12px] border outline-none"
                   style={{ background: 'var(--shell-bg)', color: 'var(--shell-text)', borderColor: 'var(--shell-border)' }} />
               </div>
 
               {(selectedType === 'transaction-ledger' || isClientSummary) && (
-                <select value={txnType} onChange={(e) => setTxnType(e.target.value)}
+                <select aria-label="Transaction type" value={txnType} onChange={(e) => setTxnType(e.target.value)}
                   className={selectClass} style={selectStyle}>
                   <option value="">All Types</option>
                   <option value="expense">Expense</option>
@@ -273,7 +275,7 @@ export default function ReportingPage() {
               )}
 
               {isClientSummary && (
-                <select value={categoryType} onChange={(e) => setCategoryType(e.target.value)}
+                <select aria-label="Category type" value={categoryType} onChange={(e) => setCategoryType(e.target.value)}
                   className={selectClass} style={selectStyle}>
                   <option value="all">All Categories</option>
                   <option value="project">Project</option>
@@ -313,6 +315,7 @@ export default function ReportingPage() {
               <div className="relative hidden sm:block">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style={{ color: 'var(--shell-text-muted)' }} />
                 <input
+                  aria-label="Search report rows"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search..."
@@ -328,12 +331,12 @@ export default function ReportingPage() {
               </button>
               <button onClick={exportExcel} title="Export Excel"
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all hover:opacity-80"
-                style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981' }}>
+                style={{ background: 'color-mix(in srgb, var(--success) 12%, transparent)', color: 'var(--success)' }}>
                 <Sheet className="h-3.5 w-3.5" /> Excel
               </button>
               <button onClick={exportPDF} title="Print / Save as PDF"
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all hover:opacity-80"
-                style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>
+                style={{ background: 'color-mix(in srgb, var(--danger) 12%, transparent)', color: 'var(--danger)' }}>
                 <Download className="h-3.5 w-3.5" /> PDF
               </button>
             </div>
@@ -341,9 +344,9 @@ export default function ReportingPage() {
 
           {/* Truncation notice */}
           {result.truncated && (
-            <div className="px-4 py-2 text-[11.5px] font-medium flex items-center gap-2"
-              style={{ background: 'rgba(245,158,11,0.12)', color: '#b45309', borderBottom: '1px solid var(--shell-border)' }}>
-              <span>⚠</span>
+            <div role="status" className="px-4 py-2 text-[11.5px] font-medium flex items-center gap-2"
+              style={{ background: 'color-mix(in srgb, var(--warning) 12%, transparent)', color: 'var(--warning)', borderBottom: '1px solid var(--shell-border)' }}>
+              <AlertTriangle aria-hidden className="h-3.5 w-3.5 shrink-0" />
               <span>{result.note || 'Some records were omitted because the result set is large. Narrow the filters to see the rest.'}</span>
             </div>
           )}
@@ -354,8 +357,8 @@ export default function ReportingPage() {
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--shell-border)', background: 'var(--shell-hover)' }}>
                   {result.columns.map((col) => (
-                    <th key={col}
-                      className={`px-4 py-2.5 font-semibold text-[10.5px] uppercase tracking-wider whitespace-nowrap ${isNumericCol(col, result.rows) ? 'text-right' : 'text-left'}`}
+                    <th key={col} scope="col"
+                      className={`px-4 py-2.5 font-semibold text-[11px] uppercase tracking-wider whitespace-nowrap ${isNumericCol(col, result.rows) ? 'text-right' : 'text-left'}`}
                       style={{ color: 'var(--shell-text-muted)' }}>
                       {col}
                     </th>
@@ -373,8 +376,8 @@ export default function ReportingPage() {
                       const isPct = col === '% Used' || col === 'GST %';
                       const display = isCurrency ? fmt(val) : isPct ? (val != null ? `${val}%` : '—') : val ?? '—';
                       const color = isPct
-                        ? val >= 100 ? '#F43F5E' : val >= 80 ? '#F59E0B' : undefined
-                        : col === 'Net' ? (val >= 0 ? '#10B981' : '#F43F5E') : undefined;
+                        ? val >= 100 ? 'var(--danger)' : val >= 80 ? 'var(--warning)' : undefined
+                        : col === 'Net' ? (val >= 0 ? 'var(--success)' : 'var(--danger)') : undefined;
                       return (
                         <td key={col} className={`px-4 py-2.5 ${isNum ? 'text-right font-semibold tabular-nums' : ''}`}
                           style={{ color: color ?? 'var(--shell-text)', whiteSpace: isNum ? 'nowrap' : undefined }}>

@@ -11,7 +11,7 @@ export const columns = (currency: string): ColumnDef<RecurringTransaction>[] => 
     accessorKey: "code",
     header: "Code",
     cell: ({ row }) => (
-      <span className="text-[12px] font-bold text-blue-400 font-mono">
+      <span className="text-[12px] font-bold text-[var(--info)] font-mono">
         {row.getValue("code")}
       </span>
     ),
@@ -43,7 +43,7 @@ export const columns = (currency: string): ColumnDef<RecurringTransaction>[] => 
     accessorKey: "frequency",
     header: "Frequency",
     cell: ({ row }) => (
-      <span className="text-[12px] font-semibold text-indigo-600 dark:text-indigo-300 uppercase">
+      <span className="text-[12px] font-semibold text-[var(--info)] uppercase">
         {row.getValue("frequency")}
       </span>
     ),
@@ -87,7 +87,7 @@ export const columns = (currency: string): ColumnDef<RecurringTransaction>[] => 
       const state = row.getValue("state") as string | null;
       if (!state) return <span className="text-[12px] text-black/25 dark:text-white/25">—</span>;
       return (
-        <span className={`text-[12px] font-semibold ${state === 'Active' ? 'text-emerald-500' : 'text-amber-400'}`}>
+        <span className={`text-[12px] font-semibold ${state === 'Active' ? 'text-[var(--success)]' : 'text-[var(--warning)]'}`}>
           {state}
         </span>
       );

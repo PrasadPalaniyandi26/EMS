@@ -16,6 +16,8 @@ interface ModuleIntelligencePanelProps {
   className?: string;
   hasSelection?: boolean;
   tabs?: PanelTab[];
+  // Overrides the default empty-state copy for this title (e.g. role-specific wording)
+  emptyState?: { icon?: React.ReactNode; heading: string; body: string; tips: string[] };
 }
 
 const EMPTY_STATES: Record<string, { icon: React.ReactNode; heading: string; body: string; tips: string[] }> = {
@@ -77,8 +79,9 @@ export function ModuleIntelligencePanel({
   className,
   hasSelection,
   tabs,
+  emptyState,
 }: ModuleIntelligencePanelProps) {
-  const empty = EMPTY_STATES[title];
+  const empty = emptyState ? { ...EMPTY_STATES[title], ...emptyState } : EMPTY_STATES[title];
   const [activeTab, setActiveTab] = useState<string>(() => tabs?.[0]?.id ?? '');
 
   const activeTabContent = tabs?.find(t => t.id === activeTab)?.content;
@@ -144,7 +147,7 @@ export function ModuleIntelligencePanel({
             {/* Tips */}
             {empty?.tips && (
               <div className="mt-2 space-y-2 px-1">
-                <p className="text-[10px] font-semibold uppercase tracking-widest px-1" style={{ color: 'var(--shell-text-muted)' }}>What you can do</p>
+                <p className="text-[11px] font-semibold uppercase tracking-widest px-1" style={{ color: 'var(--shell-text-muted)' }}>What you can do</p>
                 {empty.tips.map((tip, i) => (
                   <div key={i} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
                     <ArrowRight className="w-3 h-3 shrink-0" style={{ color: 'var(--shell-text-muted)' }} />

@@ -5,7 +5,7 @@ import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useTransactions, useCategories, useProjects, useInvalidate, useApprovalTrail } from '@/hooks/use-queries';
 import api, { getAccessToken, API_BASE } from '@/lib/api-client';
-import { formatCurrency, formatDate, CURRENCY_SYMBOL } from '@/lib/currency';
+import { formatCurrency, formatDate, parseApiDate, CURRENCY_SYMBOL } from '@/lib/currency';
 import { toast } from 'sonner';
 import {
   Plus, Pencil, Split, Send, Trash2,
@@ -21,7 +21,6 @@ import { ProcessReimbursementModal } from '@/components/reimbursements/process-r
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
 import { columns } from './columns';
 import {
-  useReactTable,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
@@ -33,6 +32,7 @@ import {
   VisibilityState,
   RowSelectionState
 } from "@tanstack/react-table";
+import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { CurrencyInput, useConfirm } from '@/components/shared/modal-primitives';
@@ -282,7 +282,8 @@ export default function ExpensePage() {
         targets.map(async (r) => {
           const t = r.original;
           if (!t.category_id || !t.amount || !t.date_recorded) return null;
-          const d = new Date(t.date_recorded);
+          const d = parseApiDate(t.date_recorded);
+          if (!d) return null;
           const params = new URLSearchParams({
             categoryId: String(t.category_id),
             amount: String(t.amount),
@@ -361,7 +362,7 @@ export default function ExpensePage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [globalFilter, setGlobalFilter] = useState('');
 
-  const table = useReactTable({
+  const table = useDataTable({
     data: rawTransactions,
     columns: expenseColumns,
     state: {
@@ -445,17 +446,17 @@ export default function ExpensePage() {
           actions={
             <>
               <button className="btn-action" onClick={openAdd}>
-                <Plus className="h-4 w-4 text-green-600" /> Add
+                <Plus className="h-4 w-4 text-[var(--success)]" /> Add
               </button>
               <button className="btn-action" onClick={openEdit} disabled={selectedCount !== 1 || !['DRAFT', 'SENT_BACK'].includes((sr[0]?.original?.status || '').toUpperCase())}>
-                <Pencil className="h-4 w-4 text-blue-600" /> Edit
+                <Pencil className="h-4 w-4 text-[var(--info)]" /> Edit
               </button>
               <button
                 className="btn-action"
                 onClick={openSplit}
                 disabled={selectedCount !== 1 || (sr.length === 1 && (sr[0].original.status || '').toUpperCase() !== 'DRAFT')}
               >
-                <Split className="h-4 w-4 text-purple-600" /> Split
+                <Split className="h-4 w-4 text-[var(--info)]" /> Split
               </button>
               <button
                 className="btn-action"
@@ -469,7 +470,7 @@ export default function ExpensePage() {
                 onClick={handleDelete}
                 disabled={selectedCount === 0 || sr.some(r => LOCKED_STATUSES.includes((r.original.status || '').toUpperCase()))}
               >
-                <Trash2 className="h-4 w-4 text-rose-500" /> Delete{selectedCount > 0 ? ` (${selectedCount})` : ''}
+                <Trash2 className="h-4 w-4 text-[var(--danger)]" /> Delete{selectedCount > 0 ? ` (${selectedCount})` : ''}
               </button>
             </>
           }
@@ -485,7 +486,7 @@ export default function ExpensePage() {
             <div className="flex-1 space-y-4">
               {/* Primary Document */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[var(--shell-text-muted)] uppercase flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
+                <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
                   <FileText className="w-3.5 h-3.5" /> Primary Document
                 </label>
                 <input
@@ -503,7 +504,7 @@ export default function ExpensePage() {
                   {panelUploading ? (
                     <>
                       <UploadCloud className="w-8 h-8 mb-2 text-[var(--shell-text-muted)] animate-pulse" />
-                      <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--shell-text-muted)]">Uploading...</p>
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--shell-text-muted)]">Uploading...</p>
                     </>
                   ) : selectedTxn?.receipt_path ? (
                     <div className="flex items-center gap-2.5 px-2">
@@ -511,8 +512,8 @@ export default function ExpensePage() {
                         <FileText className="w-4 h-4 text-[var(--shell-accent)]" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--shell-accent)] truncate">{selectedTxn.receipt_path.split('/').pop()}</p>
-                        <p className="text-[9px] text-[var(--shell-accent)]/60 font-medium">Click to view full screen</p>
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--shell-accent)] truncate">{selectedTxn.receipt_path.split('/').pop()}</p>
+                        <p className="text-[11px] text-[var(--shell-accent)]/60 font-medium">Click to view full screen</p>
                       </div>
                     </div>
                   ) : (
@@ -521,8 +522,8 @@ export default function ExpensePage() {
                         <FileText className="w-4 h-4 text-[var(--shell-text-muted)]" />
                       </div>
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--shell-text-muted)]">No Receipt</p>
-                        <p className="text-[9px] text-[var(--shell-text-muted)] opacity-60 font-medium">Click to upload</p>
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--shell-text-muted)]">No Receipt</p>
+                        <p className="text-[11px] text-[var(--shell-text-muted)] opacity-60 font-medium">Click to upload</p>
                       </div>
                     </div>
                   )}
@@ -532,7 +533,7 @@ export default function ExpensePage() {
               {/* Info fields */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-4">
                 <div className="col-span-2">
-                  <label className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">Description</label>
+                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">Description</label>
                   <p className="text-[11px] text-[var(--shell-text-muted)] bg-[var(--shell-hover)] px-2 py-1.5 rounded-lg mt-0.5 border border-[var(--shell-border)] leading-relaxed">{selectedTxn.description || 'No description provided'}</p>
                 </div>
 
@@ -541,11 +542,11 @@ export default function ExpensePage() {
                   {selectedTxn.gst_rate != null && (
                     <>
                       <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--shell-border)]">
-                        <span className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">Net Amount</span>
+                        <span className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">Net Amount</span>
                         <span className="text-[12px] font-bold text-black dark:text-white">{formatCurrency(selectedTxn.net_amount ?? selectedTxn.amount, currency)}</span>
                       </div>
                       <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--shell-border)]">
-                        <span className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">GST ({selectedTxn.gst_rate}%)</span>
+                        <span className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">GST ({selectedTxn.gst_rate}%)</span>
                         <span className="text-[12px] font-bold text-black dark:text-white">
                           {formatCurrency((selectedTxn.total_amount ?? selectedTxn.amount) - (selectedTxn.net_amount ?? selectedTxn.amount), currency)}
                         </span>
@@ -553,28 +554,28 @@ export default function ExpensePage() {
                     </>
                   )}
                   <div className="flex items-center justify-between px-3 py-2.5 bg-[var(--shell-accent)]/5">
-                    <span className="text-[9px] font-bold text-[var(--shell-accent)] uppercase tracking-wider">Total Amount</span>
+                    <span className="text-[11px] font-bold text-[var(--shell-accent)] uppercase tracking-wider">Total Amount</span>
                     <span className="text-[14px] font-black text-black dark:text-white">{formatCurrency(selectedTxn.total_amount ?? selectedTxn.amount, currency)}</span>
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">Date Recorded</label>
+                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">Date Recorded</label>
                   <p className="text-[12px] font-bold mt-0.5 text-black dark:text-white">{formatDate(selectedTxn.date_recorded)}</p>
                 </div>
                 <div>
-                  <label className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">Payment Method</label>
+                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">Payment Method</label>
                   <p className="text-[12px] font-bold mt-0.5 text-black dark:text-white capitalize">{selectedTxn.payment_method || '—'}</p>
                 </div>
                 <div>
-                  <label className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">Category</label>
+                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">Category</label>
                   <p className="text-[12px] font-bold mt-0.5 text-black dark:text-white">{selectedTxn.category_name || '—'}</p>
                 </div>
                 <div>
-                  <label className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">Reimburse</label>
+                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">Reimburse</label>
                   <p className="mt-0.5">
                     {selectedTxn.needs_reimbursement ? (
-                      <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-400/30 text-[11px] font-bold text-amber-600 dark:text-amber-300">Yes</span>
+                      <span className="px-2 py-0.5 rounded-full bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border border-[color-mix(in_srgb,var(--warning)_30%,transparent)] text-[11px] font-bold text-[var(--warning)]">Yes</span>
                     ) : (
                       <span className="px-2 py-0.5 rounded-full bg-[var(--shell-hover)] border border-[var(--shell-border)] text-[11px] font-bold text-[var(--shell-text-muted)]">No</span>
                     )}
@@ -584,17 +585,17 @@ export default function ExpensePage() {
 
               {/* Fund Allocation */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[var(--shell-text-muted)] uppercase flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
+                <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
                   <LayoutGrid className="w-3.5 h-3.5" /> Fund Allocation
                 </label>
 
                 {selectedTxn.is_split === 1 ? (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5 px-2 py-0.5 bg-teal-50 border border-teal-200 rounded-full text-[9px] font-bold text-teal-700 uppercase tracking-wider">
+                      <span className="flex items-center gap-1.5 px-2 py-0.5 bg-[color-mix(in_srgb,var(--success)_12%,transparent)] border border-[color-mix(in_srgb,var(--success)_35%,transparent)] rounded-full text-[11px] font-bold text-[var(--success)] uppercase tracking-wider">
                         <Layers className="w-3 h-3" /> Split Expense
                       </span>
-                      <button onClick={openSplit} className="text-[10px] font-bold text-[var(--shell-accent)] hover:underline uppercase tracking-wider">Re-split →</button>
+                      <button onClick={openSplit} className="text-[11px] font-bold text-[var(--shell-accent)] hover:underline uppercase tracking-wider">Re-split →</button>
                     </div>
                     {splitDetailsLoading ? (
                       <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">Loading split details...</p>
@@ -606,11 +607,11 @@ export default function ExpensePage() {
                             <div key={s.id ?? i}>
                               <div className="flex items-center justify-between mb-0.5">
                                 <div className="flex items-center gap-1.5 min-w-0">
-                                  <span className="shrink-0 w-3.5 h-3.5 rounded-full bg-[var(--shell-accent)]/10 text-[var(--shell-accent)] text-[9px] font-black flex items-center justify-center">{i + 1}</span>
+                                  <span className="shrink-0 w-3.5 h-3.5 rounded-full bg-[var(--shell-accent)]/10 text-[var(--shell-accent)] text-[11px] font-black flex items-center justify-center">{i + 1}</span>
                                   <span className="text-[11px] font-bold text-black dark:text-white truncate">{s.category_name || `Split ${i + 1}`}</span>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0 ml-2">
-                                  <span className="text-[10px] font-bold text-[var(--shell-accent)]">{pct}%</span>
+                                  <span className="text-[11px] font-bold text-[var(--shell-accent)]">{pct}%</span>
                                   <span className="text-[11px] font-black text-black dark:text-white">{formatCurrency(s.amount, currency)}</span>
                                 </div>
                               </div>
@@ -618,7 +619,7 @@ export default function ExpensePage() {
                                 <div className="bg-[var(--shell-accent)] h-full rounded-full transition-all" style={{ width: `${pct}%` }} />
                               </div>
                               {(s.description || s.project_name || s.client_name) && (
-                                <p className="text-[9px] text-[var(--shell-text-muted)] mt-0.5 truncate">
+                                <p className="text-[11px] text-[var(--shell-text-muted)] mt-0.5 truncate">
                                   {[s.description, s.project_name && `[${s.project_name}]`].filter(Boolean).join(' ')}
                                 </p>
                               )}
@@ -626,7 +627,7 @@ export default function ExpensePage() {
                           );
                         })}
                         <div className="flex items-center justify-between pt-1.5 border-t border-[var(--shell-border)]">
-                          <span className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">{splitDetails.length} splits · Total</span>
+                          <span className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">{splitDetails.length} splits · Total</span>
                           <span className="text-[12px] font-black text-[var(--shell-accent)]">{formatCurrency(selectedTxn.amount, currency)}</span>
                         </div>
                       </div>
@@ -634,22 +635,24 @@ export default function ExpensePage() {
                       <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">No split details available.</p>
                     )}
                   </div>
-                ) : (
+                ) : (selectedTxn.project_name || selectedTxn.product_name) ? (
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-[11px] font-bold text-black dark:text-white">{selectedTxn.project_name || 'General Reserve'}</span>
+                      <span className="text-[11px] font-bold text-black dark:text-white">{selectedTxn.project_name || selectedTxn.product_name}</span>
                       <span className="text-[11px] font-bold text-[var(--shell-accent)]">100.00%</span>
                     </div>
                     <div className="w-full bg-[var(--shell-hover)] rounded-full h-1 overflow-hidden shadow-inner">
                       <div className="bg-[var(--shell-accent)] h-full rounded-full" style={{ width: '100%' }} />
                     </div>
                   </div>
+                ) : (
+                  <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">Not linked to a project or product.</p>
                 )}
               </div>
 
               {/* Approval Trail */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[var(--shell-text-muted)] uppercase flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
+                <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
                   <Clock className="w-3.5 h-3.5" /> Approval Trail
                 </label>
                 {(() => {
@@ -660,68 +663,68 @@ export default function ExpensePage() {
                     <div className="space-y-2">
                       {selectedTxn.submitted_at && (
                         <div className="flex items-start gap-2.5">
-                          <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0" />
+                          <div className="w-1.5 h-1.5 rounded-full bg-[var(--info)] mt-1.5 shrink-0" />
                           <div>
-                            <p className="text-[10px] font-bold text-black dark:text-white">
+                            <p className="text-[11px] font-bold text-black dark:text-white">
                               Submitted by <span className="text-[var(--shell-accent)]">{selectedTxn.submitted_by_name || 'Employee'}</span>
                             </p>
-                            <p className="text-[9px] text-[var(--shell-text-muted)] font-medium">{formatDate(selectedTxn.submitted_at)}</p>
+                            <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">{formatDate(selectedTxn.submitted_at)}</p>
                           </div>
                         </div>
                       )}
                       {selectedTxn.sent_back_at && (
                         <div className="flex items-start gap-2.5">
-                          <div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 shrink-0" />
+                          <div className="w-1.5 h-1.5 rounded-full bg-[var(--warning)] mt-1.5 shrink-0" />
                           <div>
-                            <p className="text-[10px] font-bold text-black dark:text-white">
-                              Sent back by <span className="text-amber-500">{selectedTxn.sent_back_by_name}</span>
+                            <p className="text-[11px] font-bold text-black dark:text-white">
+                              Sent back by <span className="text-[var(--warning)]">{selectedTxn.sent_back_by_name}</span>
                               {selectedTxn.sent_back_by_role && <span className="text-[var(--shell-text-muted)]"> ({selectedTxn.sent_back_by_role})</span>}
                             </p>
-                            <p className="text-[9px] text-[var(--shell-text-muted)] font-medium">{formatDate(selectedTxn.sent_back_at)}</p>
-                            {sentBackComment && <p className="text-[9px] text-amber-600 dark:text-amber-400 mt-0.5 italic">"{sentBackComment}"</p>}
+                            <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">{formatDate(selectedTxn.sent_back_at)}</p>
+                            {sentBackComment && <p className="text-[11px] text-[var(--warning)] mt-0.5 italic">"{sentBackComment}"</p>}
                           </div>
                         </div>
                       )}
                       {selectedTxn.approved_at && (
                         <div className="flex items-start gap-2.5">
-                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
+                          <div className="w-1.5 h-1.5 rounded-full bg-[var(--success)] mt-1.5 shrink-0" />
                           <div>
-                            <p className="text-[10px] font-bold text-black dark:text-white">
-                              Approved by <span className="text-emerald-500">{selectedTxn.approved_by_name}</span>
+                            <p className="text-[11px] font-bold text-black dark:text-white">
+                              Approved by <span className="text-[var(--success)]">{selectedTxn.approved_by_name}</span>
                               {selectedTxn.approved_by_role && <span className="text-[var(--shell-text-muted)]"> ({selectedTxn.approved_by_role})</span>}
                             </p>
-                            <p className="text-[9px] text-[var(--shell-text-muted)] font-medium">{formatDate(selectedTxn.approved_at)}</p>
-                            {approvedComment && <p className="text-[9px] text-emerald-600 dark:text-emerald-400 mt-0.5 italic">"{approvedComment}"</p>}
+                            <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">{formatDate(selectedTxn.approved_at)}</p>
+                            {approvedComment && <p className="text-[11px] text-[var(--success)] mt-0.5 italic">"{approvedComment}"</p>}
                           </div>
                         </div>
                       )}
                       {selectedTxn.rejected_at && (
                         <div className="flex items-start gap-2.5">
-                          <div className="w-1.5 h-1.5 rounded-full bg-red-400 mt-1.5 shrink-0" />
+                          <div className="w-1.5 h-1.5 rounded-full bg-[var(--danger)] mt-1.5 shrink-0" />
                           <div>
-                            <p className="text-[10px] font-bold text-black dark:text-white">
-                              Rejected by <span className="text-red-500">{selectedTxn.rejected_by_name}</span>
+                            <p className="text-[11px] font-bold text-black dark:text-white">
+                              Rejected by <span className="text-[var(--danger)]">{selectedTxn.rejected_by_name}</span>
                               {selectedTxn.rejected_by_role && <span className="text-[var(--shell-text-muted)]"> ({selectedTxn.rejected_by_role})</span>}
                             </p>
-                            <p className="text-[9px] text-[var(--shell-text-muted)] font-medium">{formatDate(selectedTxn.rejected_at)}</p>
-                            {rejectedComment && <p className="text-[9px] text-red-500 mt-0.5 italic">"{rejectedComment}"</p>}
+                            <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">{formatDate(selectedTxn.rejected_at)}</p>
+                            {rejectedComment && <p className="text-[11px] text-[var(--danger)] mt-0.5 italic">"{rejectedComment}"</p>}
                           </div>
                         </div>
                       )}
                       {selectedTxn.voided_at && (
                         <div className="flex items-start gap-2.5">
-                          <div className="w-1.5 h-1.5 rounded-full bg-slate-400 mt-1.5 shrink-0" />
+                          <div className="w-1.5 h-1.5 rounded-full bg-[var(--shell-hover)] mt-1.5 shrink-0" />
                           <div>
-                            <p className="text-[10px] font-bold text-black dark:text-white">
-                              Voided by <span className="text-slate-500">{selectedTxn.voided_by_name}</span>
+                            <p className="text-[11px] font-bold text-black dark:text-white">
+                              Voided by <span className="text-[var(--shell-text-muted)]">{selectedTxn.voided_by_name}</span>
                             </p>
-                            <p className="text-[9px] text-[var(--shell-text-muted)] font-medium">{formatDate(selectedTxn.voided_at)}</p>
-                            {selectedTxn.void_reason && <p className="text-[9px] text-slate-500 mt-0.5 italic">"{selectedTxn.void_reason}"</p>}
+                            <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">{formatDate(selectedTxn.voided_at)}</p>
+                            {selectedTxn.void_reason && <p className="text-[11px] text-[var(--shell-text-muted)] mt-0.5 italic">"{selectedTxn.void_reason}"</p>}
                           </div>
                         </div>
                       )}
                       {!selectedTxn.submitted_at && !selectedTxn.approved_at && !selectedTxn.rejected_at && !selectedTxn.voided_at && (
-                        <p className="text-[10px] text-[var(--shell-text-muted)] font-medium">Draft — not yet submitted</p>
+                        <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">Draft — not yet submitted</p>
                       )}
                     </div>
                   );
@@ -730,28 +733,28 @@ export default function ExpensePage() {
 
               {/* Notes Thread */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[var(--shell-text-muted)] uppercase flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
+                <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
                   <FileText className="w-3.5 h-3.5" /> Internal Notes
                 </label>
                 {notesLoading ? (
-                  <p className="text-[10px] text-[var(--shell-text-muted)]">Loading notes...</p>
+                  <p className="text-[11px] text-[var(--shell-text-muted)]">Loading notes...</p>
                 ) : (
                   <div className="space-y-1.5">
                     {notes.map((n) => (
                       <div key={n.id} className="flex items-start gap-2 px-2.5 py-2 rounded-lg bg-[var(--shell-hover)] border border-[var(--shell-border)]">
                         <div className="flex-1 min-w-0">
-                          <p className="text-[10px] font-bold text-[var(--shell-accent)]">{n.username}</p>
+                          <p className="text-[11px] font-bold text-[var(--shell-accent)]">{n.username}</p>
                           <p className="text-[11px] text-black dark:text-white leading-snug">{n.note}</p>
-                          <p className="text-[9px] text-[var(--shell-text-muted)] mt-0.5">{formatDate(n.created_at)}</p>
+                          <p className="text-[11px] text-[var(--shell-text-muted)] mt-0.5">{formatDate(n.created_at)}</p>
                         </div>
                         {n.user_id === user?.id && (
-                          <button onClick={() => handleDeleteNote(n.id)} className="text-[var(--shell-text-muted)] hover:text-red-500 transition-colors shrink-0 mt-0.5">
+                          <button onClick={() => handleDeleteNote(n.id)} className="text-[var(--shell-text-muted)] hover:text-[var(--danger)] transition-colors shrink-0 mt-0.5">
                             <Trash2 className="w-3 h-3" />
                           </button>
                         )}
                       </div>
                     ))}
-                    {notes.length === 0 && <p className="text-[10px] text-[var(--shell-text-muted)]">No notes yet.</p>}
+                    {notes.length === 0 && <p className="text-[11px] text-[var(--shell-text-muted)]">No notes yet.</p>}
                   </div>
                 )}
                 <div className="flex gap-2">
@@ -765,7 +768,7 @@ export default function ExpensePage() {
                   <button
                     onClick={handleAddNote}
                     disabled={!newNote.trim() || noteSaving}
-                    className="h-8 px-3 rounded-lg bg-[var(--shell-accent)] text-[var(--shell-accent-fg)] text-[10px] font-bold uppercase tracking-wider disabled:opacity-40 transition-opacity"
+                    className="h-8 px-3 rounded-lg bg-[var(--shell-accent)] text-[var(--shell-accent-fg)] text-[11px] font-bold uppercase tracking-wider disabled:opacity-40 transition-opacity"
                   >
                     {noteSaving ? '...' : 'Add'}
                   </button>
@@ -775,51 +778,51 @@ export default function ExpensePage() {
               {/* Reimbursement Status — shown when employee requested reimbursement */}
               {selectedTxn.needs_reimbursement && (
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
+                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
                     <ShieldCheck className="w-3.5 h-3.5" /> Reimbursement
                   </label>
                   {selectedTxn.reimbursement_status === 'PAID' ? (
-                    <div className="flex flex-col gap-1 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-400/20">
-                      <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                    <div className="flex flex-col gap-1 px-3 py-2 rounded-lg bg-[color-mix(in_srgb,var(--success)_10%,transparent)] border border-[color-mix(in_srgb,var(--success)_20%,transparent)]">
+                      <span className="text-[11px] font-bold text-[var(--success)]">
                         ✓ Reimbursed{selectedTxn.reimbursed_by_name ? ` by ${selectedTxn.reimbursed_by_name}` : ''}{selectedTxn.reimbursed_at ? ` on ${formatDate(selectedTxn.reimbursed_at)}` : ''}
                       </span>
                       {selectedTxn.reimbursement_reference && (
-                        <span className="text-[10px] text-emerald-600/70 dark:text-emerald-400/70">Ref: {selectedTxn.reimbursement_reference}</span>
+                        <span className="text-[11px] text-[color-mix(in_srgb,var(--success)_70%,transparent)]">Ref: {selectedTxn.reimbursement_reference}</span>
                       )}
                       {selectedTxn.reimbursement_note && (
-                        <span className="text-[10px] text-emerald-600/70 dark:text-emerald-400/70">{selectedTxn.reimbursement_note}</span>
+                        <span className="text-[11px] text-[color-mix(in_srgb,var(--success)_70%,transparent)]">{selectedTxn.reimbursement_note}</span>
                       )}
                     </div>
                   ) : selectedTxn.reimbursement_status === 'ON_HOLD' ? (
-                    <div className="flex flex-col gap-1 px-3 py-2 rounded-lg bg-orange-500/10 border border-orange-400/20">
+                    <div className="flex flex-col gap-1 px-3 py-2 rounded-lg bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border border-[color-mix(in_srgb,var(--warning)_20%,transparent)]">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-orange-600 dark:text-orange-300">
+                        <div className="flex items-center gap-2 text-[var(--warning)]">
                           <PauseCircle className="w-3.5 h-3.5 shrink-0" />
                           <span className="text-[11px] font-bold">On Hold{selectedTxn.reimbursed_by_name ? ` · ${selectedTxn.reimbursed_by_name}` : ''}</span>
                         </div>
                         {(user?.roles || []).some((r: any) => ['FINANCE', 'ADMIN'].includes((r.role_name || '').toUpperCase())) && (
                           <button
                             onClick={() => { setProcessTxnId(selectedTxn.id); setProcessOpen(true); }}
-                            className="text-[10px] font-bold text-emerald-600 hover:underline uppercase tracking-wider shrink-0"
+                            className="text-[11px] font-bold text-[var(--success)] hover:underline uppercase tracking-wider shrink-0"
                           >
                             Process →
                           </button>
                         )}
                       </div>
                       {selectedTxn.reimbursement_note && (
-                        <span className="text-[10px] text-orange-600/70 dark:text-orange-300/70 pl-5">{selectedTxn.reimbursement_note}</span>
+                        <span className="text-[11px] text-[color-mix(in_srgb,var(--warning)_70%,transparent)] pl-5">{selectedTxn.reimbursement_note}</span>
                       )}
                     </div>
                   ) : (
-                    <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-400/20">
-                      <div className="flex items-center gap-2 text-amber-600 dark:text-amber-300">
+                    <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border border-[color-mix(in_srgb,var(--warning)_20%,transparent)]">
+                      <div className="flex items-center gap-2 text-[var(--warning)]">
                         <Clock className="w-3.5 h-3.5 shrink-0" />
                         <span className="text-[11px] font-bold">Pending Reimbursement</span>
                       </div>
                       {(user?.roles || []).some((r: any) => ['FINANCE', 'ADMIN'].includes((r.role_name || '').toUpperCase())) && (
                         <button
                           onClick={() => { setProcessTxnId(selectedTxn.id); setProcessOpen(true); }}
-                          className="text-[10px] font-bold text-emerald-600 hover:underline uppercase tracking-wider shrink-0"
+                          className="text-[11px] font-bold text-[var(--success)] hover:underline uppercase tracking-wider shrink-0"
                         >
                           Process →
                         </button>
@@ -833,14 +836,14 @@ export default function ExpensePage() {
               <div className="flex gap-2 pt-1">
                 <button
                   onClick={handleDuplicate}
-                  className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg border border-[var(--shell-border)] bg-[var(--shell-hover)] text-[10px] font-bold text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] hover:bg-[var(--shell-surface)] transition-colors uppercase tracking-wider"
+                  className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg border border-[var(--shell-border)] bg-[var(--shell-hover)] text-[11px] font-bold text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] hover:bg-[var(--shell-surface)] transition-colors uppercase tracking-wider"
                 >
                   <Copy className="w-3 h-3" /> Duplicate
                 </button>
                 {(selectedTxn.status || '').toUpperCase() === 'APPROVED' && (user?.roles || []).some((r: any) => ['FINANCE', 'ADMIN'].includes((r.role_name || '').toUpperCase())) && (
                   <button
                     onClick={() => { setVoidReason(''); setVoidOpen(true); }}
-                    className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg border border-red-300/40 bg-red-500/10 text-[10px] font-bold text-red-500 hover:bg-red-500/20 transition-colors uppercase tracking-wider"
+                    className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg border border-[color-mix(in_srgb,var(--danger)_40%,transparent)] bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] text-[11px] font-bold text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_20%,transparent)] transition-colors uppercase tracking-wider"
                   >
                     <Ban className="w-3 h-3" /> Void
                   </button>
@@ -895,7 +898,7 @@ export default function ExpensePage() {
         onClose={() => setSplitOpen(false)}
         title="Split Expense Record"
         icon={<Split className="h-4 w-4" />}
-        maxWidth="sm:max-w-[700px]"
+        size="md"
         footer={
           <>
             <Button
@@ -919,18 +922,18 @@ export default function ExpensePage() {
         {/* Summary cards */}
         <div className="flex gap-3 mb-4">
           <div className="flex-1 flex flex-col gap-0.5 rounded-lg p-2.5 bg-[var(--shell-hover)] border border-[var(--shell-border)]">
-            <p className="text-[var(--shell-accent)] text-[9px] font-bold uppercase tracking-wider">Original</p>
+            <p className="text-[var(--shell-accent)] text-[11px] font-bold uppercase tracking-wider">Original</p>
             <p className="text-[var(--shell-text)] text-[13px] font-black">{formatCurrency(Number(editing?.amount || 0), currency)}</p>
           </div>
-          <div className="flex-1 flex flex-col gap-0.5 rounded-lg p-2.5 bg-blue-500/10 border border-blue-400/20">
-            <p className="text-blue-400 text-[9px] font-bold uppercase tracking-wider">Split Total</p>
-            <p className="text-blue-300 text-[13px] font-black">
+          <div className="flex-1 flex flex-col gap-0.5 rounded-lg p-2.5 bg-[color-mix(in_srgb,var(--info)_10%,transparent)] border border-[color-mix(in_srgb,var(--info)_20%,transparent)]">
+            <p className="text-[var(--info)] text-[11px] font-bold uppercase tracking-wider">Split Total</p>
+            <p className="text-[var(--info)] text-[13px] font-black">
               {formatCurrency(splitEntries.reduce((sum, e) => sum + (Number(e.amount) || 0), 0), currency)}
             </p>
           </div>
-          <div className="flex-1 flex flex-col gap-0.5 rounded-lg p-2.5 bg-amber-500/10 border border-amber-400/20">
-            <p className="text-amber-400 text-[9px] font-bold uppercase tracking-wider">Remaining</p>
-            <p className="text-amber-300 text-[13px] font-black">
+          <div className="flex-1 flex flex-col gap-0.5 rounded-lg p-2.5 bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border border-[color-mix(in_srgb,var(--warning)_20%,transparent)]">
+            <p className="text-[var(--warning)] text-[11px] font-bold uppercase tracking-wider">Remaining</p>
+            <p className="text-[var(--warning)] text-[13px] font-black">
               {formatCurrency(Number(editing?.amount || 0) - splitEntries.reduce((sum, e) => sum + (Number(e.amount) || 0), 0), currency)}
             </p>
           </div>
@@ -938,9 +941,9 @@ export default function ExpensePage() {
 
         {/* Column headers */}
         <div className="grid gap-2 mb-1" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
-          <p className="text-[9px] font-bold uppercase tracking-wider text-[var(--shell-text-muted)] px-1">Category</p>
-          <p className="text-[9px] font-bold uppercase tracking-wider text-[var(--shell-text-muted)] px-1">Description</p>
-          <p className="text-[9px] font-bold uppercase tracking-wider text-[var(--shell-text-muted)] px-1 text-right">Amount</p>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--shell-text-muted)] px-1">Category</p>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--shell-text-muted)] px-1">Description</p>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--shell-text-muted)] px-1 text-right">Amount</p>
         </div>
 
         {/* Split rows */}
@@ -1000,7 +1003,7 @@ export default function ExpensePage() {
         title="Void Transaction"
         icon={<Ban className="w-4 h-4" />}
         isDestructive={true}
-        maxWidth="sm:max-w-[480px]"
+        size="sm"
         footer={
           <>
             <Button variant="ghost" onClick={() => setVoidOpen(false)} disabled={voidSaving} className="h-8 px-4 text-[11.5px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>
@@ -1009,7 +1012,7 @@ export default function ExpensePage() {
             <button
               onClick={handleVoid}
               disabled={voidSaving}
-              className="px-8 py-2.5 bg-red-600 text-white text-[12px] font-bold uppercase tracking-widest rounded-lg hover:brightness-110 active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-8 py-2.5 bg-[var(--danger)] text-[var(--danger-foreground)] text-[12px] font-bold uppercase tracking-widest rounded-lg hover:brightness-110 active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {voidSaving && <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />}
               Confirm Void
@@ -1018,13 +1021,13 @@ export default function ExpensePage() {
         }
       >
         <div className="space-y-4">
-          <div className="p-3 bg-red-500/10 border border-red-400/20 rounded-xl text-[11px] text-red-600 dark:text-red-300 font-medium">
+          <div className="p-3 bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] border border-[color-mix(in_srgb,var(--danger)_20%,transparent)] rounded-xl text-[11px] text-[var(--danger)] font-medium">
             This will permanently mark <strong>{selectedTxn?.reference_id || `#${selectedTxn?.id}`}</strong> as VOIDED. The record is kept for audit purposes but will no longer count in reports.
           </div>
           <div className="space-y-2">
             <label className="text-[11px] font-bold modal-label uppercase tracking-widest block">Void Reason (optional)</label>
             <textarea
-              className="w-full h-20 p-3 modal-input border border-[var(--shell-border)] rounded-lg text-[13px] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-red-500/50 focus:border-red-500/50 resize-none outline-none"
+              className="w-full h-20 p-3 modal-input border border-[var(--shell-border)] rounded-lg text-[13px] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[color-mix(in_srgb,var(--danger)_50%,transparent)] focus:border-[color-mix(in_srgb,var(--danger)_50%,transparent)] resize-none outline-none"
               placeholder="Describe why this transaction is being voided..."
               value={voidReason}
               onChange={(e) => setVoidReason(e.target.value)}

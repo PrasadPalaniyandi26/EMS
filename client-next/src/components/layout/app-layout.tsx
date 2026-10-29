@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, type ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
+import { canAccessRoute, fallbackRoute } from '@/lib/route-access';
 import { useSidebarStore } from '@/stores/sidebar-store';
 import { getAccessToken } from '@/lib/api-client';
 import { Sidebar } from '@/components/layout/sidebar';
@@ -11,9 +12,10 @@ import { TopBar } from '@/components/layout/topbar';
 import { BottomNav } from '@/components/layout/bottom-nav';
 
 export function AppLayout({ children }: { children: ReactNode }) {
-  const { isAuthenticated, isLoading, refreshSession } = useAuthStore();
+  const { user, isAuthenticated, isLoading, refreshSession } = useAuthStore();
   const { slim } = useSidebarStore();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!getAccessToken()) {
@@ -30,6 +32,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
     }
   }, [isLoading, isAuthenticated, router]);
 
+  const roleName = user?.role_name;
+  const routeAllowed = canAccessRoute(pathname, roleName);
+  useEffect(() => {
+    if (isAuthenticated && !routeAllowed) router.replace(fallbackRoute(roleName));
+  }, [isAuthenticated, routeAllowed, roleName, router]);
+
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center" style={{ background: 'var(--shell-bg)' }}>
@@ -39,6 +47,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   }
 
   if (!isAuthenticated) return null;
+  if (!routeAllowed) return null; // redirecting; don't render the page or fire its queries
 
   return (
     <div className={`relative min-h-dvh ${slim ? 'layout-slim' : ''}`}>

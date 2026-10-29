@@ -18,6 +18,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { COUNTRY_LIST } from '@/components/manage/client-modals';
+import { getRoleStyle } from '@/lib/roles';
+import { Field } from '@/components/shared/modal-primitives';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -30,28 +32,7 @@ function generatePassword(firstName: string, lastName: string): string {
   return `${fi}${li}${digits}${special}`;
 }
 
-const ROLE_COLORS: Record<string, string> = {
-  admin: 'bg-red-100 text-red-700 border-red-200',
-  finance: 'bg-indigo-100 text-indigo-700 border-indigo-200',
-  manager: 'bg-orange-100 text-orange-700 border-orange-200',
-  employee: 'bg-blue-100 text-blue-600 border-blue-200',
-};
-const ROLE_DOTS: Record<string, string> = {
-  admin: 'bg-red-500', finance: 'bg-indigo-500', manager: 'bg-orange-500', employee: 'bg-blue-500',
-};
-
 // ─── Field ─────────────────────────────────────────────────────────────────────
-function Field({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
-  return (
-    <div className="space-y-1.5">
-      <Label className="text-xs font-medium" style={{ color: 'var(--shell-text-muted)' }}>
-        {label}{required && <span className="text-rose-400 ml-0.5">*</span>}
-      </Label>
-      {children}
-    </div>
-  );
-}
-
 const INP = 'w-full h-10 text-sm focus:ring-1 focus:outline-none rounded-xl';
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
@@ -237,7 +218,7 @@ export default function UserFormPage() {
             <ArrowLeft className="w-4 h-4" />
             Team
           </button>
-          <span className="text-zinc-300">/</span>
+          <span className="text-[var(--shell-text-muted)]">/</span>
           <span className="text-sm font-semibold text-[var(--shell-text)]">
             {isEdit ? `Edit — ${form.first_name} ${form.last_name}`.trim() || `User #${userId}` : 'New Member'}
           </span>
@@ -289,7 +270,7 @@ export default function UserFormPage() {
                 <p className="text-sm text-[var(--shell-text-muted)] mt-0.5">Basic identity and contact details</p>
               </div>
               <div className="rounded-2xl p-6 space-y-5" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
-                <div className="grid grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <Field label="First Name" required>
                     <Input className={INP} style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }} placeholder="Jonathan" value={form.first_name} onChange={(e) => set('first_name', e.target.value)} />
                   </Field>
@@ -297,7 +278,7 @@ export default function UserFormPage() {
                     <Input className={INP} style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }} placeholder="Doe" value={form.last_name} onChange={(e) => set('last_name', e.target.value)} />
                   </Field>
                 </div>
-                <div className="grid grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <Field label="Date of Birth">
                     <Input className={INP} style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }} type="date" value={form.date_of_birth} onChange={(e) => set('date_of_birth', e.target.value)} />
                   </Field>
@@ -320,7 +301,7 @@ export default function UserFormPage() {
                       </button>
                     </div>
                     <Button type="button" variant="outline" onClick={() => { set('password', generatePassword(form.first_name, form.last_name)); setShowPassword(true); }}
-                      className="h-10 px-3 border-[var(--shell-border)] text-[var(--shell-text-muted)] hover:text-indigo-600 hover:border-emerald-300 rounded-xl">
+                      className="h-10 px-3 border-[var(--shell-border)] text-[var(--shell-text-muted)] hover:text-[var(--info)] hover:border-[color-mix(in_srgb,var(--success)_35%,transparent)] rounded-xl">
                       <RefreshCw className="w-4 h-4" />
                     </Button>
                   </div>
@@ -332,9 +313,9 @@ export default function UserFormPage() {
                 <Label className="text-xs font-medium text-[var(--shell-text-muted)] block mb-3">Account Status</Label>
                 <div className="flex p-1 border rounded-xl gap-1">
                   {[
-                    { val: 'ACTIVE',   label: 'Active',   color: 'text-indigo-600' },
-                    { val: 'On Hold',  label: 'On Hold',  color: 'text-amber-600' },
-                    { val: 'Inactive', label: 'Inactive', color: 'text-rose-500' },
+                    { val: 'ACTIVE',   label: 'Active',   color: 'text-[var(--info)]' },
+                    { val: 'On Hold',  label: 'On Hold',  color: 'text-[var(--warning)]' },
+                    { val: 'Inactive', label: 'Inactive', color: 'text-[var(--danger)]' },
                   ].map(({ val, label, color }) => (
                     <button key={val} onClick={() => set('status', val)}
                       className={cn('flex-1 py-2 text-sm font-medium rounded-lg transition-all',
@@ -357,7 +338,7 @@ export default function UserFormPage() {
               </div>
 
               <div className="rounded-2xl p-6 space-y-5" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
-                <div className="grid grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <Field label="Department">
                     <Select value={form.department} onValueChange={(v) => set('department', v)}>
                       <SelectTrigger className={INP} style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }}><SelectValue placeholder="Select department" /></SelectTrigger>
@@ -379,7 +360,7 @@ export default function UserFormPage() {
                     </Select>
                   </Field>
                 </div>
-                <div className="grid grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <Field label="Reporting Manager">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--shell-text-muted)] pointer-events-none z-10" />
@@ -410,14 +391,14 @@ export default function UserFormPage() {
                     const isChecked = selectedRoles.some((s) => s.roleId === r.id);
                     const isDefault = selectedRoles.find((s) => s.roleId === r.id)?.isDefault ?? false;
                     const key = (r.role_name || '').toLowerCase();
-                    const dotCls = ROLE_DOTS[key] || 'bg-zinc-400';
-                    const labelCls = ROLE_COLORS[key] || 'bg-[var(--shell-hover)] text-[var(--shell-text-muted)] border-[var(--shell-border)]';
+                    const dotCls = getRoleStyle(key).dot;
+                    const labelCls = getRoleStyle(key).badge;
                     return (
                       <div key={r.id}
-                        className={cn('flex items-center px-4 py-3 transition-colors', isChecked ? 'bg-indigo-50/50' : 'hover:bg-[var(--shell-hover)]')}>
+                        className={cn('flex items-center px-4 py-3 transition-colors', isChecked ? 'bg-[color-mix(in_srgb,var(--info)_50%,transparent)]' : 'hover:bg-[var(--shell-hover)]')}>
                         <div onClick={() => toggleRole(r.id)}
                           className={cn('w-4 h-4 rounded border-2 flex items-center justify-center transition-all cursor-pointer shrink-0 mr-3',
-                            isChecked ? 'bg-indigo-500 border-indigo-500' : 'border-zinc-300')}>
+                            isChecked ? 'bg-[var(--info)] border-[var(--info)]' : 'border-[var(--shell-border)]')}>
                           {isChecked && <Check className="w-2.5 h-2.5 text-white" />}
                         </div>
                         <div className={cn('w-2 h-2 rounded-full shrink-0 mr-3', dotCls)} />
@@ -430,7 +411,7 @@ export default function UserFormPage() {
                         )}
                         {isChecked && (
                           <button type="button" onClick={() => setDefaultRole(r.id)}>
-                            <Star className={cn('w-4 h-4 transition-colors', isDefault ? 'fill-amber-400 text-amber-400' : 'text-zinc-300 hover:text-amber-300')} />
+                            <Star className={cn('w-4 h-4 transition-colors', isDefault ? 'fill-[var(--warning)] text-[var(--warning)]' : 'text-[var(--shell-text-muted)] hover:text-[var(--warning)]')} />
                           </button>
                         )}
                       </div>
@@ -439,7 +420,7 @@ export default function UserFormPage() {
                 </div>
                 {defaultRoleName && (
                   <p className="text-xs text-[var(--shell-text-muted)]">
-                    Default active role: <span className="text-indigo-600 font-semibold">{defaultRoleName}</span> <span className="text-amber-400">★</span>
+                    Default active role: <span className="text-[var(--info)] font-semibold">{defaultRoleName}</span> <span className="text-[var(--warning)]">★</span>
                   </p>
                 )}
               </div>
@@ -460,7 +441,7 @@ export default function UserFormPage() {
                 <Field label="Address line 2">
                   <Input className={INP} style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }} placeholder="Building, landmark (optional)" value={form.address} onChange={(e) => set('address', e.target.value)} />
                 </Field>
-                <div className="grid grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <Field label="City">
                     <Input className={INP} style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }} placeholder="Mumbai" value={form.city} onChange={(e) => set('city', e.target.value)} />
                   </Field>
@@ -490,7 +471,7 @@ export default function UserFormPage() {
 
               <div className="rounded-2xl p-6 space-y-5" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
                 <h3 className="text-sm font-semibold text-[var(--shell-text)]">Spending Limits</h3>
-                <div className="grid grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <Field label="Single Transaction Limit (₹)">
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--shell-text-muted)] font-medium text-sm select-none">₹</span>
@@ -522,7 +503,7 @@ export default function UserFormPage() {
 
               <div className="rounded-2xl p-6 space-y-2.5" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
                 <h3 className="text-sm font-semibold text-[var(--shell-text)]">Module Access</h3>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {PERM_MODULES.map(({ key, label }) => {
                     const enabled = !!permissions.permissions[key];
                     return (
@@ -530,12 +511,12 @@ export default function UserFormPage() {
                         onClick={() => setPermissions((p) => ({ ...p, permissions: { ...p.permissions, [key]: !enabled } }))}
                         className={cn('flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-all',
                           enabled
-                            ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                            ? 'bg-[color-mix(in_srgb,var(--info)_12%,transparent)] border-[color-mix(in_srgb,var(--info)_35%,transparent)] text-[var(--info)]'
                             : 'border-[var(--shell-border)] text-[var(--shell-text-muted)] hover:border-[var(--shell-border)]',
                         )}>
                         {label}
                         <div className={cn('w-4 h-4 rounded border-2 flex items-center justify-center',
-                          enabled ? 'bg-indigo-500 border-indigo-500' : 'border-zinc-300')}>
+                          enabled ? 'bg-[var(--info)] border-[var(--info)]' : 'border-[var(--shell-border)]')}>
                           {enabled && <Check className="w-2.5 h-2.5 text-white" />}
                         </div>
                       </button>
@@ -553,7 +534,7 @@ export default function UserFormPage() {
               ← Back to Team
             </button>
             <Button onClick={handleSave} disabled={saving}
-              className="h-10 px-6 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2">
+              className="h-10 px-6 bg-[var(--info)] hover:opacity-90 text-[var(--info-foreground)] rounded-xl text-sm font-semibold flex items-center gap-2">
               {saving ? 'Saving…' : isEdit ? <><Save className="w-4 h-4" /> Save Changes</> : <><Send className="w-4 h-4" /> Create Member</>}
             </Button>
           </div>

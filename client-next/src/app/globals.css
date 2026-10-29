@@ -3,11 +3,45 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Fonts: `inline` so the utility resolves next/font's variables on the element that uses it
+   (they are defined on <body>, not :root). Inter and JetBrains Mono are loaded in layout.tsx. */
+@theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 @theme {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "Inter", sans-serif;
-  --font-mono: var(--font-geist-mono);
+
+  /* Semantic status colours (text-safe on the surface in each theme; defined below) */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-surface-raised: var(--surface-raised);
+  --color-overlay: var(--overlay);
+
+  /* Navigation icon palette (text-nav-blue, ...) */
+  --color-nav-blue: var(--nav-blue);
+  --color-nav-violet: var(--nav-violet);
+  --color-nav-rose: var(--nav-rose);
+  --color-nav-emerald: var(--nav-emerald);
+  --color-nav-orange: var(--nav-orange);
+  --color-nav-cyan: var(--nav-cyan);
+  --color-nav-indigo: var(--nav-indigo);
+  --color-nav-amber: var(--nav-amber);
+  --color-nav-purple: var(--nav-purple);
+  --color-nav-red: var(--nav-red);
+  --color-nav-slate: var(--nav-slate);
+
+  /* Type scale: 11px floor for text (the app has 200+ sizes below 10px) */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -25,6 +59,7 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -92,15 +127,17 @@
 :root {
   --radius: 0.5rem;
 
-  /* Shell — stone-100: light warm grey, clearly distinct from white surfaces */
-  --shell-bg:          #eef2f8;  /* blue-tinted grey — cohesive with navy nav */
-  --shell-surface:     #ffffff;  /* white      */
-  --shell-border:      #d6d3d1;  /* stone-300  */
-  --shell-text:        #1c1917;  /* stone-900  */
-  --shell-text-muted:  #78716c;  /* stone-500 — distinct from primary text */
-  --shell-accent:      #3b82f6;  /* blue-500   */
-  --shell-accent-fg:   #ffffff;
+  /* Shell tokens. surface/border/text/muted/accent are ALIASES of the shadcn tokens below (one source of
+     truth); bg and hover have no shadcn equivalent and stay here. */
+  --shell-bg:          #eef2f8;  /* blue-tinted grey page background */
+  --shell-surface:     var(--card);
+  --shell-border:      var(--border);
+  --shell-text:        var(--foreground);
+  --shell-text-muted:  var(--muted-foreground);
+  --shell-accent:      var(--primary);
+  --shell-accent-fg:   var(--primary-foreground);
   --shell-hover:       #f0efee;  /* stone-100 — visible hover feedback */
+  --shell-brand:       #b45309;  /* amber-700: wordmark colour, 5:1 on white */
 
   /* shadcn tokens */
   --background:        #f5f5f4;  /* stone-100  */
@@ -109,15 +146,16 @@
   --card-foreground:   #1c1917;
   --popover:           #ffffff;
   --popover-foreground:#1c1917;
-  --primary:           #3b82f6;  /* blue-500   */
+  --primary:           #2563eb;  /* blue-600: white text 5.2:1, and 5.2:1 as text on white */
   --primary-foreground:#ffffff;
   --secondary:         #fafaf9;  /* stone-50   */
   --secondary-foreground:#1c1917;
   --muted:             #fafaf9;  /* stone-50   */
-  --muted-foreground:  #78716c;
+  --muted-foreground:  #6a645f;  /* 5:1 on white and on the tinted page/hover surfaces (was #78716c, 4.2:1) */
   --accent:            #fafaf9;
   --accent-foreground: #1c1917;
-  --destructive:       #ef4444;
+  --destructive:       #dc2626;  /* red-600: white text 4.8:1 (red-500 was 3.8:1) */
+  --destructive-foreground:#ffffff;
   --border:            #d6d3d1;  /* stone-300  */
   --input:             #d6d3d1;
   --ring:              #3b82f6;  /* blue-500   */
@@ -127,26 +165,101 @@
   --chart-4:           #8b5cf6;
   --chart-5:           #ef4444;
   --sidebar:           #ffffff;
-  --sidebar-foreground:#78716c;
+  --sidebar-foreground:#6a645f;
   --sidebar-primary:   #1c1917;
   --sidebar-primary-foreground:#ffffff;
   --sidebar-accent:    #fafaf9;
   --sidebar-accent-foreground:#1c1917;
   --sidebar-border:    #d6d3d1;
   --sidebar-ring:      #3b82f6;  /* blue-500   */
+
+  /* Semantic status colours — text-safe (>= 4.5:1) on white and on the tinted page surfaces */
+  --success:           #047857;  /* emerald-700 */
+  --success-foreground:#ffffff;
+  --warning:           #a3480a;  /* deeper amber: 5:1 on white and on tinted fills */
+  --warning-foreground:#ffffff;
+  --info:              #1d4ed8;  /* blue-700    */
+  --info-foreground:   #ffffff;
+  --danger:            #b91c1c;  /* red-700     */
+  --danger-foreground: #ffffff;
+  --surface-raised:    #ffffff;
+  --overlay:           rgba(15, 23, 42, 0.5);
+
+  /* Approval workflow states (consumed by lib/status.ts as components migrate, Phase 4) */
+  --status-draft:           #0369a1;
+  --status-pending-manager: #a3480a;
+  --status-pending-finance: #c2410c;
+  --status-approved:        #047857;
+  --status-rejected:        #b91c1c;
+  --status-sent-back:       #1d4ed8;
+  --status-voided:          #475569;
+
+  /* Role colours */
+  --role-admin:    #b91c1c;
+  --role-finance:  #047857;
+  --role-manager:  #c2410c;
+  --role-employee: #1d4ed8;
+
+  /* Navigation icon palette: a deliberate multi-colour set so each sidebar destination is recognisable at a
+     glance. Decorative (icons are never the only label) but kept >= 4.5:1 on the white sidebar. */
+  --nav-blue:   #1d4ed8;
+  --nav-violet: #6d28d9;
+  --nav-rose:   #be123c;
+  --nav-emerald:#047857;
+  --nav-orange: #c2410c;
+  --nav-cyan:   #0e7490;
+  --nav-indigo: #4338ca;
+  --nav-amber:  #a3480a;
+  --nav-purple: #7e22ce;
+  --nav-red:    #b91c1c;
+  --nav-slate:  #475569;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --shadow-md: 0 1px 2px rgba(16, 24, 40, 0.05), 0 4px 12px -2px rgba(16, 24, 40, 0.08);
+  --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+/* Theme-independent design scale: layout sizes, stacking, motion, interaction states.
+   Components should read these instead of literals; the existing shell rules below already do. */
+:root {
+  --topbar-h: 44px;
+  --footer-h: 32px;
+  --bottom-nav-h: 56px;
+  --sidebar-w: 240px;
+  --sidebar-w-slim: 56px;
+  --panel-w: 360px;
+
+  --z-nav: 40;
+  --z-shell: 50;
+  --z-overlay: 100;
+  --z-modal: 200;
+  --z-toast: 300;
+
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --duration-slow: 300ms;
+  --ease-standard: ease;
+  --ease-move: ease-in-out;
+
+  --state-disabled-opacity: 0.35;
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
 }
 
 /* ─── Dark theme: glassmorphism ────────────────────────────────────── */
 .dark {
-  /* Shell — translucent frosted surfaces over a deep gradient backdrop */
+  /* Shell — translucent frosted surfaces over a deep gradient backdrop.
+     surface/border/text/muted/accent alias the shadcn tokens below (same as light). */
   --shell-bg:          #070c17;
-  --shell-surface:     rgba(34,47,71,0.65);
-  --shell-border:      rgba(148,163,184,0.18);
-  --shell-text:        #f4f7fc;
-  --shell-text-muted:  #9aa7c4;
-  --shell-accent:      #60a5fa;
-  --shell-accent-fg:   #ffffff;
+  --shell-surface:     var(--card);
+  --shell-border:      var(--border);
+  --shell-text:        var(--foreground);
+  --shell-text-muted:  var(--muted-foreground);
+  --shell-accent:      var(--primary);
+  --shell-accent-fg:   var(--primary-foreground);
   --shell-hover:       rgba(255,255,255,0.07);
+  --shell-brand:       #d97706;
 
   /* shadcn tokens */
   --background:        #070c17;
@@ -156,7 +269,7 @@
   --popover:           rgba(30,41,59,0.75);
   --popover-foreground:#f4f7fc;
   --primary:           #60a5fa;
-  --primary-foreground:#ffffff;
+  --primary-foreground:#0b1220;  /* near-black on the light blue: 7.5:1 (white was 2.5:1) */
   --secondary:         rgba(30,41,59,0.55);
   --secondary-foreground:#f4f7fc;
   --muted:             rgba(30,41,59,0.55);
@@ -164,6 +277,7 @@
   --accent:            rgba(148,163,184,0.16);
   --accent-foreground: #f4f7fc;
   --destructive:       #f87171;
+  --destructive-foreground:#2a0a0a;  /* near-black on the light red */
   --border:            rgba(148,163,184,0.18);
   --input:             rgba(148,163,184,0.18);
   --ring:              #60a5fa;
@@ -175,11 +289,52 @@
   --sidebar:           rgba(30,41,59,0.55);
   --sidebar-foreground:#9aa7c4;
   --sidebar-primary:   #60a5fa;
-  --sidebar-primary-foreground:#ffffff;
+  --sidebar-primary-foreground:#0b1220;
   --sidebar-accent:    rgba(148,163,184,0.16);
   --sidebar-accent-foreground:#f4f7fc;
   --sidebar-border:    rgba(148,163,184,0.18);
   --sidebar-ring:      #60a5fa;
+
+  /* Semantic status colours on the dark glass surfaces */
+  --success:           #34d399;
+  --success-foreground:#052e22;
+  --warning:           #fbbf24;
+  --warning-foreground:#2a1a02;
+  --info:              #60a5fa;
+  --info-foreground:   #0b1220;
+  --danger:            #f87171;
+  --danger-foreground: #2a0a0a;
+  --surface-raised:    rgba(44, 60, 90, 0.7);
+  --overlay:           rgba(0, 0, 0, 0.6);
+
+  --status-draft:           #38bdf8;
+  --status-pending-manager: #fbbf24;
+  --status-pending-finance: #fb923c;
+  --status-approved:        #34d399;
+  --status-rejected:        #f87171;
+  --status-sent-back:       #60a5fa;
+  --status-voided:          #94a3b8;
+
+  --role-admin:    #f87171;
+  --role-finance:  #34d399;
+  --role-manager:  #fb923c;
+  --role-employee: #60a5fa;
+
+  --nav-blue:   #60a5fa;
+  --nav-violet: #a78bfa;
+  --nav-rose:   #fb7185;
+  --nav-emerald:#34d399;
+  --nav-orange: #fb923c;
+  --nav-cyan:   #22d3ee;
+  --nav-indigo: #818cf8;
+  --nav-amber:  #fbbf24;
+  --nav-purple: #c084fc;
+  --nav-red:    #f87171;
+  --nav-slate:  #94a3b8;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 10px 30px -12px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 25px 60px -10px rgba(0, 0, 0, 0.7);
 }
 
 /* Ambient gradient glow behind the glass surfaces — gives the blur something to catch */
@@ -220,9 +375,7 @@
 .dark .glass-card,
 .dark .glass-panel,
 .dark .table-container {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.07),
-    0 10px 30px -12px rgba(0, 0, 0, 0.6);
+  box-shadow: var(--shadow-md);
 }
 
 /* Accent punch on primary actions and active nav */
@@ -244,9 +397,7 @@ html:not(.dark) [data-slot="card"],
 html:not(.dark) .glass-card,
 html:not(.dark) .glass-panel,
 html:not(.dark) .table-container {
-  box-shadow:
-    0 1px 2px rgba(16, 24, 40, 0.05),
-    0 4px 12px -2px rgba(16, 24, 40, 0.08);
+  box-shadow: var(--shadow-md);
 }
 html:not(.dark) .btn-action-primary {
   box-shadow: 0 2px 8px -2px color-mix(in srgb, var(--shell-accent) 45%, transparent);
@@ -289,30 +440,30 @@ html:not(.dark) .btn-action-primary {
 @layer utilities {
   /* ── Shell layout ──────────────────────────────────── */
   .menu-fixed {
-    width: 240px;
+    width: var(--sidebar-w);
     position: fixed;
     top: 0;
     left: 0;
     bottom: 0;
     background-color: var(--shell-surface);
     color: var(--shell-text-muted);
-    z-index: 50;
+    z-index: var(--z-shell);
     border-right: 1px solid var(--shell-border);
     box-shadow: 2px 0 8px rgba(0,0,0,0.08);
-    transition: width 0.3s ease-in-out, background-color 0.2s ease, border-color 0.2s ease;
+    transition: width var(--duration-slow) var(--ease-move), background-color var(--duration-base) var(--ease-standard), border-color var(--duration-base) var(--ease-standard);
     will-change: width;
   }
   .menu-fixed.menu-slim {
-    width: 56px;
+    width: var(--sidebar-w-slim);
   }
   .fixed-top {
     position: fixed;
     top: 0;
     right: 0;
     left: 0;
-    height: 44px;
+    height: var(--topbar-h);
     background-color: var(--shell-surface);
-    z-index: 40;
+    z-index: var(--z-nav);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -320,16 +471,16 @@ html:not(.dark) .btn-action-primary {
     color: var(--shell-text);
     border-bottom: 1px solid var(--shell-border);
     box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-    transition: left 0.3s ease-in-out, background-color 0.2s ease, border-color 0.2s ease;
+    transition: left var(--duration-slow) var(--ease-move), background-color var(--duration-base) var(--ease-standard), border-color var(--duration-base) var(--ease-standard);
   }
   .main-workspace {
-    margin-top: 44px;
+    margin-top: var(--topbar-h);
     background-color: var(--shell-bg);
     /* mobile: subtract topbar + bottom-nav */
-    height: calc(100dvh - 44px - 56px);
+    height: calc(100dvh - var(--topbar-h) - var(--bottom-nav-h));
     padding: 0;
     overflow-y: auto;
-    transition: margin-left 0.3s ease-in-out;
+    transition: margin-left var(--duration-slow) var(--ease-move);
   }
   @media (min-width: 640px) {
     .fixed-top {
@@ -341,15 +492,15 @@ html:not(.dark) .btn-action-primary {
     bottom: 0;
     right: 0;
     left: 0;
-    height: 32px;
+    height: var(--footer-h);
     background-color: var(--shell-surface);
     border-top: 1px solid var(--shell-border);
-    z-index: 40;
+    z-index: var(--z-nav);
     display: flex;
     align-items: center;
     padding: 0 1.5rem;
     color: var(--shell-text-muted);
-    transition: left 0.3s ease-in-out, background-color 0.2s ease, border-color 0.2s ease;
+    transition: left var(--duration-slow) var(--ease-move), background-color var(--duration-base) var(--ease-standard), border-color var(--duration-base) var(--ease-standard);
   }
   /* Mobile: footer hidden, bottom-nav takes over */
   @media (max-width: 1023px) {
@@ -357,39 +508,39 @@ html:not(.dark) .btn-action-primary {
       display: none;
     }
     .main-workspace {
-      height: calc(100dvh - 44px - 56px);
+      height: calc(100dvh - var(--topbar-h) - var(--bottom-nav-h));
     }
   }
   @media (min-width: 1024px) {
     .main-workspace {
-      height: calc(100dvh - 44px - 32px);
+      height: calc(100dvh - var(--topbar-h) - var(--footer-h));
     }
     .fixed-top {
-      left: 240px;
+      left: var(--sidebar-w);
       padding: 0 1.5rem;
     }
     .main-workspace {
-      margin-left: 240px;
+      margin-left: var(--sidebar-w);
     }
     .footer-fixed {
-      left: 240px;
+      left: var(--sidebar-w);
     }
     /* Slim sidebar offsets */
     .layout-slim .fixed-top {
-      left: 56px;
+      left: var(--sidebar-w-slim);
     }
     .layout-slim .main-workspace {
-      margin-left: 56px;
+      margin-left: var(--sidebar-w-slim);
     }
     .layout-slim .footer-fixed {
-      left: 56px;
+      left: var(--sidebar-w-slim);
     }
   }
 
   /* ── Content surfaces ──────────────────────────────── */
   .content-right-sidebar {
     display: none;
-    width: 360px;
+    width: var(--panel-w);
     background: var(--shell-surface);
     border-left: 1px solid var(--shell-border);
     flex-shrink: 0;
@@ -438,7 +589,7 @@ html:not(.dark) .btn-action-primary {
     font-weight: 500;
     color: var(--shell-text);
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all var(--duration-fast);
     white-space: nowrap;
     height: 34px;
     min-height: 34px;
@@ -448,7 +599,7 @@ html:not(.dark) .btn-action-primary {
     border-color: var(--shell-accent);
     color: var(--shell-accent);
   }
-  .btn-action:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-action:disabled { opacity: var(--state-disabled-opacity); cursor: not-allowed; }
 
   .btn-action-primary {
     display: flex;
@@ -628,22 +779,43 @@ html:not(.dark) .btn-action-primary {
   box-shadow: 0 0 6px currentColor;
 }
 
-/* Light mode: professional navy sidebar + topbar */
-html:not(.dark) .menu-fixed {
-  background-color: #1a2d4a;
-  --shell-text:        #e2e8f0;
-  --shell-text-muted:  #94a3b8;
-  --shell-border:      #243d5e;
-  --shell-hover:       rgba(255, 255, 255, 0.07);
-  --shell-accent:      #60a5fa;
-  color: #e2e8f0;
+/* Light-mode contrast bridge.
+   Tailwind's 300-600 accent shades (text-blue-400, text-emerald-500, bg-rose-500, ...) are tuned for dark
+   surfaces and measured 2.0-3.8:1 on white, so light mode remaps them to the 700 step (>= 5:1 as text on
+   white and on the tinted page/hover surfaces). Overriding the palette variables fixes every raw-palette
+   use at once, and tinted fills (bg-emerald-500/10) simply get a deeper tint. Dark mode is untouched.
+   TEMPORARY: delete this block in Phase 5 once components use the semantic tokens (--success, --status-*, ...). */
+html:not(.dark) {
+  --color-red-300: #b91c1c;     --color-red-400: #b91c1c;     --color-red-500: #b91c1c;
+  --color-orange-300: #c2410c;  --color-orange-400: #c2410c;  --color-orange-500: #c2410c;  --color-orange-600: #c2410c;
+  --color-amber-300: #b45309;   --color-amber-400: #b45309;   --color-amber-500: #b45309;   --color-amber-600: #b45309;
+  --color-yellow-400: #a16207;  --color-yellow-500: #a16207;  --color-yellow-600: #a16207;
+  --color-green-400: #15803d;   --color-green-500: #15803d;   --color-green-600: #15803d;
+  --color-emerald-300: #047857; --color-emerald-400: #047857; --color-emerald-500: #047857; --color-emerald-600: #047857;
+  --color-teal-400: #0f766e;    --color-teal-500: #0f766e;    --color-teal-600: #0f766e;
+  --color-cyan-400: #0e7490;    --color-cyan-500: #0e7490;    --color-cyan-600: #0e7490;
+  --color-sky-400: #0369a1;     --color-sky-500: #0369a1;
+  --color-blue-300: #1d4ed8;    --color-blue-400: #1d4ed8;    --color-blue-500: #1d4ed8;
+  --color-indigo-300: #4338ca;  --color-indigo-400: #4338ca;  --color-indigo-500: #4338ca;
+  --color-violet-400: #6d28d9;  --color-violet-500: #6d28d9;
+  --color-purple-400: #7e22ce;
+  --color-rose-300: #be123c;    --color-rose-400: #be123c;    --color-rose-500: #be123c;    --color-rose-600: #be123c;
 }
-html:not(.dark) .fixed-top {
-  background-color: #1a2d4a;
-  --shell-text:        #e2e8f0;
-  --shell-text-muted:  #94a3b8;
-  --shell-border:      #243d5e;
-  color: #e2e8f0;
+/* Dark-mode bridge, text only. Raw palette TEXT classes that were written without a dark: variant
+   (text-rose-700, text-blue-500, ...) are too dark on the glass surfaces (2.3-4.2:1). Elements that already
+   carry any dark: class are left alone, and fills (bg-rose-500 with white text) are not touched. */
+.dark :is(.text-blue-500, .text-blue-600, .text-blue-700):not([class*="dark:"]) { color: var(--color-blue-400); }
+.dark :is(.text-rose-500, .text-rose-600, .text-rose-700):not([class*="dark:"]) { color: var(--color-rose-400); }
+.dark :is(.text-red-500, .text-red-600, .text-red-700):not([class*="dark:"]) { color: var(--color-red-400); }
+.dark :is(.text-amber-600, .text-amber-700):not([class*="dark:"]) { color: var(--color-amber-400); }
+.dark :is(.text-emerald-600, .text-emerald-700):not([class*="dark:"]) { color: var(--color-emerald-400); }
+.dark :is(.text-indigo-500, .text-indigo-600, .text-indigo-700):not([class*="dark:"]) { color: var(--color-indigo-400); }
+
+/* Same bridge for translucent black secondary text (text-black/40..50 measured 2.9-4.0:1 on white) */
+html:not(.dark) .text-black\/40,
+html:not(.dark) .text-black\/45,
+html:not(.dark) .text-black\/50 {
+  color: rgb(0 0 0 / 0.62);
 }
 
 /* Move Sonner close button to the right side */

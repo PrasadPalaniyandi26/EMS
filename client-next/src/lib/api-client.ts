@@ -56,8 +56,10 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
 
   let res = await fetch(url, { ...options, headers, credentials: 'include' });
 
-  // If 401, try refreshing (even if accessToken is null — page reload clears it but cookie is still valid)
-  if (res.status === 401) {
+  // If 401, try refreshing (even if accessToken is null — page reload clears it but cookie is still valid).
+  // Auth endpoints are excluded: a 401 from /auth/login means wrong credentials, not an expired session,
+  // and must reach the caller so the form can show the server's message.
+  if (res.status === 401 && !endpoint.startsWith('/auth/')) {
     try {
       await refreshAccessToken();
       headers['Authorization'] = `Bearer ${accessToken}`;

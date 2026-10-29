@@ -22,13 +22,15 @@ const DATE_PRESETS = [
 
 const HEATMAP_COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899'];
 
-function heatColor(val: number, max: number) {
-  if (!val || !max) return 'var(--shell-hover)';
+// Opaque bins with their own dark text, so every cell is >= 7:1 and reads the same in light and dark
+// (the translucent colours this replaces took their contrast from whatever surface sat underneath).
+function heatColor(val: number, max: number): { background: string; color: string } {
+  if (!val || !max) return { background: 'var(--shell-hover)', color: 'var(--shell-text-muted)' };
   const pct = val / max;
-  if (pct >= 0.75) return 'rgba(239,68,68,0.75)';
-  if (pct >= 0.50) return 'rgba(245,158,11,0.70)';
-  if (pct >= 0.25) return 'rgba(59,130,246,0.60)';
-  return 'rgba(59,130,246,0.25)';
+  if (pct >= 0.75) return { background: '#fca5a5', color: '#450a0a' };
+  if (pct >= 0.50) return { background: '#fcd34d', color: '#451a03' };
+  if (pct >= 0.25) return { background: '#93c5fd', color: '#172554' };
+  return { background: '#dbeafe', color: '#1e3a8a' };
 }
 
 function SkeletonRect({ h = '120px' }: { h?: string }) {
@@ -55,7 +57,7 @@ function BurnList({ data, nameKey, fmt }: { data: any[]; nameKey: string; fmt: (
     <div className="space-y-3">
       {data.map((p: any, i: number) => {
         const pct   = p.pct ?? null;
-        const color = pct === null ? '#6b7280' : pct >= 100 ? '#ef4444' : pct >= 80 ? '#f59e0b' : '#10b981';
+        const color = pct === null ? 'var(--shell-text-muted)' : pct >= 100 ? 'var(--danger)' : pct >= 80 ? 'var(--warning)' : 'var(--success)';
         return (
           <div key={i}>
             <div className="flex justify-between items-baseline mb-1">
@@ -75,7 +77,7 @@ function BurnList({ data, nameKey, fmt }: { data: any[]; nameKey: string; fmt: (
               )}
             </div>
             {p.budget > 0 && (
-              <p className="text-[10px] mt-0.5" style={{ color: 'var(--shell-text-muted)' }}>Budget: {fmt(p.budget)}</p>
+              <p className="text-[11px] mt-0.5" style={{ color: 'var(--shell-text-muted)' }}>Budget: {fmt(p.budget)}</p>
             )}
           </div>
         );
@@ -185,7 +187,7 @@ export default function SpendAnalyticsPage() {
           <div className="dialog-header px-4 py-2.5 flex items-center gap-2">
             <Flame className="h-3.5 w-3.5" style={{ color: 'var(--shell-accent)' }} />
             Category Spend Heatmap
-            <span className="text-[10px] ml-1" style={{ color: 'var(--shell-text-muted)' }}>— darker = higher spend</span>
+            <span className="text-[11px] ml-1" style={{ color: 'var(--shell-text-muted)' }}>— darker = higher spend</span>
           </div>
           <div className="p-4 overflow-x-auto">
             {loadHeatmap ? <SkeletonRect h="220px" /> : !heatmap?.categories?.length ? (
@@ -209,7 +211,7 @@ export default function SpendAnalyticsPage() {
                         return (
                           <td key={c} title={val ? fmt(val) : '—'}
                             className="rounded text-center font-semibold cursor-default transition-all"
-                            style={{ background: heatColor(val, heatMax), color: val ? 'white' : 'var(--shell-text-muted)', padding: '5px 8px', fontSize: 10 }}>
+                            style={{ ...heatColor(val, heatMax), padding: '5px 8px', fontSize: 11 }}>
                             {val ? (val >= 100000 ? `${(val / 1000).toFixed(0)}k` : val >= 1000 ? `${(val / 1000).toFixed(1)}k` : val) : ''}
                           </td>
                         );

@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useDashboardSummary, useApprovals, useBudgets } from '@/hooks/use-queries';
 import { formatCurrency, formatDate } from '@/lib/currency';
 import { getStatusConfig } from '@/lib/status';
+import { StatCard } from '@/components/shared/stat-card';
 import {
   TrendingDown, TrendingUp, ShieldCheck, Target,
   Plus, ArrowRight, Wallet, CheckCircle2,
@@ -38,7 +39,7 @@ export default function HubPage() {
 
       {/* Quick Actions */}
       <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--shell-text-muted)] mb-2.5">Quick Actions</p>
+        <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--shell-text-muted)] mb-2.5">Quick Actions</p>
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => router.push('/expense')}
@@ -55,10 +56,10 @@ export default function HubPage() {
           {canApprove && pendingCount > 0 && (
             <button
               onClick={() => router.push('/approvals')}
-              className="btn-action flex items-center gap-2 px-4 py-2 border-amber-400/40"
+              className="btn-action flex items-center gap-2 px-4 py-2 border-[color-mix(in_srgb,var(--warning)_40%,transparent)]"
               style={{ color: 'var(--shell-text)', borderColor: 'rgb(251 191 36 / 0.4)' }}
             >
-              <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
+              <ShieldCheck className="w-3.5 h-3.5 text-[var(--warning)]" />
               Review {pendingCount} Pending Approval{pendingCount !== 1 ? 's' : ''}
             </button>
           )}
@@ -71,35 +72,29 @@ export default function HubPage() {
           {
             label: 'Total Income',
             value: summaryLoading ? '—' : formatCurrency(summary?.totalIncome || 0, currency),
-            icon: <TrendingUp className="w-4 h-4 text-emerald-500" />,
-            color: 'text-emerald-500',
+            icon: <TrendingUp className="w-4 h-4 text-[var(--success)]" />,
+            tone: 'success' as const,
           },
           {
             label: 'Total Expenses',
             value: summaryLoading ? '—' : formatCurrency(summary?.totalExpenses || 0, currency),
-            icon: <TrendingDown className="w-4 h-4 text-rose-500" />,
-            color: 'text-rose-500',
+            icon: <TrendingDown className="w-4 h-4 text-[var(--danger)]" />,
+            tone: 'danger' as const,
           },
           {
             label: 'Net Balance',
             value: summaryLoading ? '—' : formatCurrency(summary?.balance || 0, currency),
             icon: <Wallet className="w-4 h-4 text-[var(--shell-accent)]" />,
-            color: 'text-[var(--shell-accent)]',
+            tone: 'accent' as const,
           },
           {
             label: 'Pending Approvals',
             value: String(pendingCount),
-            icon: <ShieldCheck className="w-4 h-4 text-amber-500" />,
-            color: 'text-amber-500',
+            icon: <ShieldCheck className="w-4 h-4 text-[var(--warning)]" />,
+            tone: 'warning' as const,
           },
         ].map((card) => (
-          <div key={card.label} className="rounded-xl px-4 py-3 flex items-start gap-3" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
-            <div className="mt-0.5 shrink-0">{card.icon}</div>
-            <div>
-              <p className="text-[9px] font-bold uppercase tracking-widest text-[var(--shell-text-muted)]">{card.label}</p>
-              <p className={`text-[16px] font-black mt-0.5 ${card.color}`}>{card.value}</p>
-            </div>
-          </div>
+          <StatCard key={card.label} label={card.label} value={card.value} icon={card.icon} tone={card.tone} />
         ))}
       </div>
 
@@ -108,7 +103,7 @@ export default function HubPage() {
         <div className="rounded-xl overflow-hidden" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
           <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--shell-border)' }}>
             <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--shell-text-muted)]">Recent Transactions</p>
-            <button onClick={() => router.push('/transactions')} className="flex items-center gap-1 text-[10px] font-semibold text-[var(--shell-accent)] hover:opacity-80 transition-opacity">
+            <button onClick={() => router.push('/transactions')} className="flex items-center gap-1 text-[11px] font-semibold text-[var(--shell-accent)] hover:opacity-80 transition-opacity">
               View all <ArrowRight className="w-3 h-3" />
             </button>
           </div>
@@ -131,10 +126,10 @@ export default function HubPage() {
               const isIncome = t.type === 'income';
               return (
                 <div key={t.id} className="px-4 py-2.5 flex items-center gap-3 hover:bg-[var(--shell-hover)] transition-colors cursor-pointer" onClick={() => router.push('/transactions')}>
-                  <span className="text-[10px] text-[var(--shell-text-muted)] font-medium w-20 shrink-0">{formatDate(t.date_recorded)}</span>
+                  <span className="text-[11px] text-[var(--shell-text-muted)] font-medium w-20 shrink-0">{formatDate(t.date_recorded)}</span>
                   <span className="flex-1 text-[11px] font-semibold text-black dark:text-white truncate">{t.description}</span>
-                  <span className={`text-[10px] font-bold shrink-0 ${sc.color}`}>{sc.label}</span>
-                  <span className={`text-[11px] font-black shrink-0 ${isIncome ? 'text-emerald-500' : 'text-rose-500'}`}>
+                  <span className={`text-[11px] font-bold shrink-0 ${sc.color}`}>{sc.label}</span>
+                  <span className={`text-[11px] font-black shrink-0 ${isIncome ? 'text-[var(--success)]' : 'text-[var(--danger)]'}`}>
                     {isIncome ? '+' : '-'}{formatCurrency(t.amount, currency)}
                   </span>
                 </div>
@@ -147,7 +142,7 @@ export default function HubPage() {
         <div className="rounded-xl overflow-hidden" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
           <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--shell-border)' }}>
             <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--shell-text-muted)]">Budget Overview</p>
-            <button onClick={() => router.push('/manage/budgets')} className="flex items-center gap-1 text-[10px] font-semibold text-[var(--shell-accent)] hover:opacity-80 transition-opacity">
+            <button onClick={() => router.push('/manage/budgets')} className="flex items-center gap-1 text-[11px] font-semibold text-[var(--shell-accent)] hover:opacity-80 transition-opacity">
               Manage <ArrowRight className="w-3 h-3" />
             </button>
           </div>
@@ -165,25 +160,25 @@ export default function HubPage() {
                 <div key={b.id} className="px-4 py-2.5">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-[11px] font-semibold text-black dark:text-white truncate max-w-[180px]">{b.name || b.category_name || `Budget #${b.id}`}</span>
-                    <span className={`text-[10px] font-bold ${isOver ? 'text-rose-500' : isWarn ? 'text-amber-500' : 'text-[var(--shell-text-muted)]'}`}>{pct}%</span>
+                    <span className={`text-[11px] font-bold ${isOver ? 'text-[var(--danger)]' : isWarn ? 'text-[var(--warning)]' : 'text-[var(--shell-text-muted)]'}`}>{pct}%</span>
                   </div>
                   <div className="w-full h-1.5 rounded-full bg-[var(--shell-hover)] overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all ${isOver ? 'bg-rose-500' : isWarn ? 'bg-amber-400' : 'bg-[var(--shell-accent)]'}`}
+                      className={`h-full rounded-full transition-all ${isOver ? 'bg-[var(--danger)]' : isWarn ? 'bg-[var(--warning)]' : 'bg-[var(--shell-accent)]'}`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
                   <div className="flex justify-between mt-0.5">
-                    <span className="text-[9px] text-[var(--shell-text-muted)]">{formatCurrency(b.spent || 0, currency)} spent</span>
-                    <span className="text-[9px] text-[var(--shell-text-muted)]">of {formatCurrency(b.amount, currency)}</span>
+                    <span className="text-[11px] text-[var(--shell-text-muted)]">{formatCurrency(b.spent || 0, currency)} spent</span>
+                    <span className="text-[11px] text-[var(--shell-text-muted)]">of {formatCurrency(b.amount, currency)}</span>
                   </div>
                 </div>
               );
             })}
             {overBudget.length > 0 && (
-              <div className="px-4 py-2.5 flex items-center gap-2 bg-rose-500/8">
-                <Target className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                <p className="text-[10px] font-semibold text-rose-500">{overBudget.length} budget{overBudget.length !== 1 ? 's' : ''} over limit</p>
+              <div className="px-4 py-2.5 flex items-center gap-2 bg-[color-mix(in_srgb,var(--danger)_8%,transparent)]">
+                <Target className="w-3.5 h-3.5 text-[var(--danger)] shrink-0" />
+                <p className="text-[11px] font-semibold text-[var(--danger)]">{overBudget.length} budget{overBudget.length !== 1 ? 's' : ''} over limit</p>
               </div>
             )}
           </div>

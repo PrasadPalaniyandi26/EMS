@@ -52,7 +52,7 @@ export function DataTableFacetedFilter<TData, TValue>({
                 {selectedValues.size > 2 ? (
                   <Badge
                     variant="secondary"
-                    className="rounded-sm px-1 font-normal text-[10px]"
+                    className="rounded-sm px-1 font-normal text-[11px]"
                     style={{ background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)', opacity: 0.85 }}
                   >
                     {selectedValues.size} selected
@@ -64,7 +64,7 @@ export function DataTableFacetedFilter<TData, TValue>({
                       <Badge
                         variant="secondary"
                         key={option.value}
-                        className="rounded-sm px-1 font-normal text-[10px]"
+                        className="rounded-sm px-1 font-normal text-[11px]"
                         style={{ background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)', opacity: 0.85 }}
                       >
                         {option.label}
@@ -77,7 +77,7 @@ export function DataTableFacetedFilter<TData, TValue>({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-[200px]">
-        <DropdownMenuLabel className="text-[10px] uppercase font-bold text-muted-foreground">{title}</DropdownMenuLabel>
+        <DropdownMenuLabel className="text-[11px] uppercase font-bold text-muted-foreground">{title}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {options.map((option) => {
           const isSelected = selectedValues.has(option.value)

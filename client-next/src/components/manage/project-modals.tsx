@@ -9,22 +9,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Plus, Pencil, PlusCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { ModuleModal } from '@/components/shared/module/module-modal';
-import { CurrencyInput } from '@/components/shared/modal-primitives';
+import { Field, AutoLabel, CurrencyInput } from '@/components/shared/modal-primitives';
 
 // ─── Shared Styles ─────────────────────────────────────────────────────────────
 const inp = 'w-full h-10 text-sm modal-input rounded-lg';
 const sel = 'w-full h-10 text-sm modal-input rounded-lg';
 
 // ─── Field ─────────────────────────────────────────────────────────────────────
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1">
-      <Label className="text-xs font-bold modal-label normal-case tracking-normal">{label}</Label>
-      {children}
-    </div>
-  );
-}
-
 // ─── Props ─────────────────────────────────────────────────────────────────────
 interface ProjectModalProps {
   isOpen: boolean;
@@ -104,9 +95,9 @@ export function ProjectModal({
       icon={editing ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
       onSave={handleSubmit}
       saveLabel={editing ? 'Save Changes' : 'Create Project'}
-      maxWidth="sm:max-w-[860px]"
+      size="lg"
     >
-      <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
 
         {/* LEFT column: name / client / type */}
         <div className="space-y-2.5">
@@ -125,7 +116,7 @@ export function ProjectModal({
           </Field>
 
           <div className="space-y-1">
-            <Label className="text-xs font-bold modal-label normal-case tracking-normal">Project Type *</Label>
+            <AutoLabel className="text-xs font-bold modal-label normal-case tracking-normal">Project Type *</AutoLabel>
             <Select value={form.type_id} onValueChange={(v) => set('type_id', v)}>
               <SelectTrigger className={sel}><SelectValue placeholder="Select type" /></SelectTrigger>
               <SelectContent>
@@ -135,7 +126,7 @@ export function ProjectModal({
             <button
               type="button"
               onClick={() => { setShowNewType(!showNewType); setNewTypeName(''); }}
-              className="flex items-center gap-1.5 text-[9px] font-bold text-[var(--shell-accent)] hover:underline mt-1"
+              className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--shell-accent)] hover:underline mt-1"
             >
               <PlusCircle className="w-3 h-3" /> {showNewType ? 'CANCEL' : 'CREATE NEW TYPE'}
             </button>
@@ -149,7 +140,7 @@ export function ProjectModal({
                   onKeyDown={(e) => e.key === 'Enter' && handleAddType()}
                 />
                 <Button type="button" onClick={handleAddType}
-                  className="h-10 px-3 btn-action-primary rounded-lg text-[10px] font-bold uppercase tracking-widest border border-[var(--shell-border)]">
+                  className="h-10 px-3 btn-action-primary rounded-lg text-[11px] font-bold uppercase tracking-widest border border-[var(--shell-border)]">
                   Add
                 </Button>
               </div>
@@ -189,7 +180,7 @@ export function ProjectModal({
             <CurrencyInput value={form.budget} onChange={(v) => set('budget', v)} />
           </Field>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Start Date">
               <Input className={inp} type="date" value={form.start_date} onChange={(e) => set('start_date', e.target.value)} />
             </Field>
@@ -201,21 +192,21 @@ export function ProjectModal({
         </div>
 
         {/* Full-width: status + description */}
-        <div className="col-span-2">
-          <Label className="text-xs font-bold modal-label normal-case tracking-normal block mb-2">Project Status</Label>
-          <div className="flex p-1 modal-toggle-track rounded-xl gap-1">
+        <div className="sm:col-span-2">
+          <p id="project-status-label" className="mb-2 block text-xs font-semibold" style={{ color: "var(--shell-text-muted)" }}>Project Status</p>
+          <div role="radiogroup" aria-labelledby="project-status-label" className="flex p-1 modal-toggle-track rounded-xl gap-1">
             {([
-              { val: 'Active',    active: 'text-emerald-500 border border-emerald-500 shadow-sm' },
+              { val: 'Active',    active: 'text-[var(--success)] border border-[var(--success)] shadow-sm' },
               { val: 'Proposed',  active: 'text-[var(--shell-text)] border border-[var(--shell-border)] shadow-sm' },
-              { val: 'On-Hold',   active: 'text-amber-500 border border-amber-400 shadow-sm' },
-              { val: 'Completed', active: 'text-blue-400 border border-blue-400 shadow-sm' },
-              { val: 'Canceled',  active: 'text-rose-400 border border-rose-400 shadow-sm' },
+              { val: 'On-Hold',   active: 'text-[var(--warning)] border border-[var(--warning)] shadow-sm' },
+              { val: 'Completed', active: 'text-[var(--info)] border border-[var(--info)] shadow-sm' },
+              { val: 'Canceled',  active: 'text-[var(--danger)] border border-[var(--danger)] shadow-sm' },
             ]).map(({ val, active }) => (
               <button
                 key={val}
-                type="button"
+                type="button" role="radio" aria-checked={form.status === val}
                 onClick={() => set('status', val)}
-                className={`flex-1 py-1.5 text-center text-[9px] font-bold uppercase tracking-wider rounded-md transition-all ${
+                className={`flex-1 py-1.5 text-center text-[11px] font-bold uppercase tracking-wider rounded-md transition-all ${
                   form.status === val ? active : 'text-[var(--shell-text-muted)] border border-transparent hover:text-[var(--shell-text)]'
                 }`}
               >
@@ -225,10 +216,10 @@ export function ProjectModal({
           </div>
         </div>
 
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <Field label="Description">
             <Textarea
-              className="w-full text-sm modal-input border-[var(--shell-border)] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[var(--shell-accent)]/50 focus:border-indigo-500 rounded-lg resize-none min-h-[72px]"
+              className="w-full text-sm modal-input border-[var(--shell-border)] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[var(--shell-accent)]/50 focus:border-[var(--info)] rounded-lg resize-none min-h-[72px]"
               placeholder="Detailed scope of work and milestones..."
               value={form.description}
               onChange={(e) => set('description', e.target.value)}

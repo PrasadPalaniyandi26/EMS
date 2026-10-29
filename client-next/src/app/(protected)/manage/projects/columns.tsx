@@ -9,7 +9,7 @@ export const columns: ColumnDef<Project>[] = [
     accessorKey: "code",
     header: "Project ID",
     cell: ({ row }) => (
-      <span className="font-mono text-[12px] text-blue-400 font-bold">
+      <span className="font-mono text-[12px] text-[var(--info)] font-bold">
         {row.getValue("code") || `PRJ-${String(row.original.id).padStart(3, '0')}`}
       </span>
     ),
@@ -27,7 +27,7 @@ export const columns: ColumnDef<Project>[] = [
     accessorKey: "type_name",
     header: "Type",
     cell: ({ row }) => (
-      <span className="text-[12px] text-blue-600 dark:text-blue-300 font-medium">
+      <span className="text-[12px] text-[var(--info)] font-medium">
         {row.getValue("type_name") || <span className="text-black/30 dark:text-white/35">—</span>}
       </span>
     ),
@@ -36,12 +36,13 @@ export const columns: ColumnDef<Project>[] = [
     accessorKey: "lead",
     header: "Lead",
     cell: ({ row }) => {
-      const lead = (row.original as any).lead || "Sarah Jenkins";
+      const lead = (row.original as any).lead;
+      if (!lead) return <span className="text-black/30 dark:text-white/35">—</span>;
       const leadParts = lead.trim().split(/\s+/);
       const leadInitials = leadParts.length >= 2 ? (leadParts[0][0] + leadParts[leadParts.length - 1][0]).toUpperCase() : leadParts[0].slice(0, 2).toUpperCase();
       return (
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-[var(--shell-hover)] flex items-center justify-center text-[10px] font-black text-[var(--shell-accent)] uppercase border border-[var(--shell-border)] shrink-0">
+          <div className="w-6 h-6 rounded-full bg-[var(--shell-hover)] flex items-center justify-center text-[11px] font-black text-[var(--shell-text)] uppercase border border-[var(--shell-border)] shrink-0">
             {leadInitials}
           </div>
           <span className="text-[12px] font-semibold text-black/70 dark:text-white/80">{lead}</span>
@@ -55,11 +56,11 @@ export const columns: ColumnDef<Project>[] = [
     cell: ({ row }) => {
       const status = (row.original as any).status || "Active";
       const statusColor: Record<string, string> = {
-        'Active':    'text-emerald-500',
+        'Active':    'text-[var(--success)]',
         'Proposed':  'text-black/40 dark:text-white/50',
-        'On-Hold':   'text-amber-400',
-        'Completed': 'text-blue-400',
-        'Canceled':  'text-rose-400',
+        'On-Hold':   'text-[var(--warning)]',
+        'Completed': 'text-[var(--info)]',
+        'Canceled':  'text-[var(--danger)]',
       };
       return (
         <span className={`text-[12px] font-semibold ${statusColor[status] || 'text-black/40 dark:text-white/50'}`}>

@@ -15,10 +15,10 @@ import {
   getFilteredRowModel, 
   getPaginationRowModel, 
   getSortedRowModel, 
-  useReactTable,
   getFacetedRowModel,
   getFacetedUniqueValues,
 } from "@tanstack/react-table";
+import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { useConfirm } from '@/components/shared/modal-primitives';
@@ -42,7 +42,7 @@ export default function ClientsPage() {
   
   useEffect(() => { setHeader('Clients', 'Customer Relationship & Contract Management'); }, [setHeader]);
 
-  const table = useReactTable<Client>({
+  const table = useDataTable<Client>({
     data: clients || [],
     columns,
     state: {
@@ -142,13 +142,13 @@ export default function ClientsPage() {
           actions={
             <>
               <button className="btn-action" onClick={openAdd}>
-                <Plus className="h-4 w-4 text-green-600" /> Add
+                <Plus className="h-4 w-4 text-[var(--success)]" /> Add
               </button>
               <button className="btn-action" disabled={selectedRows.length !== 1} onClick={openEdit}>
-                <Pencil className="h-4 w-4 text-blue-500" /> Edit
+                <Pencil className="h-4 w-4 text-[var(--info)]" /> Edit
               </button>
               <button className="btn-action" disabled={selectedRows.length === 0} onClick={handleDelete}>
-                <Trash2 className="h-4 w-4 text-rose-500" /> Delete
+                <Trash2 className="h-4 w-4 text-[var(--danger)]" /> Delete
               </button>
             </>
           }
@@ -164,7 +164,7 @@ export default function ClientsPage() {
             <div className="space-y-2.5">
               {/* Avatar + Name */}
               <div className="flex items-center gap-4 pb-4 border-b border-[var(--shell-border)]">
-                <div className="w-14 h-14 bg-[var(--shell-accent)] rounded-xl flex items-center justify-center text-lg font-bold text-white shadow-md shrink-0">
+                <div className="w-14 h-14 bg-[var(--shell-accent)] rounded-xl flex items-center justify-center text-lg font-bold text-[var(--shell-accent-fg)] shadow-md shrink-0">
                   {selectedClient.name.substring(0, 2).toUpperCase()}
                 </div>
                 <div className="min-w-0">
@@ -175,7 +175,7 @@ export default function ClientsPage() {
                   <div className="mt-1.5 flex items-center gap-1.5">
                     {(() => { const active = (selectedClient.is_active as any) === 1 || (selectedClient.is_active as any) === true; return <>
                       <span className={`w-2 h-2 rounded-full ${active ? 'bg-[var(--shell-accent)]' : 'bg-[var(--shell-hover)]'}`} />
-                      <span className={`text-[10px] font-bold uppercase ${active ? 'text-indigo-600' : 'text-[var(--shell-text-muted)]'}`}>
+                      <span className={`text-[11px] font-bold uppercase ${active ? 'text-[var(--info)]' : 'text-[var(--shell-text-muted)]'}`}>
                         {active ? 'Active' : 'Inactive'}
                       </span>
                     </>; })()}
@@ -186,11 +186,11 @@ export default function ClientsPage() {
               {/* Contact */}
               {(selectedClient.contact_name || selectedClient.contact_email || selectedClient.contact_phone) && (
                 <div className="bg-[var(--shell-hover)] p-3 rounded-xl border border-[var(--shell-border)] space-y-2">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-[var(--shell-text-muted)] mb-2">Contact</p>
+                  <p className="text-[11px] font-black uppercase tracking-widest text-[var(--shell-text-muted)] mb-2">Contact</p>
                   {selectedClient.contact_name && (
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 bg-[var(--shell-hover)] rounded flex items-center justify-center shrink-0">
-                        <span className="text-[8px] font-bold text-[var(--shell-text-muted)]">N</span>
+                        <span className="text-[11px] font-bold text-[var(--shell-text-muted)]">N</span>
                       </div>
                       <span className="text-[11px] font-semibold text-[var(--shell-text-muted)]">{selectedClient.contact_name}</span>
                     </div>
@@ -213,7 +213,7 @@ export default function ClientsPage() {
               {/* Address */}
               {((selectedClient as any).country || selectedClient.address) && (
                 <div className="bg-[var(--shell-hover)] p-3 rounded-xl border border-[var(--shell-border)] space-y-2">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-[var(--shell-text-muted)] mb-2">Location</p>
+                  <p className="text-[11px] font-black uppercase tracking-widest text-[var(--shell-text-muted)] mb-2">Location</p>
                   <div className="flex items-start gap-2">
                     <MapPin className="w-3.5 h-3.5 text-[var(--shell-text-muted)] shrink-0 mt-0.5" />
                     <div className="text-[11px] text-[var(--shell-text-muted)] space-y-0.5">
@@ -229,7 +229,7 @@ export default function ClientsPage() {
               {/* Activity summary */}
               {activitySummary && (
                 <div className="bg-[var(--shell-hover)] p-3 rounded-xl border border-[var(--shell-border)]">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-[var(--shell-text-muted)] mb-3">Activity</p>
+                  <p className="text-[11px] font-black uppercase tracking-widest text-[var(--shell-text-muted)] mb-3">Activity</p>
                   <div className="grid grid-cols-3 gap-2 sm:grid-cols-3">
                     {[
                       { label: 'Projects', value: activitySummary.projects },
@@ -238,7 +238,7 @@ export default function ClientsPage() {
                     ].map(({ label, value }) => (
                       <div key={label} className="text-center">
                         <p className="text-base font-bold text-black dark:text-white">{value}</p>
-                        <p className="text-[9px] text-[var(--shell-text-muted)] uppercase font-bold">{label}</p>
+                        <p className="text-[11px] text-[var(--shell-text-muted)] uppercase font-bold">{label}</p>
                       </div>
                     ))}
                   </div>

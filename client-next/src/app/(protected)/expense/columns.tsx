@@ -9,7 +9,7 @@ export const columns = (currency: string): ColumnDef<any>[] => [
     accessorKey: "reference_id",
     header: "ID",
     cell: ({ row }) => (
-      <span className="text-[12px] font-bold font-mono text-blue-400">
+      <span className="text-[12px] font-bold font-mono text-[var(--info)]">
         {row.getValue("reference_id") || `#${row.original.id}`}
       </span>
     ),
@@ -41,7 +41,7 @@ export const columns = (currency: string): ColumnDef<any>[] => [
     accessorKey: "category_name",
     header: "Category",
     cell: ({ row }) => (
-      <span className="text-[12px] text-indigo-600 dark:text-indigo-300 font-medium">
+      <span className="text-[12px] text-[var(--info)] font-medium">
         {row.getValue("category_name") || "—"}
       </span>
     ),

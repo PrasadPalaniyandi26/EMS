@@ -10,12 +10,14 @@ import {
   RefreshCw, Star, ShieldCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toLocalYMD } from '@/lib/currency';
+import { getRoleStyle } from '@/lib/roles';
 import { toast } from 'sonner';
 import { useClients, useProjects, useProducts, useProjectTypes, useProductTypes } from '@/hooks/use-queries';
 import api from '@/lib/api-client';
 import { COUNTRY_LIST } from './client-modals';
 import { ModuleModal } from '@/components/shared/module/module-modal';
-import { EmailInput, PhoneInput, CurrencyInput, isValidEmail, isValidPhone } from '@/components/shared/modal-primitives';
+import { Field, AutoLabel, EmailInput, PhoneInput, CurrencyInput, isValidEmail, isValidPhone } from '@/components/shared/modal-primitives';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -33,32 +35,17 @@ function getEmployeeId(userId?: number): string {
   return `NT${10000 + userId}`;
 }
 
-const ROLE_COLORS: Record<string, { dot: string; label: string }> = {
-  admin:    { dot: 'bg-red-500',     label: 'bg-red-100 text-red-700 border-red-200' },
-  finance:  { dot: 'bg-[var(--shell-accent)]', label: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
-  manager:  { dot: 'bg-orange-500',  label: 'bg-orange-100 text-orange-700 border-orange-200' },
-  employee: { dot: 'bg-blue-500',    label: 'bg-blue-100 text-blue-600 border-blue-200' },
-};
-
 function roleColor(name?: string) {
-  return ROLE_COLORS[(name || '').toLowerCase()] || { dot: 'bg-slate-400', label: 'bg-[var(--shell-hover)] text-[var(--shell-text-muted)] border-[var(--shell-border)]' };
+  const s = getRoleStyle(name);
+  return { dot: s.dot, label: s.badge };
 }
 
 // ─── Section Header ───────────────────────────────────────────────────────────
 function SectionHeader({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-2 mb-3">
-      <span className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--shell-text-muted)]">{label}</span>
+      <span className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--shell-text-muted)]">{label}</span>
       <div className="h-[1px] flex-1" style={{ background: 'var(--shell-border)' }} />
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1">
-      <Label className="text-xs font-medium modal-label normal-case tracking-normal">{label}</Label>
-      {children}
     </div>
   );
 }
@@ -145,7 +132,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
         login_name: '', password: '',
         house_apt: '', address: '', city: '', country: '', postal_code: '',
         reporting_manager_id: '', department: '', clearance_level: 'Level 1',
-        joining_date: new Date().toISOString().split('T')[0], status: 'ACTIVE',
+        joining_date: toLocalYMD(), status: 'ACTIVE',
       });
       setSelectedRoles(employeeRole ? [{ roleId: employeeRole.role_id, isDefault: true }] : []);
     }
@@ -189,22 +176,22 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
       icon={editing ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
       onSave={handleSubmit}
       saveLabel={editing ? 'Save Changes' : 'Add User'}
-      maxWidth="sm:max-w-[1100px]"
+      size="xl"
     >
       <div className="space-y-2.5">
         {/* Employee ID badge for edit mode */}
         {editing && (
           <div className="flex items-center gap-3 modal-toggle-track rounded-lg px-4 py-2">
-            <span className="text-[9px] font-black uppercase tracking-widest text-[var(--shell-text-muted)]">Employee ID</span>
-            <span className="font-mono text-[13px] font-black text-blue-600 dark:text-blue-400">{getEmployeeId(editing.id)}</span>
-            <span className="ml-auto px-2 py-0.5 rounded text-[9px] font-black uppercase border border-[var(--shell-border)] text-[var(--shell-text)]">
+            <span className="text-[11px] font-black uppercase tracking-widest text-[var(--shell-text-muted)]">Employee ID</span>
+            <span className="font-mono text-[13px] font-black text-[var(--info)]">{getEmployeeId(editing.id)}</span>
+            <span className="ml-auto px-2 py-0.5 rounded text-[11px] font-black uppercase border border-[var(--shell-border)] text-[var(--shell-text)]">
               {editing.role_name || 'Staff'}
             </span>
           </div>
         )}
 
         {/* 3-COLUMN LAYOUT */}
-        <div className="grid grid-cols-3 gap-x-6 gap-y-3 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-3 items-start">
 
           {/* COL 1 — Personal & Contact */}
           <div className="space-y-2.5">
@@ -265,7 +252,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
           {/* COL 2 — Employment & Access */}
           <div className="space-y-2.5">
             <div className="space-y-1">
-              <Label className="text-xs font-medium modal-label normal-case tracking-normal">Department</Label>
+              <AutoLabel className="text-xs font-medium modal-label normal-case tracking-normal">Department</AutoLabel>
               <Select value={form.department} onValueChange={(v) => set('department', v)}>
                 <SelectTrigger className={INP}>
                   <SelectValue placeholder="Select Department" />
@@ -276,7 +263,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
                   ))}
                 </SelectContent>
               </Select>
-              <button type="button" onClick={() => setShowNewDeptForm(!showNewDeptForm)} className="flex items-center gap-1.5 text-[9px] font-bold text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] mt-1">
+              <button type="button" onClick={() => setShowNewDeptForm(!showNewDeptForm)} className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] mt-1">
                 <PlusCircle className="w-3 h-3" /> CREATE NEW DEPARTMENT
               </button>
               {showNewDeptForm && (
@@ -286,8 +273,8 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
               )}
             </div>
             <div className="space-y-1">
-              <Label className="text-xs font-medium modal-label normal-case tracking-normal">Roles Assigned</Label>
-              <div className="border border-[var(--shell-border)] rounded-lg overflow-hidden divide-y" style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)' }}>
+              <p id="user-roles-label" className="text-xs font-semibold" style={{ color: "var(--shell-text-muted)" }}>Roles Assigned</p>
+              <div role="group" aria-labelledby="user-roles-label" className="border border-[var(--shell-border)] rounded-lg overflow-hidden divide-y" style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)' }}>
                 {roles.map((r) => {
                   const isChecked = selectedRoles.some((s) => s.roleId === r.role_id);
                   const isDefault = selectedRoles.find((s) => s.roleId === r.role_id)?.isDefault ?? false;
@@ -303,7 +290,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
                       </span>
                       {isChecked && (
                         <button type="button" onClick={() => setDefaultRole(r.role_id)} className="ml-2 transition-colors">
-                          <Star className={cn('w-3 h-3', isDefault ? 'fill-amber-400 text-amber-400' : 'text-[var(--shell-text-muted)] hover:text-amber-300')} />
+                          <Star className={cn('w-3 h-3', isDefault ? 'fill-[var(--warning)] text-[var(--warning)]' : 'text-[var(--shell-text-muted)] hover:text-[var(--warning)]')} />
                         </button>
                       )}
                     </div>
@@ -311,8 +298,8 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
                 })}
               </div>
               {defaultRoleName && (
-                <p className="text-[9px] text-[var(--shell-text-muted)] pt-0.5">
-                  <span className="text-[var(--shell-accent)] font-bold">{defaultRoleName}</span> is the default active role <span className="text-amber-400">★</span>
+                <p className="text-[11px] text-[var(--shell-text-muted)] pt-0.5">
+                  <span className="text-[var(--shell-accent)] font-bold">{defaultRoleName}</span> is the default active role <span className="text-[var(--warning)]">★</span>
                 </p>
               )}
             </div>
@@ -362,15 +349,15 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
             </Field>
             {/* Status segmented */}
             <div className="space-y-1 pt-1">
-              <Label className="text-xs font-medium modal-label normal-case tracking-normal">Status</Label>
-              <div className="flex p-1 modal-toggle-track rounded-xl gap-1">
+              <p id="user-status-label" className="text-xs font-semibold" style={{ color: "var(--shell-text-muted)" }}>Status</p>
+              <div role="radiogroup" aria-labelledby="user-status-label" className="flex p-1 modal-toggle-track rounded-xl gap-1">
                 {([
-                  { s: 'ACTIVE',   active: 'text-emerald-500 border border-emerald-500 shadow-sm' },
-                  { s: 'On Hold',  active: 'text-amber-500 border border-amber-400 shadow-sm' },
-                  { s: 'Inactive', active: 'text-rose-400 border border-rose-400 shadow-sm' },
+                  { s: 'ACTIVE',   active: 'text-[var(--success)] border border-[var(--success)] shadow-sm' },
+                  { s: 'On Hold',  active: 'text-[var(--warning)] border border-[var(--warning)] shadow-sm' },
+                  { s: 'Inactive', active: 'text-[var(--danger)] border border-[var(--danger)] shadow-sm' },
                 ] as const).map(({ s, active: activeClass }) => (
-                  <button key={s} type="button" onClick={() => set('status', s)}
-                    className={cn('flex-1 py-1.5 text-center text-[9px] font-bold uppercase tracking-wider rounded-md transition-all',
+                  <button key={s} type="button" role="radio" aria-checked={form.status === s} onClick={() => set("status", s)}
+                    className={cn('flex-1 py-1.5 text-center text-[11px] font-bold uppercase tracking-wider rounded-md transition-all',
                       form.status === s ? activeClass : 'text-[var(--shell-text-muted)] border border-transparent hover:text-[var(--shell-text)]')}
                   >
                     {s}
@@ -481,7 +468,7 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
       onClose={onClose}
       title={`Resource Allocation — ${user?.username || ''}`}
       icon={<Pencil className="w-4 h-4" />}
-      maxWidth="sm:max-w-[900px]"
+      size="lg"
       footer={
         <Button variant="ghost" onClick={onClose} className="h-8 px-4 text-[11.5px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>Close</Button>
       }
@@ -490,7 +477,7 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
         {/* Add form — 4 equal-width fields in one row, no section box */}
         <div className="grid grid-cols-4 gap-2">
           <div className="space-y-1">
-            <Label className="text-xs font-medium modal-label normal-case tracking-normal">Client</Label>
+            <AutoLabel className="text-xs font-medium modal-label normal-case tracking-normal">Client</AutoLabel>
             <Select value={form.client_id} onValueChange={(v) => setF('client_id', v)}>
               <SelectTrigger className={INP2}>
                 <SelectValue placeholder="Select client" />
@@ -501,7 +488,7 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
             </Select>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs font-medium modal-label normal-case tracking-normal">Category</Label>
+            <AutoLabel className="text-xs font-medium modal-label normal-case tracking-normal">Category</AutoLabel>
             <Select value={form.category} onValueChange={(v) => setF('category', v)}>
               <SelectTrigger className={INP2}>
                 <SelectValue />
@@ -513,7 +500,7 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
             </Select>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs font-medium modal-label normal-case tracking-normal">Type</Label>
+            <AutoLabel className="text-xs font-medium modal-label normal-case tracking-normal">Type</AutoLabel>
             <Select value={form.type_id} onValueChange={(v) => setF('type_id', v)} disabled={typeOptions.length === 0}>
               <SelectTrigger className={INP2}>
                 <SelectValue placeholder={!form.client_id ? 'Select client first' : typeOptions.length === 0 ? 'No types available' : 'Select type'} />
@@ -524,7 +511,7 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
             </Select>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs font-medium modal-label normal-case tracking-normal">{form.category} Code</Label>
+            <AutoLabel className="text-xs font-medium modal-label normal-case tracking-normal">{form.category} Code</AutoLabel>
             <Select value={form.code} onValueChange={(v) => setF('code', v)} disabled={codeOptions.length === 0}>
               <SelectTrigger className={INP2}>
                 <SelectValue placeholder={codeOptions.length === 0 ? 'Select type first' : 'Select code'} />
@@ -539,21 +526,21 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
         {/* Action row */}
         <div className="flex items-center justify-between">
           <div className="flex gap-2">
-            <Button className="btn-action-primary border border-[var(--shell-border)] text-[var(--shell-text)] font-bold text-[10px] uppercase h-8 px-4 rounded-lg flex items-center gap-1.5" onClick={handleAddAllocation} disabled={saving}>
+            <Button className="btn-action-primary border border-[var(--shell-border)] text-[var(--shell-text)] font-bold text-[11px] uppercase h-8 px-4 rounded-lg flex items-center gap-1.5" onClick={handleAddAllocation} disabled={saving}>
               <Plus className="w-3.5 h-3.5" /> Add Allocation
             </Button>
-            <Button variant="outline" className="border-rose-400/40 text-rose-400 hover:bg-rose-400/10 font-bold text-[10px] uppercase h-8 px-4 rounded-lg flex items-center gap-1.5" onClick={handleRemove} disabled={saving || selected.size === 0}>
+            <Button variant="outline" className="border-[color-mix(in_srgb,var(--danger)_40%,transparent)] text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] font-bold text-[11px] uppercase h-8 px-4 rounded-lg flex items-center gap-1.5" onClick={handleRemove} disabled={saving || selected.size === 0}>
               <Trash2 className="w-3.5 h-3.5" /> Remove
             </Button>
           </div>
-          <span className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest">{allocations.length} Allocation{allocations.length !== 1 ? 's' : ''}</span>
+          <span className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest">{allocations.length} Allocation{allocations.length !== 1 ? 's' : ''}</span>
         </div>
 
         {/* Table */}
         <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden shadow-sm" style={{ background: 'var(--shell-surface)' }}>
           <table className="w-full text-left">
             <thead className="dialog-header">
-              <tr className="text-[9px] font-black uppercase tracking-widest">
+              <tr className="text-[11px] font-black uppercase tracking-widest">
                 <th className="w-10 px-4 py-3 text-center">
                   <input type="checkbox" className="size-3.5 rounded border-[var(--shell-border)]" onChange={(e) => setSelected(e.target.checked ? new Set(allocations.map((a) => a.id)) : new Set())} checked={selected.size === allocations.length && allocations.length > 0} />
                 </th>
@@ -576,7 +563,7 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
                   <td className="px-4 py-3 font-bold text-[var(--shell-text)]">{a.client_name}</td>
                   <td className="px-4 py-3 modal-label">{a.category}</td>
                   <td className="px-4 py-3 modal-label">{a.type}</td>
-                  <td className="px-4 py-3 font-mono text-blue-600 dark:text-blue-400 font-bold">{a.code}</td>
+                  <td className="px-4 py-3 font-mono text-[var(--info)] font-bold">{a.code}</td>
                 </tr>
               ))}
             </tbody>
@@ -656,7 +643,7 @@ const ROLE_TEMPLATES: Record<string, PermMap> = {
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
-  Core: 'modal-label', Finance: 'text-emerald-600 dark:text-emerald-500', Operations: 'text-blue-600 dark:text-blue-400', Governance: 'text-amber-600 dark:text-amber-400',
+  Core: 'modal-label', Finance: 'text-[var(--success)]', Operations: 'text-[var(--info)]', Governance: 'text-[var(--warning)]',
 };
 
 export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; onClose: () => void; user: any }) {
@@ -734,9 +721,9 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
       icon={<ShieldCheck className="w-4 h-4" />}
       onSave={handleSave}
       saveLabel={saving ? 'Saving...' : 'Save Permissions'}
-      maxWidth="sm:max-w-[1100px]"
+      size="xl"
       footerLeft={
-        <div className="flex items-center gap-2 text-[var(--shell-text-muted)] text-[10px] font-bold italic">
+        <div className="flex items-center gap-2 text-[var(--shell-text-muted)] text-[11px] font-bold italic">
           <ShieldCheck className="w-3.5 h-3.5" />
           Audit log entry will be created on save.
         </div>
@@ -747,13 +734,13 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
         <div className="flex-1 min-w-0">
           {/* Role template selector */}
           <div className="flex items-center gap-3 mb-4 pb-4 border-b border-[var(--shell-border)]">
-            <span className="text-[9px] font-black text-[var(--shell-text-muted)] uppercase tracking-widest shrink-0">Apply Template:</span>
+            <span className="text-[11px] font-black text-[var(--shell-text-muted)] uppercase tracking-widest shrink-0">Apply Template:</span>
             <div className="flex gap-2 flex-wrap">
               {Object.keys(ROLE_TEMPLATES).map((t) => {
                 const c = roleColor(t);
                 return (
                   <button key={t} onClick={() => applyTemplate(t)}
-                    className={cn('px-3 py-1 rounded-lg text-[10px] font-black uppercase border transition-all', template === t ? 'modal-input border-[var(--shell-border)] text-[var(--shell-text)] shadow-sm' : 'text-[var(--shell-text-muted)] border-[var(--shell-border)] hover:text-[var(--shell-text)]')}
+                    className={cn('px-3 py-1 rounded-lg text-[11px] font-black uppercase border transition-all', template === t ? 'modal-input border-[var(--shell-border)] text-[var(--shell-text)] shadow-sm' : 'text-[var(--shell-text-muted)] border-[var(--shell-border)] hover:text-[var(--shell-text)]')}
                     style={template !== t ? { background: 'var(--shell-bg)' } : {}}
                   >
                     <span className={cn('inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle', c.dot)} />
@@ -768,7 +755,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
           <div className="overflow-x-auto rounded-xl">
           <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden shadow-sm min-w-[480px]" style={{ background: 'var(--shell-surface)' }}>
             {/* Column header */}
-            <div className="dialog-header flex items-center text-[9px] font-black uppercase tracking-widest">
+            <div className="dialog-header flex items-center text-[11px] font-black uppercase tracking-widest">
               <div className="flex-1 px-4 py-3">Module</div>
               {PERMISSIONS.map((p) => (
                 <div key={p} className="w-[70px] py-3 text-center shrink-0">{p}</div>
@@ -780,7 +767,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
               <div key={group.label} className={gi > 0 ? 'border-t border-[var(--shell-border)]' : ''}>
                 {/* Group label */}
                 <div className="px-4 py-1.5 flex items-center gap-2" style={{ background: 'var(--shell-hover)' }}>
-                  <span className="text-[9px] font-black uppercase tracking-[0.2em]" style={{ color: '#C9A84C' }}>
+                  <span className="text-[11px] font-black uppercase tracking-[0.2em]" style={{ color: '#C9A84C' }}>
                     {group.label}
                   </span>
                   <div className="h-px flex-1" style={{ background: 'var(--shell-border)' }} />
@@ -815,7 +802,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
                         <div
                           onClick={() => toggleAllModule(modName)}
                           className={cn('w-4 h-4 rounded border-2 flex items-center justify-center cursor-pointer transition-all',
-                            allOn ? 'bg-amber-400 border-amber-400' : 'border-[var(--shell-border)] hover:border-amber-400/50')}
+                            allOn ? 'bg-[var(--warning)] border-[var(--warning)]' : 'border-[var(--shell-border)] hover:border-[color-mix(in_srgb,var(--warning)_50%,transparent)]')}
                           style={!allOn ? { background: 'var(--shell-bg)' } : {}}
                         >
                           {allOn && <Check className="w-2.5 h-2.5 text-white" />}
@@ -835,15 +822,15 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
           {/* Approval Thresholds */}
           <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden shadow-sm" style={{ background: 'var(--shell-surface)' }}>
             <div className="dialog-header px-4 py-2.5">
-              <span className="text-[9px] font-black uppercase tracking-widest">Approval Limits</span>
+              <span className="text-[11px] font-black uppercase tracking-widest">Approval Limits</span>
             </div>
             <div className="p-4 space-y-2.5">
               <div className="space-y-1">
-                <Label className="text-xs font-medium modal-label uppercase">Single Transaction</Label>
+                <AutoLabel className="text-xs font-medium modal-label uppercase">Single Transaction</AutoLabel>
                 <CurrencyInput value={thresholds.single} onChange={(v) => setThresholds((p) => ({ ...p, single: v }))} className={INP3} />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs font-medium modal-label uppercase">Monthly Ceiling</Label>
+                <AutoLabel className="text-xs font-medium modal-label uppercase">Monthly Ceiling</AutoLabel>
                 <CurrencyInput value={thresholds.monthly} onChange={(v) => setThresholds((p) => ({ ...p, monthly: v }))} className={INP3} />
               </div>
             </div>
@@ -852,20 +839,20 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
           {/* Data Scope */}
           <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden shadow-sm" style={{ background: 'var(--shell-surface)' }}>
             <div className="dialog-header px-4 py-2.5">
-              <span className="text-[9px] font-black uppercase tracking-widest">Data Visibility</span>
+              <span className="text-[11px] font-black uppercase tracking-widest">Data Visibility</span>
             </div>
             <div className="p-3 space-y-2">
               {['Own Records', 'Department', 'Global'].map((s) => (
                 <button key={s} onClick={() => setScope(s)}
                   className={cn('w-full text-left px-3 py-2 rounded-lg text-[11px] font-bold transition-all flex items-center gap-2',
-                    scope === s ? 'bg-[var(--shell-accent)] text-white' : 'text-[var(--shell-text-muted)] hover:text-[var(--shell-text)]')}
+                    scope === s ? 'bg-[var(--shell-accent)] text-[var(--shell-accent-fg)]' : 'text-[var(--shell-text-muted)] hover:text-[var(--shell-text)]')}
                   style={scope !== s ? { background: 'var(--shell-bg)' } : {}}
                 >
                   <div className={cn('w-2 h-2 rounded-full shrink-0', scope === s ? 'bg-white' : 'bg-[var(--shell-border)]')} />
                   {s}
                 </button>
               ))}
-              <p className="text-[9px] text-[var(--shell-text-muted)] font-bold leading-relaxed pt-1 italic">
+              <p className="text-[11px] text-[var(--shell-text-muted)] font-bold leading-relaxed pt-1 italic">
                 {scope === 'Own Records' && 'User sees only their own transactions and records.'}
                 {scope === 'Department' && 'Access limited to their department branch.'}
                 {scope === 'Global' && 'Full access across all departments and records.'}
@@ -876,7 +863,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
           {/* Summary */}
           <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden shadow-sm" style={{ background: 'var(--shell-surface)' }}>
             <div className="dialog-header px-4 py-2.5">
-              <span className="text-[9px] font-black uppercase tracking-widest">Summary</span>
+              <span className="text-[11px] font-black uppercase tracking-widest">Summary</span>
             </div>
             <div className="p-4 space-y-2">
               {PERMISSIONS.map((p, i) => {
@@ -886,7 +873,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
                   <div key={p}>
                     <div className="flex items-center justify-between mb-0.5">
                       <span className="text-xs font-medium text-[var(--shell-text-muted)] uppercase">{p}</span>
-                      <span className="text-[9px] font-black text-[var(--shell-accent)]">{count}/{MODULES.length}</span>
+                      <span className="text-[11px] font-black text-[var(--shell-accent)]">{count}/{MODULES.length}</span>
                     </div>
                     <div className="w-full h-1 modal-toggle-track rounded-full overflow-hidden">
                       <div className="h-full bg-[var(--shell-accent)] rounded-full transition-all duration-300" style={{ width: `${pct}%` }} />

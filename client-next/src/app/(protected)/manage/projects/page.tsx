@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import {
   Plus, Pencil, Trash2,
-  Target, CircleDollarSign, ArrowUpRight
+  Target, ArrowUpRight
 } from 'lucide-react';
 import { ProjectModal } from '@/components/manage/project-modals';
 import type { Project } from '@/lib/types';
@@ -21,10 +21,10 @@ import {
   getFilteredRowModel, 
   getPaginationRowModel, 
   getSortedRowModel, 
-  useReactTable,
   getFacetedRowModel,
   getFacetedUniqueValues,
 } from "@tanstack/react-table";
+import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 
@@ -49,7 +49,7 @@ export default function ProjectsPage() {
     setHeader('Projects', 'Operations Hub • Managed Portfolios'); 
   }, [setHeader]);
 
-  const table = useReactTable<Project>({
+  const table = useDataTable<Project>({
     data: projects || [],
     columns,
     state: {
@@ -122,17 +122,17 @@ export default function ProjectsPage() {
           actions={
             <>
               <button className="btn-action" onClick={() => { setEditingProject(null); setIsModalOpen(true); }}>
-                <Plus className="h-4 w-4 text-green-600" /> Add
+                <Plus className="h-4 w-4 text-[var(--success)]" /> Add
               </button>
               <button
                 className="btn-action"
                 disabled={selectedRows.length !== 1}
                 onClick={() => { const p = selectedRows[0].original; setEditingProject(p); setIsModalOpen(true); }}
               >
-                <Pencil className="h-4 w-4 text-blue-500" /> Edit
+                <Pencil className="h-4 w-4 text-[var(--info)]" /> Edit
               </button>
               <button className="btn-action" disabled={selectedRows.length === 0} onClick={() => setDeleteId(selectedRows[0].original.id)}>
-                <Trash2 className="h-4 w-4 text-rose-500" /> Delete
+                <Trash2 className="h-4 w-4 text-[var(--danger)]" /> Delete
               </button>
             </>
           }
@@ -149,77 +149,18 @@ export default function ProjectsPage() {
                <div className="flex items-center justify-between">
                  <div>
                    <h4 className="font-extrabold text-[15px] text-black dark:text-white leading-tight">{selectedProject.name}</h4>
-                   <p className="text-[10px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest mt-0.5">{selectedProject.code || 'Code Pending'}</p>
+                   <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest mt-0.5">{selectedProject.code || 'Code Pending'}</p>
                  </div>
-                 <span className="p-2 bg-[var(--shell-accent)]/20 rounded text-emerald-500">
+                 <span className="p-2 bg-[var(--shell-accent)]/20 rounded text-[var(--success)]">
                    <Target className="h-5 w-5" />
                  </span>
                </div>
-               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                 <div className="p-3 bg-[var(--shell-hover)] rounded-lg border border-[var(--shell-border)]">
-                   <p className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase mb-1">Health Score</p>
-                   <p className="text-sm font-black text-emerald-500">Optimal</p>
-                 </div>
-                 <div className="p-3 bg-[var(--shell-hover)] rounded-lg border border-[var(--shell-border)]">
-                   <p className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase mb-1">Retention</p>
-                   <p className="text-sm font-black text-[var(--shell-accent)]">94%</p>
-                 </div>
-               </div>
-            </div>
-
-            <div className="bg-[var(--shell-hover)] border border-[var(--shell-border)] rounded-xl p-4 space-y-2.5">
-              <h4 className="text-[11px] font-bold text-black dark:text-white uppercase tracking-wider flex items-center gap-2">
-                <CircleDollarSign className="h-4 w-4 text-[var(--shell-text-muted)]" /> Performance Metrics
-              </h4>
-              <div className="space-y-2.5">
-                <div>
-                  <div className="flex justify-between text-[10px] font-bold mb-1.5 uppercase tracking-wider">
-                    <span className="text-[var(--shell-text-muted)]">Budget Utilization</span>
-                    <span className="text-[var(--shell-accent)]">28.4%</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-[var(--shell-hover)] rounded-full overflow-hidden">
-                    <div className="w-[28%] h-full bg-[var(--shell-accent)] rounded-full"></div>
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-[10px] font-bold mb-1.5 uppercase tracking-wider">
-                    <span className="text-[var(--shell-text-muted)]">Timeline Progress</span>
-                    <span className="text-[var(--shell-accent)]">45.0%</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-[var(--shell-hover)] rounded-full overflow-hidden">
-                    <div className="w-[45%] h-full bg-[var(--shell-accent)]/60 rounded-full"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-[var(--shell-hover)] border border-[var(--shell-border)] rounded-xl p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-[11px] font-bold text-black dark:text-white uppercase tracking-wider">Burn Rate Trends</h4>
-                <p className="text-[9px] font-bold text-emerald-500 uppercase">+12% Monthly</p>
-              </div>
-              <div className="h-24 w-full flex items-end justify-between px-1 gap-1">
-                {[25, 40, 35, 60, 45, 80, 70].map((h, i) => (
-                  <div
-                    key={i}
-                    style={{ height: `${h}%` }}
-                    className={`w-full rounded-t-sm ${i === 5 ? 'bg-[var(--shell-accent)]' : 'bg-[var(--shell-hover)]'}`}
-                  />
-                ))}
-              </div>
-              <div className="flex justify-between mt-2 text-[8px] font-bold text-[var(--shell-text-muted)] uppercase tracking-tighter">
-                <span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span>
-              </div>
             </div>
 
             <div className="bg-[var(--shell-hover)] border border-[var(--shell-border)] rounded-xl p-4 space-y-3">
                <h4 className="text-[11px] font-bold text-black dark:text-white uppercase tracking-wider">Project Team</h4>
                <div className="space-y-2">
-                 {[
-                   { name: (selectedProject as any).lead || 'Sarah Jenkins', role: 'Project Director' },
-                   { name: 'Marcus Kane', role: 'Principal Architect' },
-                   { name: 'Elena Ruiz', role: 'Senior Analyst' }
-                 ].map((member, i) => {
+                 {((selectedProject as any).lead ? [{ name: (selectedProject as any).lead as string, role: 'Project Lead' }] : []).map((member, i) => {
                    const p = member.name.trim().split(/\s+/);
                    const ini = p.length >= 2 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : p[0].slice(0, 2).toUpperCase();
                    return (
@@ -230,14 +171,17 @@ export default function ProjectsPage() {
                        </div>
                        <div>
                          <p className="text-[11px] font-extrabold text-black dark:text-white">{member.name}</p>
-                         <p className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase tracking-tighter">{member.role}</p>
+                         <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-tighter">{member.role}</p>
                        </div>
                      </div>
                      <ArrowUpRight className="h-3.5 w-3.5 text-[var(--shell-text-muted)] opacity-0 group-hover:opacity-100 transition-opacity" />
                    </div>
                  ); })}
+                 {!(selectedProject as any).lead && (
+                   <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">No lead assigned.</p>
+                 )}
                </div>
-               <Button variant="outline" className="w-full h-8 border-dashed border-[var(--shell-border)] text-[9px] font-bold text-[var(--shell-text-muted)] hover:text-[var(--shell-text-muted)] hover:border-[var(--shell-border)] transition-colors uppercase tracking-widest mt-1">
+               <Button variant="outline" className="w-full h-8 border-dashed border-[var(--shell-border)] text-[11px] font-bold text-[var(--shell-text-muted)] hover:text-[var(--shell-text-muted)] hover:border-[var(--shell-border)] transition-colors uppercase tracking-widest mt-1">
                  + Manage Resources
                </Button>
             </div>
@@ -271,7 +215,7 @@ export default function ProjectsPage() {
             showCloseButton={false}
           >
             <div className="flex items-center justify-between p-4 border-b border-[var(--shell-border)] bg-[var(--shell-surface)]">
-              <h3 className="text-sm font-black text-rose-600 uppercase tracking-widest">Delete Project</h3>
+              <h3 className="text-sm font-black text-[var(--danger)] uppercase tracking-widest">Delete Project</h3>
             </div>
             <p className="text-xs text-[var(--shell-text-muted)] p-4">
               Are you sure you want to delete this project? This action cannot be undone.

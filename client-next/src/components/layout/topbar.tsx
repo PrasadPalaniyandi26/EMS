@@ -25,12 +25,12 @@ import { formatDistanceToNow } from 'date-fns';
 
 // ─── Notification type config ────────────────────
 const notifConfig: Record<string, { icon: React.ElementType; color: string; dot: string }> = {
-  approval: { icon: ShieldCheck,    color: 'text-emerald-500', dot: 'bg-emerald-400' },
-  warning:  { icon: AlertTriangle,  color: 'text-amber-400',   dot: 'bg-amber-400' },
-  error:    { icon: XCircle,        color: 'text-rose-400',    dot: 'bg-rose-400' },
-  info:     { icon: Info,           color: 'text-blue-400',    dot: 'bg-blue-400' },
-  system:   { icon: Info,           color: 'text-indigo-400',  dot: 'bg-indigo-400' },
-  budget:   { icon: AlertTriangle,  color: 'text-amber-400',   dot: 'bg-amber-400' },
+  approval: { icon: ShieldCheck,    color: 'text-[var(--success)]', dot: 'bg-[var(--success)]' },
+  warning:  { icon: AlertTriangle,  color: 'text-[var(--warning)]', dot: 'bg-[var(--warning)]' },
+  error:    { icon: XCircle,        color: 'text-[var(--danger)]',  dot: 'bg-[var(--danger)]' },
+  info:     { icon: Info,           color: 'text-[var(--info)]',    dot: 'bg-[var(--info)]' },
+  system:   { icon: Info,           color: 'text-nav-indigo',       dot: 'bg-nav-indigo' },
+  budget:   { icon: AlertTriangle,  color: 'text-[var(--warning)]', dot: 'bg-[var(--warning)]' },
 };
 const getNotifCfg = (type: string) => notifConfig[type] ?? notifConfig.info;
 
@@ -71,7 +71,7 @@ function BellDropdown() {
         >
           <Bell className="h-3.5 w-3.5" />
           {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] rounded-full bg-rose-500 text-white text-[8px] font-black flex items-center justify-center px-[3px] leading-none">
+            <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] rounded-full bg-[var(--danger)] text-[var(--danger-foreground)] text-[10px] font-black flex items-center justify-center px-[3px] leading-none">
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}
@@ -91,7 +91,7 @@ function BellDropdown() {
               Notifications
             </span>
             {unreadCount > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full bg-rose-500/15 text-rose-400 text-[9px] font-black">
+              <span className="px-1.5 py-0.5 rounded-full bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] text-[var(--danger)] text-[11px] font-black">
                 {unreadCount} new
               </span>
             )}
@@ -99,7 +99,7 @@ function BellDropdown() {
           {unreadCount > 0 && (
             <button
               onClick={handleMarkAllRead}
-              className="flex items-center gap-1 text-[10px] font-semibold transition-colors hover:text-[var(--shell-accent)]"
+              className="flex items-center gap-1 text-[11px] font-semibold transition-colors hover:text-[var(--shell-accent)]"
               style={{ color: 'var(--shell-text-muted)' }}
             >
               <CheckCheck className="w-3 h-3" /> Mark all read
@@ -142,7 +142,7 @@ function BellDropdown() {
                         {n.message}
                       </p>
                     )}
-                    <p className="text-[9px] font-semibold uppercase tracking-wide mt-1" style={{ color: 'var(--shell-text-muted)', opacity: 0.7 }}>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide mt-1" style={{ color: 'var(--shell-text-muted)', opacity: 0.7 }}>
                       {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
                     </p>
                   </div>
@@ -191,6 +191,7 @@ export function TopBar() {
         <button
           className="lg:hidden w-7 h-7 flex items-center justify-center rounded-lg hover:bg-[var(--shell-hover)] text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] transition-colors"
           onClick={toggleMobile}
+          aria-label="Open menu"
         >
           <Menu className="h-4 w-4" />
         </button>
@@ -211,6 +212,7 @@ export function TopBar() {
           className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]"
           style={{ color: 'var(--shell-text-muted)' }}
           onClick={toggleTheme}
+          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
           title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
         >
           {theme === 'dark' ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
@@ -225,6 +227,7 @@ export function TopBar() {
           style={{ color: 'var(--shell-text-muted)' }}
           onClick={() => router.push('/settings')}
           title="Settings"
+          aria-label="Settings"
         >
           <Settings className="h-3.5 w-3.5" />
         </button>
@@ -237,7 +240,7 @@ export function TopBar() {
             <button className="flex items-center gap-2 px-2 py-1 rounded-lg outline-none focus:outline-none focus-visible:ring-0 transition-colors hover:bg-[var(--shell-hover)]"
               style={{ color: 'var(--shell-text)' }}
             >
-              <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold"
+              <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[11px] font-bold"
                 style={{ background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' }}>
                 {(() => { const p = (user?.username || 'U').trim().split(/\s+/); return p.length >= 2 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : p[0].slice(0, 2).toUpperCase(); })()}
               </div>
@@ -245,7 +248,7 @@ export function TopBar() {
                 <p className="text-[12px] font-semibold leading-none" style={{ color: 'var(--shell-text)' }}>
                   {user?.username || 'Admin'}
                 </p>
-                <p className="text-[10px] mt-0.5" style={{ color: 'var(--shell-text-muted)' }}>
+                <p className="text-[11px] mt-0.5" style={{ color: 'var(--shell-text-muted)' }}>
                   {user?.role_name || user?.role || 'System Admin'}
                 </p>
               </div>
@@ -253,7 +256,7 @@ export function TopBar() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52 mt-1 rounded-xl shadow-xl"
             style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
-            <DropdownMenuLabel className="text-[10px] font-semibold uppercase tracking-wider px-3 py-2"
+            <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-wider px-3 py-2"
               style={{ color: 'var(--shell-text-muted)' }}>
               Account
             </DropdownMenuLabel>
@@ -301,7 +304,7 @@ export function TopBar() {
             )}
             <DropdownMenuSeparator style={{ background: 'var(--shell-border)' }} />
             <DropdownMenuItem
-              className="cursor-pointer gap-2.5 px-3 py-2 rounded-lg mx-1 mb-1 text-rose-500 hover:bg-rose-500/10 focus:bg-rose-500/10"
+              className="cursor-pointer gap-2.5 px-3 py-2 rounded-lg mx-1 mb-1 text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] focus:bg-[color-mix(in_srgb,var(--danger)_10%,transparent)]"
               onClick={() => logout()}
             >
               <LogOut className="w-3.5 h-3.5" />

@@ -14,8 +14,8 @@ import {
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
-  useReactTable,
 } from "@tanstack/react-table";
+import { useDataTable } from '@/hooks/use-data-table';
 
 import {
   Table,
@@ -52,7 +52,7 @@ export function DataTable<TData, TValue>({
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [localSelectedId, setLocalSelectedId] = React.useState<string | number | undefined>(undefined);
 
-  const internalTable = useReactTable({
+  const internalTable = useDataTable({
     data,
     columns,
     state: { sorting, columnVisibility, columnFilters },

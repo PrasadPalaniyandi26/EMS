@@ -79,6 +79,10 @@ export default function LoginPage() {
         .inr-glow     { animation: inr-glow     2.8s ease-in-out infinite; }
         .ticker-float { animation: ticker-float 4s   ease-in-out infinite; }
         .fade-up      { animation: fade-up      0.7s ease-out  both; }
+        @media (prefers-reduced-motion: reduce) {
+          .ring-pulse-1, .ring-pulse-2, .ring-spin, .inr-glow, .ticker-float, .fade-up { animation: none; }
+          .fade-up { opacity: 1; }
+        }
       `}</style>
 
       {/* ── Global ambient blobs ──────────────────────────────── */}
@@ -125,7 +129,7 @@ export default function LoginPage() {
         { t: 'Q2 FY26',        x: '6%',  y: '42%', d: '0.5s'  },
         { t: 'BUDGET ₹14.2L',  x: '8%',  y: '85%', d: '1.8s'  },
       ].map((tk) => (
-        <div key={tk.t} className="ticker-float absolute pointer-events-none select-none font-mono text-[11px] font-bold tracking-widest"
+        <div key={tk.t} aria-hidden className="ticker-float absolute pointer-events-none select-none font-mono text-[11px] font-bold tracking-widest"
           style={{ left: tk.x, top: tk.y, color: 'rgba(96,165,250,0.55)', animationDelay: tk.d }}>
           {tk.t}
         </div>
@@ -148,8 +152,8 @@ export default function LoginPage() {
             <div className="flex items-center gap-3 justify-center mb-5">
               <div className="h-px flex-1 max-w-[48px]"
                 style={{ background: 'linear-gradient(90deg, transparent, rgba(34,211,238,0.5))' }} />
-              <span className="text-[9px] tracking-[0.4em] uppercase font-semibold"
-                style={{ color: 'rgba(34,211,238,0.6)' }}>Est. 2024</span>
+              <span className="text-[11px] tracking-[0.4em] uppercase font-semibold"
+                style={{ color: "rgba(34,211,238,0.8)" }}>Est. 2024</span>
               <div className="h-px flex-1 max-w-[48px]"
                 style={{ background: 'linear-gradient(90deg, rgba(34,211,238,0.5), transparent)' }} />
             </div>
@@ -188,8 +192,8 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <p className="text-[9.5px] tracking-[0.38em] uppercase mt-3 font-semibold"
-              style={{ color: 'rgba(148,163,184,0.5)', letterSpacing: '0.38em' }}>
+            <p className="text-[11px] tracking-[0.38em] uppercase mt-3 font-semibold"
+              style={{ color: "rgba(148,163,184,0.8)", letterSpacing: '0.38em' }}>
               Expense · Management · System
             </p>
 
@@ -264,9 +268,9 @@ export default function LoginPage() {
                   background: 'rgba(34,211,238,0.04)',
                   border: '1px solid rgba(34,211,238,0.1)',
                 }}>
-                <Icon className="w-3 h-3" style={{ color: 'rgba(34,211,238,0.6)' }} />
-                <span className="text-[8px] font-bold tracking-wider uppercase" style={{ color: 'rgba(148,163,184,0.5)' }}>{label}</span>
-                <span className="text-[9px] font-semibold" style={{ color: 'rgba(34,211,238,0.55)' }}>{value}</span>
+                <Icon className="w-3 h-3" style={{ color: "rgba(34,211,238,0.8)" }} />
+                <span className="text-[11px] font-bold tracking-wider uppercase" style={{ color: "rgba(148,163,184,0.8)" }}>{label}</span>
+                <span className="text-[11px] font-semibold" style={{ color: "rgba(34,211,238,0.8)" }}>{value}</span>
               </div>
             ))}
           </div>
@@ -275,11 +279,11 @@ export default function LoginPage() {
         {/* Bottom tagline */}
         <div className="relative z-10 px-14 pb-10 text-center fade-up" style={{ animationDelay: '0.45s' }}>
           <p className="text-[13px] font-semibold tracking-wide mb-1.5"
-            style={{ color: 'rgba(226,232,240,0.3)' }}>
+            style={{ color: "rgba(226,232,240,0.65)" }}>
             Where Innovation Meets Automation
           </p>
-          <p className="text-[10.5px] leading-relaxed"
-            style={{ color: 'rgba(148,163,184,0.22)' }}>
+          <p className="text-[11px] leading-relaxed"
+            style={{ color: "rgba(148,163,184,0.65)" }}>
             Streamlined approvals · Real-time budgets · Financial intelligence
           </p>
         </div>
@@ -307,7 +311,7 @@ export default function LoginPage() {
               }}>
               NTEMS
             </span>
-            <p className="text-[9.5px] mt-2 tracking-[0.28em] uppercase" style={{ color: 'rgba(148,163,184,0.35)' }}>
+            <p className="text-[11px] mt-2 tracking-[0.28em] uppercase" style={{ color: "rgba(148,163,184,0.75)" }}>
               Expense Management System
             </p>
           </div>
@@ -336,14 +340,14 @@ export default function LoginPage() {
             {/* Status indicator */}
             <div className="absolute top-5 right-5 flex items-center gap-1.5">
               <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#22d3ee', boxShadow: '0 0 6px rgba(34,211,238,0.8)', animation: 'ring-pulse 2s ease-in-out infinite' }} />
-              <span className="text-[8px] tracking-[0.2em] uppercase font-semibold" style={{ color: 'rgba(34,211,238,0.45)' }}>Secure</span>
+              <span className="text-[11px] tracking-[0.2em] uppercase font-semibold" style={{ color: "rgba(34,211,238,0.75)" }}>Secure</span>
             </div>
 
             {/* Header */}
             <div className="mb-8">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-6 h-px" style={{ background: 'rgba(34,211,238,0.5)' }} />
-                <p className="text-[9.5px] font-bold tracking-[0.28em] uppercase"
+                <p className="text-[11px] font-bold tracking-[0.28em] uppercase"
                   style={{ color: 'rgba(34,211,238,0.75)' }}>
                   Secure Portal
                 </p>
@@ -351,16 +355,16 @@ export default function LoginPage() {
               <h2 className="text-[22px] font-bold tracking-tight" style={{ color: 'rgba(241,245,249,0.92)' }}>
                 Sign in to your workspace
               </h2>
-              <p className="text-[12px] mt-1" style={{ color: 'rgba(148,163,184,0.5)' }}>
+              <p className="text-[12px] mt-1" style={{ color: "rgba(148,163,184,0.8)" }}>
                 Use your Employee ID or username to continue
               </p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
               {error && (
-                <div className="rounded-xl px-4 py-3 text-[12.5px] font-medium flex items-center gap-2.5"
+                <div role="alert" className="rounded-xl px-4 py-3 text-[12.5px] font-medium flex items-center gap-2.5"
                   style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: 'rgb(252,165,165)' }}>
-                  <div className="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0 animate-pulse" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--danger)] shrink-0" />
                   {error}
                 </div>
               )}
@@ -368,8 +372,8 @@ export default function LoginPage() {
               {/* Employee ID */}
               <div className="space-y-2">
                 <Label htmlFor="username"
-                  className="text-[9.5px] font-bold uppercase tracking-[0.2em]"
-                  style={{ color: 'rgba(148,163,184,0.55)' }}>
+                  className="text-[11px] font-bold uppercase tracking-[0.2em]"
+                  style={{ color: "rgba(148,163,184,0.85)" }}>
                   Employee ID / User Name
                 </Label>
                 <Input
@@ -380,7 +384,7 @@ export default function LoginPage() {
                   onChange={(e) => setUsername(e.target.value)}
                   required
                   autoFocus
-                  className="h-12 text-[13.5px] rounded-xl w-full transition-all duration-200 placeholder:text-slate-700"
+                  className="h-12 text-[13.5px] rounded-xl w-full transition-all duration-200 placeholder:text-[rgba(148,163,184,0.6)]"
                   style={{
                     background: 'rgba(34,211,238,0.04)',
                     border: '1px solid rgba(34,211,238,0.15)',
@@ -403,8 +407,8 @@ export default function LoginPage() {
               {/* Password */}
               <div className="space-y-2">
                 <Label htmlFor="password"
-                  className="text-[9.5px] font-bold uppercase tracking-[0.2em]"
-                  style={{ color: 'rgba(148,163,184,0.55)' }}>
+                  className="text-[11px] font-bold uppercase tracking-[0.2em]"
+                  style={{ color: "rgba(148,163,184,0.85)" }}>
                   Password
                 </Label>
                 <div className="relative">
@@ -415,7 +419,7 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    className="h-12 text-[13.5px] rounded-xl w-full pr-12 transition-all duration-200 placeholder:text-slate-700"
+                    className="h-12 text-[13.5px] rounded-xl w-full pr-12 transition-all duration-200 placeholder:text-[rgba(148,163,184,0.6)]"
                     style={{
                       background: 'rgba(34,211,238,0.04)',
                       border: '1px solid rgba(34,211,238,0.15)',
@@ -435,10 +439,11 @@ export default function LoginPage() {
                   />
                   <button
                     type="button"
-                    tabIndex={-1}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-pressed={showPassword}
                     onClick={() => setShowPassword((v) => !v)}
                     className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-opacity hover:opacity-100"
-                    style={{ color: 'rgba(148,163,184,0.35)' }}>
+                    style={{ color: "rgba(148,163,184,0.75)" }}>
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
@@ -448,6 +453,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
+                aria-busy={loading}
                 className="relative w-full h-12 rounded-xl text-[13.5px] font-bold tracking-wider transition-all duration-200 flex items-center justify-center gap-2.5 overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] mt-2"
                 style={{
                   background: loading
@@ -486,18 +492,18 @@ export default function LoginPage() {
               style={{ borderTop: '1px solid rgba(34,211,238,0.08)' }}>
               <div className="flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#22d3ee', boxShadow: '0 0 4px rgba(34,211,238,0.7)' }} />
-                <span className="text-[9px] tracking-[0.18em] uppercase font-semibold" style={{ color: 'rgba(34,211,238,0.35)' }}>
+                <span className="text-[11px] tracking-[0.18em] uppercase font-semibold" style={{ color: "rgba(34,211,238,0.7)" }}>
                   Encrypted
                 </span>
               </div>
-              <span className="text-[9px] tracking-widest uppercase font-mono" style={{ color: 'rgba(148,163,184,0.25)' }}>
+              <span className="text-[11px] tracking-widest uppercase font-mono" style={{ color: "rgba(148,163,184,0.65)" }}>
                 v4.0
               </span>
             </div>
           </div>
 
-          <p className="text-center text-[9px] mt-5 tracking-widest uppercase"
-            style={{ color: 'rgba(148,163,184,0.18)' }}>
+          <p className="text-center text-[11px] mt-5 tracking-widest uppercase"
+            style={{ color: "rgba(148,163,184,0.6)" }}>
             &copy; {new Date().getFullYear()} Nilatech &mdash; All rights reserved
           </p>
         </div>

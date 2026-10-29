@@ -12,9 +12,10 @@ import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { columns, OrgBudget } from "./columns";
 import {
   getCoreRowModel, getFacetedRowModel, getFacetedUniqueValues,
-  getFilteredRowModel, getPaginationRowModel, getSortedRowModel, useReactTable,
+  getFilteredRowModel, getPaginationRowModel, getSortedRowModel,
   SortingState, ColumnFiltersState, VisibilityState,
 } from "@tanstack/react-table";
+import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import api from '@/lib/api-client';
@@ -41,7 +42,7 @@ export default function BudgetsPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const table = useReactTable({
+  const table = useDataTable({
     data: allBudgets,
     columns: columns(currency),
     state: { sorting, columnVisibility, rowSelection, columnFilters },
@@ -131,16 +132,16 @@ export default function BudgetsPage() {
           actions={
             <>
               <button className="btn-action" onClick={openAdd}>
-                <Plus className="h-4 w-4 text-green-600" /> Add
+                <Plus className="h-4 w-4 text-[var(--success)]" /> Add
               </button>
               <button className="btn-action" onClick={openEdit} disabled={selectedCount !== 1}>
-                <Pencil className="h-4 w-4 text-blue-600" /> Edit
+                <Pencil className="h-4 w-4 text-[var(--info)]" /> Edit
               </button>
               <button className="btn-action" onClick={() => { if (selectedCount !== 1) { toast.error('Select exactly one budget to submit'); return; } setIsSubmitOpen(true); }} disabled={selectedCount !== 1}>
                 <Send className="h-4 w-4 text-currency" /> Allocation
               </button>
               <button className="btn-action" onClick={() => { if (selectedCount === 0) { toast.error('Select budgets to delete'); return; } setIsDeleteOpen(true); }} disabled={selectedCount === 0}>
-                <Trash2 className="h-4 w-4 text-red-500" /> Delete{selectedCount > 0 ? ` (${selectedCount})` : ''}
+                <Trash2 className="h-4 w-4 text-[var(--danger)]" /> Delete{selectedCount > 0 ? ` (${selectedCount})` : ''}
               </button>
             </>
           }
@@ -151,13 +152,13 @@ export default function BudgetsPage() {
             {activeRow && (
             <div className="flex-1 space-y-3">
               <div className="bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)] p-4">
-                <label className="text-[10px] font-bold text-[var(--shell-text-muted)] uppercase">Utilization</label>
+                <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase">Utilization</label>
                 {(() => {
                   const pct = activeRow.amount > 0 ? Math.min(((activeRow.spent || 0) / Number(activeRow.amount)) * 100, 100) : 0;
                   return (
                     <div className="flex items-center gap-4 mt-3">
                       <div className="flex-1 h-3 bg-[var(--shell-hover)] rounded-full overflow-hidden">
-                        <div className={`h-full ${pct > 90 ? 'bg-rose-500' : 'bg-[var(--shell-accent)]'}`} style={{ width: `${pct}%` }} />
+                        <div className={`h-full ${pct > 90 ? 'bg-[var(--danger)]' : 'bg-[var(--shell-accent)]'}`} style={{ width: `${pct}%` }} />
                       </div>
                       <span className="text-xs font-bold text-black dark:text-white">{pct.toFixed(0)}%</span>
                     </div>
@@ -166,17 +167,17 @@ export default function BudgetsPage() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="p-4 bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)]">
-                  <label className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase block tracking-wider">Allocated</label>
+                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase block tracking-wider">Allocated</label>
                   <p className="text-[14px] font-bold text-black dark:text-white mt-1">{formatCurrency(Number(activeRow.amount), currency)}</p>
                 </div>
                 <div className="p-4 bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)]">
-                  <label className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase block tracking-wider">Department</label>
+                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase block tracking-wider">Department</label>
                   <p className="text-[12px] font-bold text-black dark:text-white mt-1">{activeRow.department || '—'}</p>
                 </div>
               </div>
               {activeRow.details && (
                 <div className="p-4 bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)]">
-                  <label className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase block tracking-wider mb-2">Details</label>
+                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase block tracking-wider mb-2">Details</label>
                   <p className="text-[11px] text-[var(--shell-text-muted)] leading-relaxed">{activeRow.details}</p>
                 </div>
               )}

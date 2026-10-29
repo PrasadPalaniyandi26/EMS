@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Plus, Pencil, PlusCircle } from 'lucide-react';
 import { ModuleModal } from '@/components/shared/module/module-modal';
-import { EmailInput, PhoneInput, isValidEmail, isValidPhone } from '@/components/shared/modal-primitives';
+import { Field, EmailInput, PhoneInput, isValidEmail, isValidPhone } from '@/components/shared/modal-primitives';
 
 // ─── Country List ─────────────────────────────────────────────────────────────
 export const COUNTRY_LIST = [
@@ -30,20 +30,11 @@ const inp = 'w-full h-10 text-sm modal-input rounded-lg';
 const sel = 'w-full h-10 text-sm modal-input rounded-lg';
 
 // ─── Field ────────────────────────────────────────────────────────────────────
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1">
-      <Label className="text-xs font-bold modal-label uppercase tracking-[0.1em]">{label}</Label>
-      {children}
-    </div>
-  );
-}
-
 // ─── Section Header ───────────────────────────────────────────────────────────
 function SectionHeader({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-2 mb-3">
-      <span className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--shell-text-muted)]">{label}</span>
+      <span className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--shell-text-muted)]">{label}</span>
       <div className="h-[1px] flex-1" style={{ background: 'var(--shell-border)' }} />
     </div>
   );
@@ -143,9 +134,9 @@ export function ClientModal({ isOpen, onClose, onSave, editing, businessTypes: i
       icon={editing ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
       onSave={handleSubmit}
       saveLabel={editing ? 'Save Changes' : 'Create Client'}
-      maxWidth="sm:max-w-[860px]"
+      size="lg"
     >
-      <div className="grid grid-cols-2 gap-x-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
 
         {/* LEFT column: Client Info */}
         <div className="space-y-2.5">
@@ -180,8 +171,7 @@ export function ClientModal({ isOpen, onClose, onSave, editing, businessTypes: i
             />
           </Field>
 
-          <div className="space-y-1">
-            <Label className="text-xs font-bold modal-label uppercase tracking-[0.1em]">Industry Sector</Label>
+          <Field label="Industry Sector">
             <Select value={form.business_type} onValueChange={(v) => set('business_type', v)}>
               <SelectTrigger className={sel}>
                 <SelectValue placeholder="Select sector" />
@@ -195,7 +185,7 @@ export function ClientModal({ isOpen, onClose, onSave, editing, businessTypes: i
             <button
               type="button"
               onClick={() => setShowNewIndustry(!showNewIndustry)}
-              className="flex items-center gap-1.5 text-[9px] font-bold text-[var(--shell-accent)] hover:underline mt-1"
+              className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--shell-accent)] hover:underline mt-1"
             >
               <PlusCircle className="w-3 h-3" /> CREATE NEW SECTOR
             </button>
@@ -213,7 +203,7 @@ export function ClientModal({ isOpen, onClose, onSave, editing, businessTypes: i
                 </Button>
               </div>
             )}
-          </div>
+          </Field>
 
         </div>
 
@@ -257,8 +247,7 @@ export function ClientModal({ isOpen, onClose, onSave, editing, businessTypes: i
             <Input className={inp} placeholder="e.g. GB123456789" value={form.tax_id} onChange={(e) => set('tax_id', e.target.value)} />
           </Field>
 
-          <div className="space-y-1">
-            <Label className="text-xs font-bold modal-label uppercase tracking-[0.1em]">Payment Terms</Label>
+          <Field label="Payment Terms">
             <Select value={form.payment_terms} onValueChange={(v) => set('payment_terms', v)}>
               <SelectTrigger className={sel}>
                 <SelectValue />
@@ -269,21 +258,23 @@ export function ClientModal({ isOpen, onClose, onSave, editing, businessTypes: i
                 ))}
               </SelectContent>
             </Select>
-          </div>
+          </Field>
 
           {/* ── STATUS TOGGLE ── */}
           <div className="pt-1">
-            <Label className="text-xs font-bold modal-label uppercase tracking-[0.1em] block mb-2">Status</Label>
-            <div className="flex p-1 modal-toggle-track rounded-lg gap-1 h-9 w-56">
+            <p id="client-status-label" className="mb-2 block text-xs font-semibold" style={{ color: 'var(--shell-text-muted)' }}>Status</p>
+            <div role="radiogroup" aria-labelledby="client-status-label" className="flex p-1 modal-toggle-track rounded-lg gap-1 h-9 w-56">
               {([
-                { label: 'Active',   val: true,  active: 'text-emerald-500 border border-emerald-500 shadow-sm' },
-                { label: 'Inactive', val: false, active: 'text-rose-400 border border-rose-400 shadow-sm' },
+                { label: 'Active',   val: true,  active: 'text-[var(--success)] border border-[var(--success)] shadow-sm' },
+                { label: 'Inactive', val: false, active: 'text-[var(--danger)] border border-[var(--danger)] shadow-sm' },
               ]).map(({ label, val, active }) => (
                 <button
                   key={label}
                   type="button"
+                  role="radio"
+                  aria-checked={form.is_active === val}
                   onClick={() => set('is_active', val)}
-                  className={`flex-1 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${
+                  className={`flex-1 py-1.5 text-center text-[11px] font-bold uppercase tracking-wider rounded-md transition-all ${
                     form.is_active === val ? active : 'text-[var(--shell-text-muted)] border border-transparent hover:text-[var(--shell-text)]'
                   }`}
                 >

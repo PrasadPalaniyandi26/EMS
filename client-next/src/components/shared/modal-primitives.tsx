@@ -1,20 +1,43 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ModuleModal } from '@/components/shared/module/module-modal';
+import { AlertTriangle, ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-// Shared themed class strings for form inputs and selects
+// Shared themed class strings for form inputs and selects.
+// Keyboard focus shows a 2px accent ring (focus-visible), so mouse clicks stay quiet and tabbing is obvious.
+// 40px high: the one control height for forms (the app mixed 32, 36 and 40px), and a comfortable touch target.
 export const inp = [
-  'w-full h-9 text-[13px] rounded-lg px-3',
-  'border focus:outline-none focus:ring-1 transition-colors',
+  'w-full h-10 text-sm rounded-lg px-3',
+  'border outline-none transition-colors',
+  'focus-visible:ring-2 focus-visible:ring-[var(--shell-accent)] focus-visible:border-[var(--shell-accent)]',
 ].join(' ');
 
 export const sel = [
-  'w-full h-9 text-[13px] rounded-lg',
-  'border focus:outline-none focus:ring-1 transition-colors',
+  'w-full h-10 text-sm rounded-lg',
+  'border outline-none transition-colors',
+  'focus-visible:ring-2 focus-visible:ring-[var(--shell-accent)] focus-visible:border-[var(--shell-accent)]',
 ].join(' ');
+
+// Styled native <select> with the dropdown arrow. Six files each pasted their own copy of the arrow SVG.
+// Native on purpose: the OS picker is the best experience on phones, and it is fully keyboard accessible.
+export function NativeSelect({ className, children, ...props }: React.ComponentProps<'select'>) {
+  return (
+    <div className="relative">
+      <select
+        {...props}
+        className={cn(sel, 'modal-input appearance-none pr-8 pl-3 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50', className)}
+      >
+        {children}
+      </select>
+      <ChevronDown aria-hidden className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--shell-text-muted)]" />
+    </div>
+  );
+}
 
 export const inputStyle = {
   background: 'var(--shell-bg)',
@@ -27,23 +50,79 @@ export const focusStyle = {
   borderColor: 'var(--shell-accent)',
 } as React.CSSProperties;
 
-// Field wrapper with label
-export function Field({ label, children }: { label: string; children: React.ReactNode }) {
+// Field wrapper: label + control + optional hint and error.
+// The label is linked to the control (so clicking it focuses the field and screen readers announce it),
+// and an error is announced and tied to the control through aria-invalid / aria-describedby.
+// It finds the control inside `children` itself, so existing callers need no change; pass `htmlFor`
+// only if the control already has its own id.
+interface FieldProps {
+  label: string;
+  required?: boolean;
+  hint?: string;
+  error?: string;
+  htmlFor?: string;
+  children: React.ReactNode;
+}
+
+const CONTROL_SELECTOR = 'input:not([type="hidden"]):not([type="file"]), select, textarea, [role="combobox"], [role="switch"], [role="checkbox"]';
+
+export function Field({ label, required, hint, error, htmlFor, children }: FieldProps) {
+  const autoId = useId();
+  const baseId = htmlFor ?? `field-${autoId.replace(/:/g, '')}`;
+  const errorId = `${baseId}-error`;
+  const hintId = `${baseId}-hint`;
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [controlId, setControlId] = useState(baseId);
+
+  // Runs after every render because the control can mount later (conditional children)
+  useEffect(() => {
+    const control = bodyRef.current?.querySelector<HTMLElement>(CONTROL_SELECTOR);
+    if (!control) return;
+    if (!control.id) control.id = baseId;
+    if (control.id !== controlId) setControlId(control.id);
+
+    const describedBy = error ? errorId : hint ? hintId : '';
+    if (describedBy) control.setAttribute('aria-describedby', describedBy);
+    else control.removeAttribute('aria-describedby');
+    if (error) control.setAttribute('aria-invalid', 'true');
+    else control.removeAttribute('aria-invalid');
+    if (required) control.setAttribute('aria-required', 'true');
+  });
+
   return (
     <div className="space-y-1.5">
-      <Label className="text-[10px] font-semibold uppercase tracking-[0.1em]" style={{ color: 'var(--shell-text-muted)' }}>
+      <Label htmlFor={controlId} className="text-xs font-semibold" style={{ color: 'var(--shell-text-muted)' }}>
         {label}
+        {required && <span aria-hidden className="ml-0.5 text-[var(--danger)]">*</span>}
       </Label>
-      {children}
+      <div ref={bodyRef}>{children}</div>
+      {hint && !error && <p id={hintId} className="text-[11px]" style={{ color: 'var(--shell-text-muted)' }}>{hint}</p>}
+      {error && <p id={errorId} role="alert" className="text-[11px] font-medium text-[var(--danger)]">{error}</p>}
     </div>
   );
+}
+
+// Drop-in for a bare <Label> that sits directly above one control in the same container: it links itself to
+// that control (so clicking it focuses the field and the control is announced by name). Use `Field` for new
+// code; this exists so older dialogs can be fixed by swapping the tag.
+export function AutoLabel({ className, children, style }: { className?: string; children: React.ReactNode; style?: React.CSSProperties }) {
+  const ref = useRef<HTMLLabelElement>(null);
+  const autoId = useId();
+  useEffect(() => {
+    const label = ref.current;
+    const control = label?.parentElement?.querySelector<HTMLElement>(CONTROL_SELECTOR);
+    if (!label || !control) return;
+    if (!control.id) control.id = `field-${autoId.replace(/:/g, '')}`;
+    if (label.htmlFor !== control.id) label.htmlFor = control.id;
+  });
+  return <Label ref={ref} className={className} style={style}>{children}</Label>;
 }
 
 // Section divider with label
 export function SectionHeader({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-2 mb-3 mt-1">
-      <span className="text-[9px] font-bold uppercase tracking-[0.18em]" style={{ color: 'var(--shell-text-muted)' }}>{label}</span>
+      <span className="text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: 'var(--shell-text-muted)' }}>{label}</span>
       <div className="h-px flex-1" style={{ background: 'var(--shell-border)' }} />
     </div>
   );
@@ -122,8 +201,9 @@ export function PhoneInput({
         onChange={(e) => { onChange(e.target.value); if (error) validate(e.target.value); }}
         onBlur={(e) => validate(e.target.value)}
         onKeyDown={(e) => { if (/^[a-zA-Z]$/.test(e.key)) e.preventDefault(); }}
+        aria-invalid={error ? true : undefined}
       />
-      {error && <p className="text-[10px] text-red-500 font-medium mt-0.5">{error}</p>}
+      {error && <p role="alert" className="text-[11px] text-[var(--danger)] font-medium mt-0.5">{error}</p>}
     </div>
   );
 }
@@ -176,8 +256,9 @@ export function EmailInput({
         onChange={(e) => { onChange?.(e.target.value); if (error) validate(e.target.value); }}
         onBlur={(e) => { if (!readOnly) validate(e.target.value); }}
         style={readOnly ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
+        aria-invalid={error ? true : undefined}
       />
-      {error && <p className="text-[10px] text-red-500 font-medium mt-0.5">{error}</p>}
+      {error && <p role="alert" className="text-[11px] text-[var(--danger)] font-medium mt-0.5">{error}</p>}
     </div>
   );
 }
@@ -201,42 +282,36 @@ interface ConfirmDialogProps {
   destructive?: boolean;
 }
 
+// Built on ModuleModal (the shadcn/Radix dialog), so it has a real dialog role, traps focus, closes on
+// Escape and returns focus to what opened it. The old version was a hand-rolled overlay with none of that.
+// Focus starts on Cancel so a stray Enter never confirms a destructive action.
 export function ConfirmDialog({ open, title, message, confirmLabel = 'Confirm', onConfirm, onCancel, destructive = false }: ConfirmDialogProps) {
-  if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center" onClick={onCancel}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div
-        className="relative z-10 w-full max-w-sm mx-4 rounded-2xl shadow-2xl border overflow-hidden"
-        style={{ background: 'var(--shell-surface)', borderColor: 'var(--shell-border)' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className={`flex items-center gap-3 px-5 py-4 border-b ${destructive ? 'bg-red-500/10 border-red-500/20' : 'border-[var(--shell-border)]'}`}>
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${destructive ? 'bg-red-500/20' : 'bg-amber-500/20'}`}>
-            <AlertTriangle className={`w-4 h-4 ${destructive ? 'text-red-400' : 'text-amber-400'}`} />
-          </div>
-          <h3 className="text-[13px] font-bold" style={{ color: 'var(--shell-text)' }}>{title}</h3>
-        </div>
-        <div className="px-5 py-4">
-          <p className="text-[12.5px]" style={{ color: 'var(--shell-text-muted)' }}>{message}</p>
-        </div>
-        <div className="flex items-center justify-end gap-2 px-5 pb-4">
-          <button
-            onClick={onCancel}
-            className="h-8 px-4 rounded-lg text-[12px] font-semibold border transition-all hover:bg-[var(--shell-hover)]"
-            style={{ borderColor: 'var(--shell-border)', color: 'var(--shell-text-muted)' }}
-          >
+    <ModuleModal
+      isOpen={open}
+      onClose={onCancel}
+      title={title}
+      maxWidth="sm:max-w-[420px]"
+      isDestructive={destructive}
+      icon={<AlertTriangle className="w-4 h-4" />}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onCancel} autoFocus className="h-8 px-4 text-[11.5px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
+            variant={destructive ? 'destructive' : 'default'}
             onClick={onConfirm}
-            className={`h-8 px-4 rounded-lg text-[12px] font-bold text-white transition-all ${destructive ? 'bg-red-500 hover:bg-red-600' : 'bg-amber-500 hover:bg-amber-600'}`}
+            className="h-8 px-5 text-[11.5px] font-semibold"
+            style={!destructive ? { background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' } : undefined}
           >
             {confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </>
+      }
+    >
+      <p className="text-[13px] leading-relaxed" style={{ color: 'var(--shell-text)' }}>{message}</p>
+    </ModuleModal>
   );
 }
 

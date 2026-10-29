@@ -42,9 +42,22 @@ export function ModuleShell({
     ? (intelligencePanel as React.ReactElement<any>)?.props?.onClose
     : undefined;
 
+  // One close path for the X button, the mobile backdrop and Escape: hide the panel AND clear the
+  // selection, so the next row selection reopens it (closing only the panel left the selection set).
+  const closeAll = useCallback(() => { handleClose(); originalOnClose?.(); }, [handleClose, originalOnClose]);
+
+  useEffect(() => {
+    if (!showPanel || !panelOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !document.querySelector('[role="dialog"]')) closeAll();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showPanel, panelOpen, closeAll]);
+
   const panel = intelligencePanel
     ? React.cloneElement(intelligencePanel as React.ReactElement<any>, {
-        onClose: () => { handleClose(); originalOnClose?.(); },
+        onClose: closeAll,
         hasSelection: !!showPanel,
       })
     : null;
@@ -74,8 +87,8 @@ export function ModuleShell({
         </main>
 
         {/* ── Mobile: bottom sheet backdrop ── */}
-        {panelVisible && (
-          <div className="lg:hidden fixed inset-0 bg-black/50 z-30" onClick={handleClose} />
+        {panelVisible && showPanel && (
+          <div className="lg:hidden fixed inset-0 bg-black/50 z-30" onClick={closeAll} />
         )}
 
         {/* ── Mobile: bottom sheet / Desktop: side panel ── */}
@@ -95,6 +108,9 @@ export function ModuleShell({
                 ? "translate-y-0 max-h-[80dvh]"
                 : "translate-y-full max-h-[80dvh]",
               "flex flex-col overflow-hidden shadow-2xl lg:shadow-sm backdrop-blur-xl",
+              /* Below 1280px the empty "nothing selected" panel only wastes space (it covers the page on
+                 phones and squeezes tables on laptops), so show it once a row is selected */
+              !showPanel && "max-xl:hidden!",
             )}
             style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}
           >

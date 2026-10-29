@@ -95,7 +95,13 @@ export function useTransactions(params?: Record<string, string>) {
   const qs = params ? '?' + new URLSearchParams(params).toString() : '';
   return useQuery({
     queryKey: [QUERY_KEYS.TRANSACTIONS, params],
-    queryFn: () => api.get<PaginatedResponse<Transaction>>(`/transactions${qs}`).then((r) => r.data),
+    // The API returns the rows as `data` and the pagination totals in `meta`
+    queryFn: () => api.get<Transaction[]>(`/transactions${qs}`).then((r): PaginatedResponse<Transaction> => ({
+      rows: r.data,
+      total: r.meta.total ?? r.data.length,
+      page: r.meta.page ?? 1,
+      limit: r.meta.limit ?? r.data.length,
+    })),
     staleTime: LIVE_STALE,
   });
 }

@@ -4,12 +4,18 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useCategories, useClients, useProjects, useProducts, useInvalidate } from '@/hooks/use-queries';
 import api, { getAccessToken, API_BASE } from '@/lib/api-client';
-import { CURRENCY_SYMBOL } from '@/lib/currency';
+import { CURRENCY_SYMBOL, toLocalYMD, parseApiDate, parseOcrDate } from '@/lib/currency';
 import { toast } from 'sonner';
 import { Plus, Pencil, Eye, Trash2, UploadCloud, FileText, Loader2, Sparkles } from 'lucide-react';
 import type { Transaction } from '@/lib/types';
 import { ModuleModal } from '@/components/shared/module/module-modal';
-import { CurrencyInput } from '@/components/shared/modal-primitives';
+import { Field, NativeSelect, CurrencyInput, inp } from '@/components/shared/modal-primitives';
+import { FormGrid } from '@/components/shared/form-grid';
+import { InlineAlert } from '@/components/shared/inline-alert';
+import { StatusBadge } from '@/components/shared/status-badge';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { computeTotalAmount, restoreEnteredAmount, amountLabel, GST_RATES } from '@/lib/gst';
 
 const sanitizeText = (v: unknown): string => {
@@ -19,17 +25,21 @@ const sanitizeText = (v: unknown): string => {
 
 
 
-const LABEL = 'block text-[10px] font-bold modal-label mb-1';
-const INPUT =
-  'w-full modal-input border border-[var(--shell-border)] rounded-lg h-10 px-3 text-sm text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[var(--shell-accent)]/50 focus:border-[var(--shell-accent)]/50 outline-none transition-all';
-const SELECT = INPUT + ' appearance-none pr-8 cursor-pointer';
-
 interface TransactionModalProps {
   open: boolean;
   onClose: () => void;
   type: 'expense' | 'income';
   editing?: Transaction | null;
   onSaved?: () => void;
+}
+
+// New entries start with the GST rate the user last saved (0% the first time), instead of a fixed rate
+const LAST_GST_KEY = 'ems-last-gst-rate';
+function lastGstRate() {
+  try { return localStorage.getItem(LAST_GST_KEY) || '0%'; } catch { return '0%'; }
+}
+function rememberGstRate(rate: string) {
+  try { localStorage.setItem(LAST_GST_KEY, rate); } catch { /* storage unavailable */ }
 }
 
 export function TransactionModal({ open, onClose, type, editing, onSaved }: TransactionModalProps) {
@@ -44,11 +54,11 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
   const [codeId, setCodeId] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [description, setDescription] = useState('');
-  const [dateRecorded, setDateRecorded] = useState(new Date().toISOString().split('T')[0]);
+  const [dateRecorded, setDateRecorded] = useState(toLocalYMD());
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [receiptNumber, setReceiptNumber] = useState('');
   const [amount, setAmount] = useState('');
-  const [gstRate, setGstRate] = useState('5%');
+  const [gstRate, setGstRate] = useState('0%');
   const [gstAdded, setGstAdded] = useState(false);
   const [needsReimbursement, setNeedsReimbursement] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -65,7 +75,8 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
   useEffect(() => {
     setBudgetWarning(null);
     if (type !== 'expense' || !categoryId || !amount || isNaN(Number(amount)) || Number(amount) <= 0 || !dateRecorded) return;
-    const d = new Date(dateRecorded);
+    const d = parseApiDate(dateRecorded);
+    if (!d) return;
     const month = d.getMonth() + 1;
     const year = d.getFullYear();
     const qs = new URLSearchParams({ categoryId, amount, month: String(month), year: String(year) }).toString();
@@ -85,7 +96,8 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
 
   const filteredCategories = (allCategories || []).filter((c) => c.type === type);
 
-  const codeOptions =
+  // Codes belong to a client, so offer none until a client is chosen
+  const codeOptions = !clientId ? [] :
     contextType === 'project'
       ? (projects || []).map((p) => ({ id: String(p.id), label: p.code || p.name }))
       : contextType === 'product'
@@ -112,7 +124,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
       );
       setCategoryId(editing.category_id ? String(editing.category_id) : '');
       setDescription(editing.description || '');
-      setDateRecorded(editing.date_recorded?.split('T')[0] || new Date().toISOString().split('T')[0]);
+      setDateRecorded(editing.date_recorded?.split('T')[0] || toLocalYMD());
       setPaymentMethod(editing.payment_method || 'cash');
       setReceiptNumber(editing.receipt_number || '');
       const editGstIncluded = editing.gst_included ?? false;
@@ -128,11 +140,11 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
       setCodeId('');
       setCategoryId('');
       setDescription('');
-      setDateRecorded(new Date().toISOString().split('T')[0]);
+      setDateRecorded(toLocalYMD());
       setPaymentMethod('cash');
       setReceiptNumber('');
       setAmount('');
-      setGstRate('5%');
+      setGstRate(lastGstRate());
       setGstAdded(true);
       setNeedsReimbursement(false);
       setFile(null);
@@ -165,11 +177,8 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
 
       if (ocr.amount) setAmount(String(Number(ocr.amount) || ''));
       if (ocr.date) {
-        // Parse OCR date (may be DD/MM/YYYY, MM-DD-YYYY, or free-form) into YYYY-MM-DD
-        const parsed = new Date(sanitizeText(ocr.date));
-        const iso = !isNaN(parsed.getTime())
-          ? parsed.toISOString().split('T')[0]
-          : '';
+        // Parse OCR date (DD/MM/YYYY, YYYY-MM-DD, or free-form) into YYYY-MM-DD
+        const iso = parseOcrDate(sanitizeText(ocr.date));
         if (iso) setDateRecorded(iso);
       }
       if (ocr.paymentMethod) setPaymentMethod(sanitizeText(ocr.paymentMethod));
@@ -302,6 +311,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
         await api.post('/transactions', body);
         toast.success('Transaction created');
       }
+      if (gstRate) rememberGstRate(gstRate);
       invalidate('transactions', 'dashboard');
       onSaved?.();
       onClose();
@@ -326,328 +336,253 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
       icon={editing ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
       onSave={() => handleSave()}
       saveLabel={editing ? `Update ${isExpense ? 'Expense' : 'Income'}` : `Add ${isExpense ? 'Expense' : 'Income'}`}
-      maxWidth="sm:max-w-[860px]"
+      size="lg"
     >
-      <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-
-        {/* Client */}
-        <div>
-          <label className={LABEL}>Client</label>
-          <div className="relative">
-            <select
-              className={SELECT}
-              value={clientId}
-              onChange={(e) => { setClientId(e.target.value); setCodeId(''); }}
-            >
-              <option value="">Select client...</option>
-              {(clients || []).map((c) => (
+      <FormGrid className="gap-x-4 gap-y-3">
+        <Field label="Client">
+          <NativeSelect
+            value={clientId}
+            onChange={(e) => { setClientId(e.target.value); setCodeId(''); }}
+          >
+            <option value="">Select client...</option>
+            {(clients || [])
+              .filter((c) => c.is_active || String(c.id) === clientId) // keep an inactive client that an existing entry already uses
+              .map((c) => (
                 <option key={c.id} value={String(c.id)}>{c.name}</option>
               ))}
-            </select>
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--shell-text-muted)] pointer-events-none"><path d="m6 9 6 6 6-6"/></svg>
-          </div>
-        </div>
+          </NativeSelect>
+        </Field>
 
-        {/* Category (Project / Product) */}
-        <div>
-          <label className={LABEL}>Category</label>
-          <div className="relative">
-            <select
-              className={SELECT}
-              value={contextType}
-              onChange={(e) => { setContextType(e.target.value); setCodeId(''); }}
-            >
-              <option value="">Select Category</option>
-              <option value="project">Project</option>
-              <option value="product">Product</option>
-            </select>
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--shell-text-muted)] pointer-events-none"><path d="m6 9 6 6 6-6"/></svg>
-          </div>
-        </div>
+        <Field label="Charge To">
+          <NativeSelect
+            value={contextType}
+            onChange={(e) => { setContextType(e.target.value); setCodeId(''); }}
+          >
+            <option value="">Select...</option>
+            <option value="project">Project</option>
+            <option value="product">Product</option>
+          </NativeSelect>
+        </Field>
 
-        {/* Code */}
-        <div>
-          <label className={LABEL}>Code</label>
-          <div className="relative">
-            <select
-              className={SELECT + (!contextType ? ' opacity-50 cursor-not-allowed' : '')}
-              value={codeId}
-              onChange={(e) => setCodeId(e.target.value)}
-              disabled={!contextType}
-            >
-              <option value="">Select code...</option>
-              {codeOptions.map((o) => (
-                <option key={o.id} value={o.id}>{o.label}</option>
-              ))}
-            </select>
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--shell-text-muted)] pointer-events-none"><path d="m6 9 6 6 6-6"/></svg>
-          </div>
-        </div>
+        <Field label="Code" hint={!clientId ? 'Choose a client first' : undefined}>
+          <NativeSelect
+            value={codeId}
+            onChange={(e) => setCodeId(e.target.value)}
+            disabled={!contextType || !clientId}
+          >
+            <option value="">Select code...</option>
+            {codeOptions.map((o) => (
+              <option key={o.id} value={o.id}>{o.label}</option>
+            ))}
+          </NativeSelect>
+        </Field>
 
-        {/* Expense / Income Category */}
-        <div>
-          <label className={LABEL}>{isExpense ? 'Expense Category' : 'Income Category'}</label>
-          <div className="relative">
-            <select
-              className={SELECT}
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-            >
-              <option value="">Select category...</option>
-              {filteredCategories.map((c) => (
-                <option key={c.id} value={String(c.id)}>{c.name}</option>
-              ))}
-            </select>
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--shell-text-muted)] pointer-events-none"><path d="m6 9 6 6 6-6"/></svg>
-          </div>
-        </div>
+        <Field label={isExpense ? 'Expense Category' : 'Income Category'}>
+          <NativeSelect value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+            <option value="">Select category...</option>
+            {filteredCategories.map((c) => (
+              <option key={c.id} value={String(c.id)}>{c.name}</option>
+            ))}
+          </NativeSelect>
+        </Field>
 
-        {/* Detail (single col) | Payment Method (second col) */}
-        <div>
-          <label className={LABEL}>Detail</label>
-          <input
-            className={INPUT}
+        <Field label="Detail">
+          <Input
+            className={`${inp} modal-input`}
             type="text"
             placeholder="Enter full description and justification..."
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
-        </div>
+        </Field>
 
-        {/* Payment Method */}
-        <div>
-          <label className={LABEL}>Payment Method</label>
-          <div className="relative">
-            <select
-              className={SELECT}
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value)}
-            >
-              <option value="cash">Cash</option>
-              <option value="card">Card</option>
-              <option value="bank_transfer">Bank Transfer</option>
-              <option value="upi">UPI</option>
-              <option value="cheque">Cheque</option>
-            </select>
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--shell-text-muted)] pointer-events-none"><path d="m6 9 6 6 6-6"/></svg>
-          </div>
-        </div>
+        <Field label="Payment Method">
+          <NativeSelect value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+            <option value="cash">Cash</option>
+            <option value="card">Card</option>
+            <option value="bank_transfer">Bank Transfer</option>
+            <option value="upi">UPI</option>
+            <option value="cheque">Cheque</option>
+          </NativeSelect>
+        </Field>
 
-        {/* Reference No (narrowed) + Reimburse toggle (expense only) | Date */}
-        <div>
-          <label className={LABEL}>Reference No{isExpense ? ' & Reimburse' : ''}</label>
+        <Field label={`Reference No${isExpense ? ' & Reimburse' : ''}`}>
           <div className="flex items-center gap-2">
-            <input
-              className={`${INPUT} flex-1 min-w-0`}
+            <Input
+              className={`${inp} modal-input min-w-0 flex-1`}
               type="text"
               placeholder="INV-0000 / REC-0000"
               value={receiptNumber}
               onChange={(e) => setReceiptNumber(e.target.value)}
             />
             {isExpense && (
-              <div className="flex items-center gap-1.5 h-10 shrink-0">
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={needsReimbursement}
-                  onClick={() => setNeedsReimbursement((v) => !v)}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${needsReimbursement ? 'bg-[var(--shell-accent)]' : 'bg-[var(--shell-border)]'}`}
-                >
-                  <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-md ring-0 transition-transform ${needsReimbursement ? 'translate-x-4' : 'translate-x-0'}`} />
-                </button>
-                <span className="text-[10px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wide whitespace-nowrap">
-                  {needsReimbursement ? 'Reimburse' : 'No Reimburse'}
-                </span>
-              </div>
+              <label className="flex h-10 shrink-0 cursor-pointer items-center gap-2 text-[11px] font-semibold text-[var(--shell-text-muted)]">
+                <Switch checked={needsReimbursement} onCheckedChange={setNeedsReimbursement} aria-label="Needs reimbursement" />
+                <span className="whitespace-nowrap">{needsReimbursement ? 'Reimburse' : 'No reimburse'}</span>
+              </label>
             )}
           </div>
-        </div>
+        </Field>
 
-        <div>
-          <label className={LABEL}>Date of {isExpense ? 'Expense' : 'Income'}</label>
-          <input
-            className={INPUT}
+        <Field label={`Date of ${isExpense ? 'Expense' : 'Income'}`}>
+          <Input
+            className={`${inp} modal-input`}
             type="date"
             value={dateRecorded}
             onChange={(e) => setDateRecorded(e.target.value)}
           />
-        </div>
+        </Field>
 
-        {/* GST + Is GST Included (left col) | Amount (right col) — final row */}
-        <div className="col-span-2 grid grid-cols-2 gap-x-4 items-end">
-          {/* Left col: GST dropdown + toggle inline */}
-          <div>
-            <label className={LABEL}>GST &amp; Inclusion</label>
+        {/* GST rate + inclusion switch | Amount: final row */}
+        <div className="grid grid-cols-1 items-end gap-x-4 gap-y-3 sm:col-span-2 sm:grid-cols-2">
+          <Field label="GST & Inclusion">
             <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <select
-                  className={SELECT}
-                  value={gstRate}
-                  onChange={(e) => setGstRate(e.target.value)}
-                >
+              <div className="min-w-0 flex-1">
+                <NativeSelect value={gstRate} onChange={(e) => setGstRate(e.target.value)}>
                   <option value="">Select GST...</option>
                   {GST_RATES.map((r) => (
                     <option key={r} value={r}>{r}</option>
                   ))}
-                </select>
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--shell-text-muted)] pointer-events-none"><path d="m6 9 6 6 6-6"/></svg>
+                </NativeSelect>
               </div>
-              <div className="flex items-center gap-1.5 h-10 shrink-0">
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={gstAdded}
-                  onClick={() => setGstAdded((v) => !v)}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${gstAdded ? 'bg-[var(--shell-accent)]' : 'bg-[var(--shell-border)]'}`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-md ring-0 transition-transform ${gstAdded ? 'translate-x-4' : 'translate-x-0'}`}
-                  />
-                </button>
-                <span className="text-[10px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wide whitespace-nowrap">
-                  {gstAdded ? 'Included' : 'Not Included'}
-                </span>
-              </div>
+              <label className="flex h-10 shrink-0 cursor-pointer items-center gap-2 text-[11px] font-semibold text-[var(--shell-text-muted)]">
+                <Switch checked={gstAdded} onCheckedChange={setGstAdded} aria-label="GST included in amount" />
+                <span className="whitespace-nowrap">{gstAdded ? 'Included' : 'Not included'}</span>
+              </label>
             </div>
-          </div>
+          </Field>
 
-          {/* Right col: Amount */}
-          <div>
-            <label className={LABEL}>Amount {amountLabel(gstRate, gstAdded)}</label>
-            <CurrencyInput
-              value={amount}
-              onChange={setAmount}
-              symbol={currencySymbol}
-            />
-          </div>
+          <Field label={`Amount ${amountLabel(gstRate, gstAdded)}`}>
+            <CurrencyInput value={amount} onChange={setAmount} symbol={currencySymbol} />
+          </Field>
         </div>
 
-        {/* Budget Warning — full width, expense only */}
+        {/* Budget warning: expense only */}
         {isExpense && budgetWarning && (
-          <div className={`col-span-2 px-3 py-2.5 rounded-lg border text-[11px] font-medium flex items-start gap-2 ${budgetWarning.will_exceed ? 'bg-red-500/10 border-red-400/30 text-red-600 dark:text-red-300' : 'bg-amber-500/10 border-amber-400/30 text-amber-700 dark:text-amber-300'}`}>
-            <span className="shrink-0 mt-0.5">{budgetWarning.will_exceed ? '⚠️' : '💡'}</span>
-            <span>
-              {budgetWarning.will_exceed
-                ? <>This expense <strong>exceeds</strong> the budget by <strong>{Math.abs(budgetWarning.after_this_expense).toLocaleString()}</strong>. Budget allocated: {budgetWarning.allocated.toLocaleString()} · Remaining: {budgetWarning.remaining.toLocaleString()}.</>
-                : <>Budget remaining after this expense: <strong>{budgetWarning.after_this_expense.toLocaleString()}</strong> (of {budgetWarning.allocated.toLocaleString()} allocated).</>
-              }
-            </span>
-          </div>
+          <InlineAlert className="sm:col-span-2" tone={budgetWarning.will_exceed ? 'danger' : 'tip'}>
+            {budgetWarning.will_exceed
+              ? <>This expense <strong>exceeds</strong> the budget by <strong>{Math.abs(budgetWarning.after_this_expense).toLocaleString()}</strong>. Budget allocated: {budgetWarning.allocated.toLocaleString()} · Remaining: {budgetWarning.remaining.toLocaleString()}.</>
+              : <>Budget remaining after this expense: <strong>{budgetWarning.after_this_expense.toLocaleString()}</strong> (of {budgetWarning.allocated.toLocaleString()} allocated).</>
+            }
+          </InlineAlert>
         )}
 
-        {/* Duplicate Warning — full width */}
+        {/* Duplicate warning */}
         {dupWarning && (
-          <div className={`col-span-2 rounded-lg border text-[11px] ${dupWarning.hardBlock ? 'bg-red-500/10 border-red-400/30' : 'bg-amber-500/10 border-amber-400/30'}`}>
-            <div className={`flex items-center gap-2 px-3 py-2 font-bold ${dupWarning.hardBlock ? 'text-red-600 dark:text-red-300' : 'text-amber-700 dark:text-amber-300'}`}>
-              <span>{dupWarning.hardBlock ? '🚫' : '⚠️'}</span>
-              <span>{dupWarning.hardBlock ? 'Exact duplicate detected — change amount, category, or date to proceed.' : 'Similar transaction found nearby — please review before saving.'}</span>
-            </div>
-            <div className="px-3 pb-2 space-y-1">
-              {dupWarning.matches.slice(0, 3).map((m: any) => (
-                <div key={m.id} className="flex items-center gap-3 text-[10.5px] text-[var(--shell-text-muted)]">
-                  <span className="font-mono font-bold text-blue-400">{m.reference_id || `#${m.id}`}</span>
-                  <span>{m.category_name || '—'}</span>
-                  <span className="font-semibold">{Number(m.net_amount ?? m.amount).toLocaleString()}</span>
-                  <span>{m.date_recorded?.slice(0, 10)}</span>
-                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold"
-                    style={{ background: 'var(--shell-hover)' }}>{m.status}</span>
-                </div>
-              ))}
-            </div>
-            {!dupWarning.hardBlock && (
-              <div className="px-3 pb-2.5 flex items-center gap-2">
-                <button
+          <InlineAlert
+            className="sm:col-span-2"
+            tone={dupWarning.hardBlock ? 'danger' : 'warning'}
+            title={dupWarning.hardBlock
+              ? 'Exact duplicate detected — change amount, category, or date to proceed.'
+              : 'Similar transaction found nearby — please review before saving.'}
+            actions={!dupWarning.hardBlock && (
+              <>
+                <Button
                   type="button"
                   onClick={() => handleSave(true)}
                   disabled={saving}
-                  className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-60"
+                  className="h-9 px-3 text-[12px] font-semibold"
+                  style={{ background: 'var(--warning)', color: 'var(--warning-foreground)' }}
                 >
-                  Save Anyway
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDupWarning(null)}
-                  className="px-3 py-1.5 rounded-lg text-[11px] font-semibold hover:bg-[var(--shell-hover)] transition-colors text-[var(--shell-text-muted)]"
-                >
+                  Save anyway
+                </Button>
+                <Button type="button" variant="ghost" onClick={() => setDupWarning(null)} className="h-9 px-3 text-[12px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>
                   Cancel
-                </button>
-              </div>
+                </Button>
+              </>
             )}
-          </div>
+          >
+            <ul className="space-y-1.5">
+              {dupWarning.matches.slice(0, 3).map((m: any) => (
+                <li key={m.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[var(--shell-text-muted)]">
+                  <span className="font-mono font-bold text-[var(--info)]">{m.reference_id || `#${m.id}`}</span>
+                  <span>{m.category_name || '—'}</span>
+                  <span className="font-semibold">{Number(m.net_amount ?? m.amount).toLocaleString()}</span>
+                  <span>{m.date_recorded?.slice(0, 10)}</span>
+                  <StatusBadge status={m.status} />
+                </li>
+              ))}
+            </ul>
+          </InlineAlert>
         )}
 
-        {/* Receipt Upload — full width */}
-        <div className="col-span-2">
-          <label className={LABEL}>Receipt Upload</label>
+        {/* Receipt upload */}
+        <div className="space-y-1.5 sm:col-span-2">
+          <p id="receipt-upload-label" className="text-xs font-semibold" style={{ color: 'var(--shell-text-muted)' }}>Receipt Upload</p>
           <input
             ref={fileInputRef}
             type="file"
             className="hidden"
-            accept=".pdf,.jpg,.jpeg,.png"
+            accept=".pdf,.jpg,.jpeg,.png,.webp"
+            tabIndex={-1}
+            aria-hidden
             onChange={handleFileChange}
           />
-          {/* Drop zone — always visible */}
-          <div
-            className={`border-2 border-dashed rounded-lg px-4 py-3 flex items-center gap-3 cursor-pointer transition-all group ${dragging ? 'border-[var(--shell-accent)]/50 modal-section' : 'border-[var(--shell-border)] modal-section hover:border-[var(--shell-accent)]/50'}`}
+          {/* A real button, so the drop zone is reachable by keyboard (Enter / Space opens the file picker) */}
+          <button
+            type="button"
+            aria-labelledby="receipt-upload-label"
+            aria-busy={ocrLoading}
+            className={`group flex w-full cursor-pointer items-center gap-3 rounded-lg border-2 border-dashed px-4 py-3 text-left transition-colors modal-section focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--shell-accent)] ${dragging ? 'border-[var(--shell-accent)]' : 'border-[var(--shell-border)] hover:border-[var(--shell-accent)]'}`}
             onClick={() => !ocrLoading && fileInputRef.current?.click()}
             onDrop={handleDrop}
             onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
             onDragLeave={() => setDragging(false)}
           >
             {ocrLoading
-              ? <Loader2 className="w-7 h-7 shrink-0 text-[var(--shell-accent)] animate-spin" />
-              : <UploadCloud className={`w-7 h-7 shrink-0 transition-colors ${dragging ? 'text-[var(--shell-accent)]' : 'text-[var(--shell-text-muted)] group-hover:text-[var(--shell-accent)]'}`} />
+              ? <Loader2 aria-hidden className="h-7 w-7 shrink-0 animate-spin text-[var(--shell-accent)]" />
+              : <UploadCloud aria-hidden className={`h-7 w-7 shrink-0 transition-colors ${dragging ? 'text-[var(--shell-accent)]' : 'text-[var(--shell-text-muted)] group-hover:text-[var(--shell-accent)]'}`} />
             }
-            <div>
+            <span>
               {ocrLoading
                 ? <>
-                    <p className="text-[12px] text-[var(--shell-accent)] font-semibold flex items-center gap-1.5">
-                      <Sparkles className="w-3 h-3" /> Extracting data from receipt...
-                    </p>
-                    <p className="text-[10px] text-[var(--shell-text-muted)]">Fields will be auto-filled shortly</p>
+                    <span className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--shell-accent)]">
+                      <Sparkles aria-hidden className="h-3 w-3" /> Extracting data from receipt...
+                    </span>
+                    <span className="block text-[11px] text-[var(--shell-text-muted)]">Fields will be auto-filled shortly</span>
                   </>
                 : <>
-                    <p className="text-[12px] text-[var(--shell-text-muted)] font-medium">
-                      Drag & drop or{' '}
-                      <span className="text-[var(--shell-accent)] font-bold">browse files</span>
-                    </p>
-                    <p className="text-[10px] text-[var(--shell-text-muted)] uppercase tracking-tight">PDF, JPG, PNG · max 10 MB</p>
+                    <span className="block text-[12px] font-medium text-[var(--shell-text-muted)]">
+                      Drag &amp; drop or <span className="font-bold text-[var(--shell-accent)]">browse files</span>
+                    </span>
+                    <span className="block text-[11px] uppercase tracking-tight text-[var(--shell-text-muted)]">PDF, JPG, PNG, WebP · max 10 MB</span>
                   </>
               }
-            </div>
-          </div>
-          {/* File card — visible when file exists */}
+            </span>
+          </button>
+
+          {/* File card: visible when a file exists */}
           {hasFile && (
-            <div className="mt-2 modal-section border border-[var(--shell-border)] rounded-lg px-3 py-2 flex items-center justify-between shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="modal-divider p-1.5 rounded border border-[var(--shell-border)]">
-                  <FileText className="text-[var(--shell-accent)] w-5 h-5" />
+            <div className="modal-section mt-2 flex items-center justify-between gap-2 rounded-lg border border-[var(--shell-border)] px-3 py-2 shadow-sm">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="modal-divider rounded border border-[var(--shell-border)] p-1.5">
+                  <FileText aria-hidden className="h-5 w-5 text-[var(--shell-accent)]" />
                 </div>
-                <div className="leading-tight">
-                  <p className="text-[12px] font-bold text-[var(--shell-text)] truncate max-w-[280px]">{fileName}</p>
-                  {fileSize && <p className="text-[10px] text-[var(--shell-text-muted)] uppercase tracking-tighter">{fileSize}</p>}
+                <div className="min-w-0 leading-tight">
+                  <p className="max-w-[280px] truncate text-[12px] font-bold text-[var(--shell-text)]">{fileName}</p>
+                  {fileSize && <p className="text-[11px] uppercase tracking-tighter text-[var(--shell-text-muted)]">{fileSize}</p>}
                 </div>
               </div>
-              <div className="flex gap-2 shrink-0">
+              <div className="flex shrink-0 gap-2">
                 <button
                   type="button"
                   onClick={handleViewFile}
-                  className="h-8 px-3 modal-section border border-[var(--shell-border)] rounded flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition-all"
+                  className="modal-section flex h-10 items-center gap-1.5 rounded border border-[var(--shell-border)] px-3 text-[11px] font-bold uppercase tracking-wider transition-colors hover:border-[var(--shell-accent)] sm:h-8"
                 >
-                  <Eye className="w-3.5 h-3.5 text-green-600" /> View
+                  <Eye aria-hidden className="h-3.5 w-3.5 text-[var(--success)]" /> View
                 </button>
                 <button
                   type="button"
                   onClick={handleRemoveFile}
-                  className="h-8 px-3 modal-section border border-[var(--shell-border)] rounded flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition-all"
+                  className="modal-section flex h-10 items-center gap-1.5 rounded border border-[var(--shell-border)] px-3 text-[11px] font-bold uppercase tracking-wider transition-colors hover:border-[var(--danger)] sm:h-8"
                 >
-                  <Trash2 className="w-3.5 h-3.5 text-red-500" /> Remove
+                  <Trash2 aria-hidden className="h-3.5 w-3.5 text-[var(--danger)]" /> Remove
                 </button>
               </div>
             </div>
           )}
         </div>
-      </div>
+      </FormGrid>
     </ModuleModal>
   );
 }

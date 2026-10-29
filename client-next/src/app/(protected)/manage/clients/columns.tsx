@@ -8,7 +8,7 @@ export const columns: ColumnDef<Client>[] = [
     accessorKey: "code",
     header: "ID",
     cell: ({ row }) => (
-      <span className="font-mono text-[12px] text-blue-400 font-bold">
+      <span className="font-mono text-[12px] text-[var(--info)] font-bold">
         {(row.original as any).code || `CL-XX-${1000 + row.original.id}`}
       </span>
     ),
@@ -21,7 +21,7 @@ export const columns: ColumnDef<Client>[] = [
       const name = row.getValue("name") as string;
       return (
         <div className="flex items-center gap-3">
-          <div className="w-6 h-6 bg-[var(--shell-hover)] rounded flex items-center justify-center font-bold text-[9px] text-[var(--shell-text)] border border-[var(--shell-border)] shrink-0">
+          <div className="w-6 h-6 bg-[var(--shell-hover)] rounded flex items-center justify-center font-bold text-[11px] text-[var(--shell-text)] border border-[var(--shell-border)] shrink-0">
             {name.substring(0, 2).toUpperCase()}
           </div>
           <span className="font-bold text-[12px] text-black dark:text-white">{name}</span>
@@ -62,7 +62,7 @@ export const columns: ColumnDef<Client>[] = [
     cell: ({ row }) => {
       const isActive = row.getValue("is_active") === 1;
       return (
-        <span className={`text-[12px] font-semibold ${isActive ? 'text-emerald-500' : 'text-[var(--shell-text-muted)]'}`}>
+        <span className={`text-[12px] font-semibold ${isActive ? 'text-[var(--success)]' : 'text-[var(--shell-text-muted)]'}`}>
           {isActive ? 'Active' : 'Inactive'}
         </span>
       );

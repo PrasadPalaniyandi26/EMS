@@ -12,7 +12,8 @@ import { Plus, Pencil, Download, Send, Info, Trash2 } from 'lucide-react';
 import { useUsers } from '@/hooks/use-queries';
 import { useAuthStore } from '@/stores/auth-store';
 import { ModuleModal } from '@/components/shared/module/module-modal';
-import { CurrencyInput } from '@/components/shared/modal-primitives';
+import { Field, CurrencyInput, inp } from '@/components/shared/modal-primitives';
+import { FormGrid } from '@/components/shared/form-grid';
 
 
 
@@ -76,9 +77,8 @@ export function AddBudgetModal({ isOpen, onClose, onSave, editingData }: BudgetM
     { value: String(currentYear + 1), label: `${currentYear + 1} (Forecast)` },
   ];
 
-  const inp = 'w-full modal-input rounded-lg h-10 text-sm text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)]';
+  const ctl = `${inp} modal-input`;
   const sel = 'w-full modal-input rounded-lg h-10 text-sm text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)]';
-  const lbl = 'text-xs font-bold modal-label normal-case tracking-normal';
 
   return (
     <ModuleModal
@@ -88,17 +88,14 @@ export function AddBudgetModal({ isOpen, onClose, onSave, editingData }: BudgetM
       icon={editingData ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
       onSave={() => onSave?.(form)}
       saveLabel={editingData ? 'Update Budget' : 'Save Budget'}
-      maxWidth="sm:max-w-[680px]"
+      size="md"
     >
-      <div className="space-y-2.5">
-        {/* Row 1: Budget Name | Category */}
-        <div className="grid grid-cols-2 gap-x-4">
-          <div className="space-y-1">
-            <Label className={lbl}>Budget Name</Label>
-            <Input className={inp} placeholder="e.g. Q1 Marketing Campaign" value={form.name} onChange={e => set('name', e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label className={lbl}>Category</Label>
+      <div className="space-y-3">
+        <FormGrid className="gap-x-4 gap-y-3">
+          <Field label="Budget Name">
+            <Input className={ctl} placeholder="e.g. Q1 Marketing Campaign" value={form.name} onChange={e => set('name', e.target.value)} />
+          </Field>
+          <Field label="Category">
             <Select value={form.category} onValueChange={v => set('category', v)}>
               <SelectTrigger className={sel}><SelectValue placeholder="Select Expense Type" /></SelectTrigger>
               <SelectContent>
@@ -109,22 +106,17 @@ export function AddBudgetModal({ isOpen, onClose, onSave, editingData }: BudgetM
                 <SelectItem value="admin">Office & Admin</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-        </div>
+          </Field>
 
-        {/* Row 2: Department | Owner */}
-        <div className="grid grid-cols-2 gap-x-4">
-          <div className="space-y-1">
-            <Label className={lbl}>Department</Label>
+          <Field label="Department">
             <Select value={form.department} onValueChange={v => set('department', v)}>
               <SelectTrigger className={sel}><SelectValue placeholder="Select Department" /></SelectTrigger>
               <SelectContent>
                 {DEPARTMENTS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className={lbl}>Owner (Manager)</Label>
+          </Field>
+          <Field label="Owner (Manager)">
             <Select value={form.owner_id} onValueChange={v => set('owner_id', v)}>
               <SelectTrigger className={sel}><SelectValue placeholder="Assign Owner" /></SelectTrigger>
               <SelectContent>
@@ -138,67 +130,55 @@ export function AddBudgetModal({ isOpen, onClose, onSave, editingData }: BudgetM
                 }
               </SelectContent>
             </Select>
-          </div>
-        </div>
+          </Field>
 
-        {/* Row 3: Financial Year | Total Allocation */}
-        <div className="grid grid-cols-2 gap-x-4">
-          <div className="space-y-1">
-            <Label className={lbl}>Financial Year</Label>
+          <Field label="Financial Year">
             <Select value={form.financial_year} onValueChange={v => set('financial_year', v)}>
               <SelectTrigger className={sel}><SelectValue /></SelectTrigger>
               <SelectContent>
                 {yearOptions.map(y => <SelectItem key={y.value} value={y.value}>{y.label}</SelectItem>)}
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className={lbl}>Total Allocation ({currencySymbol})</Label>
+          </Field>
+          <Field label={`Total Allocation (${currencySymbol})`}>
             <CurrencyInput value={form.allocated} onChange={(v) => set('allocated', v)} symbol={currencySymbol} />
-          </div>
-        </div>
+          </Field>
 
-        {/* Row 4: Start Date | End Date */}
-        <div className="grid grid-cols-2 gap-x-4">
-          <div className="space-y-1">
-            <Label className={lbl}>Start Date</Label>
-            <Input type="date" className={inp} value={form.start_date} onChange={e => set('start_date', e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label className={lbl}>End Date</Label>
-            <Input type="date" className={inp} value={form.end_date} onChange={e => set('end_date', e.target.value)} />
-          </div>
-        </div>
+          <Field label="Start Date">
+            <Input type="date" className={ctl} value={form.start_date} onChange={e => set('start_date', e.target.value)} />
+          </Field>
+          <Field label="End Date">
+            <Input type="date" className={ctl} value={form.end_date} onChange={e => set('end_date', e.target.value)} />
+          </Field>
+        </FormGrid>
 
-        {/* Row 5: Details (2-row height) */}
-        <div className="space-y-1">
-          <Label className={lbl}>Details</Label>
+        <Field label="Details">
           <Textarea
-            className="w-full modal-input border-[var(--shell-border)] focus:ring-1 focus:ring-[var(--shell-accent)]/50 rounded-lg text-sm text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] resize-none"
+            className="w-full modal-input border-[var(--shell-border)] focus-visible:ring-2 focus-visible:ring-[var(--shell-accent)] rounded-lg text-sm text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] resize-none"
             style={{ minHeight: '64px', maxHeight: '64px' }}
             placeholder="Budget scope, objectives, and allocation rationale..."
             value={form.details}
             onChange={e => set('details', e.target.value)}
           />
-        </div>
+        </Field>
 
-        {/* Controls */}
-        <div className="grid grid-cols-2 gap-4 pt-2 border-t border-[var(--shell-border)]">
-          <div className="flex items-center justify-between p-4 modal-section border border-[var(--shell-border)] rounded-xl">
-            <div>
-              <p className="text-[11px] font-bold" style={{ color: 'var(--shell-text)' }}>Strict Enforcement</p>
-              <p className="text-[9px] text-[var(--shell-text-muted)] font-medium">Prevent overspending strictly</p>
-            </div>
-            <Switch checked={form.strict} onCheckedChange={v => set('strict', v)} className="data-[state=checked]:bg-[var(--shell-accent)]" />
-          </div>
-          <div className="flex items-center justify-between p-4 modal-section border border-[var(--shell-border)] rounded-xl">
-            <div>
-              <p className="text-[11px] font-bold" style={{ color: 'var(--shell-text)' }}>Auto-Rollover</p>
-              <p className="text-[9px] text-[var(--shell-text-muted)] font-medium">Carry over unused balance</p>
-            </div>
-            <Switch checked={form.rollover} onCheckedChange={v => set('rollover', v)} className="data-[state=checked]:bg-[var(--shell-accent)]" />
-          </div>
-        </div>
+        {/* Switch cards: the whole card is the label, so clicking the text toggles it and it is announced */}
+        <FormGrid className="gap-4 border-t border-[var(--shell-border)] pt-3">
+          <label className="modal-section flex cursor-pointer items-center justify-between rounded-xl border border-[var(--shell-border)] p-4">
+            <span>
+              <span className="block text-[12px] font-bold" style={{ color: 'var(--shell-text)' }}>Strict Enforcement</span>
+              <span className="block text-[11px] font-medium text-[var(--shell-text-muted)]">Prevent overspending strictly</span>
+            </span>
+            <Switch checked={form.strict} onCheckedChange={v => set('strict', v)} aria-label="Strict enforcement" />
+          </label>
+          <label className="modal-section flex cursor-pointer items-center justify-between rounded-xl border border-[var(--shell-border)] p-4">
+            <span>
+              <span className="block text-[12px] font-bold" style={{ color: 'var(--shell-text)' }}>Auto-Rollover</span>
+              <span className="block text-[11px] font-medium text-[var(--shell-text-muted)]">Carry over unused balance</span>
+            </span>
+            <Switch checked={form.rollover} onCheckedChange={v => set('rollover', v)} aria-label="Auto-rollover" />
+          </label>
+        </FormGrid>
       </div>
     </ModuleModal>
   );
@@ -212,32 +192,32 @@ export function ExportBudgetModal({ isOpen, onClose }: BudgetModalProps) {
       title="Export Reports"
       icon={<Download className="w-4 h-4" />}
       saveLabel="Generate Report"
-      maxWidth="sm:max-w-[680px]"
+      size="md"
     >
       <div className="space-y-3">
         <div className="space-y-2.5">
-          <Label className="text-xs font-bold modal-label normal-case tracking-normal">Select Format</Label>
-          <div className="grid grid-cols-2 gap-4">
+          <p className="text-xs font-semibold" style={{ color: 'var(--shell-text-muted)' }}>Select Format</p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <button className="flex flex-col items-center justify-center p-6 modal-section border border-[var(--shell-border)] rounded-xl hover:border-[var(--shell-accent)]/30 hover:modal-section transition-all group scale-100 active:scale-95 shadow-sm">
-              <div className="w-12 h-12 rounded-full bg-[var(--shell-accent)]/20 text-emerald-500 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+              <div className="w-12 h-12 rounded-full bg-[var(--shell-accent)]/20 text-[var(--success)] flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <Download className="w-6 h-6" />
               </div>
               <span className="text-xs font-bold" style={{ color: 'var(--shell-text)' }}>Excel Spreadsheet</span>
-              <span className="text-[9px] text-[var(--shell-text-muted)] mt-1 font-bold">.XLSX Format</span>
+              <span className="text-[11px] text-[var(--shell-text-muted)] mt-1 font-bold">.XLSX Format</span>
             </button>
             <button className="flex flex-col items-center justify-center p-6 modal-section border border-[var(--shell-border)] rounded-xl hover:border-[var(--shell-accent)]/30 hover:modal-section transition-all group scale-100 active:scale-95 shadow-sm">
-              <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+              <div className="w-12 h-12 rounded-full bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] text-[var(--danger)] flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <Download className="w-6 h-6" />
               </div>
               <span className="text-xs font-bold" style={{ color: 'var(--shell-text)' }}>PDF Document</span>
-              <span className="text-[9px] text-[var(--shell-text-muted)] mt-1 font-bold">Portable Format</span>
+              <span className="text-[11px] text-[var(--shell-text-muted)] mt-1 font-bold">Portable Format</span>
             </button>
           </div>
         </div>
 
         <div className="p-4 bg-[var(--shell-accent)]/8 rounded-lg border border-[var(--shell-accent)]/15 flex gap-3">
           <Info className="w-4 h-4 text-[var(--shell-accent)] shrink-0 mt-0.5" />
-          <p className="text-[10px] text-[var(--shell-accent)]/80 font-medium leading-relaxed">
+          <p className="text-[11px] text-[var(--shell-accent)]/80 font-medium leading-relaxed">
             Export will include all filtered budget lines and current utilization metrics. Generated reports are secured and logged.
           </p>
         </div>
@@ -255,7 +235,7 @@ export function SubmitBudgetModal({ isOpen, onClose, onSubmit }: BudgetModalProp
       icon={<Send className="w-4 h-4" />}
       onSave={() => onSubmit?.({})}
       saveLabel="Submit Now"
-      maxWidth="sm:max-w-[680px]"
+      size="md"
       footer={
         <>
           <Button variant="ghost" onClick={onClose} className="h-8 px-4 text-[11.5px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>
@@ -282,12 +262,13 @@ export function SubmitBudgetModal({ isOpen, onClose, onSubmit }: BudgetModalProp
           </p>
         </div>
 
-        <div className="w-full space-y-2 text-left">
-          <Label className="text-xs font-bold modal-label normal-case tracking-normal ml-1">Comments (Optional)</Label>
-          <Textarea
-            className="modal-input border-[var(--shell-border)] focus:border-[var(--shell-accent)]/50 focus:ring-1 focus:ring-[var(--shell-accent)]/50 min-h-[80px] text-xs text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] resize-none rounded-lg p-3"
-            placeholder="Provide justification for this allocation..."
-          />
+        <div className="w-full text-left">
+          <Field label="Comments (Optional)">
+            <Textarea
+              className="modal-input border-[var(--shell-border)] focus-visible:ring-2 focus-visible:ring-[var(--shell-accent)] min-h-[80px] text-xs text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] resize-none rounded-lg p-3"
+              placeholder="Provide justification for this allocation..."
+            />
+          </Field>
         </div>
       </div>
     </ModuleModal>
@@ -304,11 +285,11 @@ export function DeleteBudgetModal({ isOpen, onClose, onConfirm, count }: { isOpe
       onSave={onConfirm}
       saveLabel="Yes, Delete"
       isDestructive={true}
-      maxWidth="sm:max-w-[680px]"
+      size="md"
     >
       <div className="flex flex-col items-center text-center space-y-3">
-        <div className="w-16 h-16 rounded-full bg-rose-500/15 flex items-center justify-center">
-           <Trash2 className="w-8 h-8 text-rose-600" />
+        <div className="w-16 h-16 rounded-full bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] flex items-center justify-center">
+           <Trash2 className="w-8 h-8 text-[var(--danger)]" />
         </div>
         <div className="space-y-2">
           <h3 className="text-lg font-bold tracking-tight" style={{ color: 'var(--shell-text)' }}>Delete {count} budget record(s)?</h3>

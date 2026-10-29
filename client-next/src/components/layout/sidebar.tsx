@@ -1,9 +1,10 @@
 'use client';
 
-import { usePathname, useRouter } from 'next/navigation';
-import { useTransition } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 import { useAuthStore } from '@/stores/auth-store';
+import { canAccessRoute } from '@/lib/route-access';
 import { useSidebarStore } from '@/stores/sidebar-store';
 import {
   Tooltip,
@@ -22,45 +23,45 @@ const NAV_GROUPS = [
   {
     label: null,
     items: [
-      { name: 'Home', href: '/', icon: Home, iconColor: 'text-blue-400' },
+      { name: 'Home', href: '/', icon: Home, iconColor: 'text-nav-blue' },
     ],
   },
   {
     label: 'Transactions',
     items: [
-      { name: 'Approvals', href: '/approvals', icon: ClipboardCheck, iconColor: 'text-violet-400' },
-      { name: 'Expense', href: '/expense', icon: TrendingDown, iconColor: 'text-rose-400' },
-      { name: 'Income', href: '/income', icon: TrendingUp, iconColor: 'text-emerald-500' },
-      { name: 'Recurring', href: '/manage/recurring', icon: RotateCcw, iconColor: 'text-orange-400' },
+      { name: 'Approvals', href: '/approvals', icon: ClipboardCheck, iconColor: 'text-nav-violet' },
+      { name: 'Expense', href: '/expense', icon: TrendingDown, iconColor: 'text-nav-rose' },
+      { name: 'Income', href: '/income', icon: TrendingUp, iconColor: 'text-nav-emerald' },
+      { name: 'Recurring', href: '/manage/recurring', icon: RotateCcw, iconColor: 'text-nav-orange' },
     ],
   },
   {
     label: 'Operations',
     items: [
-      { name: 'Client', href: '/manage/clients', icon: Users, iconColor: 'text-cyan-400' },
-      { name: 'Project', href: '/manage/projects', icon: Briefcase, iconColor: 'text-indigo-400' },
-      { name: 'Product', href: '/manage/products', icon: Package, iconColor: 'text-amber-400' },
+      { name: 'Client', href: '/manage/clients', icon: Users, iconColor: 'text-nav-cyan' },
+      { name: 'Project', href: '/manage/projects', icon: Briefcase, iconColor: 'text-nav-indigo' },
+      { name: 'Product', href: '/manage/products', icon: Package, iconColor: 'text-nav-amber' },
     ],
   },
   {
     label: 'Manage',
     items: [
-      { name: 'Organization', href: '/manage/organization', icon: Building2, iconColor: 'text-blue-400' },
-      { name: 'Budget', href: '/manage/budgets', icon: Target, iconColor: 'text-cyan-400' },
+      { name: 'Organization', href: '/manage/organization', icon: Building2, iconColor: 'text-nav-blue' },
+      { name: 'Budget', href: '/manage/budgets', icon: Target, iconColor: 'text-nav-cyan' },
     ],
   },
   {
     label: 'Analytics',
     items: [
-      { name: 'Spend Analytics', href: '/analytics/resource-utilization', icon: BarChart2, iconColor: 'text-purple-400' },
-      { name: 'Transaction Reports', href: '/reporting', icon: FileBarChart, iconColor: 'text-blue-400' },
+      { name: 'Spend Analytics', href: '/analytics/resource-utilization', icon: BarChart2, iconColor: 'text-nav-purple' },
+      { name: 'Transaction Reports', href: '/reporting', icon: FileBarChart, iconColor: 'text-nav-blue' },
     ],
   },
   {
     label: 'System',
     items: [
-      { name: 'Audit Log', href: '/system/audit-log', icon: Shield, iconColor: 'text-red-400' },
-      { name: 'Settings', href: '/settings', icon: Settings, iconColor: 'text-slate-400' },
+      { name: 'Audit Log', href: '/system/audit-log', icon: Shield, iconColor: 'text-nav-red' },
+      { name: 'Settings', href: '/settings', icon: Settings, iconColor: 'text-nav-slate' },
     ],
   },
 ];
@@ -69,15 +70,8 @@ const EMPLOYEE_ALLOWED = ['/expense', '/approvals'];
 
 export function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
-  const [, startTransition] = useTransition();
   const { user } = useAuthStore();
   const { mobileOpen, closeMobile, slim, toggleSlim } = useSidebarStore();
-
-  function navigate(href: string) {
-    closeMobile();
-    startTransition(() => { router.push(href); });
-  }
 
   const isEmployeeActive = (user?.role_name || '').toUpperCase() === 'EMPLOYEE';
 
@@ -102,21 +96,22 @@ export function Sidebar() {
           {/* Logo */}
           <div className="h-[44px] flex items-center shrink-0 overflow-hidden" style={{ borderBottom: '1px solid var(--shell-border)', justifyContent: slim ? 'center' : 'center' }}>
             {slim ? (
-              <span className="text-[16px] font-extrabold" style={{ color: '#d97706', fontFamily: 'var(--font-raleway)' }}>N</span>
+              <span className="text-[16px] font-extrabold" style={{ color: 'var(--shell-brand)', fontFamily: 'var(--font-raleway)' }}>N</span>
             ) : (
-              <span className="text-[16px] font-extrabold tracking-[0.22em]" style={{ color: '#d97706', fontFamily: 'var(--font-raleway)' }}>NTEMS</span>
+              <span className="text-[16px] font-extrabold tracking-[0.22em]" style={{ color: 'var(--shell-brand)', fontFamily: 'var(--font-raleway)' }}>NTEMS</span>
             )}
           </div>
 
           {/* Navigation */}
           <nav className={`flex-1 py-3 overflow-y-auto hide-scrollbar space-y-0.5 ${slim ? 'px-2' : 'px-3'}`}>
             {NAV_GROUPS.map((group, gi) => {
-              const visibleItems = group.items.filter((item) => !isEmployeeActive || EMPLOYEE_ALLOWED.includes(item.href));
+              const visibleItems = group.items.filter((item) =>
+                canAccessRoute(item.href, user?.role_name) && (!isEmployeeActive || EMPLOYEE_ALLOWED.includes(item.href)));
               if (visibleItems.length === 0) return null;
               return (
                 <div key={gi} className={gi > 0 ? 'pt-4' : ''}>
                   {group.label && !slim && (
-                    <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.14em] mb-1.5" style={{ color: 'var(--shell-text-muted)' }}>
+                    <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.14em] mb-1.5" style={{ color: 'var(--shell-text-muted)' }}>
                       {group.label}
                     </p>
                   )}
@@ -127,9 +122,12 @@ export function Sidebar() {
                     {visibleItems.map((item) => {
                       const isActive = pathname === item.href;
                       const linkEl = (
-                        <button
+                        <Link
                           key={item.href}
-                          onClick={() => navigate(item.href)}
+                          href={item.href}
+                          onClick={closeMobile}
+                          aria-current={isActive ? 'page' : undefined}
+                          aria-label={slim ? item.name : undefined}
                           className={`flex items-center transition-all rounded-full ${
                             slim
                               ? 'justify-center w-9 h-9 mx-auto'
@@ -139,7 +137,7 @@ export function Sidebar() {
                         >
                           <item.icon className={`h-[15px] w-[15px] shrink-0 ${item.iconColor}`} />
                           {!slim && item.name}
-                        </button>
+                        </Link>
                       );
 
                       if (slim) {
@@ -167,6 +165,7 @@ export function Sidebar() {
                 <TooltipTrigger asChild>
                   <button
                     onClick={toggleSlim}
+                    aria-label={slim ? "Expand sidebar" : "Collapse sidebar"}
                     className="w-6 h-6 flex items-center justify-center rounded-md transition-colors hover:bg-[var(--shell-hover)]"
                     style={{ color: 'var(--shell-text-muted)' }}
                   >
@@ -194,13 +193,13 @@ export function Sidebar() {
               </Tooltip>
             ) : (
               <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition-colors hover:bg-[var(--shell-hover)]">
-                <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold"
+                <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[11px] font-bold"
                   style={{ background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' }}>
                   {initials}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[12px] font-semibold leading-none truncate" style={{ color: 'var(--shell-text)' }}>{user?.username || 'User'}</p>
-                  <p className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--shell-text-muted)' }}>{user?.role_name || user?.role || 'Admin'}</p>
+                  <p className="text-[11px] mt-0.5 truncate" style={{ color: 'var(--shell-text-muted)' }}>{user?.role_name || user?.role || 'Admin'}</p>
                 </div>
                 <ChevronsUpDown className="w-3 h-3 shrink-0" style={{ color: 'var(--shell-text-muted)' }} />
               </div>

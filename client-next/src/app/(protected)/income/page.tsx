@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useTransactions, useCategories, useClients, useProjects, useInvalidate, useApprovalTrail } from '@/hooks/use-queries';
 import api, { getAccessToken, API_BASE } from '@/lib/api-client';
 import { formatCurrency, formatDate, CURRENCY_SYMBOL } from '@/lib/currency';
+import { STATUS_CONFIG } from '@/lib/status';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -21,7 +22,6 @@ import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
 import { columns } from './columns';
 import { 
-  useReactTable, 
   getCoreRowModel, 
   getFilteredRowModel, 
   getPaginationRowModel, 
@@ -33,6 +33,7 @@ import {
   VisibilityState,
   RowSelectionState
 } from "@tanstack/react-table";
+import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { CurrencyInput, useConfirm } from '@/components/shared/modal-primitives';
@@ -54,19 +55,20 @@ export default function IncomePage() {
   const { data: clients } = useClients();
   const { data: categories } = useCategories();
   const { data: projects } = useProjects();
-  // This workspace shows only active income (APPROVED/REJECTED are excluded below and
-  // live in Approvals history), so the row count is naturally bounded. Request a high
-  // limit instead of the default 20 so the full active set is available to the
-  // client-side table + faceted filters rather than just the latest 20 records.
+  // Income is auto-approved on submit, so hiding APPROVED/REJECTED would make a record vanish from
+  // the page it was entered on. Show every status and let the toolbar filter narrow it down.
+  // Request a high limit instead of the default 20 so the client-side table has the full set.
   const { data: txnData, isLoading } = useTransactions({ type: 'income', limit: '500' });
 
-  const EXCLUDED_STATUSES = ['APPROVED', 'REJECTED'];
   const LOCKED_STATUSES = ['APPROVED', 'REJECTED'];
+  const [statusFilter, setStatusFilter] = useState('all');
   const rawTransactions = useMemo(() => {
     if (!txnData) return [];
     const rows = Array.isArray(txnData) ? txnData : (txnData as any).rows || [];
-    return rows.filter((t: any) => !EXCLUDED_STATUSES.includes((t.status || '').toUpperCase()));
-  }, [txnData]);
+    return statusFilter === 'all'
+      ? rows
+      : rows.filter((t: any) => (t.status || '').toUpperCase() === statusFilter);
+  }, [txnData, statusFilter]);
 
   // Combined Categories for Filter
   const facetedCategories = useMemo(() => {
@@ -324,7 +326,7 @@ export default function IncomePage() {
     return () => mq.removeEventListener('change', handler);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const table = useReactTable({
+  const table = useDataTable({
     data: rawTransactions,
     columns: incomeColumns,
     state: {
@@ -406,21 +408,21 @@ export default function IncomePage() {
           actions={
             <>
               <button className="btn-action" onClick={openAdd}>
-                <Plus className="h-4 w-4 text-green-600" /> Add
+                <Plus className="h-4 w-4 text-[var(--success)]" /> Add
               </button>
               <button
                 className="btn-action"
                 onClick={openEdit}
                 disabled={selectedCount !== 1 || !['DRAFT', 'SENT_BACK'].includes((sr[0]?.original?.status || '').toUpperCase())}
               >
-                <Pencil className="h-4 w-4 text-blue-600" /> Edit
+                <Pencil className="h-4 w-4 text-[var(--info)]" /> Edit
               </button>
               <button
                 className="btn-action"
                 onClick={openSplit}
                 disabled={selectedCount !== 1 || !['DRAFT', 'SENT_BACK'].includes((sr[0]?.original?.status || '').toUpperCase())}
               >
-                <Split className="h-4 w-4 text-purple-600" /> Split
+                <Split className="h-4 w-4 text-[var(--info)]" /> Split
               </button>
               <button
                 className="btn-action"
@@ -430,9 +432,22 @@ export default function IncomePage() {
                 <Send className="h-4 w-4 text-currency" /> Submit
               </button>
               <button className="btn-action" onClick={handleDelete} disabled={selectedCount === 0}>
-                <Trash2 className="h-4 w-4 text-rose-500" /> Delete{selectedCount > 0 ? ` (${selectedCount})` : ''}
+                <Trash2 className="h-4 w-4 text-[var(--danger)]" /> Delete{selectedCount > 0 ? ` (${selectedCount})` : ''}
               </button>
             </>
+          }
+          extra={
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-8 w-[150px] rounded-full text-[12.5px]" aria-label="Filter by status">
+                <SelectValue placeholder="All statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+                  <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           }
         />
       }
@@ -446,7 +461,7 @@ export default function IncomePage() {
             <div className="flex-1 space-y-4">
               {/* Primary Document */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[var(--shell-text-muted)] uppercase flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
+                <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
                   <FileText className="w-3.5 h-3.5" /> Primary Document
                 </label>
                 <input
@@ -464,23 +479,23 @@ export default function IncomePage() {
                   {panelUploading ? (
                     <>
                       <UploadCloud className="w-8 h-8 mb-2 text-[var(--shell-text-muted)] animate-pulse" />
-                      <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--shell-text-muted)]">Uploading...</p>
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--shell-text-muted)]">Uploading...</p>
                     </>
                   ) : selectedTxn?.receipt_path ? (
                     <>
                       <div className="w-10 h-10 rounded-xl bg-[var(--shell-accent)]/20 border border-[var(--shell-accent)]/30 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
                         <FileText className="w-5 h-5 text-[var(--shell-accent)]" />
                       </div>
-                      <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--shell-accent)] truncate max-w-[160px] px-2">{selectedTxn.receipt_path.split('/').pop()}</p>
-                      <p className="text-[9px] text-[var(--shell-accent)]/60 mt-0.5 font-medium">Click to view full screen</p>
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--shell-accent)] truncate max-w-[160px] px-2">{selectedTxn.receipt_path.split('/').pop()}</p>
+                      <p className="text-[11px] text-[var(--shell-accent)]/60 mt-0.5 font-medium">Click to view full screen</p>
                     </>
                   ) : (
                     <>
                       <div className="w-10 h-10 rounded-xl bg-[var(--shell-hover)] border border-[var(--shell-border)] flex items-center justify-center mb-2">
                         <FileText className="w-5 h-5 text-[var(--shell-text-muted)]" />
                       </div>
-                      <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--shell-text-muted)]">No Receipt or Invoice</p>
-                      <p className="text-[9px] text-[var(--shell-text-muted)] opacity-60 mt-0.5 font-medium">Click to upload PDF, JPG, PNG</p>
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--shell-text-muted)]">No Receipt or Invoice</p>
+                      <p className="text-[11px] text-[var(--shell-text-muted)] opacity-60 mt-0.5 font-medium">Click to upload PDF, JPG, PNG</p>
                     </>
                   )}
                 </div>
@@ -489,7 +504,7 @@ export default function IncomePage() {
               {/* Info fields */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-4">
                 <div className="col-span-2">
-                  <label className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">Description</label>
+                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">Description</label>
                   <p className="text-[11px] text-[var(--shell-text-muted)] bg-[var(--shell-hover)] px-2 py-1.5 rounded-lg mt-0.5 border border-[var(--shell-border)] leading-relaxed">{selectedTxn.description || 'No description provided'}</p>
                 </div>
 
@@ -498,11 +513,11 @@ export default function IncomePage() {
                   {selectedTxn.gst_rate != null && (
                     <>
                       <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--shell-border)]">
-                        <span className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">Net Amount</span>
+                        <span className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">Net Amount</span>
                         <span className="text-[12px] font-bold text-black dark:text-white">{formatCurrency(selectedTxn.net_amount ?? selectedTxn.amount, currency)}</span>
                       </div>
                       <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--shell-border)]">
-                        <span className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">GST ({selectedTxn.gst_rate}%)</span>
+                        <span className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">GST ({selectedTxn.gst_rate}%)</span>
                         <span className="text-[12px] font-bold text-black dark:text-white">
                           {formatCurrency((selectedTxn.total_amount ?? selectedTxn.amount) - (selectedTxn.net_amount ?? selectedTxn.amount), currency)}
                         </span>
@@ -510,37 +525,37 @@ export default function IncomePage() {
                     </>
                   )}
                   <div className="flex items-center justify-between px-3 py-2.5 bg-[var(--shell-accent)]/5">
-                    <span className="text-[9px] font-bold text-[var(--shell-accent)] uppercase tracking-wider">Total Amount</span>
+                    <span className="text-[11px] font-bold text-[var(--shell-accent)] uppercase tracking-wider">Total Amount</span>
                     <span className="text-[14px] font-black text-black dark:text-white">{formatCurrency(selectedTxn.total_amount ?? selectedTxn.amount, currency)}</span>
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">Date Recorded</label>
+                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">Date Recorded</label>
                   <p className="text-[12px] font-bold mt-0.5 text-black dark:text-white">{formatDate(selectedTxn.date_recorded)}</p>
                 </div>
                 <div>
-                  <label className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">Payment Method</label>
+                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">Payment Method</label>
                   <p className="text-[12px] font-bold mt-0.5 text-black dark:text-white capitalize">{selectedTxn.payment_method || '—'}</p>
                 </div>
                 <div>
-                  <label className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">Category</label>
+                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">Category</label>
                   <p className="text-[12px] font-bold mt-0.5 text-black dark:text-white">{selectedTxn.category_name || '—'}</p>
                 </div>
               </div>
 
               {/* Fund Allocation */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[var(--shell-text-muted)] uppercase flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
+                <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
                   <LayoutGrid className="w-3.5 h-3.5" /> Fund Allocation
                 </label>
                 {selectedTxn.is_split === 1 ? (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5 px-2 py-0.5 bg-teal-50 border border-teal-200 rounded-full text-[9px] font-bold text-teal-700 uppercase tracking-wider">
+                      <span className="flex items-center gap-1.5 px-2 py-0.5 bg-[color-mix(in_srgb,var(--success)_12%,transparent)] border border-[color-mix(in_srgb,var(--success)_35%,transparent)] rounded-full text-[11px] font-bold text-[var(--success)] uppercase tracking-wider">
                         <Layers className="w-3 h-3" /> Split Income
                       </span>
-                      <button onClick={openSplit} className="text-[10px] font-bold text-[var(--shell-accent)] hover:underline uppercase tracking-wider">Re-split →</button>
+                      <button onClick={openSplit} className="text-[11px] font-bold text-[var(--shell-accent)] hover:underline uppercase tracking-wider">Re-split →</button>
                     </div>
                     {splitDetailsLoading ? (
                       <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">Loading split details...</p>
@@ -552,11 +567,11 @@ export default function IncomePage() {
                             <div key={s.id ?? i}>
                               <div className="flex items-center justify-between mb-0.5">
                                 <div className="flex items-center gap-1.5 min-w-0">
-                                  <span className="shrink-0 w-3.5 h-3.5 rounded-full bg-[var(--shell-accent)]/10 text-[var(--shell-accent)] text-[9px] font-black flex items-center justify-center">{i + 1}</span>
+                                  <span className="shrink-0 w-3.5 h-3.5 rounded-full bg-[var(--shell-accent)]/10 text-[var(--shell-accent)] text-[11px] font-black flex items-center justify-center">{i + 1}</span>
                                   <span className="text-[11px] font-bold text-black dark:text-white truncate">{s.category_name || `Split ${i + 1}`}</span>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0 ml-2">
-                                  <span className="text-[10px] font-bold text-[var(--shell-accent)]">{pct}%</span>
+                                  <span className="text-[11px] font-bold text-[var(--shell-accent)]">{pct}%</span>
                                   <span className="text-[11px] font-black text-black dark:text-white">{formatCurrency(s.amount, currency)}</span>
                                 </div>
                               </div>
@@ -564,7 +579,7 @@ export default function IncomePage() {
                                 <div className="bg-[var(--shell-accent)] h-full rounded-full transition-all" style={{ width: `${pct}%` }} />
                               </div>
                               {(s.description || s.project_name) && (
-                                <p className="text-[9px] text-[var(--shell-text-muted)] mt-0.5 truncate">
+                                <p className="text-[11px] text-[var(--shell-text-muted)] mt-0.5 truncate">
                                   {[s.description, s.project_name && `[${s.project_name}]`].filter(Boolean).join(' ')}
                                 </p>
                               )}
@@ -572,7 +587,7 @@ export default function IncomePage() {
                           );
                         })}
                         <div className="flex items-center justify-between pt-1.5 border-t border-[var(--shell-border)]">
-                          <span className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">{splitDetails.length} splits · Total</span>
+                          <span className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">{splitDetails.length} splits · Total</span>
                           <span className="text-[12px] font-black text-[var(--shell-accent)]">{formatCurrency(selectedTxn.amount, currency)}</span>
                         </div>
                       </div>
@@ -580,22 +595,24 @@ export default function IncomePage() {
                       <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">No split details available.</p>
                     )}
                   </div>
-                ) : (
+                ) : (selectedTxn.project_name || selectedTxn.product_name) ? (
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-[11px] font-bold text-black dark:text-white">{selectedTxn.project_name || 'General Reserve'}</span>
+                      <span className="text-[11px] font-bold text-black dark:text-white">{selectedTxn.project_name || selectedTxn.product_name}</span>
                       <span className="text-[11px] font-bold text-[var(--shell-accent)]">100.00%</span>
                     </div>
                     <div className="w-full bg-[var(--shell-hover)] rounded-full h-1 overflow-hidden shadow-inner">
                       <div className="bg-[var(--shell-accent)] h-full rounded-full" style={{ width: '100%' }} />
                     </div>
                   </div>
+                ) : (
+                  <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">Not linked to a project or product.</p>
                 )}
               </div>
 
               {/* Approval Trail */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[var(--shell-text-muted)] uppercase flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
+                <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
                   <Clock className="w-3.5 h-3.5" /> Approval Trail
                 </label>
                 {(() => {
@@ -606,68 +623,68 @@ export default function IncomePage() {
                     <div className="space-y-2">
                       {selectedTxn.submitted_at && (
                         <div className="flex items-start gap-2.5">
-                          <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0" />
+                          <div className="w-1.5 h-1.5 rounded-full bg-[var(--info)] mt-1.5 shrink-0" />
                           <div>
-                            <p className="text-[10px] font-bold text-black dark:text-white">
+                            <p className="text-[11px] font-bold text-black dark:text-white">
                               Submitted by <span className="text-[var(--shell-accent)]">{selectedTxn.submitted_by_name || 'User'}</span>
                             </p>
-                            <p className="text-[9px] text-[var(--shell-text-muted)] font-medium">{formatDate(selectedTxn.submitted_at)}</p>
+                            <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">{formatDate(selectedTxn.submitted_at)}</p>
                           </div>
                         </div>
                       )}
                       {selectedTxn.sent_back_at && (
                         <div className="flex items-start gap-2.5">
-                          <div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 shrink-0" />
+                          <div className="w-1.5 h-1.5 rounded-full bg-[var(--warning)] mt-1.5 shrink-0" />
                           <div>
-                            <p className="text-[10px] font-bold text-black dark:text-white">
-                              Sent back by <span className="text-amber-500">{selectedTxn.sent_back_by_name}</span>
+                            <p className="text-[11px] font-bold text-black dark:text-white">
+                              Sent back by <span className="text-[var(--warning)]">{selectedTxn.sent_back_by_name}</span>
                               {selectedTxn.sent_back_by_role && <span className="text-[var(--shell-text-muted)]"> ({selectedTxn.sent_back_by_role})</span>}
                             </p>
-                            <p className="text-[9px] text-[var(--shell-text-muted)] font-medium">{formatDate(selectedTxn.sent_back_at)}</p>
-                            {sentBackComment && <p className="text-[9px] text-amber-600 dark:text-amber-400 mt-0.5 italic">"{sentBackComment}"</p>}
+                            <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">{formatDate(selectedTxn.sent_back_at)}</p>
+                            {sentBackComment && <p className="text-[11px] text-[var(--warning)] mt-0.5 italic">"{sentBackComment}"</p>}
                           </div>
                         </div>
                       )}
                       {selectedTxn.approved_at && (
                         <div className="flex items-start gap-2.5">
-                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
+                          <div className="w-1.5 h-1.5 rounded-full bg-[var(--success)] mt-1.5 shrink-0" />
                           <div>
-                            <p className="text-[10px] font-bold text-black dark:text-white">
-                              Approved by <span className="text-emerald-500">{selectedTxn.approved_by_name}</span>
+                            <p className="text-[11px] font-bold text-black dark:text-white">
+                              Approved by <span className="text-[var(--success)]">{selectedTxn.approved_by_name}</span>
                               {selectedTxn.approved_by_role && <span className="text-[var(--shell-text-muted)]"> ({selectedTxn.approved_by_role})</span>}
                             </p>
-                            <p className="text-[9px] text-[var(--shell-text-muted)] font-medium">{formatDate(selectedTxn.approved_at)}</p>
-                            {approvedComment && <p className="text-[9px] text-emerald-600 dark:text-emerald-400 mt-0.5 italic">"{approvedComment}"</p>}
+                            <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">{formatDate(selectedTxn.approved_at)}</p>
+                            {approvedComment && <p className="text-[11px] text-[var(--success)] mt-0.5 italic">"{approvedComment}"</p>}
                           </div>
                         </div>
                       )}
                       {selectedTxn.rejected_at && (
                         <div className="flex items-start gap-2.5">
-                          <div className="w-1.5 h-1.5 rounded-full bg-red-400 mt-1.5 shrink-0" />
+                          <div className="w-1.5 h-1.5 rounded-full bg-[var(--danger)] mt-1.5 shrink-0" />
                           <div>
-                            <p className="text-[10px] font-bold text-black dark:text-white">
-                              Rejected by <span className="text-red-500">{selectedTxn.rejected_by_name}</span>
+                            <p className="text-[11px] font-bold text-black dark:text-white">
+                              Rejected by <span className="text-[var(--danger)]">{selectedTxn.rejected_by_name}</span>
                               {selectedTxn.rejected_by_role && <span className="text-[var(--shell-text-muted)]"> ({selectedTxn.rejected_by_role})</span>}
                             </p>
-                            <p className="text-[9px] text-[var(--shell-text-muted)] font-medium">{formatDate(selectedTxn.rejected_at)}</p>
-                            {rejectedComment && <p className="text-[9px] text-red-500 mt-0.5 italic">"{rejectedComment}"</p>}
+                            <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">{formatDate(selectedTxn.rejected_at)}</p>
+                            {rejectedComment && <p className="text-[11px] text-[var(--danger)] mt-0.5 italic">"{rejectedComment}"</p>}
                           </div>
                         </div>
                       )}
                       {selectedTxn.voided_at && (
                         <div className="flex items-start gap-2.5">
-                          <div className="w-1.5 h-1.5 rounded-full bg-slate-400 mt-1.5 shrink-0" />
+                          <div className="w-1.5 h-1.5 rounded-full bg-[var(--shell-hover)] mt-1.5 shrink-0" />
                           <div>
-                            <p className="text-[10px] font-bold text-black dark:text-white">
-                              Voided by <span className="text-slate-500">{selectedTxn.voided_by_name}</span>
+                            <p className="text-[11px] font-bold text-black dark:text-white">
+                              Voided by <span className="text-[var(--shell-text-muted)]">{selectedTxn.voided_by_name}</span>
                             </p>
-                            <p className="text-[9px] text-[var(--shell-text-muted)] font-medium">{formatDate(selectedTxn.voided_at)}</p>
-                            {selectedTxn.void_reason && <p className="text-[9px] text-slate-500 mt-0.5 italic">"{selectedTxn.void_reason}"</p>}
+                            <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">{formatDate(selectedTxn.voided_at)}</p>
+                            {selectedTxn.void_reason && <p className="text-[11px] text-[var(--shell-text-muted)] mt-0.5 italic">"{selectedTxn.void_reason}"</p>}
                           </div>
                         </div>
                       )}
                       {!selectedTxn.submitted_at && !selectedTxn.approved_at && !selectedTxn.rejected_at && !selectedTxn.voided_at && (
-                        <p className="text-[10px] text-[var(--shell-text-muted)] font-medium">Draft — not yet submitted</p>
+                        <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">Draft — not yet submitted</p>
                       )}
                     </div>
                   );
@@ -676,28 +693,28 @@ export default function IncomePage() {
 
               {/* Notes Thread */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[var(--shell-text-muted)] uppercase flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
+                <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
                   <FileText className="w-3.5 h-3.5" /> Internal Notes
                 </label>
                 {notesLoading ? (
-                  <p className="text-[10px] text-[var(--shell-text-muted)]">Loading notes...</p>
+                  <p className="text-[11px] text-[var(--shell-text-muted)]">Loading notes...</p>
                 ) : (
                   <div className="space-y-1.5">
                     {notes.map((n: any) => (
                       <div key={n.id} className="flex items-start gap-2 px-2.5 py-2 rounded-lg bg-[var(--shell-hover)] border border-[var(--shell-border)]">
                         <div className="flex-1 min-w-0">
-                          <p className="text-[10px] font-bold text-[var(--shell-accent)]">{n.username}</p>
+                          <p className="text-[11px] font-bold text-[var(--shell-accent)]">{n.username}</p>
                           <p className="text-[11px] text-black dark:text-white leading-snug">{n.note}</p>
-                          <p className="text-[9px] text-[var(--shell-text-muted)] mt-0.5">{formatDate(n.created_at)}</p>
+                          <p className="text-[11px] text-[var(--shell-text-muted)] mt-0.5">{formatDate(n.created_at)}</p>
                         </div>
                         {n.user_id === user?.id && (
-                          <button onClick={() => handleDeleteNote(n.id)} className="text-[var(--shell-text-muted)] hover:text-red-500 transition-colors shrink-0 mt-0.5">
+                          <button onClick={() => handleDeleteNote(n.id)} className="text-[var(--shell-text-muted)] hover:text-[var(--danger)] transition-colors shrink-0 mt-0.5">
                             <Trash2 className="w-3 h-3" />
                           </button>
                         )}
                       </div>
                     ))}
-                    {notes.length === 0 && <p className="text-[10px] text-[var(--shell-text-muted)]">No notes yet.</p>}
+                    {notes.length === 0 && <p className="text-[11px] text-[var(--shell-text-muted)]">No notes yet.</p>}
                   </div>
                 )}
                 <div className="flex gap-2">
@@ -711,7 +728,7 @@ export default function IncomePage() {
                   <button
                     onClick={handleAddNote}
                     disabled={!newNote.trim() || noteSaving}
-                    className="h-8 px-3 rounded-lg bg-[var(--shell-accent)] text-[var(--shell-accent-fg)] text-[10px] font-bold uppercase tracking-wider disabled:opacity-40 transition-opacity"
+                    className="h-8 px-3 rounded-lg bg-[var(--shell-accent)] text-[var(--shell-accent-fg)] text-[11px] font-bold uppercase tracking-wider disabled:opacity-40 transition-opacity"
                   >
                     {noteSaving ? '...' : 'Add'}
                   </button>
@@ -720,7 +737,7 @@ export default function IncomePage() {
 
               {/* Reference ID */}
               <div>
-                <label className="text-[10px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5 mb-1.5">
+                <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5 mb-1.5">
                   <ShieldCheck className="w-3.5 h-3.5" /> Reference ID
                 </label>
                 <div className="px-3 py-2 rounded-lg font-mono text-[12px] font-bold leading-relaxed" style={{ background: 'var(--shell-hover)', border: '1px solid var(--shell-border)', color: 'var(--shell-accent)' }}>
@@ -732,14 +749,14 @@ export default function IncomePage() {
               <div className="flex gap-2 pt-1">
                 <button
                   onClick={handleDuplicate}
-                  className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg border border-[var(--shell-border)] bg-[var(--shell-hover)] text-[10px] font-bold text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] hover:bg-[var(--shell-surface)] transition-colors uppercase tracking-wider"
+                  className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg border border-[var(--shell-border)] bg-[var(--shell-hover)] text-[11px] font-bold text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] hover:bg-[var(--shell-surface)] transition-colors uppercase tracking-wider"
                 >
                   <Copy className="w-3 h-3" /> Duplicate
                 </button>
                 {(selectedTxn.status || '').toUpperCase() === 'APPROVED' && (user?.roles || []).some((r: any) => ['FINANCE', 'ADMIN'].includes((r.role_name || '').toUpperCase())) && (
                   <button
                     onClick={() => { setVoidReason(''); setVoidOpen(true); }}
-                    className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg border border-red-300/40 bg-red-500/10 text-[10px] font-bold text-red-500 hover:bg-red-500/20 transition-colors uppercase tracking-wider"
+                    className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg border border-[color-mix(in_srgb,var(--danger)_40%,transparent)] bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] text-[11px] font-bold text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_20%,transparent)] transition-colors uppercase tracking-wider"
                   >
                     <Ban className="w-3 h-3" /> Void
                   </button>
@@ -775,7 +792,7 @@ export default function IncomePage() {
         onClose={() => setSplitOpen(false)}
         title="Split Income Record"
         icon={<Split className="h-4 w-4" />}
-        maxWidth="sm:max-w-[700px]"
+        size="md"
         footer={
           <>
             <Button
@@ -799,18 +816,18 @@ export default function IncomePage() {
         {/* Summary cards */}
         <div className="flex gap-3 mb-4">
           <div className="flex-1 flex flex-col gap-0.5 rounded-lg p-2.5 bg-[var(--shell-hover)] border border-[var(--shell-border)]">
-            <p className="text-[var(--shell-accent)] text-[9px] font-bold uppercase tracking-wider">Original</p>
+            <p className="text-[var(--shell-accent)] text-[11px] font-bold uppercase tracking-wider">Original</p>
             <p className="text-[var(--shell-text)] text-[13px] font-black">{formatCurrency(Number(editing?.amount || 0), currency)}</p>
           </div>
-          <div className="flex-1 flex flex-col gap-0.5 rounded-lg p-2.5 bg-blue-500/10 border border-blue-400/20">
-            <p className="text-blue-400 text-[9px] font-bold uppercase tracking-wider">Split Total</p>
-            <p className="text-blue-300 text-[13px] font-black">
+          <div className="flex-1 flex flex-col gap-0.5 rounded-lg p-2.5 bg-[color-mix(in_srgb,var(--info)_10%,transparent)] border border-[color-mix(in_srgb,var(--info)_20%,transparent)]">
+            <p className="text-[var(--info)] text-[11px] font-bold uppercase tracking-wider">Split Total</p>
+            <p className="text-[var(--info)] text-[13px] font-black">
               {formatCurrency(splitEntries.reduce((sum, e) => sum + (Number(e.amount) || 0), 0), currency)}
             </p>
           </div>
-          <div className="flex-1 flex flex-col gap-0.5 rounded-lg p-2.5 bg-amber-500/10 border border-amber-400/20">
-            <p className="text-amber-400 text-[9px] font-bold uppercase tracking-wider">Remaining</p>
-            <p className="text-amber-300 text-[13px] font-black">
+          <div className="flex-1 flex flex-col gap-0.5 rounded-lg p-2.5 bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border border-[color-mix(in_srgb,var(--warning)_20%,transparent)]">
+            <p className="text-[var(--warning)] text-[11px] font-bold uppercase tracking-wider">Remaining</p>
+            <p className="text-[var(--warning)] text-[13px] font-black">
               {formatCurrency(Number(editing?.amount || 0) - splitEntries.reduce((sum, e) => sum + (Number(e.amount) || 0), 0), currency)}
             </p>
           </div>
@@ -818,9 +835,9 @@ export default function IncomePage() {
 
         {/* Column headers */}
         <div className="grid gap-2 mb-1" style={{ gridTemplateColumns: '2fr 3fr 1.5fr' }}>
-          <p className="text-[9px] font-bold uppercase tracking-wider text-[var(--shell-text-muted)] px-1">Category</p>
-          <p className="text-[9px] font-bold uppercase tracking-wider text-[var(--shell-text-muted)] px-1">Description</p>
-          <p className="text-[9px] font-bold uppercase tracking-wider text-[var(--shell-text-muted)] px-1 text-right">Amount</p>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--shell-text-muted)] px-1">Category</p>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--shell-text-muted)] px-1">Description</p>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--shell-text-muted)] px-1 text-right">Amount</p>
         </div>
 
         {/* Split rows */}
@@ -872,7 +889,7 @@ export default function IncomePage() {
         title="Void Transaction"
         icon={<Ban className="w-4 h-4" />}
         isDestructive={true}
-        maxWidth="sm:max-w-[480px]"
+        size="sm"
         footer={
           <>
             <Button variant="ghost" onClick={() => setVoidOpen(false)} disabled={voidSaving} className="h-8 px-4 text-[11.5px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>
@@ -881,7 +898,7 @@ export default function IncomePage() {
             <button
               onClick={handleVoid}
               disabled={voidSaving}
-              className="px-8 py-2.5 bg-red-600 text-white text-[12px] font-bold uppercase tracking-widest rounded-lg hover:brightness-110 active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-8 py-2.5 bg-[var(--danger)] text-[var(--danger-foreground)] text-[12px] font-bold uppercase tracking-widest rounded-lg hover:brightness-110 active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {voidSaving && <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />}
               Confirm Void
@@ -890,13 +907,13 @@ export default function IncomePage() {
         }
       >
         <div className="space-y-4">
-          <div className="p-3 bg-red-500/10 border border-red-400/20 rounded-xl text-[11px] text-red-600 dark:text-red-300 font-medium">
+          <div className="p-3 bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] border border-[color-mix(in_srgb,var(--danger)_20%,transparent)] rounded-xl text-[11px] text-[var(--danger)] font-medium">
             This will permanently mark <strong>{selectedTxn?.reference_id || `#${selectedTxn?.id}`}</strong> as VOIDED. The record is kept for audit purposes but will no longer count in reports.
           </div>
           <div className="space-y-2">
             <label className="text-[11px] font-bold modal-label uppercase tracking-widest block">Void Reason (optional)</label>
             <textarea
-              className="w-full h-20 p-3 modal-input border border-[var(--shell-border)] rounded-lg text-[13px] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-red-500/50 focus:border-red-500/50 resize-none outline-none"
+              className="w-full h-20 p-3 modal-input border border-[var(--shell-border)] rounded-lg text-[13px] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[color-mix(in_srgb,var(--danger)_50%,transparent)] focus:border-[color-mix(in_srgb,var(--danger)_50%,transparent)] resize-none outline-none"
               placeholder="Describe why this transaction is being voided..."
               value={voidReason}
               onChange={(e) => setVoidReason(e.target.value)}

@@ -6,10 +6,10 @@ import { cn } from "@/lib/utils"
 
 const getRoleTextColor = (roleName?: string) => {
   switch (roleName?.toLowerCase()) {
-    case 'admin': return 'text-red-500';
+    case 'admin': return 'text-[var(--danger)]';
     case 'finance': return 'text-[var(--shell-accent)]';
-    case 'manager': return 'text-orange-500';
-    case 'employee': return 'text-blue-500';
+    case 'manager': return 'text-[var(--warning)]';
+    case 'employee': return 'text-[var(--info)]';
     default: return '';
   }
 };
@@ -19,7 +19,7 @@ export const columns = (users: User[]): ColumnDef<User>[] => [
     accessorKey: "id",
     header: "ID",
     cell: ({ row }) => (
-      <span className="font-mono text-[11px] font-bold text-blue-500">
+      <span className="font-mono text-[11px] font-bold text-[var(--info)]">
         NT{10000 + row.original.id}
       </span>
     ),
@@ -32,7 +32,7 @@ export const columns = (users: User[]): ColumnDef<User>[] => [
       const u = row.original;
       return (
         <div className="flex items-center gap-3">
-          <div className="h-7 w-7 rounded-lg flex items-center justify-center text-[10px] font-bold uppercase shrink-0"
+          <div className="h-7 w-7 rounded-lg flex items-center justify-center text-[11px] font-bold uppercase shrink-0"
             style={{ background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' }}>
             {(() => { const p = u.username.trim().split(/\s+/); return p.length >= 2 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : p[0].slice(0, 2).toUpperCase(); })()}
           </div>
@@ -70,7 +70,7 @@ export const columns = (users: User[]): ColumnDef<User>[] => [
       const managerName = row.original.manager_name || users.find(u => u.id === managerId)?.username || '—';
       return (
         <div className="flex items-center gap-2">
-          <div className="h-5 w-5 rounded-full flex items-center justify-center text-[8px] font-bold shrink-0"
+          <div className="h-5 w-5 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
             style={{ background: 'var(--shell-bg)', border: '1px solid var(--shell-border)', color: 'var(--shell-text-muted)' }}>
             {(() => { const p = managerName.trim().split(/\s+/); return p.length >= 2 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : p[0].slice(0, 2).toUpperCase(); })()}
           </div>
@@ -85,14 +85,14 @@ export const columns = (users: User[]): ColumnDef<User>[] => [
     cell: ({ row }) => {
       const status = row.original.user_status || (row.getValue("is_active") !== 0 ? 'ACTIVE' : 'INACTIVE');
       const cfg = {
-        'ACTIVE':   { dot: 'bg-emerald-400 ring-emerald-400/20', text: 'text-[var(--shell-accent)]', label: 'Active' },
-        'ON_HOLD':  { dot: 'bg-amber-400 ring-amber-400/20',   text: 'text-amber-500',  label: 'On Hold' },
-        'INACTIVE': { dot: 'bg-rose-400 ring-rose-400/20',     text: 'text-rose-500',   label: 'Inactive' },
-      }[status.toUpperCase()] || { dot: 'bg-gray-300 ring-gray-200', text: '', label: status };
+        'ACTIVE':   { dot: 'bg-[var(--success)] ring-[color-mix(in_srgb,var(--success)_20%,transparent)]', text: 'text-[var(--shell-accent)]', label: 'Active' },
+        'ON_HOLD':  { dot: 'bg-[var(--warning)] ring-[color-mix(in_srgb,var(--warning)_20%,transparent)]',   text: 'text-[var(--warning)]',  label: 'On Hold' },
+        'INACTIVE': { dot: 'bg-[var(--danger)] ring-[color-mix(in_srgb,var(--danger)_20%,transparent)]',     text: 'text-[var(--danger)]',   label: 'Inactive' },
+      }[status.toUpperCase()] || { dot: 'bg-[var(--shell-hover)] ring-[var(--shell-text-muted)]', text: '', label: status };
       return (
         <div className="flex items-center justify-center gap-2">
           <div className={cn("h-1.5 w-1.5 rounded-full ring-4", cfg.dot)} />
-          <span className={cn("text-[10px] font-bold uppercase tracking-widest", cfg.text)}>{cfg.label}</span>
+          <span className={cn("text-[11px] font-bold uppercase tracking-widest", cfg.text)}>{cfg.label}</span>
         </div>
       );
     },

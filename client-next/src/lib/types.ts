@@ -300,7 +300,8 @@ export interface ApiResponse<T> {
   success: boolean;
   data: T;
   error: ApiError | null;
-  meta: { timestamp: string };
+  // total/page/limit are present on paginated list endpoints
+  meta: { timestamp: string; total?: number; page?: number; limit?: number };
 }
 
 export interface ApiError {
@@ -313,7 +314,7 @@ export interface PaginatedResponse<T> {
   rows: T[];
   total: number;
   page: number;
-  pageSize: number;
+  limit: number;
 }
 
 // ─── Auth Types ──────────────────────────────────

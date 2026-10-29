@@ -14,7 +14,6 @@ import {
   Receipt,
   Cpu,
   History as HistoryIcon,
-  BarChart3,
   ShieldCheck,
   CornerUpLeft,
   LayoutGrid,
@@ -35,7 +34,6 @@ import { ModuleIntelligencePanel } from '@/components/shared/module/module-intel
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
 import {
-  useReactTable,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
@@ -47,6 +45,7 @@ import {
   VisibilityState,
   RowSelectionState,
 } from '@tanstack/react-table';
+import { useDataTable } from '@/hooks/use-data-table';
 
 // ─── Column definitions ─────────────────────────────────────────────────────
 
@@ -57,7 +56,7 @@ function buildColumns(role: string, currency: string): ColumnDef<any>[] {
       accessorKey: 'code',
       header: 'ID',
       cell: ({ row }: any) => (
-        <span className="text-[11px] font-bold font-mono text-blue-400">
+        <span className="text-[11px] font-bold font-mono text-[var(--info)]">
           {row.original.code || row.original.reference_id || `#${row.original.id}`}
         </span>
       ),
@@ -86,7 +85,7 @@ function buildColumns(role: string, currency: string): ColumnDef<any>[] {
                 : name.slice(0, 2).toUpperCase();
               return (
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white border border-[var(--shell-border)]"
+                  <div className="w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[11px] font-black text-[var(--shell-accent-fg)] border border-[var(--shell-border)]"
                     style={{ background: 'var(--shell-accent)' }}>
                     {initials}
                   </div>
@@ -103,7 +102,7 @@ function buildColumns(role: string, currency: string): ColumnDef<any>[] {
       header: () => <div className="text-center">Category</div>,
       cell: ({ row }) => (
         <div className="flex justify-center">
-          <span className="text-[12px] font-medium text-indigo-300">
+          <span className="text-[12px] font-medium text-[var(--info)]">
             {row.getValue('category_name') || 'General'}
           </span>
         </div>
@@ -125,7 +124,7 @@ function buildColumns(role: string, currency: string): ColumnDef<any>[] {
         const c = getStatusConfig(row.getValue('transaction_status') as string);
         return (
           <div className="flex justify-center">
-            <Badge variant="outline" className={`text-[10px] font-bold ${c.color} border-current/20`}>
+            <Badge variant="outline" className={`text-[11px] font-bold ${c.color} border-current/20`}>
               {c.label}
             </Badge>
           </div>
@@ -212,7 +211,7 @@ export default function ApprovalsPage() {
   const colRole = canToggle ? roleName : 'EMPLOYEE';
   const cols = useMemo(() => buildColumns(colRole, currency), [colRole, currency]);
 
-  const table = useReactTable({
+  const table = useDataTable({
     data: approvals,
     columns: cols,
     state: { sorting, columnFilters, columnVisibility, rowSelection, globalFilter },
@@ -305,9 +304,9 @@ export default function ApprovalsPage() {
   return (
     <div className="flex flex-col h-full w-full" style={{ background: 'var(--shell-bg)' }}>
       {/* Tab strip */}
-      <div className="px-4 flex items-end gap-0 shrink-0" style={{ borderBottom: '1px solid var(--shell-border)' }}>
+      <div role="tablist" aria-label="Approval views" className="px-4 flex items-end gap-0 shrink-0" style={{ borderBottom: '1px solid var(--shell-border)' }}>
         {tabs.map((tab) => (
-          <button
+          <button role="tab" aria-selected={view === tab.value}
             key={tab.value}
             onClick={() => switchView(tab.value)}
             className={`relative px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider transition-all ${
@@ -345,21 +344,21 @@ export default function ApprovalsPage() {
                     onClick={() => canActOnSelected && setIsApproveOpen(true)}
                     disabled={!canActOnSelected}
                   >
-                    <ShieldCheck className="w-4 h-4 text-green-600" /> Approve
+                    <ShieldCheck className="w-4 h-4 text-[var(--success)]" /> Approve
                   </button>
                   <button
                     className="btn-action"
                     onClick={() => canActOnSelected && setIsRejectOpen(true)}
                     disabled={!canActOnSelected}
                   >
-                    <XCircle className="w-4 h-4 text-red-600" /> Reject
+                    <XCircle className="w-4 h-4 text-[var(--danger)]" /> Reject
                   </button>
                   <button
                     className="btn-action"
                     onClick={() => canActOnSelected && setIsSendBackOpen(true)}
                     disabled={!canActOnSelected}
                   >
-                    <CornerUpLeft className="w-4 h-4 text-blue-600" /> Send back
+                    <CornerUpLeft className="w-4 h-4 text-[var(--info)]" /> Send back
                   </button>
                   {(isFinance || isAdmin) && (
                     <button
@@ -367,7 +366,7 @@ export default function ApprovalsPage() {
                       onClick={() => canVoidSelected && setIsVoidOpen(true)}
                       disabled={!canVoidSelected}
                     >
-                      <Ban className="w-4 h-4 text-red-500" /> Void
+                      <Ban className="w-4 h-4 text-[var(--danger)]" /> Void
                     </button>
                   )}
                 </>
@@ -381,16 +380,25 @@ export default function ApprovalsPage() {
             title="Approval Review"
             onClose={() => setRowSelection({})}
             hasSelection={!!selectedApproval}
+            emptyState={!canToggle ? {
+              heading: 'No Request Selected',
+              body: 'Select one of your submissions to see who reviewed it, their comments, and the outcome.',
+              tips: ['See who approved or rejected it', 'Read the reviewer\'s comments', 'Full audit trail per request'],
+            } : undefined}
           >
             {selectedApproval && (
             <div className="flex-1 space-y-4">
               {/* Receipt Viewer */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
+                <h3 className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
                   <Receipt className="w-3.5 h-3.5" /> Receipt
-                </label>
+                </h3>
                 <div
-                  className="h-20 rounded-xl flex items-center justify-center group cursor-pointer hover:brightness-105 transition-all shadow-md px-4"
+                  role={selectedApproval?.receipt_path ? "button" : undefined}
+                  tabIndex={selectedApproval?.receipt_path ? 0 : undefined}
+                  aria-label={selectedApproval?.receipt_path ? "Open receipt in a new tab" : undefined}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } }}
+                  className="focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)] h-20 rounded-xl flex items-center justify-center group cursor-pointer hover:brightness-105 transition-all shadow-md px-4"
                   style={{ background: 'var(--shell-bg)', border: '1px solid var(--shell-border)' }}
                   onClick={async () => {
                     if (selectedApproval?.receipt_path) {
@@ -424,8 +432,8 @@ export default function ApprovalsPage() {
                         <Receipt className="w-4 h-4 text-[var(--shell-text-muted)]" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--shell-text-muted)] truncate">{selectedApproval.receipt_path.split('/').pop()}</p>
-                        <p className="text-[9px] text-[var(--shell-text-muted)]/60 font-medium">Click to expand preview</p>
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--shell-text-muted)] truncate">{selectedApproval.receipt_path.split('/').pop()}</p>
+                        <p className="text-[11px] text-[var(--shell-text-muted)]/60 font-medium">Click to expand preview</p>
                       </div>
                     </div>
                   ) : (
@@ -433,7 +441,7 @@ export default function ApprovalsPage() {
                       <div className="w-8 h-8 rounded-lg bg-[var(--shell-hover)] border border-[var(--shell-border)] flex items-center justify-center shrink-0">
                         <FileText className="w-4 h-4 text-[var(--shell-text-muted)]" />
                       </div>
-                      <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--shell-text-muted)]">No receipt attached</p>
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--shell-text-muted)]">No receipt attached</p>
                     </div>
                   )}
                 </div>
@@ -441,9 +449,9 @@ export default function ApprovalsPage() {
 
               {/* Submission Details */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
+                <h3 className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
                   <Cpu className="w-3.5 h-3.5" /> Submission Details
-                </label>
+                </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {([
                     // Pending queue view: show who submitted; History view: show approver/rejector
@@ -470,9 +478,9 @@ export default function ApprovalsPage() {
                       amber: selectedApproval.needs_reimbursement,
                     },
                   ] as Array<{ label: string; val: string; amber?: boolean }>).map((item, idx) => (
-                    <div key={idx} className={`px-2.5 py-2 rounded-lg border ${item.amber ? 'bg-amber-500/10 border-amber-400/30' : 'bg-[var(--shell-hover)] border-[var(--shell-border)]'}`}>
-                      <p className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">{item.label}</p>
-                      <p className={`text-[11px] font-bold truncate mt-0.5 ${item.amber ? 'text-amber-500' : 'text-black dark:text-white'}`}>{item.val}</p>
+                    <div key={idx} className={`px-2.5 py-2 rounded-lg border ${item.amber ? 'bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border-[color-mix(in_srgb,var(--warning)_30%,transparent)]' : 'bg-[var(--shell-hover)] border-[var(--shell-border)]'}`}>
+                      <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">{item.label}</p>
+                      <p className={`text-[11px] font-bold truncate mt-0.5 ${item.amber ? 'text-[var(--warning)]' : 'text-black dark:text-white'}`}>{item.val}</p>
                     </div>
                   ))}
                 </div>
@@ -480,12 +488,12 @@ export default function ApprovalsPage() {
 
               {/* Fund Allocation / Split Detail */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
+                <h3 className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
                   <LayoutGrid className="w-3.5 h-3.5" /> Fund Allocation
-                </label>
+                </h3>
                 {selectedApproval.is_split === 1 ? (
                   <div className="space-y-2">
-                    <span className="flex items-center gap-1.5 px-2 py-0.5 bg-teal-500/15 border border-teal-400/20 rounded-full text-[9px] font-bold text-teal-400 uppercase tracking-wider w-fit">
+                    <span className="flex items-center gap-1.5 px-2 py-0.5 bg-[color-mix(in_srgb,var(--success)_15%,transparent)] border border-[color-mix(in_srgb,var(--success)_20%,transparent)] rounded-full text-[11px] font-bold text-[var(--success)] uppercase tracking-wider w-fit">
                       <Layers className="w-3 h-3" /> Split Transaction
                     </span>
                     {splitDetailsLoading ? (
@@ -498,23 +506,23 @@ export default function ApprovalsPage() {
                             <div key={s.id ?? i}>
                               <div className="flex items-center justify-between mb-0.5">
                                 <div className="flex items-center gap-1.5 min-w-0">
-                                  <span className="shrink-0 w-3.5 h-3.5 rounded-full bg-[var(--shell-hover)] text-[var(--shell-text-muted)] text-[9px] font-black flex items-center justify-center">{i + 1}</span>
+                                  <span className="shrink-0 w-3.5 h-3.5 rounded-full bg-[var(--shell-hover)] text-[var(--shell-text-muted)] text-[11px] font-black flex items-center justify-center">{i + 1}</span>
                                   <span className="text-[11px] font-bold text-black dark:text-white truncate">{s.category_name || `Split ${i + 1}`}</span>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0 ml-2">
-                                  <span className="text-[10px] font-bold text-[var(--shell-accent)]">{pct}%</span>
+                                  <span className="text-[11px] font-bold text-[var(--shell-accent)]">{pct}%</span>
                                   <span className="text-[11px] font-black text-black dark:text-white">{formatCurrency(Number(s.amount), currency)}</span>
                                 </div>
                               </div>
                               <div className="w-full bg-[var(--shell-hover)] rounded-full h-1 overflow-hidden shadow-inner">
                                 <div className="bg-[var(--shell-accent)] h-full rounded-full transition-all" style={{ width: `${pct}%` }} />
                               </div>
-                              {s.description && <p className="text-[9px] text-[var(--shell-text-muted)] mt-0.5 truncate">{s.description}</p>}
+                              {s.description && <p className="text-[11px] text-[var(--shell-text-muted)] mt-0.5 truncate">{s.description}</p>}
                             </div>
                           );
                         })}
                         <div className="flex items-center justify-between pt-1.5 border-t border-[var(--shell-border)]">
-                          <span className="text-[9px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">{splitDetails.length} splits · Total</span>
+                          <span className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">{splitDetails.length} splits · Total</span>
                           <span className="text-[12px] font-black text-[var(--shell-accent)]">{formatCurrency(amount, currency)}</span>
                         </div>
                       </div>
@@ -522,43 +530,36 @@ export default function ApprovalsPage() {
                       <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">No split details available.</p>
                     )}
                   </div>
-                ) : (
+                ) : (selectedApproval.project_name || selectedApproval.product_name) ? (
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-[11px] font-bold text-black dark:text-white">{selectedApproval.project_name || 'General Reserve'}</span>
+                      <span className="text-[11px] font-bold text-black dark:text-white">{selectedApproval.project_name || selectedApproval.product_name}</span>
                       <span className="text-[11px] font-bold text-[var(--shell-accent)]">100.00%</span>
                     </div>
                     <div className="w-full bg-[var(--shell-hover)] rounded-full h-1 overflow-hidden shadow-inner">
                       <div className="bg-[var(--shell-accent)] h-full rounded-full" style={{ width: '100%' }} />
                     </div>
                   </div>
+                ) : (
+                  <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">Not linked to a project or product.</p>
                 )}
               </div>
 
               {/* Timeline */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
+                <h3 className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
                   <HistoryIcon className="w-3.5 h-3.5" /> Approval Timeline
-                </label>
+                </h3>
                 <div className="space-y-3 relative before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-[var(--shell-hover)] ml-1">
                   <div className="relative pl-7">
-                    <div className="absolute left-0 top-0.5 w-5 h-5 rounded-full bg-green-500/20 border-2 border-green-500 flex items-center justify-center z-10">
-                      <ShieldCheck className="w-3 h-3 text-green-400" />
+                    <div className="absolute left-0 top-0.5 w-5 h-5 rounded-full bg-[color-mix(in_srgb,var(--success)_20%,transparent)] border-2 border-[var(--success)] flex items-center justify-center z-10">
+                      <ShieldCheck className="w-3 h-3 text-[var(--success)]" />
                     </div>
                     <p className="text-[11px] font-black text-black dark:text-white tracking-tight">
                       Submitted by {selectedApproval.submitted_by_name || 'User'}
                     </p>
-                    <p className="text-[9px] text-[var(--shell-text-muted)] font-bold uppercase mt-0.5">
+                    <p className="text-[11px] text-[var(--shell-text-muted)] font-bold uppercase mt-0.5">
                       {formatDate(selectedApproval.created_at)}
-                    </p>
-                  </div>
-                  <div className="relative pl-7">
-                    <div className="absolute left-0 top-0.5 w-5 h-5 rounded-full bg-blue-500/20 border-2 border-blue-500 flex items-center justify-center z-10">
-                      <BarChart3 className="w-3 h-3 text-blue-400" />
-                    </div>
-                    <p className="text-[11px] font-black text-black dark:text-white tracking-tight">Automatic Policy Check</p>
-                    <p className="text-[9px] text-green-400 font-black uppercase mt-0.5 tracking-tight flex items-center gap-1">
-                      <CheckCircle2 size={9} /> Passed — In Policy
                     </p>
                   </div>
                 </div>
@@ -567,36 +568,36 @@ export default function ApprovalsPage() {
               {/* Reimbursement status — shown when employee requested reimbursement */}
               {selectedApproval.needs_reimbursement && (
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
+                  <h3 className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
                     <Wallet className="w-3.5 h-3.5" /> Reimbursement
-                  </label>
+                  </h3>
                   {selectedApproval.reimbursement_status === 'PAID' ? (
-                    <div className="flex flex-col gap-1 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-400/20">
-                      <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                    <div className="flex flex-col gap-1 px-3 py-2 rounded-lg bg-[color-mix(in_srgb,var(--success)_10%,transparent)] border border-[color-mix(in_srgb,var(--success)_20%,transparent)]">
+                      <div className="flex items-center gap-2 text-[var(--success)]">
                         <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                         <span className="text-[11px] font-bold">
                           Reimbursed{selectedApproval.reimbursed_by_name ? ` by ${selectedApproval.reimbursed_by_name}` : ''}{selectedApproval.reimbursed_at ? ` · ${new Date(selectedApproval.reimbursed_at).toLocaleDateString()}` : ''}
                         </span>
                       </div>
                       {selectedApproval.reimbursement_reference && (
-                        <span className="text-[10px] text-emerald-600/70 dark:text-emerald-400/70 pl-5">Ref: {selectedApproval.reimbursement_reference}</span>
+                        <span className="text-[11px] text-[color-mix(in_srgb,var(--success)_70%,transparent)] pl-5">Ref: {selectedApproval.reimbursement_reference}</span>
                       )}
                       {selectedApproval.reimbursement_note && (
-                        <span className="text-[10px] text-emerald-600/70 dark:text-emerald-400/70 pl-5">{selectedApproval.reimbursement_note}</span>
+                        <span className="text-[11px] text-[color-mix(in_srgb,var(--success)_70%,transparent)] pl-5">{selectedApproval.reimbursement_note}</span>
                       )}
                     </div>
                   ) : selectedApproval.reimbursement_status === 'ON_HOLD' ? (
-                    <div className="flex flex-col gap-1 px-3 py-2 rounded-lg bg-orange-500/10 border border-orange-400/20">
-                      <div className="flex items-center gap-2 text-orange-600 dark:text-orange-300">
+                    <div className="flex flex-col gap-1 px-3 py-2 rounded-lg bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border border-[color-mix(in_srgb,var(--warning)_20%,transparent)]">
+                      <div className="flex items-center gap-2 text-[var(--warning)]">
                         <PauseCircle className="w-3.5 h-3.5 shrink-0" />
                         <span className="text-[11px] font-bold">On Hold{selectedApproval.reimbursed_by_name ? ` · ${selectedApproval.reimbursed_by_name}` : ''}</span>
                       </div>
                       {selectedApproval.reimbursement_note && (
-                        <span className="text-[10px] text-orange-600/70 dark:text-orange-300/70 pl-5">{selectedApproval.reimbursement_note}</span>
+                        <span className="text-[11px] text-[color-mix(in_srgb,var(--warning)_70%,transparent)] pl-5">{selectedApproval.reimbursement_note}</span>
                       )}
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-400/20 text-amber-600 dark:text-amber-300">
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border border-[color-mix(in_srgb,var(--warning)_20%,transparent)] text-[var(--warning)]">
                       <Clock className="w-3.5 h-3.5 shrink-0" />
                       <span className="text-[11px] font-bold">Pending Reimbursement</span>
                     </div>
@@ -609,19 +610,19 @@ export default function ApprovalsPage() {
                 <div className="grid grid-cols-3 gap-2 pt-1">
                   <button
                     onClick={() => setIsApproveOpen(true)}
-                    className="bg-[var(--shell-accent)] text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] hover:brightness-110 shadow-lg transition-all active:scale-95"
+                    className="bg-[var(--shell-accent)] text-[var(--shell-accent-fg)] py-2.5 rounded-xl text-[11px] font-black uppercase tracking-[0.1em] hover:brightness-110 shadow-lg transition-all active:scale-95"
                   >
                     Approve
                   </button>
                   <button
                     onClick={() => setIsSendBackOpen(true)}
-                    className="bg-blue-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] hover:brightness-110 shadow-lg shadow-blue-600/20 transition-all active:scale-95"
+                    className="bg-[var(--info)] text-[var(--info-foreground)] py-2.5 rounded-xl text-[11px] font-black uppercase tracking-[0.1em] hover:brightness-110 shadow-lg shadow-blue-600/20 transition-all active:scale-95"
                   >
                     Send Back
                   </button>
                   <button
                     onClick={() => setIsRejectOpen(true)}
-                    className="bg-[var(--shell-hover)] border border-rose-400/30 text-rose-400 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] hover:bg-rose-500/15 transition-all active:scale-95"
+                    className="bg-[var(--shell-hover)] border border-[color-mix(in_srgb,var(--danger)_30%,transparent)] text-[var(--danger)] py-2.5 rounded-xl text-[11px] font-black uppercase tracking-[0.1em] hover:bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] transition-all active:scale-95"
                   >
                     Reject
                   </button>

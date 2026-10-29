@@ -10,8 +10,8 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-6 px-6" style={{ background: 'var(--shell-bg)' }}>
-      <div className="w-14 h-14 rounded-full bg-red-500/10 flex items-center justify-center">
-        <AlertTriangle className="w-7 h-7 text-red-400" />
+      <div className="w-14 h-14 rounded-full bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] flex items-center justify-center">
+        <AlertTriangle className="w-7 h-7 text-[var(--danger)]" />
       </div>
       <div className="text-center space-y-1.5 max-w-sm">
         <h2 className="text-[15px] font-bold" style={{ color: 'var(--shell-text)' }}>Something went wrong</h2>
@@ -19,7 +19,7 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
           {error?.message || 'An unexpected error occurred. Please try again.'}
         </p>
         {error?.digest && (
-          <p className="text-[10px] font-mono" style={{ color: 'var(--shell-text-muted)' }}>Error ID: {error.digest}</p>
+          <p className="text-[11px] font-mono" style={{ color: 'var(--shell-text-muted)' }}>Error ID: {error.digest}</p>
         )}
       </div>
       <button

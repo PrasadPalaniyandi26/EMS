@@ -164,14 +164,14 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label className={LBL}>Username <span className="text-[10px] text-muted-foreground font-normal">(used to login)</span></Label>
+                <Label className={LBL}>Username <span className="text-[11px] text-muted-foreground font-normal">(used to login)</span></Label>
                 <Input
                   className={INP}
                   placeholder="e.g. johnp"
                   value={loginName}
                   onChange={(e) => { setLoginName(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '')); setLoginNameError(''); }}
                 />
-                {loginNameError && <p className="text-[11px] text-red-500">{loginNameError}</p>}
+                {loginNameError && <p className="text-[11px] text-[var(--danger)]">{loginNameError}</p>}
               </div>
 
               <div className="space-y-1.5">
@@ -184,7 +184,7 @@ export default function SettingsPage() {
                   onChange={(e) => { setEmail(e.target.value); setEmailError(''); }}
                   onBlur={(e) => { if (e.target.value && !validateEmail(e.target.value)) setEmailError('Invalid email address.'); }}
                 />
-                {emailError && <p className="text-[11px] text-red-500">{emailError}</p>}
+                {emailError && <p className="text-[11px] text-[var(--danger)]">{emailError}</p>}
               </div>
 
               <div className="space-y-1.5">
@@ -197,7 +197,7 @@ export default function SettingsPage() {
                   onChange={(e) => { setPhone(e.target.value); setPhoneError(''); }}
                   onBlur={(e) => { if (e.target.value && !validatePhone(e.target.value)) setPhoneError('Invalid phone number.'); }}
                 />
-                {phoneError && <p className="text-[11px] text-red-500">{phoneError}</p>}
+                {phoneError && <p className="text-[11px] text-[var(--danger)]">{phoneError}</p>}
               </div>
 
               <div className="space-y-1.5">
