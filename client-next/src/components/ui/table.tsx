@@ -23,7 +23,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   return (
     <thead
       data-slot="table-header"
-      className={cn("sticky top-0 z-10", className)}
+      className={cn("sticky top-0 z-10 bg-[var(--shell-surface)]", className)}
       style={{ background: 'var(--shell-surface)', borderBottom: '1px solid var(--shell-border)' }}
       {...props}
     />
@@ -58,7 +58,7 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
     <tr
       data-slot="table-row"
       className={cn(
-        "border-b transition-colors cursor-pointer table-row-hover data-[state=selected]:bg-[var(--shell-accent)]/10",
+        "border-b transition-colors cursor-pointer table-row-hover data-[state=selected]:bg-[var(--shell-accent)]/10 data-[selected=true]:bg-[var(--shell-accent)]/8 data-[selected=true]:shadow-[inset_2px_0_0_var(--shell-accent)]",
         className
       )}
       style={{ borderColor: 'var(--shell-border)' }}
@@ -72,7 +72,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
     <th
       data-slot="table-head"
       className={cn(
-        "h-9 px-3 text-left align-middle font-semibold whitespace-nowrap text-[11px] uppercase tracking-wider [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "h-10 px-4 text-left align-middle font-medium whitespace-nowrap text-[12px] [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
         className
       )}
       style={{ color: 'var(--shell-text-muted)' }}
@@ -86,7 +86,7 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
     <td
       data-slot="table-cell"
       className={cn(
-        "px-3 py-2 align-middle whitespace-nowrap text-[12.5px] [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "px-4 py-2.5 align-middle whitespace-nowrap text-[13px] [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
         className
       )}
       style={{ color: 'var(--shell-text)' }}

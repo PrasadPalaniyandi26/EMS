@@ -1,82 +1,52 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { formatCurrency, formatDate } from "@/lib/currency";
-import { Building2 } from "lucide-react";
 import type { RecurringTransaction } from "@/lib/types";
-import { getStatusConfig } from "@/lib/status";
+import { IdCell, TextCell, DateCell, MoneyCell, StatusText, ToneText, headerRight } from "@/components/data-table/cells";
+
+const FREQUENCY_LABEL = (f?: string) => (f ? f.charAt(0).toUpperCase() + f.slice(1).toLowerCase() : '');
 
 export const columns = (currency: string): ColumnDef<RecurringTransaction>[] => [
   {
     accessorKey: "code",
     header: "Code",
-    cell: ({ row }) => (
-      <span className="text-[12px] font-bold text-[var(--info)] font-mono">
-        {row.getValue("code")}
-      </span>
-    ),
+    cell: ({ row }) => <IdCell value={row.getValue("code")} />,
     size: 100,
   },
   {
     accessorKey: "description",
     header: "Vendor",
-    cell: ({ row }) => (
-      <div className="flex items-center gap-2">
-        <Building2 className="w-3.5 h-3.5 text-black/40 dark:text-white/50 shrink-0" />
-        <span className="truncate text-[12px] font-bold text-black dark:text-white">
-          {row.getValue("description") || "Unknown"}
-        </span>
-      </div>
-    ),
+    cell: ({ row }) => <TextCell value={row.getValue("description") || "Unknown"} strong className="block max-w-[240px] truncate" />,
     size: 200,
   },
   {
     accessorKey: "category_name",
     header: "Description",
-    cell: ({ row }) => (
-      <span className="text-[12px] font-medium text-black/60 dark:text-white/70">
-        {row.getValue("category_name") || "Operating Expenses"}
-      </span>
-    ),
+    cell: ({ row }) => <TextCell value={row.getValue("category_name") || "Operating Expenses"} />,
   },
   {
     accessorKey: "frequency",
     header: "Frequency",
-    cell: ({ row }) => (
-      <span className="text-[12px] font-semibold text-[var(--info)] uppercase">
-        {row.getValue("frequency")}
-      </span>
-    ),
+    cell: ({ row }) => <TextCell value={FREQUENCY_LABEL(row.getValue("frequency") as string)} />,
     size: 120,
   },
   {
     accessorKey: "next_run_date",
-    header: "Next Run",
-    cell: ({ row }) => (
-      <span className="text-[12px] text-black/60 dark:text-white/70">
-        {row.getValue("next_run_date") ? formatDate(row.getValue("next_run_date") as string) : "—"}
-      </span>
-    ),
+    header: "Next run",
+    cell: ({ row }) => <DateCell value={row.getValue("next_run_date") as string} />,
     size: 130,
   },
   {
     accessorKey: "last_run_date",
-    header: "Last Run",
-    cell: ({ row }) => (
-      <span className="text-[12px] text-black/40 dark:text-white/45 italic">
-        {row.getValue("last_run_date") ? formatDate(row.getValue("last_run_date") as string) : "—"}
-      </span>
-    ),
+    header: "Last run",
+    cell: ({ row }) => <DateCell value={row.getValue("last_run_date") as string} />,
     size: 130,
   },
   {
     id: "status",
     accessorFn: (row) => (row as any).status ?? 'DRAFT',
     header: "Status",
-    cell: ({ row }) => {
-      const c = getStatusConfig(row.getValue("status") as string);
-      return <span className={`text-[12px] font-semibold ${c.color}`}>{c.label}</span>;
-    },
+    cell: ({ row }) => <StatusText status={row.getValue("status") as string} />,
     size: 130,
   },
   {
@@ -85,26 +55,17 @@ export const columns = (currency: string): ColumnDef<RecurringTransaction>[] => 
     header: "State",
     cell: ({ row }) => {
       const state = row.getValue("state") as string | null;
-      if (!state) return <span className="text-[12px] text-black/25 dark:text-white/25">—</span>;
-      return (
-        <span className={`text-[12px] font-semibold ${state === 'Active' ? 'text-[var(--success)]' : 'text-[var(--warning)]'}`}>
-          {state}
-        </span>
-      );
+      return state ? <ToneText label={state} tone={state === 'Active' ? 'success' : 'warning'} /> : <TextCell value="" />;
     },
     size: 90,
   },
   {
     accessorKey: "total_amount",
-    header: () => <div className="text-right">Total Amount</div>,
+    header: headerRight("Total amount"),
     cell: ({ row }) => {
       const val = row.getValue("total_amount");
       const amount = val != null ? parseFloat(String(val)) : parseFloat(String((row.original as any).amount ?? 0));
-      return (
-        <div className="text-[12px] font-bold text-right text-black dark:text-white">
-          {formatCurrency(amount, currency || 'INR')}
-        </div>
-      );
+      return <MoneyCell value={amount} currency={currency || 'INR'} />;
     },
     size: 140,
   },

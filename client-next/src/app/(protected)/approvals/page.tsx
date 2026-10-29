@@ -46,6 +46,7 @@ import {
   RowSelectionState,
 } from '@tanstack/react-table';
 import { useDataTable } from '@/hooks/use-data-table';
+import { IdCell, TextCell, DateCell, MoneyCell, StatusText, headerRight } from '@/components/data-table/cells';
 
 // ─── Column definitions ─────────────────────────────────────────────────────
 
@@ -55,91 +56,43 @@ function buildColumns(role: string, currency: string): ColumnDef<any>[] {
     {
       accessorKey: 'code',
       header: 'ID',
-      cell: ({ row }: any) => (
-        <span className="text-[11px] font-bold font-mono text-[var(--info)]">
-          {row.original.code || row.original.reference_id || `#${row.original.id}`}
-        </span>
-      ),
+      cell: ({ row }: any) => <IdCell value={row.original.code || row.original.reference_id || `#${row.original.id}`} />,
       size: 100,
     },
     {
       accessorKey: 'description',
       header: 'Description',
-      cell: ({ row }) => (
-        <span className="text-[12px] font-medium text-[var(--shell-text-muted)] truncate block max-w-xs">
-          {row.getValue('description') || '—'}
-        </span>
-      ),
+      cell: ({ row }) => <TextCell value={row.getValue('description') as string} className="block max-w-xs truncate" />,
     },
     ...(isEmployee
       ? []
       : [
           {
             accessorKey: 'submitted_by_name',
-            header: 'Submitted By',
-            cell: ({ row }: any) => {
-              const name: string = row.original.submitted_by_name || 'System';
-              const parts = name.trim().split(/\s+/);
-              const initials = parts.length >= 2
-                ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-                : name.slice(0, 2).toUpperCase();
-              return (
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[11px] font-black text-[var(--shell-accent-fg)] border border-[var(--shell-border)]"
-                    style={{ background: 'var(--shell-accent)' }}>
-                    {initials}
-                  </div>
-                  <span className="text-[12px] font-semibold text-black dark:text-white truncate">
-                    {name}
-                  </span>
-                </div>
-              );
-            },
+            header: 'Submitted by',
+            cell: ({ row }: any) => <TextCell value={row.original.submitted_by_name || 'System'} />,
           } as ColumnDef<any>,
         ]),
     {
       accessorKey: 'category_name',
-      header: () => <div className="text-center">Category</div>,
-      cell: ({ row }) => (
-        <div className="flex justify-center">
-          <span className="text-[12px] font-medium text-[var(--info)]">
-            {row.getValue('category_name') || 'General'}
-          </span>
-        </div>
-      ),
+      header: 'Category',
+      cell: ({ row }) => <TextCell value={(row.getValue('category_name') as string) || 'General'} />,
     },
     {
       accessorKey: 'created_at',
-      header: () => <div className="text-center">Submitted On</div>,
-      cell: ({ row }) => (
-        <div className="text-[12px] text-[var(--shell-text-muted)] text-center">
-          {formatDate(row.original.date_recorded || row.getValue('created_at'))}
-        </div>
-      ),
+      header: 'Submitted on',
+      cell: ({ row }) => <DateCell value={row.original.date_recorded || row.getValue('created_at')} />,
     },
     {
       accessorKey: 'transaction_status',
-      header: () => <div className="text-center">Status</div>,
-      cell: ({ row }) => {
-        const c = getStatusConfig(row.getValue('transaction_status') as string);
-        return (
-          <div className="flex justify-center">
-            <Badge variant="outline" className={`text-[11px] font-bold ${c.color} border-current/20`}>
-              {c.label}
-            </Badge>
-          </div>
-        );
-      },
+      header: 'Status',
+      cell: ({ row }) => <StatusText status={row.getValue('transaction_status') as string} />,
       size: 150,
     },
     {
       accessorKey: 'amount',
-      header: () => <div className="text-right">Amount</div>,
-      cell: ({ row }) => (
-        <div className="text-[12px] font-bold text-right text-black dark:text-white">
-          {formatCurrency(Number(row.getValue('amount') || 0), currency)}
-        </div>
-      ),
+      header: headerRight('Amount'),
+      cell: ({ row }) => <MoneyCell value={row.getValue('amount')} currency={currency} />,
       size: 120,
     },
   ];

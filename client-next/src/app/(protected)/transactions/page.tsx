@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { getStatusConfig } from '@/lib/status';
 import { formatCurrency, formatDate, getDateRange, toLocalYMD } from '@/lib/currency';
 import { toast } from 'sonner';
+import { TextCell, DateCell, MoneyCell, StatusText } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 
@@ -320,72 +321,57 @@ export default function TransactionsPage() {
 
       {/* Table */}
       <div className="flex-1 overflow-auto min-h-0">
-        <table className="w-full text-left border-collapse text-[12px]">
-          <thead
-            className="font-bold uppercase tracking-wider sticky top-0 z-10 border-b border-[var(--shell-border)] shadow-sm"
-            style={{ background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' }}
-          >
+        <table className="w-full border-collapse text-left text-[13px]">
+          <thead className="sticky top-0 z-10 border-b border-[var(--shell-border)] bg-[var(--shell-surface)] text-[12px] font-medium text-[var(--shell-text-muted)]">
             <tr>
-              <th scope="col" className="px-4 py-3 border-r border-[var(--shell-accent-fg)]/20 w-10 text-center">
-                <Checkbox aria-label="Select all transactions" className="border-[var(--shell-accent-fg)]/40" checked={selectedIds.size === displayedTxns.length && displayedTxns.length > 0} onCheckedChange={toggleAll} />
+              <th scope="col" className="h-10 w-10 px-4 text-center">
+                <Checkbox aria-label="Select all transactions" checked={selectedIds.size === displayedTxns.length && displayedTxns.length > 0} onCheckedChange={toggleAll} />
               </th>
-              <th scope="col" className="px-3 py-3 border-r border-[var(--shell-accent-fg)]/20 w-28">Date</th>
-              <th scope="col" className="px-3 py-3 border-r border-[var(--shell-accent-fg)]/20">Description</th>
-              <th scope="col" className="px-3 py-3 border-r border-[var(--shell-accent-fg)]/20 w-32">Category</th>
-              <th scope="col" className="px-3 py-3 border-r border-[var(--shell-accent-fg)]/20 w-32">Client</th>
-              <th scope="col" className="px-3 py-3 border-r border-[var(--shell-accent-fg)]/20 w-24">Type</th>
-              <th scope="col" className="px-3 py-3 border-r border-[var(--shell-accent-fg)]/20 w-28">Status</th>
-              <th scope="col" className="px-4 py-3 text-right w-32">Amount</th>
+              <th scope="col" className="h-10 w-28 px-4 font-medium">Date</th>
+              <th scope="col" className="h-10 px-4 font-medium">Description</th>
+              <th scope="col" className="h-10 w-32 px-4 font-medium">Category</th>
+              <th scope="col" className="h-10 w-32 px-4 font-medium">Client</th>
+              <th scope="col" className="h-10 w-24 px-4 font-medium">Type</th>
+              <th scope="col" className="h-10 w-36 px-4 font-medium">Status</th>
+              <th scope="col" className="h-10 w-32 px-4 text-right font-medium">Amount</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[var(--shell-border)]">
+          <tbody>
             {isLoading && [...Array(8)].map((_, i) => (
               <tr key={i} className="animate-pulse">
-                <td className="px-4 py-3 border-r border-[var(--shell-border)]"><div className="h-4 w-4 rounded bg-[var(--shell-hover)]" /></td>
-                <td className="px-3 py-3 border-r border-[var(--shell-border)]"><div className="h-3 w-20 rounded bg-[var(--shell-hover)]" /></td>
-                <td className="px-3 py-3 border-r border-[var(--shell-border)]"><div className="h-3 w-48 rounded bg-[var(--shell-hover)]" /></td>
-                <td className="px-3 py-3 border-r border-[var(--shell-border)]"><div className="h-3 w-24 rounded bg-[var(--shell-hover)]" /></td>
-                <td className="px-3 py-3 border-r border-[var(--shell-border)]"><div className="h-3 w-20 rounded bg-[var(--shell-hover)]" /></td>
-                <td className="px-3 py-3 border-r border-[var(--shell-border)]"><div className="h-5 w-16 rounded-full bg-[var(--shell-hover)]" /></td>
-                <td className="px-3 py-3 border-r border-[var(--shell-border)]"><div className="h-3 w-16 rounded bg-[var(--shell-hover)]" /></td>
+                <td className="px-4 py-3"><div className="h-4 w-4 rounded bg-[var(--shell-hover)]" /></td>
+                <td className="px-3 py-3"><div className="h-3 w-20 rounded bg-[var(--shell-hover)]" /></td>
+                <td className="px-3 py-3"><div className="h-3 w-48 rounded bg-[var(--shell-hover)]" /></td>
+                <td className="px-3 py-3"><div className="h-3 w-24 rounded bg-[var(--shell-hover)]" /></td>
+                <td className="px-3 py-3"><div className="h-3 w-20 rounded bg-[var(--shell-hover)]" /></td>
+                <td className="px-3 py-3"><div className="h-5 w-16 rounded-full bg-[var(--shell-hover)]" /></td>
+                <td className="px-3 py-3"><div className="h-3 w-16 rounded bg-[var(--shell-hover)]" /></td>
                 <td className="px-4 py-3"><div className="h-3 w-20 rounded bg-[var(--shell-hover)] ml-auto" /></td>
               </tr>
             ))}
             {!isLoading && displayedTxns.map((t: any) => {
               const isSelected = selectedIds.has(t.id);
               const isViewing = selectedTxn?.id === t.id;
-              const statCfg = getStatusConfig(t.status);
               const isIncome = t.type === 'income';
               return (
                 <tr
                   key={t.id}
-                  className={`cursor-pointer transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--shell-accent)] ${isViewing ? 'bg-theme-sidebar/10' : (isSelected ? 'bg-theme-sidebar/5' : 'hover:bg-[var(--shell-hover)]')}`}
+                  className={`cursor-pointer transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--shell-accent)] border-b border-[var(--shell-border)] ${isViewing ? 'bg-[var(--shell-accent)]/8 shadow-[inset_2px_0_0_var(--shell-accent)]' : (isSelected ? 'bg-[var(--shell-accent)]/5' : 'hover:bg-[var(--shell-hover)]')}`}
                   tabIndex={0}
                   aria-selected={isViewing}
                   onClick={() => setSelectedTxn(t)}
                   onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); setSelectedTxn(t); } }}
                 >
-                  <td className="px-4 py-2 text-center border-r border-[var(--shell-border)]" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-4 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
                     <Checkbox aria-label={`Select ${t.description}`} checked={isSelected} onCheckedChange={() => toggleSelect(t.id)} />
                   </td>
-                  <td className="px-3 py-2 text-[var(--shell-text)] font-medium border-r border-[var(--shell-border)]">{formatDate(t.date_recorded)}</td>
-                  <td className="px-3 py-2 font-semibold text-[var(--shell-text)] truncate max-w-[350px] border-r border-[var(--shell-border)]">{t.description}</td>
-                  <td className="px-3 py-2 text-[var(--shell-text)] border-r border-[var(--shell-border)] tracking-tight">{t.category_name || '—'}</td>
-                  <td className="px-3 py-2 text-[var(--shell-text)] border-r border-[var(--shell-border)]">{t.client_name || '—'}</td>
-                  <td className="px-3 py-2 border-r border-[var(--shell-border)]">
-                    <Badge variant="outline" className={`text-[11px] font-bold uppercase ${isIncome ? 'text-[var(--info)] border-[color-mix(in_srgb,var(--info)_20%,transparent)]' : 'text-[var(--danger)] border-[color-mix(in_srgb,var(--danger)_20%,transparent)]'}`}>
-                      {t.type}
-                    </Badge>
-                  </td>
-                  <td className="px-3 py-2 border-r border-[var(--shell-border)]">
-                    <div className={`flex items-center gap-1.5 ${statCfg.color}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${statCfg.dot}`} />
-                      <span className="font-bold text-[11px]">{statCfg.label}</span>
-                    </div>
-                  </td>
-                  <td className={`px-4 py-2 text-right font-bold ${isIncome ? 'text-[var(--info)]' : 'text-[var(--danger)]'}`}>
-                    {isIncome ? '+' : '-'}{formatCurrency(t.amount, currency)}
-                  </td>
+                  <td className="px-4 py-2.5"><DateCell value={t.date_recorded} /></td>
+                  <td className="max-w-[350px] truncate px-4 py-2.5"><TextCell value={t.description} strong /></td>
+                  <td className="px-4 py-2.5"><TextCell value={t.category_name} /></td>
+                  <td className="px-4 py-2.5"><TextCell value={t.client_name} /></td>
+                  <td className="px-4 py-2.5"><TextCell value={isIncome ? 'Income' : 'Expense'} /></td>
+                  <td className="px-4 py-2.5"><StatusText status={t.status} /></td>
+                  <td className="px-4 py-2.5"><MoneyCell value={t.amount} currency={currency} /></td>
                 </tr>
               );
             })}

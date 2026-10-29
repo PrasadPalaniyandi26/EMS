@@ -104,7 +104,7 @@ export function DataTable<TData, TValue>({
           <Table>
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup: any) => (
-                <TableRow key={headerGroup.id} className="hover:bg-transparent border-b-0">
+                <TableRow key={headerGroup.id} className="hover:bg-transparent">
                   {headerGroup.headers.map((header: any) => (
                     <TableHead key={header.id} colSpan={header.colSpan}>
                       {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
@@ -113,7 +113,7 @@ export function DataTable<TData, TValue>({
                 </TableRow>
               ))}
             </TableHeader>
-            <TableBody className="divide-y divide-casper/20">
+            <TableBody>
               {table.getRowModel().rows?.length ? (
                 table.getRowModel().rows.map((row: any) => {
                   const isSelected = tableInstance
@@ -129,7 +129,6 @@ export function DataTable<TData, TValue>({
                           ? ''
                           : 'hover:bg-[var(--shell-hover)]'
                       }`}
-                      style={isSelected ? { outline: '1px solid rgb(34 197 94)', outlineOffset: '-1px', background: 'rgb(34 197 94 / 0.08)' } : undefined}
                     >
                       {row.getVisibleCells().map((cell: any) => (
                         <TableCell key={cell.id}>

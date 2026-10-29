@@ -1,7 +1,7 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { formatCurrency } from "@/lib/currency";
+import { IdCell, TextCell, MoneyCell, ToneText, headerRight } from "@/components/data-table/cells";
 
 export type OrgBudget = {
   id: number;
@@ -19,63 +19,34 @@ export const columns = (currency: string): ColumnDef<OrgBudget, any>[] => [
   {
     accessorKey: "code",
     header: "ID",
-    cell: ({ row }) => (
-      <span className="font-mono text-[11px] text-[var(--info)] font-black">
-        {row.getValue("code") || `BUD-${String(row.original.id).padStart(3, '0')}`}
-      </span>
-    ),
+    cell: ({ row }) => <IdCell value={row.getValue("code") || `BUD-${String(row.original.id).padStart(3, '0')}`} />,
     size: 110,
   },
   {
     accessorKey: "name",
-    header: "Budget Name",
-    cell: ({ row }) => (
-      <div className="min-w-0">
-        <p className="font-bold text-[12px] text-black dark:text-white leading-tight truncate max-w-[200px]">
-          {row.getValue("name") || '—'}
-        </p>
-        {(row.original as any).details && (
-          <p className="text-[11px] text-black/40 dark:text-white/45 font-medium truncate max-w-[200px]">{(row.original as any).details}</p>
-        )}
-      </div>
-    ),
+    header: "Budget name",
+    cell: ({ row }) => <TextCell value={row.getValue("name")} strong className="block max-w-[240px] truncate" />,
   },
   {
     accessorKey: "department",
     header: "Department",
-    cell: ({ row }) => (
-      <span className="text-[12px] text-black/60 dark:text-white/70 font-medium">
-        {row.getValue("department") || "—"}
-      </span>
-    ),
+    cell: ({ row }) => <TextCell value={row.getValue("department")} />,
   },
   {
     accessorKey: "category_name",
     header: "Category",
-    cell: ({ row }) => (
-      <span className="text-[12px] text-[var(--info)] font-medium">
-        {row.getValue("category_name") || "General"}
-      </span>
-    ),
+    cell: ({ row }) => <TextCell value={row.getValue("category_name") || "General"} />,
   },
   {
     accessorKey: "financial_year",
-    header: () => <div className="text-center">FY</div>,
-    cell: ({ row }) => (
-      <div className="text-center text-[11px] font-bold text-black dark:text-white">
-        {row.getValue("financial_year") || "—"}
-      </div>
-    ),
+    header: "FY",
+    cell: ({ row }) => <TextCell value={row.getValue("financial_year")} />,
     size: 70,
   },
   {
     accessorKey: "amount",
-    header: () => <div className="text-right">Allocated</div>,
-    cell: ({ row }) => (
-      <div className="text-[12px] font-bold text-right text-[var(--shell-accent)]">
-        {formatCurrency(Number(row.getValue("amount")), currency, false)}
-      </div>
-    ),
+    header: headerRight("Allocated"),
+    cell: ({ row }) => <MoneyCell value={row.getValue("amount")} currency={currency} symbol={false} />,
     size: 130,
   },
   {
@@ -83,11 +54,7 @@ export const columns = (currency: string): ColumnDef<OrgBudget, any>[] => [
     header: "Status",
     cell: ({ row }) => {
       const active = (row.original as any).is_active;
-      return (
-        <span className={`text-[12px] font-semibold ${active ? 'text-[var(--success)]' : 'text-black/30 dark:text-white/40'}`}>
-          {active ? 'Active' : 'Inactive'}
-        </span>
-      );
+      return <ToneText label={active ? "Active" : "Inactive"} tone={active ? "success" : "muted"} />;
     },
     size: 90,
   },

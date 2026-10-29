@@ -1,79 +1,51 @@
 "use client"
 
 import { ColumnDef } from "@tanstack/react-table"
-import { formatCurrency, formatDate } from "@/lib/currency"
-import { getStatusConfig } from "@/lib/status"
+import { IdCell, TextCell, DateCell, MoneyCell, StatusText, headerRight } from "@/components/data-table/cells"
 
 export const columns = (currency: string): ColumnDef<any>[] => [
   {
     accessorKey: "reference_id",
     header: "ID",
-    cell: ({ row }) => (
-      <span className="text-[12px] font-bold font-mono text-[var(--info)]">
-        {row.getValue("reference_id") || `#${row.original.id}`}
-      </span>
-    ),
+    cell: ({ row }) => <IdCell value={row.getValue("reference_id") || `#${row.original.id}`} />,
     size: 110,
   },
   {
     accessorKey: "receipt_number",
     header: "Invoice",
-    cell: ({ row }) => (
-      <span className="text-[12px] font-medium text-black/50 dark:text-white/60">
-        {row.getValue("receipt_number") || "—"}
-      </span>
-    ),
+    cell: ({ row }) => <TextCell value={row.getValue("receipt_number")} />,
   },
   {
     id: "code",
     header: "Code",
-    cell: ({ row }) => (
-      <span className="text-[12px] font-bold text-black/50 dark:text-white/60 font-mono">
-        {row.original.project_name
-          ? (row.original.context_code || row.original.project_name)
-          : row.original.product_name
-          ? (row.original.context_code || row.original.product_name)
-          : "—"}
-      </span>
-    ),
+    cell: ({ row }) => {
+      const o = row.original
+      const code = o.project_name
+        ? (o.context_code || o.project_name)
+        : o.product_name
+        ? (o.context_code || o.product_name)
+        : ""
+      return <IdCell value={code} />
+    },
   },
   {
     accessorKey: "category_name",
     header: "Category",
-    cell: ({ row }) => (
-      <span className="text-[12px] text-[var(--info)] font-medium">
-        {row.getValue("category_name") || "—"}
-      </span>
-    ),
+    cell: ({ row }) => <TextCell value={row.getValue("category_name")} />,
   },
   {
     accessorKey: "date_recorded",
-    header: () => <div className="text-center">Date</div>,
-    cell: ({ row }) => (
-      <div className="text-[12px] text-black/50 dark:text-white/60 text-center">
-        {formatDate(row.getValue("date_recorded"))}
-      </div>
-    ),
+    header: "Date",
+    cell: ({ row }) => <DateCell value={row.getValue("date_recorded")} />,
   },
   {
     accessorKey: "status",
-    header: () => <div className="text-center">Status</div>,
-    cell: ({ row }) => {
-      const c = getStatusConfig(row.getValue("status") as string);
-      return (
-        <div className="flex items-center justify-center">
-          <span className={`text-[12px] font-semibold ${c.color}`}>{c.label}</span>
-        </div>
-      );
-    },
+    header: "Status",
+    cell: ({ row }) => <StatusText status={row.getValue("status") as string} />,
   },
   {
     accessorKey: "total_amount",
-    header: () => <div className="text-right">Total Amount</div>,
-    cell: ({ row }) => (
-      <div className="text-[12px] font-bold text-right text-black dark:text-white">
-        {formatCurrency(row.getValue("total_amount"), currency)}
-      </div>
-    ),
+    header: headerRight("Total amount"),
+    cell: ({ row }) => <MoneyCell value={row.getValue("total_amount")} currency={currency} />,
   },
 ]
