@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
+import { useFitPageSize } from '@/hooks/use-fit-page-size';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuditLogs, useAuditStats } from '@/hooks/use-queries';
 import { ModuleShell } from '@/components/shared/module/module-shell';
@@ -145,6 +146,10 @@ export default function AuditLogPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
+  // Rows per page follow the height of the table area (see useFitPageSize); 25 until it is measured
+  const tableAreaRef = useRef<HTMLDivElement>(null);
+  const fitted = useFitPageSize(tableAreaRef, { fallbackRowHeight: 43 });
+  const pageSize = fitted ?? 25;
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
 
   // Debounce search input → only fires API after 400ms pause
@@ -155,7 +160,7 @@ export default function AuditLogPage() {
 
   useEffect(() => { setHeader('Audit Log', 'System activity and change history'); }, [setHeader]);
 
-  const params: Record<string, string> = { page: String(page), limit: '50' };
+  const params: Record<string, string> = { page: String(page), limit: String(pageSize) };
   if (search) params.search = search;
   if (actionFilter) params.action = actionFilter;
   if (tableFilter) params.tableName = tableFilter;
@@ -167,13 +172,13 @@ export default function AuditLogPage() {
 
   const rows: AuditLog[] = (auditResp as any)?.rows ?? [];
   const total: number = (auditResp as any)?.total ?? 0;
-  const limit: number = (auditResp as any)?.limit ?? 50;
+  const limit: number = (auditResp as any)?.limit ?? pageSize;
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
   const stats = statsData as any;
 
   // Reset page on filter change
-  useEffect(() => { setPage(1); }, [search, actionFilter, tableFilter, dateFrom, dateTo]);
+  useEffect(() => { setPage(1); }, [search, actionFilter, tableFilter, dateFrom, dateTo, pageSize]);
 
 
   return (
@@ -278,7 +283,7 @@ export default function AuditLogPage() {
       )}
 
       {/* Table */}
-      <div className="flex-1 overflow-auto custom-scrollbar">
+      <div ref={tableAreaRef} className="flex-1 overflow-auto custom-scrollbar">
         {isLoading ? (
           <div className="space-y-0 pt-1">
             {[...Array(12)].map((_, i) => (
@@ -314,10 +319,10 @@ export default function AuditLogPage() {
           </div>
         ) : (
           <table className="w-full text-[12px]">
-            <thead className="sticky top-0 z-10" style={{ background: 'var(--shell-hover)' }}>
+            <thead className="sticky top-0 z-10" style={{ background: 'var(--table-header)' }}>
               <tr className="border-b" style={{ borderColor: 'var(--shell-border)' }}>
                 {['Action', 'Table', 'Record', 'Actor', 'Time', ''].map((h, i) => (
-                  <th key={i} scope="col" className="h-10 px-4 text-left text-[12px] font-semibold" style={{ color: 'var(--shell-text-muted)' }}>
+                  <th key={i} scope="col" className="h-10 px-4 text-left text-[12px] font-semibold text-[var(--shell-text)]" style={{ color: 'var(--shell-text-muted)' }}>
                     {h}
                   </th>
                 ))}

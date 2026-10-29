@@ -1,5 +1,6 @@
 'use client';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
+import { useFitPageSize } from '@/hooks/use-fit-page-size';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useTransactions, useClients } from '@/hooks/use-queries';
@@ -75,18 +76,21 @@ export default function TransactionsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [selectedTxn, setSelectedTxn] = useState<any>(null);
   const [page, setPage] = useState(0);
-  const PAGE_SIZE = 50;
+  // Rows per page follow the height of the table area (see useFitPageSize); 25 until it is measured
+  const tableAreaRef = useRef<HTMLDivElement>(null);
+  const fitted = useFitPageSize(tableAreaRef);
+  const PAGE_SIZE = fitted ?? 25;
 
   useEffect(() => { setHeader('Transactions', 'View all transactions'); }, [setHeader]);
 
-  useEffect(() => { setPage(0); }, [search, filterType, filterPayment, filterClient, datePreset, dateFrom, dateTo]);
+  useEffect(() => { setPage(0); }, [search, filterType, filterPayment, filterClient, datePreset, dateFrom, dateTo, PAGE_SIZE]);
 
   const queryParams = useMemo(() => ({
     ...filters,
     ...(search ? { search } : {}),
     page: String(page + 1),
     limit: String(PAGE_SIZE),
-  }), [filters, search, page]);
+  }), [filters, search, page, PAGE_SIZE]);
 
   const { data: txnData, isLoading } = useTransactions(queryParams);
   const displayedTxns = txnData?.rows || [];
@@ -320,9 +324,9 @@ export default function TransactionsPage() {
       </div>
 
       {/* Table */}
-      <div className="flex-1 overflow-auto min-h-0">
-        <table className="w-full border-collapse text-left text-[13px]">
-          <thead className="sticky top-0 z-10 border-b border-[var(--shell-border)] bg-[var(--shell-hover)] text-[12px] font-semibold text-[var(--shell-text-muted)]">
+      <div ref={tableAreaRef} className="flex-1 overflow-auto min-h-0">
+        <table className="w-full border-collapse whitespace-nowrap text-left text-[13px]">
+          <thead className="sticky top-0 z-10 border-b border-[var(--shell-border)] bg-[var(--table-header)] text-[12px] font-semibold text-[var(--shell-text)]">
             <tr>
               <th scope="col" className="h-10 w-10 px-4 text-center">
                 <Checkbox aria-label="Select all transactions" checked={selectedIds.size === displayedTxns.length && displayedTxns.length > 0} onCheckedChange={toggleAll} />

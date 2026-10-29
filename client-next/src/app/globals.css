@@ -25,6 +25,7 @@
   --color-danger-foreground: var(--danger-foreground);
   --color-surface-raised: var(--surface-raised);
   --color-overlay: var(--overlay);
+  --color-table-header: var(--table-header);
 
   /* Navigation icon palette (text-nav-blue, ...) */
   --color-nav-blue: var(--nav-blue);
@@ -144,6 +145,7 @@
   --danger-foreground: #ffffff;
   --surface-raised:    #ffffff;
   --overlay:           rgba(22, 22, 22, 0.5);
+  --table-header:      #e0e0e0;  /* table header band: clearly stronger than the white rows */
 
   /* Approval workflow states (consumed by lib/status.ts as components migrate, Phase 4) */
   --status-draft:           #0369a1;
@@ -267,6 +269,7 @@
   --danger:            #ff8389;
   --danger-foreground: #2a0a0a;
   --surface-raised:    #393939;
+  --table-header:      #393939;  /* table header band: clearly stronger than the #2f2f2f rows */
   --overlay:           rgba(0, 0, 0, 0.6);
 
   --status-draft:           #38bdf8;

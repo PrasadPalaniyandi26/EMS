@@ -16,6 +16,7 @@ import {
   getSortedRowModel,
 } from "@tanstack/react-table";
 import { useDataTable } from '@/hooks/use-data-table';
+import { useFitPageSize } from '@/hooks/use-fit-page-size';
 
 import {
   Table,
@@ -71,6 +72,19 @@ export function DataTable<TData, TValue>({
   });
 
   const table = tableInstance || internalTable;
+
+  // Page size follows the space available: as many rows as fit (desktop table or phone cards), so a page
+  // never leaves a blank band and never needs an inner scrollbar for a few extra rows.
+  const desktopRef = React.useRef<HTMLDivElement>(null);
+  const mobileRef = React.useRef<HTMLDivElement>(null);
+  const remeasureKey = `${table.getRowModel().rows.length}-${isLoading}`;
+  const desktopFit = useFitPageSize(desktopRef, { remeasureKey });
+  const mobileFit = useFitPageSize(mobileRef, { rowSelector: '[data-row-card]', headerSelector: '[data-none]', fallbackRowHeight: 150, min: 3, remeasureKey });
+  const fit = desktopFit ?? mobileFit;
+  React.useEffect(() => {
+    if (fit && table.getState().pagination.pageSize !== fit) table.setPageSize(fit);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fit]);
   const effectiveSelectedId = selectedRowId !== undefined ? selectedRowId : localSelectedId;
 
   // Responsive column visibility: hide mobileHiddenColumns below the sm breakpoint (640px)
@@ -104,7 +118,7 @@ export function DataTable<TData, TValue>({
     <div className={`flex-1 flex flex-col min-h-0 w-full ${fullHeight ? 'h-full' : ''}`}>
       <div className="flex-1 overflow-hidden relative flex flex-col" style={{ background: 'var(--shell-surface)' }}>
         {/* Phones: one card per row (label above value) so nothing scrolls sideways */}
-        <div className="md:hidden flex-1 overflow-y-auto">
+        <div ref={mobileRef} className="md:hidden flex-1 overflow-y-auto">
           {isLoading ? (
             <div aria-busy="true" aria-label="Loading">
               {[...Array(6)].map((_, i) => (
@@ -126,6 +140,7 @@ export function DataTable<TData, TValue>({
             return (
               <div
                 key={row.id}
+                data-row-card
                 role="button"
                 tabIndex={0}
                 aria-pressed={isSelected}
@@ -155,7 +170,7 @@ export function DataTable<TData, TValue>({
             </div>
           )}
         </div>
-        <div className="hidden md:block overflow-y-auto overflow-x-auto hide-scrollbar flex-1 relative">
+        <div ref={desktopRef} className="hidden md:block overflow-y-auto overflow-x-auto hide-scrollbar flex-1 relative">
           <Table>
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup: any) => (

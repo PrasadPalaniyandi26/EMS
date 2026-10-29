@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import api from '@/lib/api-client';
 import { useAuthStore } from '@/stores/auth-store';
 import type {
@@ -103,6 +103,8 @@ export function useTransactions(params?: Record<string, string>) {
       page: r.meta.page ?? 1,
       limit: r.meta.limit ?? r.data.length,
     })),
+    // Keep showing the previous page while the next one (or a resized page) loads, so paging never flashes empty
+    placeholderData: keepPreviousData,
     staleTime: LIVE_STALE,
   });
 }
@@ -209,6 +211,7 @@ export function useAuditLogs(params?: Record<string, string>) {
       const r = await api.get<AuditLog[]>(`/audit${qs}`);
       return { rows: (r.data as any) ?? [], total: (r as any).meta?.total ?? 0, limit: (r as any).meta?.limit ?? 50 };
     },
+    placeholderData: keepPreviousData,
     staleTime: LIVE_STALE,
   });
 }
