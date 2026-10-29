@@ -24,7 +24,7 @@ export function DataTableToolbar<TData>({
     <div className="flex flex-wrap items-center justify-between gap-2 w-full">
       {/* Left: action buttons */}
       {actions && (
-        <div className="flex items-center gap-2 shrink-0 self-center flex-wrap">
+        <div className="toolbar-actions flex items-center gap-2 shrink-0 self-center flex-wrap">
           {actions}
         </div>
       )}
@@ -36,11 +36,13 @@ export function DataTableToolbar<TData>({
             placeholder="Search..."
             value={(table.getState().globalFilter as string) ?? ""}
             onChange={(event) => table.setGlobalFilter(event.target.value)}
-            className="h-8 w-full rounded-full pl-4 pr-7 text-[12.5px] focus-visible:ring-1"
-            style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)', color: 'var(--shell-text)' }}
+            className="h-8 w-full rounded-md pl-3 pr-7 text-[13px] focus-visible:ring-1"
+            style={{ background: 'transparent', border: '1px solid var(--input)', color: 'var(--shell-text)' }}
           />
           {((table.getState().globalFilter as string) ?? "") && (
             <button
+              type="button"
+              aria-label="Clear search"
               onClick={() => table.setGlobalFilter("")}
               className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 transition-colors"
               style={{ color: 'var(--shell-text-muted)' }}
@@ -57,7 +59,7 @@ export function DataTableToolbar<TData>({
               table.resetColumnFilters();
               table.setGlobalFilter("");
             }}
-            className="h-8 px-3 text-[12px] font-medium rounded-lg"
+            className="h-8 px-3 text-[13px] font-medium rounded-md"
             style={{ color: 'var(--shell-text-muted)' }}
           >
             Reset

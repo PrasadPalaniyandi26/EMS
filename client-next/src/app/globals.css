@@ -532,6 +532,9 @@
     color: var(--shell-accent);
   }
   .btn-action:disabled { opacity: var(--state-disabled-opacity); cursor: not-allowed; }
+  /* Row actions that do not apply to the current selection are hidden, so with nothing selected a table
+     toolbar shows only what can be done (Add), instead of a strip of disabled buttons. */
+  .toolbar-actions .btn-action:disabled { display: none; }
 
   .btn-action-primary {
     display: flex;

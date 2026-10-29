@@ -100,7 +100,46 @@ export function DataTable<TData, TValue>({
   return (
     <div className={`flex-1 flex flex-col min-h-0 w-full ${fullHeight ? 'h-full' : ''}`}>
       <div className="flex-1 overflow-hidden relative flex flex-col" style={{ background: 'var(--shell-surface)' }}>
-        <div className="overflow-y-auto overflow-x-auto hide-scrollbar flex-1 relative">
+        {/* Phones: one card per row (label above value) so nothing scrolls sideways */}
+        <div className="md:hidden flex-1 overflow-y-auto">
+          {table.getRowModel().rows?.length ? table.getRowModel().rows.map((row: any) => {
+            const isSelected = tableInstance
+              ? row.getIsSelected()
+              : effectiveSelectedId !== undefined && (row.original as any).id === effectiveSelectedId;
+            const headers = table.getHeaderGroups()[0]?.headers ?? [];
+            return (
+              <div
+                key={row.id}
+                role="button"
+                tabIndex={0}
+                aria-pressed={isSelected}
+                onClick={() => handleRowClick(row.original, row)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleRowClick(row.original, row); } }}
+                className={`grid grid-cols-2 gap-x-4 gap-y-2.5 border-b border-[var(--shell-border)] px-4 py-3 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--shell-accent)] ${isSelected ? 'bg-[var(--shell-accent)]/8 shadow-[inset_2px_0_0_var(--shell-accent)]' : 'active:bg-[var(--shell-hover)]'}`}
+              >
+                {row.getVisibleCells().map((cell: any) => {
+                  const header = headers.find((h: any) => h.column.id === cell.column.id);
+                  const label = header && !header.isPlaceholder && cell.column.columnDef.header
+                    ? flexRender(cell.column.columnDef.header, header.getContext())
+                    : null;
+                  if (!label) return null;
+                  return (
+                    <div key={cell.id} className="min-w-0">
+                      <div className="mb-0.5 text-[12px] text-[var(--shell-text-muted)] [&_*]:!text-left">{label}</div>
+                      <div className="truncate [&_.text-right]:!text-left">{flexRender(cell.column.columnDef.cell, cell.getContext())}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          }) : (
+            <div className="flex flex-col items-center justify-center gap-2 py-12" style={{ color: 'var(--shell-text-muted)' }}>
+              <SearchX className="w-6 h-6 opacity-40" />
+              <span className="text-[13px]">{emptyMessage}</span>
+            </div>
+          )}
+        </div>
+        <div className="hidden md:block overflow-y-auto overflow-x-auto hide-scrollbar flex-1 relative">
           <Table>
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup: any) => (

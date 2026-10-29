@@ -86,9 +86,9 @@ export function ModuleShell({
           {children}
         </main>
 
-        {/* ── Mobile: bottom sheet backdrop ── */}
+        {/* ── Mobile: dim only. It must not block taps, because the selection actions in the toolbar stay usable above the sheet ── */}
         {panelVisible && showPanel && (
-          <div className="lg:hidden fixed inset-0 bg-black/50 z-30" onClick={closeAll} />
+          <div aria-hidden className="lg:hidden fixed inset-0 bg-black/30 z-30 pointer-events-none" />
         )}
 
         {/* ── Mobile: bottom sheet / Desktop: side panel ── */}

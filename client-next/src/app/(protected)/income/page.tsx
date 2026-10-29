@@ -310,7 +310,7 @@ export default function IncomePage() {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [globalFilter, setGlobalFilter] = useState('');
 
-  const MOBILE_HIDDEN = ['reference_id', 'receipt_number', 'code', 'category_name'];
+  const MOBILE_HIDDEN: string[] = [];
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 639px)');
     const apply = (isMobile: boolean) => {
@@ -438,7 +438,7 @@ export default function IncomePage() {
           }
           extra={
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-8 w-[150px] rounded-full text-[12.5px]" aria-label="Filter by status">
+              <SelectTrigger className="h-8 w-[150px] rounded-md text-[13px]" aria-label="Filter by status">
                 <SelectValue placeholder="All statuses" />
               </SelectTrigger>
               <SelectContent>

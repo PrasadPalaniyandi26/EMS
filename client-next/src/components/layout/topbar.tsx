@@ -65,7 +65,7 @@ function BellDropdown() {
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <button
-          className="relative w-7 h-7 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]"
+          className="relative w-9 h-9 lg:w-7 lg:h-7 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]"
           style={{ color: 'var(--shell-text-muted)' }}
           title="Notifications"
         >
@@ -189,7 +189,7 @@ export function TopBar() {
       {/* Left: hamburger (mobile) + page title */}
       <div className="flex items-center gap-3">
         <button
-          className="lg:hidden w-7 h-7 flex items-center justify-center rounded-lg hover:bg-[var(--shell-hover)] text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] transition-colors"
+          className="lg:hidden w-9 h-9 flex items-center justify-center rounded-lg hover:bg-[var(--shell-hover)] text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] transition-colors"
           onClick={toggleMobile}
           aria-label="Open menu"
         >
@@ -209,7 +209,7 @@ export function TopBar() {
 
         {/* Theme toggle */}
         <button
-          className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]"
+          className="w-9 h-9 lg:w-7 lg:h-7 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]"
           style={{ color: 'var(--shell-text-muted)' }}
           onClick={toggleTheme}
           aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
@@ -223,7 +223,7 @@ export function TopBar() {
 
         {/* Settings */}
         <button
-          className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]"
+          className="w-9 h-9 lg:w-7 lg:h-7 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]"
           style={{ color: 'var(--shell-text-muted)' }}
           onClick={() => router.push('/settings')}
           title="Settings"

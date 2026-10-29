@@ -345,7 +345,7 @@ export default function ExpensePage() {
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
-  const MOBILE_HIDDEN = ['reference_id', 'receipt_number', 'code', 'category_name'];
+  const MOBILE_HIDDEN: string[] = [];
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 639px)');
     const apply = (isMobile: boolean) => {

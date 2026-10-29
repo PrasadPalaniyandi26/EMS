@@ -144,7 +144,7 @@ export default function ApprovalsPage() {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [globalFilter, setGlobalFilter] = useState('');
 
-  const MOBILE_HIDDEN_APPROVALS = ['category_name', 'description'];
+  const MOBILE_HIDDEN_APPROVALS: string[] = [];
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 639px)');
     const apply = (isMobile: boolean) => {
@@ -262,7 +262,7 @@ export default function ApprovalsPage() {
           <button role="tab" aria-selected={view === tab.value}
             key={tab.value}
             onClick={() => switchView(tab.value)}
-            className={`relative px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider transition-all ${
+            className={`relative px-4 py-2.5 text-[13px] font-medium transition-all ${
               view === tab.value
                 ? 'text-black dark:text-white'
                 : 'text-[var(--shell-text-muted)] hover:text-[var(--shell-text)]'
