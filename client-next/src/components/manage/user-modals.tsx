@@ -17,7 +17,7 @@ import { useClients, useProjects, useProducts, useProjectTypes, useProductTypes 
 import api from '@/lib/api-client';
 import { COUNTRY_LIST } from './client-modals';
 import { ModuleModal } from '@/components/shared/module/module-modal';
-import { Field, AutoLabel, EmailInput, PhoneInput, CurrencyInput, isValidEmail, isValidPhone } from '@/components/shared/modal-primitives';
+import { Field, AutoLabel, SectionHeader, EmailInput, PhoneInput, CurrencyInput, isValidEmail, isValidPhone } from '@/components/shared/modal-primitives';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -41,14 +41,6 @@ function roleColor(name?: string) {
 }
 
 // ─── Section Header ───────────────────────────────────────────────────────────
-function SectionHeader({ label }: { label: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-3">
-      <span className="text-[12px] font-semibold text-[var(--shell-text-muted)]">{label}</span>
-      <div className="h-[1px] flex-1" style={{ background: 'var(--shell-border)' }} />
-    </div>
-  );
-}
 
 // ─── Shared input class ───────────────────────────────────────────────────────
 const INP = 'w-full h-10 text-sm border-input bg-transparent text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[var(--shell-accent)]/50 focus:border-[var(--shell-accent)]/50 rounded-lg';
@@ -181,9 +173,9 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
       <div className="space-y-2.5">
         {/* Employee ID badge for edit mode */}
         {editing && (
-          <div className="flex items-center gap-3 rounded-lg border bg-[var(--shell-hover)] rounded-lg px-4 py-2">
+          <div className="flex items-center gap-3 rounded-lg border bg-[var(--secondary)] rounded-lg px-4 py-2">
             <span className="text-[12px] font-semibold text-[var(--shell-text-muted)]">Employee ID</span>
-            <span className="text-[13px] font-semibold text-[var(--info)]">{getEmployeeId(editing.id)}</span>
+            <span className="text-[13px] font-semibold text-[var(--shell-text)]">{getEmployeeId(editing.id)}</span>
             <span className="ml-auto px-2 py-0.5 rounded-md text-[12px] font-semibold border border-[var(--shell-border)] text-[var(--shell-text)]">
               {editing.role_name || 'Staff'}
             </span>
@@ -350,7 +342,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
             {/* Status segmented */}
             <div className="space-y-1 pt-1">
               <p id="user-status-label" className="text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Status</p>
-              <div role="radiogroup" aria-labelledby="user-status-label" className="flex p-1 rounded-lg border bg-[var(--shell-hover)] rounded-lg gap-1">
+              <div role="radiogroup" aria-labelledby="user-status-label" className="flex p-1 rounded-lg border bg-[var(--secondary)] rounded-lg gap-1">
                 {([
                   { s: 'ACTIVE',   active: 'text-[var(--success)] border border-[var(--success)]' },
                   { s: 'On Hold',  active: 'text-[var(--warning)] border border-[var(--warning)]' },
@@ -563,7 +555,7 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
                   <td className="px-4 py-3 font-semibold text-[var(--shell-text)]">{a.client_name}</td>
                   <td className="px-4 py-3 text-[var(--shell-text)]">{a.category}</td>
                   <td className="px-4 py-3 text-[var(--shell-text)]">{a.type}</td>
-                  <td className="px-4 py-3 text-[var(--info)] font-semibold">{a.code}</td>
+                  <td className="px-4 py-3 text-[var(--shell-text)] font-semibold">{a.code}</td>
                 </tr>
               ))}
             </tbody>
@@ -875,7 +867,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
                       <span className="text-xs font-medium text-[var(--shell-text-muted)]">{p}</span>
                       <span className="text-[12px] font-semibold text-[var(--shell-accent)]">{count}/{MODULES.length}</span>
                     </div>
-                    <div className="w-full h-1 rounded-lg border bg-[var(--shell-hover)] rounded-full overflow-hidden">
+                    <div className="w-full h-1 rounded-lg border bg-[var(--secondary)] rounded-full overflow-hidden">
                       <div className="h-full bg-[var(--shell-accent)] rounded-full transition-all duration-300" style={{ width: `${pct}%` }} />
                     </div>
                   </div>

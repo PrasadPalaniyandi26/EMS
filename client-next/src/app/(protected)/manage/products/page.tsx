@@ -293,7 +293,7 @@ export default function ProductsPage() {
             </div>
             <div>
               <p id="product-status-label" className="mb-1 text-xs font-semibold" style={{ color: 'var(--shell-text-muted)' }}>Production Status</p>
-              <div role="radiogroup" aria-labelledby="product-status-label" className="rounded-lg border bg-[var(--shell-hover)] flex flex-wrap gap-1 rounded-lg p-1">
+              <div role="radiogroup" aria-labelledby="product-status-label" className="rounded-lg border bg-[var(--secondary)] flex flex-wrap gap-1 rounded-lg p-1">
                 {['R&D', 'Prototype', 'Assembly', 'Quality', 'Market Ready'].map(opt => (
                   <button
                     key={opt}

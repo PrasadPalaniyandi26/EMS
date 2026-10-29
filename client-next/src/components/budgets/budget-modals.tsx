@@ -12,7 +12,7 @@ import { Plus, Pencil, Download, Send, Info, Trash2 } from 'lucide-react';
 import { useUsers } from '@/hooks/use-queries';
 import { useAuthStore } from '@/stores/auth-store';
 import { ModuleModal } from '@/components/shared/module/module-modal';
-import { Field, CurrencyInput, inp } from '@/components/shared/modal-primitives';
+import { Field, CurrencyInput, inp, sel } from '@/components/shared/modal-primitives';
 import { FormGrid } from '@/components/shared/form-grid';
 
 
@@ -77,8 +77,7 @@ export function AddBudgetModal({ isOpen, onClose, onSave, editingData }: BudgetM
     { value: String(currentYear + 1), label: `${currentYear + 1} (Forecast)` },
   ];
 
-  const ctl = `${inp} border-input bg-transparent text-[var(--shell-text)]`;
-  const sel = 'w-full border-input bg-transparent text-[var(--shell-text)] rounded-lg h-10 text-sm text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)]';
+  const ctl = inp;
 
   return (
     <ModuleModal

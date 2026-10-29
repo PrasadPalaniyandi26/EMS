@@ -21,3 +21,4 @@ npm-debug.log*
 *.zip
 *.tar.gz
 .env.bak*
+.claude/settings.local.json

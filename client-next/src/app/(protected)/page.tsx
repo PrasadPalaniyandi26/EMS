@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { inputStyle } from '@/components/shared/modal-primitives';
 import { StatCard, StatStrip } from '@/components/shared/stat-card';
+import { ChartFrame } from '@/components/shared/chart-frame';
 import { useRouter } from 'next/navigation';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
@@ -193,11 +194,12 @@ export default function DashboardPage() {
           <div className="dialog-header px-4 py-2.5">Monthly Income vs Expenses</div>
           <div className="p-4">
             {trendLoading ? <SkeletonRect h="260px" /> : trendData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={260}>
+              <ChartFrame label="Monthly income and expenses by month" columns={['Month', 'Income', 'Expenses']} rows={trendData.map((d: any) => [d.month, fmt(d.income || 0), fmt(d.expenses || 0)])}>
+<ResponsiveContainer width="100%" height={260}>
                 <BarChart data={trendData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--shell-border)" strokeOpacity={0.5} />
-                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'var(--shell-text-muted)' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: 'var(--shell-text-muted)' }} axisLine={false} tickLine={false} />
+                  <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'var(--shell-text-muted)' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 12, fill: 'var(--shell-text-muted)' }} axisLine={false} tickLine={false} />
                   <Tooltip
                     contentStyle={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)', borderRadius: 8, fontSize: 12, color: 'var(--shell-text)' }}
                     cursor={{ fill: 'var(--shell-hover)' }}
@@ -207,6 +209,7 @@ export default function DashboardPage() {
                   <Bar dataKey="expenses" fill="var(--danger)" radius={[4, 4, 0, 0]} name="Expenses" />
                 </BarChart>
               </ResponsiveContainer>
+              </ChartFrame>
             ) : (
               <p className="py-16 text-center text-[12px] italic" style={{ color: 'var(--shell-text-muted)' }}>No data yet. Add transactions to see trends.</p>
             )}
@@ -217,15 +220,17 @@ export default function DashboardPage() {
           <div className="dialog-header px-4 py-2.5">Expenses by Category</div>
           <div className="p-4">
             {categoryLoading ? <SkeletonRect h="260px" /> : categoryData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={260}>
+              <ChartFrame label="Expenses by category" columns={['Category', 'Amount']} rows={categoryData.map((d: any) => [d.name, fmt(Number(d.value) || 0)])}>
+<ResponsiveContainer width="100%" height={260}>
                 <PieChart>
                   <Pie data={categoryData} cx="50%" cy="45%" outerRadius={90} innerRadius={48} paddingAngle={3} dataKey="value">
                     {categoryData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Pie>
                   <Tooltip formatter={(val) => fmt(typeof val === 'number' ? val : 0)} contentStyle={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)', borderRadius: 8, fontSize: 12, color: 'var(--shell-text)' }} />
-                  <Legend wrapperStyle={{ fontSize: 11, color: 'var(--shell-text-muted)' }} />
+                  <Legend wrapperStyle={{ fontSize: 12, color: 'var(--shell-text-muted)' }} />
                 </PieChart>
               </ResponsiveContainer>
+              </ChartFrame>
             ) : (
               <p className="py-16 text-center text-[12px] italic" style={{ color: 'var(--shell-text-muted)' }}>No expense data yet.</p>
             )}
@@ -274,11 +279,12 @@ export default function DashboardPage() {
           <div className="dialog-header px-4 py-2.5">Top Project Spend</div>
           <div className="p-4">
             {projectLoading ? <SkeletonRect h="200px" /> : (projectSpend || []).length > 0 ? (
-              <ResponsiveContainer width="100%" height={Math.max(160, (projectSpend as any[]).length * 42)}>
+              <ChartFrame label="Top project spend" columns={['Project', 'Spent']} rows={(projectSpend as any[]).map((d: any) => [d.project_name, fmt(Number(d.spent) || 0)])}>
+<ResponsiveContainer width="100%" height={Math.max(160, (projectSpend as any[]).length * 42)}>
                 <BarChart data={projectSpend as any[]} layout="vertical" margin={{ left: 0, right: 16 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--shell-border)" strokeOpacity={0.5} horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--shell-text-muted)' }} axisLine={false} tickLine={false} />
-                  <YAxis type="category" dataKey="project_name" tick={{ fontSize: 11, fill: 'var(--shell-text-muted)' }} axisLine={false} tickLine={false} width={100} />
+                  <XAxis type="number" tick={{ fontSize: 12, fill: 'var(--shell-text-muted)' }} axisLine={false} tickLine={false} />
+                  <YAxis type="category" dataKey="project_name" tick={{ fontSize: 12, fill: 'var(--shell-text-muted)' }} axisLine={false} tickLine={false} width={100} />
                   <Tooltip
                     formatter={(val) => fmt(typeof val === 'number' ? val : 0)}
                     contentStyle={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)', borderRadius: 8, fontSize: 12, color: 'var(--shell-text)' }}
@@ -286,6 +292,7 @@ export default function DashboardPage() {
                   <Bar dataKey="spent" fill="var(--info)" radius={[0, 4, 4, 0]} name="Spent" />
                 </BarChart>
               </ResponsiveContainer>
+              </ChartFrame>
             ) : (
               <p className="py-8 text-center text-[12px] italic" style={{ color: 'var(--shell-text-muted)' }}>No project-linked expenses yet.</p>
             )}

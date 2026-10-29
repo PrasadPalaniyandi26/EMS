@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Plus, Pencil, PlusCircle } from 'lucide-react';
 import { ModuleModal } from '@/components/shared/module/module-modal';
-import { Field, EmailInput, PhoneInput, isValidEmail, isValidPhone } from '@/components/shared/modal-primitives';
+import { Field, SectionHeader, EmailInput, PhoneInput, isValidEmail, isValidPhone, inp, sel } from '@/components/shared/modal-primitives';
 
 // ─── Country List ─────────────────────────────────────────────────────────────
 export const COUNTRY_LIST = [
@@ -26,19 +26,9 @@ export const COUNTRY_LIST = [
 ];
 
 // ─── Shared Styles ────────────────────────────────────────────────────────────
-const inp = 'w-full h-10 text-sm border-input bg-transparent text-[var(--shell-text)] rounded-lg';
-const sel = 'w-full h-10 text-sm border-input bg-transparent text-[var(--shell-text)] rounded-lg';
 
 // ─── Field ────────────────────────────────────────────────────────────────────
 // ─── Section Header ───────────────────────────────────────────────────────────
-function SectionHeader({ label }: { label: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-3">
-      <span className="text-[12px] font-semibold text-[var(--shell-text-muted)]">{label}</span>
-      <div className="h-[1px] flex-1" style={{ background: 'var(--shell-border)' }} />
-    </div>
-  );
-}
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface ClientModalProps {
@@ -263,7 +253,7 @@ export function ClientModal({ isOpen, onClose, onSave, editing, businessTypes: i
           {/* ── STATUS TOGGLE ── */}
           <div className="pt-1">
             <p id="client-status-label" className="mb-2 block text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Status</p>
-            <div role="radiogroup" aria-labelledby="client-status-label" className="flex p-1 rounded-lg border bg-[var(--shell-hover)] rounded-lg gap-1 h-9 w-56">
+            <div role="radiogroup" aria-labelledby="client-status-label" className="flex p-1 rounded-lg border bg-[var(--secondary)] rounded-lg gap-1 h-9 w-56">
               {([
                 { label: 'Active',   val: true,  active: 'text-[var(--success)] border border-[var(--success)]' },
                 { label: 'Inactive', val: false, active: 'text-[var(--danger)] border border-[var(--danger)]' },

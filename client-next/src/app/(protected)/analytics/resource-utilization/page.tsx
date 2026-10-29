@@ -1,5 +1,6 @@
 'use client';
 
+import { ChartFrame } from '@/components/shared/chart-frame';
 import { useEffect, useState } from 'react';
 import { inputStyle } from '@/components/shared/modal-primitives';
 import { useHeaderStore } from '@/stores/header-store';
@@ -118,7 +119,7 @@ export default function SpendAnalyticsPage() {
   const { data: burnProduct, isLoading: loadBurnProd  } = useProductBurn(dateFrom, dateTo);
 
   const surface   = { background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' };
-  const axisStyle = { fontSize: 11, fill: 'var(--shell-text-muted)' };
+  const axisStyle = { fontSize: 12, fill: 'var(--shell-text-muted)' };
 
   const heatMax = heatmap
     ? Math.max(...(heatmap.months || []).flatMap((m: any) =>
@@ -167,7 +168,8 @@ export default function SpendAnalyticsPage() {
             {loadSpenders ? <SkeletonRect h="220px" /> : !spenders?.length ? (
               <p className="text-center py-12 text-[12px] italic" style={{ color: 'var(--shell-text-muted)' }}>No expense data for this period</p>
             ) : (
-              <ResponsiveContainer width="100%" height={220}>
+              <ChartFrame label="Top spenders in the selected period" columns={['User', 'Expense']} rows={(spenders || []).map((d: any) => [d.username, fmt(Number(d.total) || 0)])}>
+<ResponsiveContainer width="100%" height={220}>
                 <BarChart data={spenders} layout="vertical" margin={{ left: 0, right: 40, top: 4, bottom: 4 }}>
                   <XAxis type="number" tick={axisStyle} tickFormatter={(v) => fmt(v)} axisLine={false} tickLine={false} />
                   <YAxis type="category" dataKey="username" tick={axisStyle} width={90} axisLine={false} tickLine={false} />
@@ -179,6 +181,7 @@ export default function SpendAnalyticsPage() {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
+              </ChartFrame>
             )}
           </div>
         </div>
@@ -212,7 +215,7 @@ export default function SpendAnalyticsPage() {
                         return (
                           <td key={c} title={val ? fmt(val) : '—'}
                             className="rounded-md text-center font-semibold cursor-default transition-all"
-                            style={{ ...heatColor(val, heatMax), padding: '5px 8px', fontSize: 11 }}>
+                            style={{ ...heatColor(val, heatMax), padding: '5px 8px', fontSize: 12 }}>
                             {val ? (val >= 100000 ? `${(val / 1000).toFixed(0)}k` : val >= 1000 ? `${(val / 1000).toFixed(1)}k` : val) : ''}
                           </td>
                         );

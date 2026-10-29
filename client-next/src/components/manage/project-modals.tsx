@@ -9,11 +9,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Plus, Pencil, PlusCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { ModuleModal } from '@/components/shared/module/module-modal';
-import { Field, AutoLabel, CurrencyInput } from '@/components/shared/modal-primitives';
+import { Field, AutoLabel, CurrencyInput, inp, sel } from '@/components/shared/modal-primitives';
 
 // ─── Shared Styles ─────────────────────────────────────────────────────────────
-const inp = 'w-full h-10 text-sm border-input bg-transparent text-[var(--shell-text)] rounded-lg';
-const sel = 'w-full h-10 text-sm border-input bg-transparent text-[var(--shell-text)] rounded-lg';
 
 // ─── Field ─────────────────────────────────────────────────────────────────────
 // ─── Props ─────────────────────────────────────────────────────────────────────
@@ -194,7 +192,7 @@ export function ProjectModal({
         {/* Full-width: status + description */}
         <div className="sm:col-span-2">
           <p id="project-status-label" className="mb-2 block text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Project Status</p>
-          <div role="radiogroup" aria-labelledby="project-status-label" className="flex p-1 rounded-lg border bg-[var(--shell-hover)] rounded-lg gap-1">
+          <div role="radiogroup" aria-labelledby="project-status-label" className="flex p-1 rounded-lg border bg-[var(--secondary)] rounded-lg gap-1">
             {([
               { val: 'Active',    active: 'text-[var(--success)] border border-[var(--success)]' },
               { val: 'Proposed',  active: 'text-[var(--shell-text)] border border-[var(--shell-border)]' },

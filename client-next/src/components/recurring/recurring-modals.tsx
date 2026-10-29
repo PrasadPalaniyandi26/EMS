@@ -28,13 +28,12 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ModuleModal } from '@/components/shared/module/module-modal';
-import { Field, NativeSelect, CurrencyInput, inp } from '@/components/shared/modal-primitives';
+import { Field, NativeSelect, CurrencyInput, inp, sel } from '@/components/shared/modal-primitives';
 
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 
 // Shared control styles for these dialogs: 40px, keyboard focus ring
-const ctl = `${inp} border-input bg-transparent text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)]`;
-const sel = 'w-full h-10 text-sm border-input bg-transparent text-[var(--shell-text)] border border-[var(--shell-border)] text-[var(--shell-text)] focus-visible:ring-2 focus-visible:ring-[var(--shell-accent)] rounded-lg';
+const ctl = inp;
 
 interface RecurringModalProps {
   isOpen: boolean;
@@ -106,7 +105,7 @@ export function RecurringModal({
           </div>
           <div className="space-y-1.5">
             <p id="recurring-type-label" className="text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Transaction Type</p>
-            <div role="radiogroup" aria-labelledby="recurring-type-label" className="flex p-1 rounded-lg border bg-[var(--shell-hover)] rounded-lg gap-1 h-10">
+            <div role="radiogroup" aria-labelledby="recurring-type-label" className="flex p-1 rounded-lg border bg-[var(--secondary)] rounded-lg gap-1 h-10">
               {([
                 { val: 'expense', active: 'text-[var(--danger)] border border-[var(--danger)]' },
                 { val: 'income',  active: 'text-[var(--success)] border border-[var(--success)]' },
