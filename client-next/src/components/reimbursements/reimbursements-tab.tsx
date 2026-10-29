@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
-import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailActions } from '@/components/shared/detail/detail-kit';
+import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import {
   getCoreRowModel, getFilteredRowModel, getPaginationRowModel,
   getSortedRowModel, getFacetedRowModel, getFacetedUniqueValues,
@@ -182,6 +182,10 @@ export function ReimbursementsTab() {
     borderColor: 'var(--shell-border)',
   };
 
+  const itemActions: DetailActionDef[] = isFinanceOrAdmin && selected && selected.reimbursement_status !== 'PAID'
+    ? [{ label: selected.reimbursement_status === 'ON_HOLD' ? 'Process payment' : 'Process', variant: 'primary', onClick: () => openModal([selected.id]) }]
+    : [];
+
   return (
     <>
       <ModuleShell
@@ -189,6 +193,7 @@ export function ReimbursementsTab() {
         searchRow={
           <DataTableToolbar
             table={table}
+            actions={<ToolbarActions actions={itemActions} />}
             extra={
               <select
                 value={statusTab}
@@ -208,11 +213,7 @@ export function ReimbursementsTab() {
             title="Reimbursement Detail"
             onClose={() => setSelected(null)}
             hasSelection={!!selected}
-            footer={
-              isFinanceOrAdmin && selected && selected.reimbursement_status !== 'PAID' ? (
-                <DetailActions actions={[{ label: selected.reimbursement_status === 'ON_HOLD' ? 'Process payment' : 'Process', variant: 'primary', onClick: () => openModal([selected.id]) }]} />
-              ) : undefined
-            }
+            footer={itemActions.length > 0 ? <DetailActions actions={itemActions} /> : undefined}
           >
             {selected && (() => {
               const x: any = selected;

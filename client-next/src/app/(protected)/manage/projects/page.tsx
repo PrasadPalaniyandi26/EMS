@@ -27,7 +27,7 @@ import {
 import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
-import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAllocation, DetailActions } from '@/components/shared/detail/detail-kit';
+import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAllocation, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import { formatCurrency } from '@/lib/currency';
 
 export default function ProjectsPage() {
@@ -115,17 +115,22 @@ export default function ProjectsPage() {
     }
   };
 
+  const itemActions: DetailActionDef[] = selectedProject ? [
+    { label: 'Edit', variant: 'primary', onClick: () => { setEditingProject(selectedProject as any); setIsModalOpen(true); } },
+    { label: 'Delete', variant: 'danger', onClick: () => setDeleteId((selectedProject as any).id) },
+  ] : [];
+
   return (
     <ModuleShell
       showPanel={!!selectedProject}
       searchRow={
         <DataTableToolbar
           table={table}
-          actions={
+          actions={<>
             <button className="btn-action" onClick={() => { setEditingProject(null); setIsModalOpen(true); }}>
               <Plus className="h-4 w-4 text-[var(--success)]" /> Add
             </button>
-          }
+          <ToolbarActions actions={itemActions} /></>}
         />
       }
       intelligencePanel={
@@ -133,12 +138,7 @@ export default function ProjectsPage() {
             title="Project Intelligence"
             onClose={() => setRowSelection({})}
             hasSelection={!!selectedProject}
-            footer={
-              <DetailActions actions={[
-                { label: 'Edit', variant: 'primary', onClick: () => { setEditingProject(selectedProject as any); setIsModalOpen(true); } },
-                { label: 'Delete', variant: 'danger', onClick: () => setDeleteId((selectedProject as any).id) },
-              ]} />
-            }
+            footer={itemActions.length > 0 ? <DetailActions actions={itemActions} /> : undefined}
           >
             {selectedProject && (() => {
               const pr: any = selectedProject;

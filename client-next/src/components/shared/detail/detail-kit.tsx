@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { FileText, ArrowUpRight } from 'lucide-react';
+import { FileText, ArrowUpRight, Send, Pencil, Trash2, CheckCircle2, XCircle, CornerUpLeft, Ban, PauseCircle, PlayCircle, Shield, UserX, Briefcase, CreditCard } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getAccessToken, API_BASE } from '@/lib/api-client';
@@ -203,5 +203,40 @@ export function DetailActions({ actions }: { actions: DetailActionDef[] }) {
         </button>
       ))}
     </div>
+  );
+}
+
+// The same actions as the panel footer, shown in the table toolbar next to Add, so a user can act from either
+// place. Pages build the list once (`DetailActionDef[]`, empty when nothing is selected) and pass it to both.
+const TOOLBAR_ICONS: Record<string, { icon: ReactNode; tone: string }> = {
+  Submit: { icon: <Send className="h-4 w-4" />, tone: 'text-[var(--shell-accent)]' },
+  Edit: { icon: <Pencil className="h-4 w-4" />, tone: 'text-[var(--info)]' },
+  Delete: { icon: <Trash2 className="h-4 w-4" />, tone: 'text-[var(--danger)]' },
+  Approve: { icon: <CheckCircle2 className="h-4 w-4" />, tone: 'text-[var(--success)]' },
+  Reject: { icon: <XCircle className="h-4 w-4" />, tone: 'text-[var(--danger)]' },
+  'Send back': { icon: <CornerUpLeft className="h-4 w-4" />, tone: 'text-[var(--info)]' },
+  Void: { icon: <Ban className="h-4 w-4" />, tone: 'text-[var(--danger)]' },
+  Pause: { icon: <PauseCircle className="h-4 w-4" />, tone: 'text-[var(--warning)]' },
+  Resume: { icon: <PlayCircle className="h-4 w-4" />, tone: 'text-[var(--info)]' },
+  Permissions: { icon: <Shield className="h-4 w-4" />, tone: 'text-[var(--warning)]' },
+  Deactivate: { icon: <UserX className="h-4 w-4" />, tone: 'text-[var(--danger)]' },
+  Allocation: { icon: <Briefcase className="h-4 w-4" />, tone: 'text-[var(--info)]' },
+  Process: { icon: <CreditCard className="h-4 w-4" />, tone: 'text-[var(--shell-accent)]' },
+  'Process payment': { icon: <CreditCard className="h-4 w-4" />, tone: 'text-[var(--shell-accent)]' },
+};
+
+export function ToolbarActions({ actions }: { actions: DetailActionDef[] }) {
+  return (
+    <>
+      {actions.map((a) => {
+        const meta = TOOLBAR_ICONS[a.label];
+        return (
+          <button key={a.label} type="button" className="btn-action" onClick={a.onClick} disabled={a.disabled}>
+            {a.icon ?? (meta && <span aria-hidden className={meta.tone}>{meta.icon}</span>)}
+            {a.label}
+          </button>
+        );
+      })}
+    </>
   );
 }

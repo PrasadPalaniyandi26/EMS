@@ -36,7 +36,7 @@ import {
 import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
-import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailActions } from '@/components/shared/detail/detail-kit';
+import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
 import { columns } from './columns';
@@ -154,17 +154,23 @@ export default function OrganizationPage() {
 
   const managerName = (id?: number) => users.find(u => u.id === id)?.username || '—';
 
+  const itemActions: DetailActionDef[] = isAdmin && selectedUser ? [
+    { label: 'Edit', variant: 'primary', onClick: () => { setEditingUser(selectedUser); setUserModalOpen(true); } },
+    { label: 'Permissions', onClick: () => setPermissionsModalOpen(true) },
+    { label: 'Deactivate', variant: 'danger', onClick: handleDeactivate },
+  ] : [];
+
   return (
     <ModuleShell
       showPanel={!!selectedUser}
       searchRow={
         <DataTableToolbar
           table={table}
-          actions={
+          actions={<>
             <button className="btn-action" onClick={() => { setEditingUser(null); setUserModalOpen(true); }} disabled={!isAdmin} title={!isAdmin ? 'Admin access required' : undefined}>
               <Plus className="h-4 w-4 text-[var(--success)]" /> Add
             </button>
-          }
+          <ToolbarActions actions={itemActions} /></>}
         />
       }
       intelligencePanel={
@@ -173,15 +179,7 @@ export default function OrganizationPage() {
             icon={<UserIcon className="h-3 w-3" />}
             onClose={() => setSelectedId(null)}
             hasSelection={!!selectedUser}
-            footer={
-              isAdmin ? (
-                <DetailActions actions={[
-                  { label: 'Edit', variant: 'primary', onClick: () => { if (selectedUser) { setEditingUser(selectedUser); setUserModalOpen(true); } } },
-                  { label: 'Permissions', onClick: () => setPermissionsModalOpen(true) },
-                  { label: 'Deactivate', variant: 'danger', onClick: handleDeactivate },
-                ]} />
-              ) : undefined
-            }
+            footer={itemActions.length > 0 ? <DetailActions actions={itemActions} /> : undefined}
           >
             {selectedUser && (() => {
               const u: any = selectedUser;

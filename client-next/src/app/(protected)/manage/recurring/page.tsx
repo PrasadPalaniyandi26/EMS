@@ -43,7 +43,7 @@ import {
 import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
-import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAttachment, DetailTimeline, DetailActions } from '@/components/shared/detail/detail-kit';
+import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAttachment, DetailTimeline, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import { getStatusConfig } from '@/lib/status';
 
 export default function RecurringPage() {
@@ -403,19 +403,50 @@ export default function RecurringPage() {
     }
   };
 
+  const itemActions: DetailActionDef[] = (() => {
+    if (!activeRow || !canManage) return [];
+    const st = (((activeRow as any).status) || 'DRAFT').toUpperCase();
+    if (['DRAFT', 'SENT_BACK'].includes(st)) {
+      return [
+        { label: 'Submit', variant: 'primary', onClick: handleSubmit },
+        { label: 'Edit', onClick: openEdit },
+        { label: 'Delete', variant: 'danger', onClick: handleDelete },
+      ] as DetailActionDef[];
+    }
+    if (st === 'PENDING_FINANCE' && canApprove) {
+      return [
+        { label: 'Approve', variant: 'primary', onClick: handleApprove },
+        { label: 'Reject', variant: 'danger', onClick: handleReject },
+      ] as DetailActionDef[];
+    }
+    if (st === 'APPROVED') {
+      return [
+        activeRow.is_active
+          ? { label: 'Pause', variant: 'primary', onClick: () => handleToggleStatus('pause') }
+          : { label: 'Resume', variant: 'primary', onClick: () => handleToggleStatus('resume') },
+        { label: 'Edit', onClick: openEdit },
+        { label: 'Delete', variant: 'danger', onClick: handleDelete },
+      ] as DetailActionDef[];
+    }
+    return [
+      { label: 'Edit', variant: 'primary', onClick: openEdit },
+      { label: 'Delete', variant: 'danger', onClick: handleDelete },
+    ] as DetailActionDef[];
+  })();
+
   return (
     <ModuleShell
       showPanel={!!activeRow}
       searchRow={
         <DataTableToolbar
           table={table}
-          actions={
+          actions={<>
             canManage ? (
               <button className="btn-action" onClick={openAdd}>
                 <Plus className="h-4 w-4 text-[var(--success)]" /> Add
               </button>
             ) : null
-          }
+          <ToolbarActions actions={itemActions} /></>}
         />
       }
       intelligencePanel={
@@ -423,36 +454,7 @@ export default function RecurringPage() {
             title="Subscription Lifecycle"
             onClose={() => setRowSelection({})}
             hasSelection={!!activeRow}
-            footer={(() => {
-              if (!activeRow || !canManage) return undefined;
-              const st = (((activeRow as any).status) || 'DRAFT').toUpperCase();
-              if (['DRAFT', 'SENT_BACK'].includes(st)) {
-                return <DetailActions actions={[
-                  { label: 'Submit', variant: 'primary', onClick: handleSubmit },
-                  { label: 'Edit', onClick: openEdit },
-                  { label: 'Delete', variant: 'danger', onClick: handleDelete },
-                ]} />;
-              }
-              if (st === 'PENDING_FINANCE' && canApprove) {
-                return <DetailActions actions={[
-                  { label: 'Approve', variant: 'primary', onClick: handleApprove },
-                  { label: 'Reject', variant: 'danger', onClick: handleReject },
-                ]} />;
-              }
-              if (st === 'APPROVED') {
-                return <DetailActions actions={[
-                  activeRow.is_active
-                    ? { label: 'Pause', variant: 'primary' as const, onClick: () => handleToggleStatus('pause') }
-                    : { label: 'Resume', variant: 'primary' as const, onClick: () => handleToggleStatus('resume') },
-                  { label: 'Edit', onClick: openEdit },
-                  { label: 'Delete', variant: 'danger', onClick: handleDelete },
-                ]} />;
-              }
-              return <DetailActions actions={[
-                { label: 'Edit', variant: 'primary', onClick: openEdit },
-                { label: 'Delete', variant: 'danger', onClick: handleDelete },
-              ]} />;
-            })()}
+            footer={itemActions.length > 0 ? <DetailActions actions={itemActions} /> : undefined}
           >
             {activeRow && (() => {
               const r: any = activeRow;

@@ -36,7 +36,7 @@ import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { TransactionDetail } from '@/components/transactions/transaction-detail';
-import { DetailActions } from '@/components/shared/detail/detail-kit';
+import { DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import { CurrencyInput, useConfirm } from '@/components/shared/modal-primitives';
 
 export default function ExpensePage() {
@@ -439,17 +439,34 @@ export default function ExpensePage() {
     } catch { toast.error('Failed to delete note'); }
   };
 
+  // One list of actions for the selected item, shown in the toolbar and pinned in the panel (same commands, either place)
+  const itemActions: DetailActionDef[] = (() => {
+    if (!selectedTxn) return [];
+    const st = (selectedTxn.status || '').toUpperCase();
+    if (['DRAFT', 'SENT_BACK'].includes(st)) {
+      return [
+        { label: 'Submit', variant: 'primary', onClick: handleSubmit },
+        { label: 'Edit', onClick: openEdit },
+        { label: 'Delete', variant: 'danger', onClick: handleDelete },
+      ];
+    }
+    if (st === 'APPROVED' && (user?.roles || []).some((r: any) => ['FINANCE', 'ADMIN'].includes((r.role_name || '').toUpperCase()))) {
+      return [{ label: 'Void', variant: 'danger', onClick: () => { setVoidReason(''); setVoidOpen(true); } }];
+    }
+    return [];
+  })();
+
   return (
     <ModuleShell
       showPanel={!!selectedTxn}
       searchRow={
         <DataTableToolbar
           table={table}
-          actions={
+          actions={<>
             <button className="btn-action" onClick={openAdd}>
               <Plus className="h-4 w-4 text-[var(--success)]" /> Add
             </button>
-          }
+          <ToolbarActions actions={itemActions} /></>}
         />
       }
       intelligencePanel={
@@ -457,23 +474,7 @@ export default function ExpensePage() {
             title="Transaction Detail"
             onClose={() => setRowSelection({})}
             hasSelection={!!selectedTxn}
-            footer={(() => {
-              if (!selectedTxn) return undefined;
-              const st = (selectedTxn.status || '').toUpperCase();
-              if (['DRAFT', 'SENT_BACK'].includes(st)) {
-                return (
-                  <DetailActions actions={[
-                    { label: 'Submit', variant: 'primary', onClick: handleSubmit },
-                    { label: 'Edit', onClick: openEdit },
-                    { label: 'Delete', variant: 'danger', onClick: handleDelete },
-                  ]} />
-                );
-              }
-              if (st === 'APPROVED' && (user?.roles || []).some((r: any) => ['FINANCE', 'ADMIN'].includes((r.role_name || '').toUpperCase()))) {
-                return <DetailActions actions={[{ label: 'Void', variant: 'danger', onClick: () => { setVoidReason(''); setVoidOpen(true); } }]} />;
-              }
-              return undefined;
-            })()}
+            footer={itemActions.length > 0 ? <DetailActions actions={itemActions} /> : undefined}
           >
             {selectedTxn && (
               <>

@@ -18,7 +18,7 @@ import {
 import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
-import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAllocation, DetailActions } from '@/components/shared/detail/detail-kit';
+import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAllocation, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import api from '@/lib/api-client';
 
 export default function BudgetsPage() {
@@ -124,17 +124,23 @@ export default function BudgetsPage() {
     return Array.from(depts).map((d) => ({ label: d as string, value: d as string }));
   }, [allBudgets]);
 
+  const itemActions: DetailActionDef[] = activeRow ? [
+    { label: 'Edit', variant: 'primary', onClick: openEdit },
+    { label: 'Allocation', onClick: () => setIsSubmitOpen(true) },
+    { label: 'Delete', variant: 'danger', onClick: () => setIsDeleteOpen(true) },
+  ] : [];
+
   return (
     <ModuleShell
       showPanel={!!activeRow}
       searchRow={
         <DataTableToolbar
           table={table}
-          actions={
+          actions={<>
             <button className="btn-action" onClick={openAdd}>
               <Plus className="h-4 w-4 text-[var(--success)]" /> Add
             </button>
-          }
+          <ToolbarActions actions={itemActions} /></>}
         />
       }
       intelligencePanel={
@@ -142,13 +148,7 @@ export default function BudgetsPage() {
             title="Budget Details"
             onClose={() => setRowSelection({})}
             hasSelection={!!activeRow}
-            footer={
-              <DetailActions actions={[
-                { label: 'Edit', variant: 'primary', onClick: openEdit },
-                { label: 'Allocation', onClick: () => setIsSubmitOpen(true) },
-                { label: 'Delete', variant: 'danger', onClick: () => setIsDeleteOpen(true) },
-              ]} />
-            }
+            footer={itemActions.length > 0 ? <DetailActions actions={itemActions} /> : undefined}
           >
             {activeRow && (() => {
               const b: any = activeRow;

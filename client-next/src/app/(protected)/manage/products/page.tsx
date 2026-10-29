@@ -28,7 +28,7 @@ import {
 import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
-import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAllocation, DetailActions } from '@/components/shared/detail/detail-kit';
+import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAllocation, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import { CurrencyInput, Field, NativeSelect, ConfirmDialog, inp } from '@/components/shared/modal-primitives';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
@@ -151,17 +151,22 @@ export default function ProductsPage() {
     } catch { toast.error('Failed to delete'); }
   };
 
+  const itemActions: DetailActionDef[] = selectedProduct ? [
+    { label: 'Edit', variant: 'primary', onClick: openEdit },
+    { label: 'Delete', variant: 'danger', onClick: () => setDeleteId(selectedProduct.id) },
+  ] : [];
+
   return (
     <ModuleShell
       showPanel={!!selectedProduct}
       searchRow={
         <DataTableToolbar
           table={table}
-          actions={
+          actions={<>
             <button className="btn-action" onClick={openAdd}>
               <Plus className="h-4 w-4 text-[var(--success)]" /> Add
             </button>
-          }
+          <ToolbarActions actions={itemActions} /></>}
         />
       }
       intelligencePanel={
@@ -169,12 +174,7 @@ export default function ProductsPage() {
             title="Product Intelligence"
             onClose={() => setRowSelection({})}
             hasSelection={!!selectedProduct}
-            footer={
-              <DetailActions actions={[
-                { label: 'Edit', variant: 'primary', onClick: openEdit },
-                { label: 'Delete', variant: 'danger', onClick: () => setDeleteId(selectedProduct!.id) },
-              ]} />
-            }
+            footer={itemActions.length > 0 ? <DetailActions actions={itemActions} /> : undefined}
           >
             {selectedProduct && (() => {
               const pd: any = selectedProduct;

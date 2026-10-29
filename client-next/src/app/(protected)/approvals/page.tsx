@@ -31,7 +31,7 @@ import { getStatusConfig } from '@/lib/status';
 import { ApproveModal, RejectModal, SendBackModal, VoidModal } from '@/components/approvals/approvals-modals';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
-import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAttachment, DetailAllocation, DetailTimeline, DetailActions } from '@/components/shared/detail/detail-kit';
+import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAttachment, DetailAllocation, DetailTimeline, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
 import {
@@ -255,6 +255,16 @@ export default function ApprovalsPage() {
     ...(canSeeReimbursements ? [{ label: 'Reimbursements', value: 'reimbursements' as const }] : []),
   ];
 
+  const itemActions: DetailActionDef[] = canActOnSelected
+    ? [
+        { label: 'Approve', variant: 'primary', onClick: () => setIsApproveOpen(true) },
+        { label: 'Send back', onClick: () => setIsSendBackOpen(true) },
+        { label: 'Reject', variant: 'danger', onClick: () => setIsRejectOpen(true) },
+      ]
+    : canVoidSelected
+    ? [{ label: 'Void', variant: 'danger', onClick: () => setIsVoidOpen(true) }]
+    : [];
+
   return (
     <div className="flex flex-col h-full w-full" style={{ background: 'var(--shell-bg)' }}>
       {/* Tab strip */}
@@ -289,6 +299,7 @@ export default function ApprovalsPage() {
       searchRow={
         <DataTableToolbar
           table={table}
+          actions={<ToolbarActions actions={itemActions} />}
         />
       }
       intelligencePanel={
@@ -301,17 +312,7 @@ export default function ApprovalsPage() {
               body: 'Select one of your submissions to see who reviewed it, their comments, and the outcome.',
               tips: ['See who approved or rejected it', 'Read the reviewer\'s comments', 'Full audit trail per request'],
             } : undefined}
-            footer={
-              canActOnSelected ? (
-                <DetailActions actions={[
-                  { label: 'Approve', variant: 'primary', onClick: () => setIsApproveOpen(true) },
-                  { label: 'Send back', variant: 'secondary', onClick: () => setIsSendBackOpen(true) },
-                  { label: 'Reject', variant: 'danger', onClick: () => setIsRejectOpen(true) },
-                ]} />
-              ) : canVoidSelected ? (
-                <DetailActions actions={[{ label: 'Void', variant: 'danger', onClick: () => setIsVoidOpen(true) }]} />
-              ) : undefined
-            }
+            footer={itemActions.length > 0 ? <DetailActions actions={itemActions} /> : undefined}
           >
             {selectedApproval && (() => {
               const a = selectedApproval;
