@@ -6,6 +6,7 @@ import { useHeaderStore } from '@/stores/header-store';
 import { useAuditLogs, useAuditStats } from '@/hooks/use-queries';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
+import { DetailSummary, DetailSection, DetailGrid, DetailField } from '@/components/shared/detail/detail-kit';
 import { formatDistanceToNow, format } from 'date-fns';
 import {
   Shield, Search, X, RefreshCw,
@@ -48,90 +49,56 @@ function AuditDetailPanel({ log }: { log: AuditLog }) {
       .map((k) => ({ key: k, old: oldVals[k], new: newVals[k] }));
   }, [oldVals, newVals]);
 
+  const label = (k: string) => k.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+
   return (
-    <div className="space-y-4">
-      {/* Header card */}
-      <div className="rounded-lg p-4 border" style={{ background: 'var(--shell-hover)', borderColor: 'var(--shell-border)' }}>
-        <div className="flex items-center gap-2 mb-3">
-          <div className={`px-2 py-0.5 rounded text-[11px] font-black ${action.bg} ${action.color}`}>
-            {action.label}
-          </div>
-          <span className="text-[11px] font-bold text-black dark:text-white">
-            {TABLE_LABELS[log.table_name] || log.table_name}
-          </span>
-          {log.reference_id && (
-            <span className="text-[11px] font-bold text-[var(--info)] bg-[color-mix(in_srgb,var(--info)_10%,transparent)] px-1.5 py-0.5 rounded ml-auto">
-              {log.reference_id}
-            </span>
-          )}
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          {[
-            { label: 'Actor',      val: log.username || `User #${log.changed_by}` },
-            { label: 'Record ID',  val: `#${log.record_id}` },
-            { label: 'Date',       val: format(new Date(log.changed_at), 'MMM d, yyyy') },
-            { label: 'Time',       val: format(new Date(log.changed_at), 'h:mm:ss a') },
-          ].map(({ label, val }) => (
-            <div key={label} className="rounded-lg px-2.5 py-2 border" style={{ background: 'var(--shell-surface)', borderColor: 'var(--shell-border)' }}>
-              <p className="text-[11px] font-bold" style={{ color: 'var(--shell-text-muted)' }}>{label}</p>
-              <p className="text-[11px] font-bold text-black dark:text-white mt-0.5 truncate">{val}</p>
-            </div>
-          ))}
-        </div>
-      </div>
+    <>
+      <DetailSummary
+        title={`${action.label} · ${TABLE_LABELS[log.table_name] || log.table_name}`}
+        subtitle={log.reference_id || `Record #${log.record_id}`}
+        status={log.username || `User #${log.changed_by}`}
+        statusClass="text-[var(--shell-text-muted)]"
+      />
 
-      {/* Changed fields diff */}
+      <DetailSection title="Details">
+        <DetailGrid>
+          <DetailField label="Actor" value={log.username || `User #${log.changed_by}`} />
+          <DetailField label="Record" value={`#${log.record_id}`} />
+          <DetailField label="Date" value={format(new Date(log.changed_at), 'MMM d, yyyy')} />
+          <DetailField label="Time" value={format(new Date(log.changed_at), 'h:mm:ss a')} />
+        </DetailGrid>
+      </DetailSection>
+
       {changedFields && changedFields.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-[11px] font-bold flex items-center gap-2 border-b pb-1.5"
-            style={{ color: 'var(--shell-text-muted)', borderColor: 'var(--shell-border)' }}>
-            <GitCommit className="w-3.5 h-3.5" /> Changes ({changedFields.length} fields)
-          </p>
-          <div className="space-y-2">
+        <DetailSection title={`Changes (${changedFields.length} fields)`}>
+          <DetailGrid cols={1}>
             {changedFields.map(({ key, old: oldVal, new: newVal }) => (
-              <div key={key} className="rounded-lg overflow-hidden border text-[11px]" style={{ borderColor: 'var(--shell-border)' }}>
-                <div className="px-3 py-1.5 border-b font-bold text-[11px]"
-                  style={{ background: 'var(--shell-hover)', borderColor: 'var(--shell-border)', color: 'var(--shell-text-muted)' }}>
-                  {key.replace(/_/g, ' ')}
-                </div>
-                {oldVal !== undefined && (
-                  <div className="px-3 py-2 flex items-start gap-2 bg-[color-mix(in_srgb,var(--danger)_5%,transparent)] border-b" style={{ borderColor: 'var(--shell-border)' }}>
-                    <span className="text-[11px] font-black text-[var(--danger)] mt-0.5 shrink-0 w-7">Old</span>
-                    <span className="text-[var(--danger)] break-all">{String(oldVal ?? '—')}</span>
-                  </div>
-                )}
-                {newVal !== undefined && (
-                  <div className="px-3 py-2 flex items-start gap-2 bg-[color-mix(in_srgb,var(--success)_5%,transparent)]">
-                    <span className="text-[11px] font-black text-[var(--success)] mt-0.5 shrink-0 w-7">New</span>
-                    <span className="text-[var(--success)] break-all">{String(newVal ?? '—')}</span>
-                  </div>
-                )}
-              </div>
+              <DetailField
+                key={key}
+                label={label(key)}
+                value={
+                  <span className="break-all">
+                    {oldVal !== undefined && <span className="text-[var(--danger)]">{String(oldVal ?? '—')}</span>}
+                    {oldVal !== undefined && newVal !== undefined && <span className="mx-1.5 text-[var(--shell-text-muted)]">→</span>}
+                    {newVal !== undefined && <span className="text-[var(--success)]">{String(newVal ?? '—')}</span>}
+                  </span>
+                }
+              />
             ))}
-          </div>
-        </div>
+          </DetailGrid>
+        </DetailSection>
       )}
 
-      {/* Raw values (INSERT only — show new_values) */}
       {log.action === 'INSERT' && newVals && (
-        <div className="space-y-2">
-          <p className="text-[11px] font-bold flex items-center gap-2 border-b pb-1.5"
-            style={{ color: 'var(--shell-text-muted)', borderColor: 'var(--shell-border)' }}>
-            <FileText className="w-3.5 h-3.5" /> Record Data
-          </p>
-          <div className="rounded-lg overflow-hidden border text-[11px]" style={{ borderColor: 'var(--shell-border)' }}>
+        <DetailSection title="Record data">
+          <DetailGrid cols={1}>
             {Object.entries(newVals).map(([k, v]) => (
-              <div key={k} className="flex items-start gap-3 px-3 py-1.5 border-b" style={{ borderColor: 'var(--shell-border)' }}>
-                <span className="text-[11px] font-bold min-w-[100px] shrink-0 mt-0.5" style={{ color: 'var(--shell-text-muted)' }}>
-                  {k.replace(/_/g, ' ')}
-                </span>
-                <span className="text-black dark:text-white break-all">{String(v ?? '—')}</span>
-              </div>
+              <DetailField key={k} label={label(k)} value={<span className="break-all">{String(v ?? '—')}</span>} />
             ))}
-          </div>
-        </div>
+          </DetailGrid>
+        </DetailSection>
       )}
-    </div>
+    </>
   );
 }
 

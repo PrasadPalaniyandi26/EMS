@@ -102,11 +102,11 @@ export function ModuleShell({
                 ? "lg:w-[360px] lg:opacity-100"
                 : "lg:w-0 lg:opacity-0 lg:overflow-hidden lg:pointer-events-none",
               /* Mobile — bottom sheet */
-              "fixed inset-x-0 bottom-0 z-40 lg:static lg:inset-auto lg:z-auto",
+              "fixed inset-x-0 bottom-[var(--bottom-nav-h)] z-40 lg:static lg:inset-auto lg:z-auto",
               "rounded-t-2xl lg:rounded-none",
               panelVisible
-                ? "translate-y-0 max-h-[80dvh]"
-                : "translate-y-full max-h-[80dvh]",
+                ? "translate-y-0 max-h-[calc(80dvh-var(--bottom-nav-h))]"
+                : "translate-y-full max-h-[calc(80dvh-var(--bottom-nav-h))]",
               "flex flex-col overflow-hidden shadow-2xl lg:shadow-none",
               /* Below 1280px the empty "nothing selected" panel only wastes space (it covers the page on
                  phones and squeezes tables on laptops), so show it once a row is selected */

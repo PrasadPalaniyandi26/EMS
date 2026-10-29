@@ -43,6 +43,8 @@ import {
 import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
+import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAttachment, DetailTimeline, DetailActions } from '@/components/shared/detail/detail-kit';
+import { getStatusConfig } from '@/lib/status';
 
 export default function RecurringPage() {
   const setHeader = useHeaderStore((s) => s.setHeader);
@@ -409,56 +411,9 @@ export default function RecurringPage() {
           table={table}
           actions={
             canManage ? (
-              <>
-                <button className="btn-action" onClick={openAdd}>
-                  <Plus className="h-4 w-4 text-[var(--success)]" /> Add
-                </button>
-                <button className="btn-action" onClick={openEdit} disabled={selectedCount !== 1}>
-                  <Pencil className="h-4 w-4 text-[var(--info)]" /> Edit
-                </button>
-                <button
-                  className="btn-action"
-                  onClick={handleSubmit}
-                  disabled={selectedCount !== 1 || !['DRAFT', 'SENT_BACK'].includes(((selectedRows[0]?.original as any)?.status || 'DRAFT').toUpperCase())}
-                >
-                  <Send className="h-4 w-4 text-[var(--shell-accent)]" /> Submit
-                </button>
-                {canApprove && (
-                  <>
-                    <button
-                      className="btn-action"
-                      onClick={handleApprove}
-                      disabled={selectedCount !== 1 || ((selectedRows[0]?.original as any)?.status || '').toUpperCase() !== 'PENDING_FINANCE'}
-                    >
-                      <CheckCircle2 className="h-4 w-4 text-[var(--success)]" /> Approve
-                    </button>
-                    <button
-                      className="btn-action"
-                      onClick={handleReject}
-                      disabled={selectedCount !== 1 || ((selectedRows[0]?.original as any)?.status || '').toUpperCase() !== 'PENDING_FINANCE'}
-                    >
-                      <XCircle className="h-4 w-4 text-[var(--danger)]" /> Reject
-                    </button>
-                  </>
-                )}
-                <button
-                  className="btn-action"
-                  onClick={() => handleToggleStatus('pause')}
-                  disabled={selectedCount !== 1 || ((selectedRows[0]?.original as any)?.status || '').toUpperCase() !== 'APPROVED' || !(selectedRows[0]?.original as any)?.is_active}
-                >
-                  <PauseCircle className="h-4 w-4 text-[var(--warning)]" /> Pause
-                </button>
-                <button
-                  className="btn-action"
-                  onClick={() => handleToggleStatus('resume')}
-                  disabled={selectedCount !== 1 || ((selectedRows[0]?.original as any)?.status || '').toUpperCase() !== 'APPROVED' || !!(selectedRows[0]?.original as any)?.is_active}
-                >
-                  <PlayCircle className="h-4 w-4 text-[var(--info)]" /> Resume
-                </button>
-                <button className="btn-action" onClick={handleDelete} disabled={selectedCount === 0}>
-                  <Trash2 className="h-4 w-4 text-[var(--danger)]" /> Delete{selectedCount > 0 ? ` (${selectedCount})` : ''}
-                </button>
-              </>
+              <button className="btn-action" onClick={openAdd}>
+                <Plus className="h-4 w-4 text-[var(--success)]" /> Add
+              </button>
             ) : null
           }
         />
@@ -468,159 +423,102 @@ export default function RecurringPage() {
             title="Subscription Lifecycle"
             onClose={() => setRowSelection({})}
             hasSelection={!!activeRow}
+            footer={(() => {
+              if (!activeRow || !canManage) return undefined;
+              const st = (((activeRow as any).status) || 'DRAFT').toUpperCase();
+              if (['DRAFT', 'SENT_BACK'].includes(st)) {
+                return <DetailActions actions={[
+                  { label: 'Submit', variant: 'primary', onClick: handleSubmit },
+                  { label: 'Edit', onClick: openEdit },
+                  { label: 'Delete', variant: 'danger', onClick: handleDelete },
+                ]} />;
+              }
+              if (st === 'PENDING_FINANCE' && canApprove) {
+                return <DetailActions actions={[
+                  { label: 'Approve', variant: 'primary', onClick: handleApprove },
+                  { label: 'Reject', variant: 'danger', onClick: handleReject },
+                ]} />;
+              }
+              if (st === 'APPROVED') {
+                return <DetailActions actions={[
+                  activeRow.is_active
+                    ? { label: 'Pause', variant: 'primary' as const, onClick: () => handleToggleStatus('pause') }
+                    : { label: 'Resume', variant: 'primary' as const, onClick: () => handleToggleStatus('resume') },
+                  { label: 'Edit', onClick: openEdit },
+                  { label: 'Delete', variant: 'danger', onClick: handleDelete },
+                ]} />;
+              }
+              return <DetailActions actions={[
+                { label: 'Edit', variant: 'primary', onClick: openEdit },
+                { label: 'Delete', variant: 'danger', onClick: handleDelete },
+              ]} />;
+            })()}
           >
-            {activeRow && (
-            <div className="flex-1 space-y-8">
-              <div className="bg-[var(--shell-hover)] rounded-lg border border-[var(--shell-border)] p-4 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)]">Schedule Info</label>
-                  {(activeRow as any).status === 'APPROVED' ? (
-                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${activeRow.is_active ? 'bg-[color-mix(in_srgb,var(--success)_20%,transparent)] text-[var(--success)]' : 'bg-[color-mix(in_srgb,var(--warning)_20%,transparent)] text-[var(--warning)]'}`}>
-                      {activeRow.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                  ) : (
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[var(--shell-hover)] text-[var(--shell-text-muted)]">
-                      {((activeRow as any).status || 'DRAFT').replace('_', ' ')}
-                    </span>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-0.5">Frequency</p>
-                    <p className="text-[12px] font-bold text-black dark:text-white capitalize">{activeRow.frequency || '—'}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-0.5">Next Run</p>
-                    <p className="text-[12px] font-bold text-black dark:text-white">
-                      {activeRow.next_run_date
-                        ? parseApiDate(activeRow.next_run_date)?.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
-                        : '—'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-0.5">Last Run</p>
-                    <p className="text-[12px] font-bold text-black dark:text-white">
-                      {(activeRow as any).last_run_date
-                        ? parseApiDate((activeRow as any).last_run_date)?.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
-                        : 'Not yet run'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-0.5">Type</p>
-                    <p className="text-[12px] font-bold text-black dark:text-white capitalize">{(activeRow as any).type || 'expense'}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-0.5">Start Date</p>
-                    <p className="text-[12px] font-bold text-black dark:text-white">
-                      {(activeRow as any).start_date
-                        ? parseApiDate((activeRow as any).start_date)?.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
-                        : parseApiDate((activeRow as any).next_run_date)?.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-0.5">End Date</p>
-                    <p className="text-[12px] font-bold text-black dark:text-white">
-                      {(activeRow as any).end_date
-                        ? parseApiDate((activeRow as any).end_date)?.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
-                        : <span className="text-[var(--shell-text-muted)] font-normal italic">Open-Ended</span>}
-                    </p>
-                  </div>
-                  {(activeRow as any).client_name && (
-                    <div className="col-span-2">
-                      <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-0.5">Client</p>
-                      <p className="text-[12px] font-bold text-black dark:text-white">{(activeRow as any).client_name}</p>
-                    </div>
-                  )}
-                  {(activeRow as any).project_name && (
-                    <div className="col-span-2">
-                      <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-0.5">Project</p>
-                      <p className="text-[12px] font-bold text-black dark:text-white">{(activeRow as any).project_name}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
+            {activeRow && (() => {
+              const r: any = activeRow;
+              const st = (r.status || 'DRAFT').toUpperCase();
+              const cfg = getStatusConfig(st);
+              const day = (v?: string | null) => (v ? parseApiDate(v)?.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : undefined);
+              const freq = r.frequency ? String(r.frequency).replace(/^./, (c: string) => c.toUpperCase()) : undefined;
+              return (
+                <>
+                  <DetailSummary
+                    title={r.description || r.code || 'Recurring transaction'}
+                    subtitle={[r.code, r.category_name].filter(Boolean).join(' · ')}
+                    status={st === 'APPROVED' ? (r.is_active ? 'Approved · Active' : 'Approved · Paused') : cfg.label}
+                    statusClass={cfg.color}
+                    figure={formatCurrency(r.total_amount ?? r.amount, currency)}
+                    figureLabel={freq}
+                  />
 
-              {(activeRow as any).receipt_path && (
-                <div className="space-y-2">
-                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] border-b border-[var(--shell-border)] pb-1.5 flex items-center gap-2">
-                    <FileText className="w-3.5 h-3.5" /> Supporting Document
-                  </label>
-                  <div
-                    className="h-12 rounded-lg flex items-center gap-3 px-3 cursor-pointer border-2 border-[var(--shell-accent)]/40 hover:border-[var(--shell-accent)] transition-all"
-                    style={{ background: 'linear-gradient(135deg, rgba(74,111,83,0.12) 0%, rgba(74,111,83,0.05) 100%)' }}
-                    onClick={() => handleViewReceipt((activeRow as any).receipt_path)}
-                  >
-                    <FileText className="w-4 h-4 text-[var(--shell-accent)] shrink-0" />
-                    <p className="text-[11px] font-bold text-[var(--shell-accent)] truncate">{(activeRow as any).receipt_path.split('/').pop()}</p>
-                    <p className="text-[11px] text-[var(--shell-accent)]/60 ml-auto shrink-0">Click to view</p>
-                  </div>
-                </div>
-              )}
+                  <DetailSection title="Schedule">
+                    <DetailGrid>
+                      <DetailField label="Frequency" value={freq} />
+                      <DetailField label="Type" value={String(r.type || 'expense').replace(/^./, (c: string) => c.toUpperCase())} />
+                      <DetailField label="Next run" value={day(r.next_run_date)} />
+                      <DetailField label="Last run" value={day(r.last_run_date) || 'Not yet run'} />
+                      <DetailField label="Start date" value={day(r.start_date) || day(r.next_run_date)} />
+                      <DetailField label="End date" value={day(r.end_date) || 'Open-ended'} />
+                      {r.client_name && <DetailField label="Client" value={r.client_name} />}
+                      {r.project_name && <DetailField label="Project" value={r.project_name} />}
+                    </DetailGrid>
+                  </DetailSection>
 
-              <div className="space-y-2.5">
-                <label className="text-[11px] font-bold text-[var(--shell-text-muted)] border-b border-[var(--shell-border)] pb-2 flex items-center gap-2">
-                  <CreditCard className="w-4 h-4" /> Payment Info
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="bg-[var(--shell-hover)] rounded-lg border border-[var(--shell-border)] p-3">
-                    <p className="text-[11px] font-bold text-[var(--shell-text-muted)]">Method</p>
-                    <p className="text-[12px] font-bold text-black dark:text-white capitalize">{(activeRow as any).payment_method || '—'}</p>
-                  </div>
-                  <div className="bg-[var(--shell-hover)] rounded-lg border border-[var(--shell-border)] p-3">
-                    <p className="text-[11px] font-bold text-[var(--shell-text-muted)]">Auto-Run</p>
-                    <p className="text-[12px] font-bold text-black dark:text-white">{activeRow.is_active ? 'Enabled' : 'Paused'}</p>
-                  </div>
-                  {(activeRow as any).gst_rate && (
-                    <div className="col-span-2 bg-[var(--shell-hover)] rounded-lg border border-[var(--shell-border)] p-3">
-                      <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-1">GST</p>
-                      <p className="text-[12px] font-bold text-black dark:text-white">{(activeRow as any).gst_rate}% · {(activeRow as any).gst_included ? 'Included in amount' : 'Added on top'}</p>
-                      <p className="text-[11px] text-[var(--shell-text-muted)] mt-0.5">
-                        Net {formatCurrency((activeRow as any).net_amount ?? (activeRow as any).amount, currency)} · Total {formatCurrency((activeRow as any).total_amount ?? (activeRow as any).amount, currency)}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
+                  <DetailSection title="Payment">
+                    <DetailGrid>
+                      <DetailField label="Method" value={r.payment_method ? String(r.payment_method).replace(/_/g, ' ').replace(/^./, (c: string) => c.toUpperCase()) : undefined} />
+                      <DetailField label="Auto-run" value={r.is_active ? 'Enabled' : 'Paused'} />
+                      {r.gst_rate && (
+                        <>
+                          <DetailField label={`GST (${r.gst_rate}%)`} value={r.gst_included ? 'Included in amount' : 'Added on top'} />
+                          <DetailField label="Net amount" value={formatCurrency(r.net_amount ?? r.amount, currency)} />
+                        </>
+                      )}
+                    </DetailGrid>
+                  </DetailSection>
 
-              <div className="space-y-2.5">
-                <label className="text-[11px] font-bold text-[var(--shell-text-muted)] border-b border-[var(--shell-border)] pb-2 flex items-center gap-2">
-                  <History className="w-4 h-4" /> Run History
-                </label>
-                <div className="rounded-lg overflow-hidden border border-[var(--shell-border)] bg-[var(--shell-hover)]">
-                  {runHistoryLoading ? (
-                    <p className="px-3 py-4 text-[11px] text-[var(--shell-text-muted)]">Loading...</p>
-                  ) : !runHistory || runHistory.length === 0 ? (
-                    <p className="px-3 py-4 text-[11px] text-[var(--shell-text-muted)]">No runs yet — schedule has not been triggered.</p>
-                  ) : (
-                    <table className="w-full text-left text-[11px]">
-                      <thead className="bg-[var(--shell-surface)] text-[var(--shell-text-muted)] font-bold">
-                        <tr>
-                          <th className="px-3 py-2">Date</th>
-                          <th className="px-3 py-2 text-center">Status</th>
-                          <th className="px-3 py-2 text-right">Amount</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[var(--shell-border)]">
-                        {runHistory.map((run: any) => (
-                          <tr key={run.id}>
-                            <td className="px-3 py-2 text-[var(--shell-text-muted)]">
-                              {run.date_recorded ? parseApiDate(run.date_recorded)?.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
-                            </td>
-                            <td className="px-3 py-2 text-center">
-                              <span className="text-[var(--success)] font-bold text-[11px] px-1.5 py-0.5 bg-[var(--shell-accent)]/20 rounded">
-                                {run.status === 'APPROVED' ? 'Success' : run.status}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2 text-right font-bold text-[var(--shell-text-muted)]">{formatCurrency(run.amount, currency)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  {r.receipt_path && (
+                    <DetailSection title="Document">
+                      <DetailAttachment path={r.receipt_path} />
+                    </DetailSection>
                   )}
-                </div>
-              </div>
-            </div>
-            )}
+
+                  <DetailSection title="Run history">
+                    {runHistoryLoading ? (
+                      <p className="text-[12px] text-[var(--shell-text-muted)]">Loading...</p>
+                    ) : !runHistory || runHistory.length === 0 ? (
+                      <p className="text-[12px] text-[var(--shell-text-muted)]">No runs yet. The schedule has not been triggered.</p>
+                    ) : (
+                      <DetailTimeline items={runHistory.map((run: any) => ({
+                        title: formatCurrency(run.amount, currency),
+                        meta: [day(run.date_recorded), run.status === 'APPROVED' ? 'Success' : run.status].filter(Boolean).join(' · '),
+                        tone: run.status === 'APPROVED' ? 'success' as const : 'muted' as const,
+                      }))} />
+                    )}
+                  </DetailSection>
+                </>
+              );
+            })()}
           </ModuleIntelligencePanel>
       }
     >

@@ -36,6 +36,7 @@ import {
 import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
+import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailActions } from '@/components/shared/detail/detail-kit';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
 import { columns } from './columns';
@@ -160,23 +161,9 @@ export default function OrganizationPage() {
         <DataTableToolbar
           table={table}
           actions={
-            <>
-              <button className="btn-action" onClick={() => { setEditingUser(null); setUserModalOpen(true); }} disabled={!isAdmin} title={!isAdmin ? 'Admin access required' : undefined}>
-                <Plus className="h-4 w-4 text-[var(--success)]" /> Add
-              </button>
-              <button className="btn-action" onClick={() => { if (selectedUser) { setEditingUser(selectedUser); setUserModalOpen(true); } }} disabled={!selectedId || !isAdmin} title={!isAdmin ? 'Admin access required' : undefined}>
-                <Pencil className="h-4 w-4 text-[var(--info)]" /> Edit
-              </button>
-              <button className="btn-action" onClick={() => setAllocationModalOpen(true)} disabled={!selectedId || !isAdmin} title={!isAdmin ? 'Admin access required' : undefined}>
-                <Briefcase className="h-4 w-4 text-[var(--info)]" /> Allocation
-              </button>
-              <button className="btn-action" onClick={() => setPermissionsModalOpen(true)} disabled={!selectedId || !isAdmin} title={!isAdmin ? 'Admin access required' : undefined}>
-                <Shield className="h-4 w-4 text-[var(--warning)]" /> Permissions
-              </button>
-              <button className="btn-action" onClick={handleDeactivate} disabled={!selectedId || !isAdmin} title={!isAdmin ? 'Admin access required' : undefined}>
-                <UserX className="h-4 w-4 text-[var(--danger)]" /> Deactivate
-              </button>
-            </>
+            <button className="btn-action" onClick={() => { setEditingUser(null); setUserModalOpen(true); }} disabled={!isAdmin} title={!isAdmin ? 'Admin access required' : undefined}>
+              <Plus className="h-4 w-4 text-[var(--success)]" /> Add
+            </button>
           }
         />
       }
@@ -186,130 +173,61 @@ export default function OrganizationPage() {
             icon={<UserIcon className="h-3 w-3" />}
             onClose={() => setSelectedId(null)}
             hasSelection={!!selectedUser}
+            footer={
+              isAdmin ? (
+                <DetailActions actions={[
+                  { label: 'Edit', variant: 'primary', onClick: () => { if (selectedUser) { setEditingUser(selectedUser); setUserModalOpen(true); } } },
+                  { label: 'Permissions', onClick: () => setPermissionsModalOpen(true) },
+                  { label: 'Deactivate', variant: 'danger', onClick: handleDeactivate },
+                ]} />
+              ) : undefined
+            }
           >
-            {selectedUser && (
-            <div className="flex-1 space-y-4 animate-in fade-in slide-in-from-right-6 duration-500 custom-scrollbar overflow-y-auto pr-1">
-              {/* Avatar + Identity */}
-              <div className="flex items-center gap-4 pb-4" style={{ borderBottom: '1px solid var(--shell-border)' }}>
-                <div className="relative shrink-0">
-                  <div className="h-14 w-14 rounded-lg flex items-center justify-center font-black text-lg"
-                    style={{ background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' }}>
-                    {(() => { const p = selectedUser.username.trim().split(/\s+/); return p.length >= 2 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : p[0].slice(0, 2).toUpperCase(); })()}
-                  </div>
-                  <div className={`absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full border-2 shadow ${selectedUser.user_status === 'ON_HOLD' ? 'bg-[var(--warning)]' : selectedUser.user_status === 'INACTIVE' || selectedUser.is_active === 0 ? 'bg-[var(--danger)]' : 'bg-[var(--success)]'}`}
-                    style={{ borderColor: 'var(--shell-surface)' }} />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="text-[14px] font-bold leading-tight truncate" style={{ color: 'var(--shell-text)' }}>{selectedUser.username}</h3>
-                  <p className="text-[11px] font-semibold mt-0.5" style={{ color: 'var(--shell-accent)' }}>
-                    NT{10000 + selectedUser.id}
-                  </p>
-                  <div className="flex flex-wrap gap-1 mt-1.5">
-                    {(selectedUser.roles && selectedUser.roles.length > 0 ? selectedUser.roles : [{ role_name: selectedUser.role_name, is_default: true }]).map((r, i) => {
-                      const colors: Record<string, string> = { admin: 'bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] text-[var(--danger)]', finance: 'bg-[color-mix(in_srgb,var(--info)_12%,transparent)] text-[var(--info)]', manager: 'bg-[color-mix(in_srgb,var(--warning)_12%,transparent)] text-[var(--warning)]', employee: 'bg-[color-mix(in_srgb,var(--info)_12%,transparent)] text-[var(--info)]' };
-                      const key = (r.role_name || '').toLowerCase();
-                      const cls = colors[key] || 'bg-[var(--shell-hover)] text-[var(--shell-text-muted)]';
-                      return (
-                        <span key={i} className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${cls}`}>
-                          {r.role_name}{r.is_default && ' ★'}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* Contact & Location — 2 column */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-lg p-3 space-y-2" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
-                  <p className="text-[11px] font-bold mb-2" style={{ color: 'var(--shell-text-muted)' }}>Contact</p>
-                  <div className="flex items-start gap-2">
-                    <Mail className="w-3 h-3 shrink-0 mt-0.5" style={{ color: 'var(--shell-text-muted)' }} />
-                    <span className="text-[11px] break-all leading-tight" style={{ color: 'var(--shell-text)' }}>{selectedUser.email}</span>
-                  </div>
-                  {selectedUser.contact_no && (
-                    <div className="flex items-center gap-2">
-                      <Phone className="w-3 h-3 shrink-0" style={{ color: 'var(--shell-text-muted)' }} />
-                      <span className="text-[11px]" style={{ color: 'var(--shell-text)' }}>{selectedUser.contact_no}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 pt-1" style={{ borderTop: '1px solid var(--shell-border)' }}>
-                    <Building2 className="w-3 h-3 shrink-0" style={{ color: 'var(--shell-text-muted)' }} />
-                    <span className="text-[11px] font-semibold" style={{ color: 'var(--shell-text)' }}>{selectedUser.department || 'Unassigned'}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <UserIcon className="w-3 h-3 shrink-0" style={{ color: 'var(--shell-text-muted)' }} />
-                    <span className="text-[11px] font-semibold" style={{ color: 'var(--shell-text)' }}>{selectedUser.manager_name || managerName(selectedUser.manager_id ?? undefined) || '—'}</span>
-                  </div>
-                </div>
-                <div className="rounded-lg p-3 space-y-2" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
-                  <p className="text-[11px] font-bold mb-2" style={{ color: 'var(--shell-text-muted)' }}>Location</p>
-                  {selectedUser.house_apt && <p className="text-[11px]" style={{ color: 'var(--shell-text)' }}>{selectedUser.house_apt}</p>}
-                  {selectedUser.address && <p className="text-[11px]" style={{ color: 'var(--shell-text)' }}>{selectedUser.address}</p>}
-                  {selectedUser.city && <p className="text-[11px] font-semibold" style={{ color: 'var(--shell-text)' }}>{selectedUser.city}{selectedUser.postal_code ? ` — ${selectedUser.postal_code}` : ''}</p>}
-                  {selectedUser.country && <p className="text-[11px]" style={{ color: 'var(--shell-text-muted)' }}>{selectedUser.country}</p>}
-                  {!selectedUser.address && !selectedUser.city && (
-                    <p className="text-[11px] italic" style={{ color: 'var(--shell-text-muted)' }}>No address on file</p>
-                  )}
-                  <div className="flex items-center gap-2 pt-1" style={{ borderTop: '1px solid var(--shell-border)' }}>
-                    <Calendar className="w-3 h-3 shrink-0" style={{ color: 'var(--shell-text-muted)' }} />
-                    <span className="text-[11px]" style={{ color: 'var(--shell-text)' }}>{selectedUser.joining_date ? parseApiDate(selectedUser.joining_date)?.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not set'}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="w-3 h-3 shrink-0" style={{ color: 'var(--shell-text-muted)' }} />
-                    <span className="text-[11px] font-semibold" style={{ color: 'var(--shell-accent)' }}>{selectedUser.clearance_level || 'Level 1'}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Active Allocations */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-[11px] font-bold flex items-center gap-1.5" style={{ color: 'var(--shell-text-muted)' }}>
-                    <FolderOpen className="w-3 h-3" /> Active Allocations
-                  </h4>
-                  <span className="text-[11px] font-bold" style={{ color: 'var(--shell-accent)' }}>{panelAllocations.length}</span>
-                </div>
-                <div className="space-y-1.5">
-                  {panelAllocations.length === 0 ? (
-                    <p className="text-[11px] italic text-center py-3" style={{ color: 'var(--shell-text-muted)' }}>No allocations assigned</p>
-                  ) : panelAllocations.slice(0, 5).map((a) => (
-                    <div key={a.id} className="rounded-lg p-2.5" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-[11px] font-semibold leading-none truncate flex-1 mr-2" style={{ color: 'var(--shell-text)' }}>{a.code}</span>
-                        <span className="text-[11px] font-bold shrink-0" style={{ color: 'var(--shell-text-muted)' }}>{a.type}</span>
-                      </div>
-                      <span className="text-[11px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>{a.client_name} · {a.category}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Quick actions */}
-              {isAdmin && (
-              <div className="grid grid-cols-2 gap-2 pt-2" style={{ borderTop: '1px solid var(--shell-border)' }}>
-                <button
-                  onClick={() => setAllocationModalOpen(true)}
-                  className="flex items-center justify-center gap-2 py-2 rounded-lg text-[11px] font-semibold transition-colors"
-                  style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)', color: 'var(--shell-text)' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--shell-accent)'; (e.currentTarget as HTMLElement).style.color = 'var(--shell-accent)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--shell-border)'; (e.currentTarget as HTMLElement).style.color = 'var(--shell-text)'; }}
-                >
-                  <Briefcase className="w-3.5 h-3.5" /> Allocation
-                </button>
-                <button
-                  onClick={() => setPermissionsModalOpen(true)}
-                  className="flex items-center justify-center gap-2 py-2 rounded-lg text-[11px] font-semibold text-white transition-all"
-                  style={{ background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.88'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
-                >
-                  <Shield className="w-3.5 h-3.5" /> Permissions
-                </button>
-              </div>
-              )}
-            </div>
-            )}
+            {selectedUser && (() => {
+              const u: any = selectedUser;
+              const inactive = u.user_status === 'INACTIVE' || u.is_active === 0;
+              const status = u.user_status === 'ON_HOLD' ? 'On hold' : inactive ? 'Inactive' : 'Active';
+              const statusClass = u.user_status === 'ON_HOLD' ? 'text-[var(--warning)]' : inactive ? 'text-[var(--danger)]' : 'text-[var(--success)]';
+              const roles = (u.roles && u.roles.length > 0 ? u.roles : [{ role_name: u.role_name, is_default: true }])
+                .map((r: any) => `${r.role_name}${r.is_default ? ' (default)' : ''}`).join(', ');
+              const address = [u.house_apt, u.address, [u.city, u.postal_code].filter(Boolean).join(' '), u.country].filter(Boolean).join(', ');
+              const joined = u.joining_date ? parseApiDate(u.joining_date)?.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : undefined;
+              return (
+                <>
+                  <DetailSummary title={u.username} subtitle={`NT${10000 + u.id}${u.department ? ` · ${u.department}` : ''}`} status={status} statusClass={statusClass} />
+                  <DetailSection title="Details">
+                    <DetailGrid>
+                      <DetailField label="Roles" value={roles} wide />
+                      <DetailField label="Department" value={u.department || 'Unassigned'} />
+                      <DetailField label="Manager" value={u.manager_name || managerName(u.manager_id ?? undefined)} />
+                      <DetailField label="Joined" value={joined} />
+                      <DetailField label="Clearance" value={u.clearance_level || 'Level 1'} />
+                    </DetailGrid>
+                  </DetailSection>
+                  <DetailSection title="Contact">
+                    <DetailGrid>
+                      <DetailField label="Email" value={u.email} wide />
+                      <DetailField label="Phone" value={u.contact_no} />
+                      <DetailField label="Address" value={address || 'No address on file'} wide />
+                    </DetailGrid>
+                  </DetailSection>
+                  <DetailSection
+                    title={`Active allocations (${panelAllocations.length})`}
+                    action={isAdmin ? <button type="button" onClick={() => setAllocationModalOpen(true)} className="text-[12px] font-medium text-[var(--shell-accent)] hover:underline">Manage</button> : undefined}
+                  >
+                    {panelAllocations.length === 0 ? (
+                      <p className="text-[12px] text-[var(--shell-text-muted)]">No allocations assigned.</p>
+                    ) : (
+                      <DetailGrid cols={1}>
+                        {panelAllocations.slice(0, 5).map((al) => (
+                          <DetailField key={al.id} label={`${al.code} · ${al.type}`} value={[al.client_name, al.category].filter(Boolean).join(' · ')} />
+                        ))}
+                      </DetailGrid>
+                    )}
+                  </DetailSection>
+                </>
+              );
+            })()}
           </ModuleIntelligencePanel>
       }
     >

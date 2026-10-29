@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { TextCell, DateCell, MoneyCell, StatusText } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
+import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAttachment } from '@/components/shared/detail/detail-kit';
 
 export default function TransactionsPage() {
   const setHeader = useHeaderStore((s) => s.setHeader);
@@ -117,130 +118,49 @@ export default function TransactionsPage() {
           onClose={() => setSelectedTxn(null)}
           hasSelection={!!selectedTxn}
         >
-          {selectedTxn && (
-            <div className="space-y-5">
-              <div className={`rounded-lg p-4 border ${selectedTxn.type === 'income' ? 'bg-[color-mix(in_srgb,var(--info)_15%,transparent)] border-[color-mix(in_srgb,var(--info)_20%,transparent)]' : 'bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] border-[color-mix(in_srgb,var(--danger)_20%,transparent)]'}`}>
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <p className={`text-[11px] font-bold mb-1 ${selectedTxn.type === 'income' ? 'text-[var(--info)]' : 'text-[var(--danger)]'}`}>Total Amount</p>
-                    <p className={`text-2xl font-black ${selectedTxn.type === 'income' ? 'text-[var(--info)]' : 'text-[var(--danger)]'}`}>{formatCurrency(selectedTxn.amount, currency)}</p>
-                  </div>
-                  {selectedTxn.status && (() => {
-                    const sc = getStatusConfig(selectedTxn.status);
-                    return <Badge variant="outline" className={`text-[11px] font-bold ${sc.color} ${sc.bg}`}>{sc.label}</Badge>;
-                  })()}
-                </div>
-                <div className={`grid grid-cols-2 gap-4 pt-3 border-t ${selectedTxn.type === 'income' ? 'border-[color-mix(in_srgb,var(--info)_20%,transparent)]' : 'border-[color-mix(in_srgb,var(--danger)_20%,transparent)]'}`}>
-                  <div>
-                    <p className="text-[11px] font-bold mb-0.5 text-[var(--shell-text-muted)]">Record ID</p>
-                    <p className="text-[13px] font-bold text-black dark:text-white">#{selectedTxn.id}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-bold mb-0.5 text-[var(--shell-text-muted)]">Reference #</p>
-                    <p className="text-[13px] font-bold text-black dark:text-white">{selectedTxn.reference_id || '—'}</p>
-                  </div>
-                </div>
-              </div>
+          {selectedTxn && (() => {
+            const t = selectedTxn;
+            const cfg = getStatusConfig(t.status);
+            const reimb = t.reimbursement_status;
+            return (
+              <>
+                <DetailSummary
+                  title={t.reference_id || `#${t.id}`}
+                  subtitle={t.description || 'No description'}
+                  status={cfg.label}
+                  statusClass={cfg.color}
+                  figure={`${t.type === 'income' ? '+' : '-'}${formatCurrency(t.amount, currency)}`}
+                  figureLabel={t.type === 'income' ? 'Income' : 'Expense'}
+                />
 
-              <div className="grid grid-cols-2 gap-y-4 gap-x-4">
-                <div className="col-span-2">
-                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-1 block">Description</p>
-                  <p className="text-[12px] font-medium text-[var(--shell-text-muted)] bg-[var(--shell-hover)] px-2.5 py-2 rounded-lg border border-[var(--shell-border)] leading-relaxed">
-                    {selectedTxn.description || 'No description provided.'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-1 block">Category</p>
-                  <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold border bg-[var(--shell-hover)] text-[var(--shell-text-muted)] border-[var(--shell-border)]">
-                    {selectedTxn.category_name || 'Uncategorized'}
-                  </span>
-                </div>
-                <div>
-                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-1 block">Transaction Date</p>
-                  <p className="text-[12px] font-bold text-black dark:text-white">{formatDate(selectedTxn.date_recorded)}</p>
-                </div>
-                <div className="col-span-2 h-[1px] bg-[var(--shell-hover)]" />
-                <div>
-                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-1 block">Payment Method</p>
-                  <div className="flex items-center gap-2">
-                    <CreditCard className="h-4 w-4 text-[var(--shell-text-muted)]" />
-                    <p className="text-[12px] font-bold text-[var(--shell-text-muted)] capitalize">{selectedTxn.payment_method || '—'}</p>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-1 block">Type</p>
-                  <p className="text-[12px] font-bold text-[var(--shell-text-muted)] capitalize">{selectedTxn.type}</p>
-                </div>
-              </div>
+                <DetailSection title="Details">
+                  <DetailGrid>
+                    <DetailField label="Date" value={formatDate(t.date_recorded)} />
+                    <DetailField label="Payment method" value={t.payment_method ? String(t.payment_method).replace(/_/g, ' ').replace(/^./, (c: string) => c.toUpperCase()) : undefined} />
+                    <DetailField label="Category" value={t.category_name} />
+                    <DetailField label="Client" value={t.client_name} />
+                    {(t.project_name || t.product_name) && <DetailField label="Project / product" value={t.project_name || t.product_name} wide />}
+                  </DetailGrid>
+                </DetailSection>
 
-              {selectedTxn.needs_reimbursement && (
-                <div className="space-y-1.5">
-                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
-                    <Wallet className="w-3.5 h-3.5" /> Reimbursement
-                  </p>
-                  {selectedTxn.reimbursement_status === 'PAID' ? (
-                    <div className="flex flex-col gap-1 px-3 py-2.5 rounded-lg bg-[color-mix(in_srgb,var(--success)_10%,transparent)] border border-[color-mix(in_srgb,var(--success)_20%,transparent)]">
-                      <div className="flex items-center gap-2 text-[var(--success)]">
-                        <CheckCircle2 className="w-4 h-4 shrink-0" />
-                        <span className="text-[11px] font-bold">
-                          Reimbursed{selectedTxn.reimbursed_by_name ? ` by ${selectedTxn.reimbursed_by_name}` : ''}{selectedTxn.reimbursed_at ? ` · ${formatDate(selectedTxn.reimbursed_at)}` : ''}
-                        </span>
-                      </div>
-                      {selectedTxn.reimbursement_reference && (
-                        <span className="text-[11px] text-[color-mix(in_srgb,var(--success)_70%,transparent)] pl-6">Ref: {selectedTxn.reimbursement_reference}</span>
-                      )}
-                      {selectedTxn.reimbursement_note && (
-                        <span className="text-[11px] text-[color-mix(in_srgb,var(--success)_70%,transparent)] pl-6">{selectedTxn.reimbursement_note}</span>
-                      )}
-                    </div>
-                  ) : selectedTxn.reimbursement_status === 'ON_HOLD' ? (
-                    <div className="flex flex-col gap-1 px-3 py-2.5 rounded-lg bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border border-[color-mix(in_srgb,var(--warning)_20%,transparent)]">
-                      <div className="flex items-center gap-2 text-[var(--warning)]">
-                        <PauseCircle className="w-4 h-4 shrink-0" />
-                        <span className="text-[11px] font-bold">On Hold{selectedTxn.reimbursed_by_name ? ` · ${selectedTxn.reimbursed_by_name}` : ''}</span>
-                      </div>
-                      {selectedTxn.reimbursement_note && (
-                        <span className="text-[11px] text-[color-mix(in_srgb,var(--warning)_70%,transparent)] pl-6">{selectedTxn.reimbursement_note}</span>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border border-[color-mix(in_srgb,var(--warning)_20%,transparent)] text-[var(--warning)]">
-                      <Clock className="w-4 h-4 shrink-0" />
-                      <span className="text-[11px] font-bold">Pending Reimbursement</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <p className="text-[11px] font-bold text-[var(--shell-text-muted)]">Attached Document</p>
-                {selectedTxn.receipt_path ? (
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const path = selectedTxn.receipt_path;
-                      const url = path.startsWith('/') ? path : `${API_BASE}/receipts/${path}`;
-                      try {
-                        const token = getAccessToken();
-                        const res = await fetch(url, { credentials: 'include', headers: token ? { Authorization: `Bearer ${token}` } : {} });
-                        if (!res.ok) { toast.error(`Receipt load failed: ${res.status}`); return; }
-                        window.open(URL.createObjectURL(await res.blob()), '_blank');
-                      } catch {
-                        toast.error('Could not load receipt. Please try again.');
-                      }
-                    }}
-                    className="flex w-full items-center gap-2.5 rounded-lg border border-[var(--shell-border)] bg-[var(--shell-hover)] px-3 py-3 text-left hover:border-[var(--shell-accent)] focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]"
-                  >
-                    <FileText aria-hidden className="h-4 w-4 shrink-0 text-[var(--shell-text-muted)]" />
-                    <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-[var(--shell-text)]">{selectedTxn.receipt_path.split('/').pop()}</span>
-                    <span className="flex items-center gap-1 text-[11px] font-bold text-[var(--shell-text-muted)]">OPEN <ArrowUpRight aria-hidden className="h-3 w-3" /></span>
-                  </button>
-                ) : (
-                  <p className="rounded-lg border border-dashed border-[var(--shell-border)] px-3 py-3 text-[12px] text-[var(--shell-text-muted)]">No document attached.</p>
+                {t.needs_reimbursement && (
+                  <DetailSection title="Reimbursement">
+                    <DetailGrid>
+                      <DetailField label="Status" value={reimb === 'PAID' ? 'Paid' : reimb === 'ON_HOLD' ? 'On hold' : 'Pending'} tone={reimb === 'PAID' ? 'success' : 'warning'} />
+                      <DetailField label="Handled by" value={t.reimbursed_by_name} />
+                      {t.reimbursement_reference && <DetailField label="Reference" value={t.reimbursement_reference} />}
+                      {t.reimbursed_at && <DetailField label="Date" value={formatDate(t.reimbursed_at)} />}
+                      {t.reimbursement_note && <DetailField label="Note" value={t.reimbursement_note} wide />}
+                    </DetailGrid>
+                  </DetailSection>
                 )}
-              </div>
-            </div>
-          )}
+
+                <DetailSection title="Document">
+                  <DetailAttachment path={t.receipt_path} />
+                </DetailSection>
+              </>
+            );
+          })()}
         </ModuleIntelligencePanel>
       }
     >

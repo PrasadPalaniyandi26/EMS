@@ -16,6 +16,8 @@ interface ModuleIntelligencePanelProps {
   className?: string;
   hasSelection?: boolean;
   tabs?: PanelTab[];
+  // Actions for the selected item, pinned to the bottom (use DetailActions)
+  footer?: React.ReactNode;
   // Overrides the default empty-state copy for this title (e.g. role-specific wording)
   emptyState?: { icon?: React.ReactNode; heading: string; body: string; tips: string[] };
 }
@@ -79,6 +81,7 @@ export function ModuleIntelligencePanel({
   className,
   hasSelection,
   tabs,
+  footer,
   emptyState,
 }: ModuleIntelligencePanelProps) {
   const empty = emptyState ? { ...EMPTY_STATES[title], ...emptyState } : EMPTY_STATES[title];
@@ -159,6 +162,10 @@ export function ModuleIntelligencePanel({
           </div>
         )}
       </div>
+
+      {hasSelection && footer && (
+        <div className="shrink-0 border-t border-[var(--shell-border)] bg-[var(--shell-surface)] p-3">{footer}</div>
+      )}
     </aside>
   );
 }

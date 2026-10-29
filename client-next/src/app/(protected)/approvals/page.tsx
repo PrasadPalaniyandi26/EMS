@@ -31,6 +31,7 @@ import { getStatusConfig } from '@/lib/status';
 import { ApproveModal, RejectModal, SendBackModal, VoidModal } from '@/components/approvals/approvals-modals';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
+import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAttachment, DetailAllocation, DetailTimeline, DetailActions } from '@/components/shared/detail/detail-kit';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
 import {
@@ -288,44 +289,6 @@ export default function ApprovalsPage() {
       searchRow={
         <DataTableToolbar
           table={table}
-          actions={
-            <>
-              {(isManager || isFinance || isAdmin) && (
-                <>
-                  <button
-                    className="btn-action"
-                    onClick={() => canActOnSelected && setIsApproveOpen(true)}
-                    disabled={!canActOnSelected}
-                  >
-                    <ShieldCheck className="w-4 h-4 text-[var(--success)]" /> Approve
-                  </button>
-                  <button
-                    className="btn-action"
-                    onClick={() => canActOnSelected && setIsRejectOpen(true)}
-                    disabled={!canActOnSelected}
-                  >
-                    <XCircle className="w-4 h-4 text-[var(--danger)]" /> Reject
-                  </button>
-                  <button
-                    className="btn-action"
-                    onClick={() => canActOnSelected && setIsSendBackOpen(true)}
-                    disabled={!canActOnSelected}
-                  >
-                    <CornerUpLeft className="w-4 h-4 text-[var(--info)]" /> Send back
-                  </button>
-                  {(isFinance || isAdmin) && (
-                    <button
-                      className="btn-action"
-                      onClick={() => canVoidSelected && setIsVoidOpen(true)}
-                      disabled={!canVoidSelected}
-                    >
-                      <Ban className="w-4 h-4 text-[var(--danger)]" /> Void
-                    </button>
-                  )}
-                </>
-              )}
-            </>
-          }
         />
       }
       intelligencePanel={
@@ -338,252 +301,106 @@ export default function ApprovalsPage() {
               body: 'Select one of your submissions to see who reviewed it, their comments, and the outcome.',
               tips: ['See who approved or rejected it', 'Read the reviewer\'s comments', 'Full audit trail per request'],
             } : undefined}
+            footer={
+              canActOnSelected ? (
+                <DetailActions actions={[
+                  { label: 'Approve', variant: 'primary', onClick: () => setIsApproveOpen(true) },
+                  { label: 'Send back', variant: 'secondary', onClick: () => setIsSendBackOpen(true) },
+                  { label: 'Reject', variant: 'danger', onClick: () => setIsRejectOpen(true) },
+                ]} />
+              ) : canVoidSelected ? (
+                <DetailActions actions={[{ label: 'Void', variant: 'danger', onClick: () => setIsVoidOpen(true) }]} />
+              ) : undefined
+            }
           >
-            {selectedApproval && (
-            <div className="flex-1 space-y-4">
-              {/* Receipt Viewer */}
-              <div className="space-y-2">
-                <h3 className="text-[11px] font-bold text-[var(--shell-text-muted)] flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
-                  <Receipt className="w-3.5 h-3.5" /> Receipt
-                </h3>
-                <div
-                  role={selectedApproval?.receipt_path ? "button" : undefined}
-                  tabIndex={selectedApproval?.receipt_path ? 0 : undefined}
-                  aria-label={selectedApproval?.receipt_path ? "Open receipt in a new tab" : undefined}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } }}
-                  className="focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)] h-20 rounded-lg flex items-center justify-center group cursor-pointer transition-all px-4"
-                  style={{ background: 'var(--shell-bg)', border: '1px solid var(--shell-border)' }}
-                  onClick={async () => {
-                    if (selectedApproval?.receipt_path) {
-                      const path = selectedApproval.receipt_path;
-                      const url = path.startsWith('/') ? path : `${API_BASE}/receipts/${path}`;
-                      try {
-                        const token = getAccessToken();
-                        const res = await fetch(url, {
-                          credentials: 'include',
-                          headers: token ? { Authorization: `Bearer ${token}` } : {},
-                        });
-                        if (!res.ok) {
-                          const text = await res.text();
-                          console.error('Receipt fetch failed:', res.status, text);
-                          toast.error(`Receipt load failed: ${res.status}`);
-                          return;
-                        }
-                        const blob = await res.blob();
-                        const blobUrl = URL.createObjectURL(blob);
-                        window.open(blobUrl, '_blank');
-                      } catch (err) {
-                        console.error('Receipt fetch error:', err);
-                        toast.error('Could not load receipt. Please try again.');
-                      }
-                    }
-                  }}
-                >
-                  {selectedApproval?.receipt_path ? (
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-[var(--shell-hover)] border border-[var(--shell-border)] flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                        <Receipt className="w-4 h-4 text-[var(--shell-text-muted)]" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-bold text-[var(--shell-text-muted)] truncate">{selectedApproval.receipt_path.split('/').pop()}</p>
-                        <p className="text-[11px] text-[var(--shell-text-muted)]/60 font-medium">Click to expand preview</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-[var(--shell-hover)] border border-[var(--shell-border)] flex items-center justify-center shrink-0">
-                        <FileText className="w-4 h-4 text-[var(--shell-text-muted)]" />
-                      </div>
-                      <p className="text-[11px] font-bold text-[var(--shell-text-muted)]">No receipt attached</p>
-                    </div>
-                  )}
-                </div>
-              </div>
+            {selectedApproval && (() => {
+              const a = selectedApproval;
+              const statusCfg = getStatusConfig(a.transaction_status);
+              const total = a.total_amount ?? amount;
+              const state = (a.transaction_status || '').toUpperCase();
+              const people =
+                view === 'pending' || (state !== 'APPROVED' && state !== 'REJECTED')
+                  ? { label: 'Submitted by', value: a.submitted_by_name || 'System' }
+                  : state === 'APPROVED'
+                  ? { label: 'Approved by', value: a.approved_by_name }
+                  : { label: 'Rejected by', value: a.rejected_by_name };
+              const linked = a.project_name || a.product_name;
+              return (
+                <>
+                  <DetailSummary
+                    title={a.code || a.reference_id || `#${a.id}`}
+                    subtitle={a.description}
+                    status={statusCfg.label}
+                    statusClass={statusCfg.color}
+                    figure={formatCurrency(total, currency)}
+                    figureLabel="Total"
+                  />
 
-              {/* Submission Details */}
-              <div className="space-y-2">
-                <h3 className="text-[11px] font-bold text-[var(--shell-text-muted)] flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
-                  <Cpu className="w-3.5 h-3.5" /> Submission Details
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {([
-                    // Pending queue view: show who submitted; History view: show approver/rejector
-                    ...(view === 'pending' ? [
-                      { label: 'Submitted By', val: selectedApproval.submitted_by_name || 'System' },
-                    ] : [
-                      (() => {
-                        const s = (selectedApproval.transaction_status || '').toUpperCase();
-                        if (s === 'APPROVED') return { label: 'Approved By', val: selectedApproval.approved_by_name || '—' };
-                        if (s === 'REJECTED') return { label: 'Rejected By', val: selectedApproval.rejected_by_name || '—' };
-                        return { label: 'Submitted By', val: selectedApproval.submitted_by_name || 'System' };
-                      })(),
-                    ]),
-                    { label: 'Category', val: selectedApproval.category_name || '—' },
-                    { label: 'Total Amount', val: formatCurrency(selectedApproval.total_amount ?? amount, currency) },
-                    ...(selectedApproval.gst_rate != null ? [
-                      { label: 'Net Amount', val: formatCurrency(selectedApproval.net_amount ?? amount, currency) },
-                      { label: `GST (${selectedApproval.gst_rate}%)`, val: formatCurrency((selectedApproval.total_amount ?? amount) - (selectedApproval.net_amount ?? amount), currency) },
-                      { label: 'Claimable', val: selectedApproval.is_claimable ? 'Yes — GST Reclaimable' : 'No' },
-                    ] : []),
-                    {
-                      label: 'Reimburse',
-                      val: selectedApproval.needs_reimbursement ? 'Yes — Needs Reimbursement' : 'No',
-                      amber: selectedApproval.needs_reimbursement,
-                    },
-                  ] as Array<{ label: string; val: string; amber?: boolean }>).map((item, idx) => (
-                    <div key={idx} className={`px-2.5 py-2 rounded-lg border ${item.amber ? 'bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border-[color-mix(in_srgb,var(--warning)_30%,transparent)]' : 'bg-[var(--shell-hover)] border-[var(--shell-border)]'}`}>
-                      <p className="text-[11px] font-bold text-[var(--shell-text-muted)]">{item.label}</p>
-                      <p className={`text-[11px] font-bold truncate mt-0.5 ${item.amber ? 'text-[var(--warning)]' : 'text-black dark:text-white'}`}>{item.val}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
+                  <DetailSection title="Details">
+                    <DetailGrid>
+                      <DetailField label={people.label} value={people.value} />
+                      <DetailField label="Category" value={a.category_name} />
+                      {a.gst_rate != null && (
+                        <>
+                          <DetailField label="Net amount" value={formatCurrency(a.net_amount ?? amount, currency)} />
+                          <DetailField label={`GST (${a.gst_rate}%)`} value={formatCurrency(total - (a.net_amount ?? amount), currency)} />
+                          <DetailField label="GST claimable" value={a.is_claimable ? 'Yes' : 'No'} />
+                        </>
+                      )}
+                      <DetailField label="Reimbursement" value={a.needs_reimbursement ? 'Needed' : 'Not needed'} tone={a.needs_reimbursement ? 'warning' : 'muted'} />
+                    </DetailGrid>
+                  </DetailSection>
 
-              {/* Fund Allocation / Split Detail */}
-              <div className="space-y-2">
-                <h3 className="text-[11px] font-bold text-[var(--shell-text-muted)] flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
-                  <LayoutGrid className="w-3.5 h-3.5" /> Fund Allocation
-                </h3>
-                {selectedApproval.is_split === 1 ? (
-                  <div className="space-y-2">
-                    <span className="flex items-center gap-1.5 px-2 py-0.5 bg-[color-mix(in_srgb,var(--success)_15%,transparent)] border border-[color-mix(in_srgb,var(--success)_20%,transparent)] rounded-full text-[11px] font-bold text-[var(--success)] w-fit">
-                      <Layers className="w-3 h-3" /> Split Transaction
-                    </span>
-                    {splitDetailsLoading ? (
-                      <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">Loading split details...</p>
-                    ) : splitDetails.length > 0 ? (
-                      <div className="space-y-2">
-                        {splitDetails.map((s: any, i: number) => {
-                          const pct = ((s.amount / (amount || 1)) * 100).toFixed(1);
-                          return (
-                            <div key={s.id ?? i}>
-                              <div className="flex items-center justify-between mb-0.5">
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  <span className="shrink-0 w-3.5 h-3.5 rounded-full bg-[var(--shell-hover)] text-[var(--shell-text-muted)] text-[11px] font-black flex items-center justify-center">{i + 1}</span>
-                                  <span className="text-[11px] font-bold text-black dark:text-white truncate">{s.category_name || `Split ${i + 1}`}</span>
-                                </div>
-                                <div className="flex items-center gap-2 shrink-0 ml-2">
-                                  <span className="text-[11px] font-bold text-[var(--shell-accent)]">{pct}%</span>
-                                  <span className="text-[11px] font-black text-black dark:text-white">{formatCurrency(Number(s.amount), currency)}</span>
-                                </div>
-                              </div>
-                              <div className="w-full bg-[var(--shell-hover)] rounded-full h-1 overflow-hidden">
-                                <div className="bg-[var(--shell-accent)] h-full rounded-full transition-all" style={{ width: `${pct}%` }} />
-                              </div>
-                              {s.description && <p className="text-[11px] text-[var(--shell-text-muted)] mt-0.5 truncate">{s.description}</p>}
-                            </div>
-                          );
-                        })}
-                        <div className="flex items-center justify-between pt-1.5 border-t border-[var(--shell-border)]">
-                          <span className="text-[11px] font-bold text-[var(--shell-text-muted)]">{splitDetails.length} splits · Total</span>
-                          <span className="text-[12px] font-black text-[var(--shell-accent)]">{formatCurrency(amount, currency)}</span>
-                        </div>
-                      </div>
+                  <DetailSection title="Receipt">
+                    <DetailAttachment path={a.receipt_path} emptyLabel="No receipt attached" />
+                  </DetailSection>
+
+                  <DetailSection title="Fund allocation">
+                    {a.is_split === 1 ? (
+                      splitDetailsLoading ? (
+                        <p className="text-[12px] text-[var(--shell-text-muted)]">Loading split details...</p>
+                      ) : splitDetails.length > 0 ? (
+                        <DetailAllocation
+                          items={splitDetails.map((s: any, i: number) => ({
+                            label: s.category_name || `Split ${i + 1}`,
+                            amount: formatCurrency(Number(s.amount), currency),
+                            pct: (Number(s.amount) / (amount || 1)) * 100,
+                            note: s.description,
+                          }))}
+                          total={`${splitDetails.length} splits · ${formatCurrency(amount, currency)}`}
+                        />
+                      ) : (
+                        <p className="text-[12px] text-[var(--shell-text-muted)]">No split details available.</p>
+                      )
+                    ) : linked ? (
+                      <DetailAllocation items={[{ label: linked, pct: 100 }]} />
                     ) : (
-                      <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">No split details available.</p>
+                      <p className="text-[12px] text-[var(--shell-text-muted)]">Not linked to a project or product.</p>
                     )}
-                  </div>
-                ) : (selectedApproval.project_name || selectedApproval.product_name) ? (
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[11px] font-bold text-black dark:text-white">{selectedApproval.project_name || selectedApproval.product_name}</span>
-                      <span className="text-[11px] font-bold text-[var(--shell-accent)]">100.00%</span>
-                    </div>
-                    <div className="w-full bg-[var(--shell-hover)] rounded-full h-1 overflow-hidden">
-                      <div className="bg-[var(--shell-accent)] h-full rounded-full" style={{ width: '100%' }} />
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">Not linked to a project or product.</p>
-                )}
-              </div>
+                  </DetailSection>
 
-              {/* Timeline */}
-              <div className="space-y-2">
-                <h3 className="text-[11px] font-bold text-[var(--shell-text-muted)] flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
-                  <HistoryIcon className="w-3.5 h-3.5" /> Approval Timeline
-                </h3>
-                <div className="space-y-3 relative before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-[var(--shell-hover)] ml-1">
-                  <div className="relative pl-7">
-                    <div className="absolute left-0 top-0.5 w-5 h-5 rounded-full bg-[color-mix(in_srgb,var(--success)_20%,transparent)] border-2 border-[var(--success)] flex items-center justify-center z-10">
-                      <ShieldCheck className="w-3 h-3 text-[var(--success)]" />
-                    </div>
-                    <p className="text-[11px] font-black text-black dark:text-white">
-                      Submitted by {selectedApproval.submitted_by_name || 'User'}
-                    </p>
-                    <p className="text-[11px] text-[var(--shell-text-muted)] font-bold mt-0.5">
-                      {formatDate(selectedApproval.created_at)}
-                    </p>
-                  </div>
-                </div>
-              </div>
+                  <DetailSection title="Timeline">
+                    <DetailTimeline items={[{ title: `Submitted by ${a.submitted_by_name || 'User'}`, meta: formatDate(a.created_at), tone: 'success' }]} />
+                  </DetailSection>
 
-              {/* Reimbursement status — shown when employee requested reimbursement */}
-              {selectedApproval.needs_reimbursement && (
-                <div className="space-y-1.5">
-                  <h3 className="text-[11px] font-bold text-[var(--shell-text-muted)] flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
-                    <Wallet className="w-3.5 h-3.5" /> Reimbursement
-                  </h3>
-                  {selectedApproval.reimbursement_status === 'PAID' ? (
-                    <div className="flex flex-col gap-1 px-3 py-2 rounded-lg bg-[color-mix(in_srgb,var(--success)_10%,transparent)] border border-[color-mix(in_srgb,var(--success)_20%,transparent)]">
-                      <div className="flex items-center gap-2 text-[var(--success)]">
-                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                        <span className="text-[11px] font-bold">
-                          Reimbursed{selectedApproval.reimbursed_by_name ? ` by ${selectedApproval.reimbursed_by_name}` : ''}{selectedApproval.reimbursed_at ? ` · ${new Date(selectedApproval.reimbursed_at).toLocaleDateString()}` : ''}
-                        </span>
-                      </div>
-                      {selectedApproval.reimbursement_reference && (
-                        <span className="text-[11px] text-[color-mix(in_srgb,var(--success)_70%,transparent)] pl-5">Ref: {selectedApproval.reimbursement_reference}</span>
-                      )}
-                      {selectedApproval.reimbursement_note && (
-                        <span className="text-[11px] text-[color-mix(in_srgb,var(--success)_70%,transparent)] pl-5">{selectedApproval.reimbursement_note}</span>
-                      )}
-                    </div>
-                  ) : selectedApproval.reimbursement_status === 'ON_HOLD' ? (
-                    <div className="flex flex-col gap-1 px-3 py-2 rounded-lg bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border border-[color-mix(in_srgb,var(--warning)_20%,transparent)]">
-                      <div className="flex items-center gap-2 text-[var(--warning)]">
-                        <PauseCircle className="w-3.5 h-3.5 shrink-0" />
-                        <span className="text-[11px] font-bold">On Hold{selectedApproval.reimbursed_by_name ? ` · ${selectedApproval.reimbursed_by_name}` : ''}</span>
-                      </div>
-                      {selectedApproval.reimbursement_note && (
-                        <span className="text-[11px] text-[color-mix(in_srgb,var(--warning)_70%,transparent)] pl-5">{selectedApproval.reimbursement_note}</span>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border border-[color-mix(in_srgb,var(--warning)_20%,transparent)] text-[var(--warning)]">
-                      <Clock className="w-3.5 h-3.5 shrink-0" />
-                      <span className="text-[11px] font-bold">Pending Reimbursement</span>
-                    </div>
+                  {a.needs_reimbursement && (
+                    <DetailSection title="Reimbursement">
+                      <DetailGrid>
+                        <DetailField
+                          label="Status"
+                          value={a.reimbursement_status === 'PAID' ? 'Paid' : a.reimbursement_status === 'ON_HOLD' ? 'On hold' : 'Pending'}
+                          tone={a.reimbursement_status === 'PAID' ? 'success' : 'warning'}
+                        />
+                        <DetailField label="Handled by" value={a.reimbursed_by_name} />
+                        {a.reimbursement_reference && <DetailField label="Reference" value={a.reimbursement_reference} />}
+                        {a.reimbursed_at && <DetailField label="Date" value={formatDate(a.reimbursed_at)} />}
+                        {a.reimbursement_note && <DetailField label="Note" value={a.reimbursement_note} wide />}
+                      </DetailGrid>
+                    </DetailSection>
                   )}
-                </div>
-              )}
-
-              {/* Action buttons in panel — only for pending items in Manager/Finance view */}
-              {canActOnSelected && (
-                <div className="grid grid-cols-3 gap-2 pt-1">
-                  <button
-                    onClick={() => setIsApproveOpen(true)}
-                    className="bg-[var(--shell-accent)] text-[var(--shell-accent-fg)] py-2.5 rounded-lg text-[11px] font-black transition-all active:scale-95"
-                  >
-                    Approve
-                  </button>
-                  <button
-                    onClick={() => setIsSendBackOpen(true)}
-                    className="bg-[var(--info)] text-[var(--info-foreground)] py-2.5 rounded-lg text-[11px] font-black transition-all active:scale-95"
-                  >
-                    Send Back
-                  </button>
-                  <button
-                    onClick={() => setIsRejectOpen(true)}
-                    className="bg-[var(--shell-hover)] border border-[color-mix(in_srgb,var(--danger)_30%,transparent)] text-[var(--danger)] py-2.5 rounded-lg text-[11px] font-black hover:bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] transition-all active:scale-95"
-                  >
-                    Reject
-                  </button>
-                </div>
-              )}
-
-            </div>
-            )}
+                </>
+              );
+            })()}
           </ModuleIntelligencePanel>
       }
     >

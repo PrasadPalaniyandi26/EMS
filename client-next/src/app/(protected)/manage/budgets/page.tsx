@@ -18,6 +18,7 @@ import {
 import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
+import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAllocation, DetailActions } from '@/components/shared/detail/detail-kit';
 import api from '@/lib/api-client';
 
 export default function BudgetsPage() {
@@ -130,59 +131,54 @@ export default function BudgetsPage() {
         <DataTableToolbar
           table={table}
           actions={
-            <>
-              <button className="btn-action" onClick={openAdd}>
-                <Plus className="h-4 w-4 text-[var(--success)]" /> Add
-              </button>
-              <button className="btn-action" onClick={openEdit} disabled={selectedCount !== 1}>
-                <Pencil className="h-4 w-4 text-[var(--info)]" /> Edit
-              </button>
-              <button className="btn-action" onClick={() => { if (selectedCount !== 1) { toast.error('Select exactly one budget to submit'); return; } setIsSubmitOpen(true); }} disabled={selectedCount !== 1}>
-                <Send className="h-4 w-4 text-[var(--shell-accent)]" /> Allocation
-              </button>
-              <button className="btn-action" onClick={() => { if (selectedCount === 0) { toast.error('Select budgets to delete'); return; } setIsDeleteOpen(true); }} disabled={selectedCount === 0}>
-                <Trash2 className="h-4 w-4 text-[var(--danger)]" /> Delete{selectedCount > 0 ? ` (${selectedCount})` : ''}
-              </button>
-            </>
+            <button className="btn-action" onClick={openAdd}>
+              <Plus className="h-4 w-4 text-[var(--success)]" /> Add
+            </button>
           }
         />
       }
       intelligencePanel={
-          <ModuleIntelligencePanel title="Budget Details" onClose={() => setRowSelection({})} hasSelection={!!activeRow}>
-            {activeRow && (
-            <div className="flex-1 space-y-3">
-              <div className="bg-[var(--shell-hover)] rounded-lg border border-[var(--shell-border)] p-4">
-                <label className="text-[11px] font-bold text-[var(--shell-text-muted)]">Utilization</label>
-                {(() => {
-                  const pct = activeRow.amount > 0 ? Math.min(((activeRow.spent || 0) / Number(activeRow.amount)) * 100, 100) : 0;
-                  return (
-                    <div className="flex items-center gap-4 mt-3">
-                      <div className="flex-1 h-3 bg-[var(--shell-hover)] rounded-full overflow-hidden">
-                        <div className={`h-full ${pct > 90 ? 'bg-[var(--danger)]' : 'bg-[var(--shell-accent)]'}`} style={{ width: `${pct}%` }} />
-                      </div>
-                      <span className="text-xs font-bold text-black dark:text-white">{pct.toFixed(0)}%</span>
-                    </div>
-                  );
-                })()}
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-4 bg-[var(--shell-hover)] rounded-lg border border-[var(--shell-border)]">
-                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] block">Allocated</label>
-                  <p className="text-[14px] font-bold text-black dark:text-white mt-1">{formatCurrency(Number(activeRow.amount), currency)}</p>
-                </div>
-                <div className="p-4 bg-[var(--shell-hover)] rounded-lg border border-[var(--shell-border)]">
-                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] block">Department</label>
-                  <p className="text-[12px] font-bold text-black dark:text-white mt-1">{activeRow.department || '—'}</p>
-                </div>
-              </div>
-              {activeRow.details && (
-                <div className="p-4 bg-[var(--shell-hover)] rounded-lg border border-[var(--shell-border)]">
-                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] block mb-2">Details</label>
-                  <p className="text-[11px] text-[var(--shell-text-muted)] leading-relaxed">{activeRow.details}</p>
-                </div>
-              )}
-            </div>
-            )}
+          <ModuleIntelligencePanel
+            title="Budget Details"
+            onClose={() => setRowSelection({})}
+            hasSelection={!!activeRow}
+            footer={
+              <DetailActions actions={[
+                { label: 'Edit', variant: 'primary', onClick: openEdit },
+                { label: 'Allocation', onClick: () => setIsSubmitOpen(true) },
+                { label: 'Delete', variant: 'danger', onClick: () => setIsDeleteOpen(true) },
+              ]} />
+            }
+          >
+            {activeRow && (() => {
+              const b: any = activeRow;
+              const spent = Number(b.spent || 0);
+              const pct = Number(b.amount) > 0 ? Math.min((spent / Number(b.amount)) * 100, 100) : 0;
+              return (
+                <>
+                  <DetailSummary
+                    title={b.name}
+                    subtitle={b.code}
+                    status={b.is_active ? 'Active' : 'Inactive'}
+                    statusClass={b.is_active ? 'text-[var(--success)]' : 'text-[var(--shell-text-muted)]'}
+                    figure={formatCurrency(Number(b.amount), currency)}
+                    figureLabel="Allocated"
+                  />
+                  <DetailSection title="Utilization">
+                    <DetailAllocation items={[{ label: 'Spent', amount: formatCurrency(spent, currency), pct }]} />
+                  </DetailSection>
+                  <DetailSection title="Details">
+                    <DetailGrid>
+                      <DetailField label="Department" value={b.department} />
+                      <DetailField label="Category" value={b.category_name || 'General'} />
+                      <DetailField label="Financial year" value={b.financial_year} />
+                      <DetailField label="Owner" value={b.owner_name} />
+                      {b.details && <DetailField label="Notes" value={b.details} wide />}
+                    </DetailGrid>
+                  </DetailSection>
+                </>
+              );
+            })()}
           </ModuleIntelligencePanel>
       }
     >

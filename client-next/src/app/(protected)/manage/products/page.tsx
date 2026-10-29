@@ -28,6 +28,7 @@ import {
 import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
+import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAllocation, DetailActions } from '@/components/shared/detail/detail-kit';
 import { CurrencyInput, Field, NativeSelect, ConfirmDialog, inp } from '@/components/shared/modal-primitives';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
@@ -157,17 +158,9 @@ export default function ProductsPage() {
         <DataTableToolbar
           table={table}
           actions={
-            <>
-              <button className="btn-action" onClick={openAdd}>
-                <Plus className="h-4 w-4 text-[var(--success)]" /> Add
-              </button>
-              <button className="btn-action" disabled={selectedRows.length !== 1} onClick={openEdit}>
-                <Pencil className="h-4 w-4 text-[var(--info)]" /> Edit
-              </button>
-              <button className="btn-action" disabled={selectedRows.length === 0} onClick={() => setDeleteId(selectedRows[0].original.id)}>
-                <Trash2 className="h-4 w-4 text-[var(--danger)]" /> Delete
-              </button>
-            </>
+            <button className="btn-action" onClick={openAdd}>
+              <Plus className="h-4 w-4 text-[var(--success)]" /> Add
+            </button>
           }
         />
       }
@@ -176,37 +169,43 @@ export default function ProductsPage() {
             title="Product Intelligence"
             onClose={() => setRowSelection({})}
             hasSelection={!!selectedProduct}
+            footer={
+              <DetailActions actions={[
+                { label: 'Edit', variant: 'primary', onClick: openEdit },
+                { label: 'Delete', variant: 'danger', onClick: () => setDeleteId(selectedProduct!.id) },
+              ]} />
+            }
           >
-            {selectedProduct && (<>
-            {/* Identity card */}
-            <div className="bg-[var(--shell-hover)] rounded-lg border border-[var(--shell-border)] p-4 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-extrabold text-[15px] text-black dark:text-white leading-tight">{selectedProduct.name}</h4>
-                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mt-0.5">
-                    {selectedProduct.code || `PRD-${String(selectedProduct.id).padStart(3, '0')}`}
-                  </p>
-                </div>
-                <span className="p-2 bg-[var(--shell-hover)] rounded-lg text-[var(--shell-text-muted)]">
-                  <Package className="h-5 w-5" />
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-3 pt-2">
-                <div className="p-3 bg-[var(--shell-hover)] rounded-lg border border-[var(--shell-border)]">
-                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-1">Type</p>
-                  <p className="text-sm font-black text-[var(--shell-text-muted)] truncate">{selectedProduct.type_name || '—'}</p>
-                </div>
-                <div className="p-3 bg-[var(--shell-hover)] rounded-lg border border-[var(--shell-border)]">
-                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-1">Client</p>
-                  <p className="text-sm font-black text-[var(--shell-accent)] truncate">{selectedProduct.client_name || '—'}</p>
-                </div>
-              </div>
-              {selectedProduct.description && (
-                <p className="text-[11px] text-[var(--shell-text-muted)] leading-relaxed border-t border-[var(--shell-border)] pt-3">{selectedProduct.description}</p>
-              )}
-            </div>
-
-            </>)}
+            {selectedProduct && (() => {
+              const pd: any = selectedProduct;
+              const status = pd.status || (pd.is_active ? 'Active' : 'Inactive');
+              return (
+                <>
+                  <DetailSummary
+                    title={pd.name}
+                    subtitle={pd.code || `PRD-${String(pd.id).padStart(3, '0')}`}
+                    status={status}
+                    statusClass="text-[var(--shell-text-muted)]"
+                    figure={pd.unit_cost != null && pd.unit_cost !== '' ? `${currencySymbol}${Number(pd.unit_cost).toLocaleString()}` : undefined}
+                    figureLabel="Est. unit cost"
+                  />
+                  <DetailSection title="Details">
+                    <DetailGrid>
+                      <DetailField label="Type" value={pd.type_name} />
+                      <DetailField label="Client" value={pd.client_name} />
+                      <DetailField label="Lead / manager" value={pd.lead} />
+                      <DetailField label="Category" value={pd.category} />
+                      <DetailField label="Model / version" value={pd.model} wide />
+                    </DetailGrid>
+                  </DetailSection>
+                  {pd.description && (
+                    <DetailSection title="Description">
+                      <p className="text-[13px] leading-relaxed text-[var(--shell-text)]">{pd.description}</p>
+                    </DetailSection>
+                  )}
+                </>
+              );
+            })()}
           </ModuleIntelligencePanel>
       }
     >

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
+import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailActions } from '@/components/shared/detail/detail-kit';
 import {
   getCoreRowModel, getFilteredRowModel, getPaginationRowModel,
   getSortedRowModel, getFacetedRowModel, getFacetedUniqueValues,
@@ -188,18 +189,6 @@ export function ReimbursementsTab() {
         searchRow={
           <DataTableToolbar
             table={table}
-            actions={
-              isFinanceOrAdmin ? (
-                <button
-                  className="btn-action-primary"
-                  onClick={() => selected && openModal([selected.id])}
-                  disabled={!canProcess}
-                >
-                  <CreditCard className="w-3.5 h-3.5" />
-                  Process
-                </button>
-              ) : null
-            }
             extra={
               <select
                 value={statusTab}
@@ -219,153 +208,64 @@ export function ReimbursementsTab() {
             title="Reimbursement Detail"
             onClose={() => setSelected(null)}
             hasSelection={!!selected}
+            footer={
+              isFinanceOrAdmin && selected && selected.reimbursement_status !== 'PAID' ? (
+                <DetailActions actions={[{ label: selected.reimbursement_status === 'ON_HOLD' ? 'Process payment' : 'Process', variant: 'primary', onClick: () => openModal([selected.id]) }]} />
+              ) : undefined
+            }
           >
-            {selected && (
-              <div className="flex-1 space-y-6">
-                {/* Employee */}
-                <div className="bg-[var(--shell-hover)] rounded-lg border border-[var(--shell-border)] p-4 space-y-3">
-                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)]">Employee</p>
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-[13px] font-bold"
-                      style={{ background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' }}>
-                      {(selected.employee_name || 'U').slice(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="text-[13px] font-bold text-black dark:text-white">{selected.employee_name}</p>
-                      <p className="text-[11px] text-[var(--shell-text-muted)]">{selected.employee_id}</p>
-                    </div>
-                  </div>
-                </div>
+            {selected && (() => {
+              const x: any = selected;
+              const total = x.total_amount ?? x.amount;
+              const state = x.reimbursement_status;
+              return (
+                <>
+                  <DetailSummary
+                    title={x.employee_name || 'Employee'}
+                    subtitle={[x.employee_id, x.reference_id || `#${x.id}`].filter(Boolean).join(' · ')}
+                    status={state === 'PAID' ? 'Paid' : state === 'ON_HOLD' ? 'On hold' : 'Pending'}
+                    statusClass={state === 'PAID' ? 'text-[var(--success)]' : 'text-[var(--warning)]'}
+                    figure={formatCurrency(total, currency)}
+                    figureLabel="Total"
+                  />
 
-                {/* Transaction detail */}
-                <div className="space-y-3">
-                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] border-b border-[var(--shell-border)] pb-1.5">Transaction</p>
-                  <div className="space-y-2.5">
-                    {infoRow(<Tag className="w-3.5 h-3.5" />, 'Reference', <span className="text-[var(--info)]">{selected.reference_id || `#${selected.id}`}</span>)}
-                    {infoRow(<CalendarDays className="w-3.5 h-3.5" />, 'Date', formatDate(selected.date_recorded))}
-                    {infoRow(<Tag className="w-3.5 h-3.5" />, 'Category', selected.category_name || '—')}
-                    {(selected.project_name || selected.product_name) && infoRow(
-                      <Briefcase className="w-3.5 h-3.5" />,
-                      selected.project_name ? 'Project' : 'Product',
-                      selected.project_name || selected.product_name,
-                    )}
-                    {selected.description && infoRow(<Tag className="w-3.5 h-3.5" />, 'Description', selected.description)}
-                  </div>
-                </div>
+                  <DetailSection title="Transaction">
+                    <DetailGrid>
+                      <DetailField label="Date" value={formatDate(x.date_recorded)} />
+                      <DetailField label="Category" value={x.category_name} />
+                      {(x.project_name || x.product_name) && <DetailField label={x.project_name ? 'Project' : 'Product'} value={x.project_name || x.product_name} wide />}
+                      {x.description && <DetailField label="Description" value={x.description} wide />}
+                      {x.gst_rate ? (
+                        <>
+                          <DetailField label="Net amount" value={formatCurrency(x.net_amount, currency)} />
+                          <DetailField label={`GST (${x.gst_rate}%)`} value={formatCurrency(total - (x.net_amount ?? x.amount), currency)} />
+                        </>
+                      ) : null}
+                    </DetailGrid>
+                  </DetailSection>
 
-                {/* Amount breakdown */}
-                <div className="bg-[var(--shell-hover)] rounded-lg border border-[var(--shell-border)] p-4 space-y-2">
-                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)]">Amount</p>
-                  {selected.gst_rate ? (
-                    <>
-                      <div className="flex justify-between text-[11px]">
-                        <span className="text-[var(--shell-text-muted)]">Net (excl. GST)</span>
-                        <span className="font-semibold text-black dark:text-white">{formatCurrency(selected.net_amount, currency)}</span>
-                      </div>
-                      <div className="flex justify-between text-[11px]">
-                        <span className="text-[var(--shell-text-muted)]">GST ({selected.gst_rate}%)</span>
-                        <span className="font-semibold text-black dark:text-white">{formatCurrency((selected.total_amount ?? selected.amount) - (selected.net_amount ?? selected.amount), currency)}</span>
-                      </div>
-                      <div className="flex justify-between text-[13px] font-bold border-t border-[var(--shell-border)] pt-2 mt-1">
-                        <span className="text-black dark:text-white">Total</span>
-                        <span className="text-black dark:text-white">{formatCurrency(selected.total_amount ?? selected.amount, currency)}</span>
-                      </div>
-                    </>
-                  ) : (
-                    <p className="text-[15px] font-bold text-black dark:text-white">{formatCurrency(selected.total_amount ?? selected.amount, currency)}</p>
+                  <DetailSection title="Reimbursement">
+                    <DetailGrid>
+                      <DetailField label="Status" value={state === 'PAID' ? 'Paid' : state === 'ON_HOLD' ? 'On hold' : 'Pending'} tone={state === 'PAID' ? 'success' : 'warning'} />
+                      <DetailField label="Handled by" value={x.reimbursed_by_name} />
+                      {x.reimbursed_at && <DetailField label="Date" value={formatDate(x.reimbursed_at)} />}
+                      {x.reimbursement_reference && <DetailField label="Payment reference" value={x.reimbursement_reference} />}
+                      {x.reimbursement_note && <DetailField label="Note" value={x.reimbursement_note} wide />}
+                    </DetailGrid>
+                  </DetailSection>
+
+                  {x.approved_by_name && (
+                    <DetailSection title="Approval">
+                      <DetailGrid>
+                        <DetailField label="Approved by" value={x.approved_by_name} />
+                        <DetailField label="Role" value={x.approved_by_role} />
+                        {x.approved_at && <DetailField label="Date" value={formatDate(x.approved_at)} />}
+                      </DetailGrid>
+                    </DetailSection>
                   )}
-                </div>
-
-                {/* Reimbursement status */}
-                <div className="space-y-2">
-                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] border-b border-[var(--shell-border)] pb-1.5 flex items-center gap-2">
-                    <Wallet className="w-3.5 h-3.5" /> Reimbursement
-                  </p>
-                  {selected.reimbursement_status === 'PAID' ? (
-                    <>
-                      <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-[color-mix(in_srgb,var(--success)_10%,transparent)] border border-[color-mix(in_srgb,var(--success)_20%,transparent)] text-[var(--success)] text-[11px] font-bold">
-                        <CheckCircle2 className="w-4 h-4 shrink-0" />
-                        <div>
-                          <p>Reimbursed{selected.reimbursed_by_name ? ` by ${selected.reimbursed_by_name}` : ''}</p>
-                          {selected.reimbursed_at && <p className="font-normal opacity-80">{formatDate(selected.reimbursed_at)}</p>}
-                        </div>
-                      </div>
-                      {selected.reimbursement_reference && (
-                        <div className="px-3 py-2 rounded-lg border text-[11px]" style={{ background: 'var(--shell-hover)', borderColor: 'var(--shell-border)' }}>
-                          <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-0.5">Payment Reference</p>
-                          <p className="font-bold text-black dark:text-white">{selected.reimbursement_reference}</p>
-                        </div>
-                      )}
-                      {selected.reimbursement_note && (
-                        <div className="px-3 py-2 rounded-lg border text-[11px]" style={{ background: 'var(--shell-hover)', borderColor: 'var(--shell-border)' }}>
-                          <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-0.5">Note</p>
-                          <p className="text-black dark:text-white">{selected.reimbursement_note}</p>
-                        </div>
-                      )}
-                    </>
-                  ) : selected.reimbursement_status === 'ON_HOLD' ? (
-                    <>
-                      <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border border-[color-mix(in_srgb,var(--warning)_20%,transparent)] text-[var(--warning)] text-[11px] font-bold">
-                        <PauseCircle className="w-4 h-4 shrink-0" />
-                        <div>
-                          <p>On Hold{selected.reimbursed_by_name ? ` · ${selected.reimbursed_by_name}` : ''}</p>
-                          {selected.reimbursed_at && <p className="font-normal opacity-80">{formatDate(selected.reimbursed_at)}</p>}
-                        </div>
-                      </div>
-                      {selected.reimbursement_reference && (
-                        <div className="px-3 py-2 rounded-lg border text-[11px]" style={{ background: 'var(--shell-hover)', borderColor: 'var(--shell-border)' }}>
-                          <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-0.5">Reference</p>
-                          <p className="font-bold text-black dark:text-white">{selected.reimbursement_reference}</p>
-                        </div>
-                      )}
-                      {selected.reimbursement_note && (
-                        <div className="px-3 py-2 rounded-lg border text-[11px]" style={{ background: 'var(--shell-hover)', borderColor: 'var(--shell-border)' }}>
-                          <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-0.5">Note</p>
-                          <p className="text-black dark:text-white">{selected.reimbursement_note}</p>
-                        </div>
-                      )}
-                      {isFinanceOrAdmin && (
-                        <button
-                          onClick={() => openModal([selected.id])}
-                          className="w-full text-[11px] font-bold text-[var(--shell-accent)] hover:underline text-center py-1"
-                        >
-                          Process Payment →
-                        </button>
-                      )}
-                    </>
-                  ) : (
-                    <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border border-[color-mix(in_srgb,var(--warning)_20%,transparent)]">
-                      <div className="flex items-center gap-2 text-[var(--warning)]">
-                        <Clock className="w-4 h-4 shrink-0" />
-                        <span className="text-[11px] font-bold">Pending Reimbursement</span>
-                      </div>
-                      {isFinanceOrAdmin && (
-                        <button
-                          onClick={() => openModal([selected.id])}
-                          className="text-[11px] font-bold text-[var(--shell-accent)] hover:underline"
-                        >
-                          Process →
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Approved by */}
-                {selected.approved_by_name && (
-                  <div className="space-y-2">
-                    <p className="text-[11px] font-bold text-[var(--shell-text-muted)] border-b border-[var(--shell-border)] pb-1.5 flex items-center gap-2">
-                      <BadgeCheck className="w-3.5 h-3.5" /> Approved By
-                    </p>
-                    <div className="px-3 py-2 rounded-lg bg-[var(--shell-hover)] border border-[var(--shell-border)]">
-                      <p className="text-[12px] font-bold text-black dark:text-white">{selected.approved_by_name}</p>
-                      {selected.approved_by_role && <p className="text-[11px] text-[var(--shell-text-muted)]">{selected.approved_by_role}</p>}
-                      {selected.approved_at && <p className="text-[11px] text-[var(--shell-text-muted)] mt-0.5">{formatDate(selected.approved_at)}</p>}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+                </>
+              );
+            })()}
           </ModuleIntelligencePanel>
         }
       >

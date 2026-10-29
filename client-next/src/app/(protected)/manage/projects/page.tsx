@@ -27,6 +27,8 @@ import {
 import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
+import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAllocation, DetailActions } from '@/components/shared/detail/detail-kit';
+import { formatCurrency } from '@/lib/currency';
 
 export default function ProjectsPage() {
   const setHeader = useHeaderStore((s) => s.setHeader);
@@ -120,21 +122,9 @@ export default function ProjectsPage() {
         <DataTableToolbar
           table={table}
           actions={
-            <>
-              <button className="btn-action" onClick={() => { setEditingProject(null); setIsModalOpen(true); }}>
-                <Plus className="h-4 w-4 text-[var(--success)]" /> Add
-              </button>
-              <button
-                className="btn-action"
-                disabled={selectedRows.length !== 1}
-                onClick={() => { const p = selectedRows[0].original; setEditingProject(p); setIsModalOpen(true); }}
-              >
-                <Pencil className="h-4 w-4 text-[var(--info)]" /> Edit
-              </button>
-              <button className="btn-action" disabled={selectedRows.length === 0} onClick={() => setDeleteId(selectedRows[0].original.id)}>
-                <Trash2 className="h-4 w-4 text-[var(--danger)]" /> Delete
-              </button>
-            </>
+            <button className="btn-action" onClick={() => { setEditingProject(null); setIsModalOpen(true); }}>
+              <Plus className="h-4 w-4 text-[var(--success)]" /> Add
+            </button>
           }
         />
       }
@@ -143,49 +133,44 @@ export default function ProjectsPage() {
             title="Project Intelligence"
             onClose={() => setRowSelection({})}
             hasSelection={!!selectedProject}
+            footer={
+              <DetailActions actions={[
+                { label: 'Edit', variant: 'primary', onClick: () => { setEditingProject(selectedProject as any); setIsModalOpen(true); } },
+                { label: 'Delete', variant: 'danger', onClick: () => setDeleteId((selectedProject as any).id) },
+              ]} />
+            }
           >
-            {selectedProject && (<>
-            <div className="bg-[var(--shell-hover)] border border-[var(--shell-border)] rounded-lg p-4 space-y-2.5">
-               <div className="flex items-center justify-between">
-                 <div>
-                   <h4 className="font-extrabold text-[15px] text-black dark:text-white leading-tight">{selectedProject.name}</h4>
-                   <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mt-0.5">{selectedProject.code || 'Code Pending'}</p>
-                 </div>
-                 <span className="p-2 bg-[var(--shell-accent)]/20 rounded text-[var(--success)]">
-                   <Target className="h-5 w-5" />
-                 </span>
-               </div>
-            </div>
-
-            <div className="bg-[var(--shell-hover)] border border-[var(--shell-border)] rounded-lg p-4 space-y-3">
-               <h4 className="text-[11px] font-bold text-black dark:text-white">Project Team</h4>
-               <div className="space-y-2">
-                 {((selectedProject as any).lead ? [{ name: (selectedProject as any).lead as string, role: 'Project Lead' }] : []).map((member, i) => {
-                   const p = member.name.trim().split(/\s+/);
-                   const ini = p.length >= 2 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : p[0].slice(0, 2).toUpperCase();
-                   return (
-                   <div key={i} className="flex items-center justify-between group cursor-pointer hover:bg-[var(--shell-hover)] p-1.5 -mx-1.5 rounded transition-colors">
-                     <div className="flex items-center gap-3">
-                       <div className="w-8 h-8 rounded-full bg-[var(--shell-hover)] flex items-center justify-center font-black text-xs text-[var(--shell-accent)] border border-[var(--shell-border)]">
-                         {ini}
-                       </div>
-                       <div>
-                         <p className="text-[11px] font-extrabold text-black dark:text-white">{member.name}</p>
-                         <p className="text-[11px] font-bold text-[var(--shell-text-muted)]">{member.role}</p>
-                       </div>
-                     </div>
-                     <ArrowUpRight className="h-3.5 w-3.5 text-[var(--shell-text-muted)] opacity-0 group-hover:opacity-100 transition-opacity" />
-                   </div>
-                 ); })}
-                 {!(selectedProject as any).lead && (
-                   <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">No lead assigned.</p>
-                 )}
-               </div>
-               <Button variant="outline" className="w-full h-8 border-dashed border-[var(--shell-border)] text-[11px] font-bold text-[var(--shell-text-muted)] hover:text-[var(--shell-text-muted)] hover:border-[var(--shell-border)] transition-colors mt-1">
-                 + Manage Resources
-               </Button>
-            </div>
-            </>)}
+            {selectedProject && (() => {
+              const pr: any = selectedProject;
+              const tone: Record<string, string> = {
+                'Active': 'text-[var(--success)]', 'On-Hold': 'text-[var(--warning)]', 'Completed': 'text-[var(--info)]', 'Canceled': 'text-[var(--danger)]',
+              };
+              const status = pr.status || 'Active';
+              return (
+                <>
+                  <DetailSummary
+                    title={pr.name}
+                    subtitle={pr.code || 'Code pending'}
+                    status={status}
+                    statusClass={tone[status] || 'text-[var(--shell-text-muted)]'}
+                    figure={formatCurrency(Number(pr.budget || 0), 'INR')}
+                    figureLabel="Est. budget"
+                  />
+                  <DetailSection title="Details">
+                    <DetailGrid>
+                      <DetailField label="Type" value={pr.type_name} />
+                      <DetailField label="Project lead" value={pr.lead} />
+                      <DetailField label="Client" value={pr.client_name} wide />
+                    </DetailGrid>
+                  </DetailSection>
+                  {pr.description && (
+                    <DetailSection title="Description">
+                      <p className="text-[13px] leading-relaxed text-[var(--shell-text)]">{pr.description}</p>
+                    </DetailSection>
+                  )}
+                </>
+              );
+            })()}
           </ModuleIntelligencePanel>
       }
     >
