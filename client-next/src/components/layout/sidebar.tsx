@@ -15,7 +15,7 @@ import {
 import {
   Home, ClipboardCheck, TrendingDown, TrendingUp,
   Users, Briefcase, Package, Building2, Target, RotateCcw,
-  BarChart2, Settings, ChevronsUpDown, Shield, FileBarChart,
+  BarChart2, Settings, Shield, FileBarChart,
   ChevronLeft, ChevronRight,
 } from 'lucide-react';
 
@@ -75,10 +75,6 @@ export function Sidebar() {
 
   const isEmployeeActive = (user?.role_name || '').toUpperCase() === 'EMPLOYEE';
 
-  const parts = (user?.username || 'U').trim().split(/\s+/);
-  const initials = parts.length >= 2
-    ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-    : parts[0].slice(0, 2).toUpperCase();
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -156,11 +152,11 @@ export function Sidebar() {
             })}
           </nav>
 
-          {/* Bottom: slim toggle + user profile */}
+          {/* Bottom: collapse toggle (the signed-in user lives in the top bar) */}
           <div className={`shrink-0 ${slim ? 'px-2 py-2' : 'px-3 py-3'}`} style={{ borderTop: '1px solid var(--shell-border)' }}>
 
             {/* Slim toggle button — desktop only */}
-            <div className="hidden lg:flex justify-end mb-1.5">
+            <div className="hidden lg:flex justify-end">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
@@ -177,33 +173,6 @@ export function Sidebar() {
                 </TooltipContent>
               </Tooltip>
             </div>
-
-            {slim ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="w-9 h-9 mx-auto rounded-md flex items-center justify-center cursor-pointer transition-colors hover:bg-[var(--shell-hover)]"
-                    style={{ background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' }}>
-                    <span className="text-[11px] font-bold">{initials}</span>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="text-[12px]">
-                  <p className="font-semibold">{user?.username || 'User'}</p>
-                  <p className="text-[11px] opacity-70">{user?.role_name || user?.role || 'Admin'}</p>
-                </TooltipContent>
-              </Tooltip>
-            ) : (
-              <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition-colors hover:bg-[var(--shell-hover)]">
-                <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[11px] font-bold"
-                  style={{ background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' }}>
-                  {initials}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[12px] font-semibold leading-none truncate" style={{ color: 'var(--shell-text)' }}>{user?.username || 'User'}</p>
-                  <p className="text-[11px] mt-0.5 truncate" style={{ color: 'var(--shell-text-muted)' }}>{user?.role_name || user?.role || 'Admin'}</p>
-                </div>
-                <ChevronsUpDown className="w-3 h-3 shrink-0" style={{ color: 'var(--shell-text-muted)' }} />
-              </div>
-            )}
           </div>
         </aside>
       </>

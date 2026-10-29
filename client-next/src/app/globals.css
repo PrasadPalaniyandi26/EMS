@@ -84,6 +84,7 @@
 
 /* ─── Light theme: warm ivory ─────────────────────────────────────── */
 :root {
+  color-scheme: light;
   --radius: 0.5rem;
 
   /* Shell tokens. surface/border/text/muted/accent are ALIASES of the shadcn tokens below (one source of
@@ -209,6 +210,7 @@
 
 /* ─── Dark theme: flat, solid surfaces ─────────────────────────────── */
 .dark {
+  color-scheme: dark;
   /* Shell: two solid surfaces (canvas and surface) separated by hairlines, no blur or gradient.
      surface/border/text/muted/accent alias the shadcn tokens below (same as light). */
   --shell-bg:          #0b0f17;  /* canvas */
@@ -321,6 +323,14 @@
     min-height: 100dvh;
     overflow: hidden;
     font-size: 13.5px;
+  }
+  /* Native controls (select popups, date pickers, scrollbars, autofill) follow the theme. Without this the
+     browser draws them light on the dark surface. Options also get explicit colours because some browsers
+     ignore color-scheme for the option list. */
+  select option,
+  select optgroup {
+    background-color: var(--popover);
+    color: var(--popover-foreground);
   }
   /* Kill browser autofill flash */
   input:-webkit-autofill,
@@ -564,10 +574,6 @@
   }
 
   /* ── Misc ────────────────────────────────────────────── */
-  /* Native date inputs follow the theme (calendar icon and picker) */
-  input[type="date"] { color-scheme: light; }
-  .dark input[type="date"] { color-scheme: dark; }
-
   .hide-scrollbar::-webkit-scrollbar { display: none; }
   .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 }

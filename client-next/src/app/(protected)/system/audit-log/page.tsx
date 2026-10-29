@@ -314,10 +314,10 @@ export default function AuditLogPage() {
           </div>
         ) : (
           <table className="w-full text-[12px]">
-            <thead className="sticky top-0 z-10" style={{ background: 'var(--shell-surface)' }}>
+            <thead className="sticky top-0 z-10" style={{ background: 'var(--shell-hover)' }}>
               <tr className="border-b" style={{ borderColor: 'var(--shell-border)' }}>
                 {['Action', 'Table', 'Record', 'Actor', 'Time', ''].map((h, i) => (
-                  <th key={i} scope="col" className="h-10 px-4 text-left text-[12px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>
+                  <th key={i} scope="col" className="h-10 px-4 text-left text-[12px] font-semibold" style={{ color: 'var(--shell-text-muted)' }}>
                     {h}
                   </th>
                 ))}

@@ -187,7 +187,7 @@ export function ClientModal({ isOpen, onClose, onSave, editing, businessTypes: i
               onClick={() => setShowNewIndustry(!showNewIndustry)}
               className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--shell-accent)] hover:underline mt-1"
             >
-              <PlusCircle className="w-3 h-3" /> CREATE NEW SECTOR
+              <PlusCircle className="w-3 h-3" /> Create new sector
             </button>
             {showNewIndustry && (
               <div className="mt-1 flex gap-2">

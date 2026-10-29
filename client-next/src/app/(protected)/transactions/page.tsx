@@ -322,7 +322,7 @@ export default function TransactionsPage() {
       {/* Table */}
       <div className="flex-1 overflow-auto min-h-0">
         <table className="w-full border-collapse text-left text-[13px]">
-          <thead className="sticky top-0 z-10 border-b border-[var(--shell-border)] bg-[var(--shell-surface)] text-[12px] font-medium text-[var(--shell-text-muted)]">
+          <thead className="sticky top-0 z-10 border-b border-[var(--shell-border)] bg-[var(--shell-hover)] text-[12px] font-semibold text-[var(--shell-text-muted)]">
             <tr>
               <th scope="col" className="h-10 w-10 px-4 text-center">
                 <Checkbox aria-label="Select all transactions" checked={selectedIds.size === displayedTxns.length && displayedTxns.length > 0} onCheckedChange={toggleAll} />

@@ -23,7 +23,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   return (
     <thead
       data-slot="table-header"
-      className={cn("sticky top-0 z-10 bg-[var(--shell-surface)]", className)}
+      className={cn("sticky top-0 z-10 border-b bg-[var(--shell-hover)]", className)}
       style={{ background: 'var(--shell-surface)', borderBottom: '1px solid var(--shell-border)' }}
       {...props}
     />
@@ -72,7 +72,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
     <th
       data-slot="table-head"
       className={cn(
-        "h-10 px-4 text-left align-middle font-medium whitespace-nowrap text-[12px] [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "h-10 px-4 text-left align-middle font-semibold whitespace-nowrap text-[12px] [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
         className
       )}
       style={{ color: 'var(--shell-text-muted)' }}

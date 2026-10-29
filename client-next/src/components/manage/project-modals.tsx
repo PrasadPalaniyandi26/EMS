@@ -128,7 +128,7 @@ export function ProjectModal({
               onClick={() => { setShowNewType(!showNewType); setNewTypeName(''); }}
               className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--shell-accent)] hover:underline mt-1"
             >
-              <PlusCircle className="w-3 h-3" /> {showNewType ? 'CANCEL' : 'CREATE NEW TYPE'}
+              <PlusCircle className="w-3 h-3" /> {showNewType ? 'Cancel' : 'Create new type'}
             </button>
             {showNewType && (
               <div className="mt-1 flex gap-2">

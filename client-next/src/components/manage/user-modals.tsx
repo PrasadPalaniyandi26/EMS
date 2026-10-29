@@ -264,7 +264,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
                 </SelectContent>
               </Select>
               <button type="button" onClick={() => setShowNewDeptForm(!showNewDeptForm)} className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] mt-1">
-                <PlusCircle className="w-3 h-3" /> CREATE NEW DEPARTMENT
+                <PlusCircle className="w-3 h-3" /> Create new department
               </button>
               {showNewDeptForm && (
                 <div className="mt-2 p-3 border border-[var(--shell-border)] rounded-lg space-y-2" style={{ background: 'var(--shell-bg)' }}>
@@ -597,22 +597,22 @@ const MODULE_GROUPS = [
     items: ['Dashboard & Analytics'],
   },
   {
-    label: 'TRANSACTION',
+    label: 'Transactions',
     color: '#C9A84C',
     items: ['Approvals & Workflow', 'Expense Management', 'Income Tracking'],
   },
   {
-    label: 'OPERATIONS',
+    label: 'Operations',
     color: '#C9A84C',
     items: ['Client Database', 'Projects & Milestones', 'Products & BOM'],
   },
   {
-    label: 'MANAGE',
+    label: 'Manage',
     color: '#C9A84C',
     items: ['Organization & Users', 'Budgets & Forecasts'],
   },
   {
-    label: 'ANALYTICS',
+    label: 'Analytics',
     color: '#C9A84C',
     items: ['Reports & Audit'],
   },

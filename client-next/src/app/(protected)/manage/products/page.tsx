@@ -249,7 +249,7 @@ export default function ProductsPage() {
                     onClick={() => { setShowNewType(!showNewType); setNewTypeName(''); }}
                     className="mt-1 flex items-center gap-1.5 text-[11px] font-bold text-[var(--info)] hover:underline"
                   >
-                    <PlusCircle aria-hidden className="h-3 w-3" /> {showNewType ? 'CANCEL' : 'CREATE NEW TYPE'}
+                    <PlusCircle aria-hidden className="h-3 w-3" /> {showNewType ? 'Cancel' : 'Create new type'}
                   </button>
                   {showNewType && (
                     <div className="mt-1 flex gap-2">
