@@ -21,6 +21,10 @@ export const QUERY_KEYS = {
   PRODUCTS: 'products',
   PRODUCT_TYPES: 'productTypes',
   TYPE_USAGE: 'typeUsage',
+  CLIENT_SECTORS: 'clientSectors',
+  SECTOR_USAGE: 'sectorUsage',
+  DEPARTMENTS: 'departments',
+  DEPARTMENT_USAGE: 'departmentUsage',
   PROJECT_CATEGORIES: 'projectCategories',
   PRODUCT_CATEGORIES: 'productCategories',
   TRANSACTIONS: 'transactions',
@@ -53,6 +57,46 @@ export function useClients() {
     queryKey: [QUERY_KEYS.CLIENTS],
     queryFn: () => api.get<Client[]>('/clients').then((r) => r.data),
     staleTime: REF_STALE,
+  });
+}
+
+export interface ClientSector { id: number; name: string }
+
+export interface Department { id: number; name: string }
+
+export function useDepartments() {
+  return useQuery({
+    queryKey: [QUERY_KEYS.DEPARTMENTS],
+    queryFn: () => api.get<Department[]>('/departments').then((r) => r.data),
+    staleTime: REF_STALE,
+  });
+}
+
+// How many users and budgets use each department, for the manage dialog
+export function useDepartmentUsage(enabled: boolean) {
+  return useQuery({
+    queryKey: [QUERY_KEYS.DEPARTMENT_USAGE],
+    queryFn: () => api.get<{ departments: Record<number, number> }>('/departments/usage').then((r) => r.data),
+    enabled,
+    staleTime: LIVE_STALE,
+  });
+}
+
+export function useClientSectors() {
+  return useQuery({
+    queryKey: [QUERY_KEYS.CLIENT_SECTORS],
+    queryFn: () => api.get<ClientSector[]>('/client-sectors').then((r) => r.data),
+    staleTime: REF_STALE,
+  });
+}
+
+// How many clients use each sector, for the manage dialog
+export function useSectorUsage(enabled: boolean) {
+  return useQuery({
+    queryKey: [QUERY_KEYS.SECTOR_USAGE],
+    queryFn: () => api.get<{ sectors: Record<number, number> }>('/client-sectors/usage').then((r) => r.data),
+    enabled,
+    staleTime: LIVE_STALE,
   });
 }
 

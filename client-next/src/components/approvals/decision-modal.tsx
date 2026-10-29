@@ -111,7 +111,7 @@ export function DecisionModal({
           <Button variant="ghost" onClick={onClose} disabled={saving} className="h-8 px-4 text-[12px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>
             Cancel
           </Button>
-          <Button onClick={handleConfirm} disabled={saving} className={cn('h-8 px-5 text-[12px] font-semibold', btn.className)} style={btn.style}>
+          <Button onClick={handleConfirm} disabled={saving || (field.required && !text.trim())} className={cn('h-8 px-5 text-[12px] font-semibold', btn.className)} style={btn.style}>
             {saving && <span aria-hidden className="mr-2 inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />}
             {saving && busyLabel ? busyLabel : confirmLabel}
           </Button>

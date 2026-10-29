@@ -30,7 +30,7 @@ import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAllocation, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
-import { formatCurrency } from '@/lib/currency';
+import { formatCurrency, formatDate } from '@/lib/currency';
 
 export default function ProjectsPage() {
   const setHeader = useHeaderStore((s) => s.setHeader);
@@ -93,29 +93,6 @@ export default function ProjectsPage() {
       setRowSelection({});
     } catch (err: any) {
       toast.error(err?.message || 'Failed to save project');
-    }
-  };
-
-  const handleSaveType = async (form: any) => {
-    try {
-      const res = await api.post('/project-types', form);
-      toast.success('Project type created');
-      invalidate('projectTypes');
-      return (res.data as any);
-    } catch {
-      toast.error('Failed to create project type');
-      throw new Error('Failed');
-    }
-  };
-
-  const handleSaveCategory = async (form: any) => {
-    try {
-      const res = await api.post('/project-categories', form);
-      invalidate('projectCategories');
-      return (res.data as any);
-    } catch {
-      toast.error('Failed to create category');
-      throw new Error('Failed');
     }
   };
 
@@ -183,6 +160,8 @@ export default function ProjectsPage() {
                       <DetailField label="Type" value={pr.type_name} />
                       <DetailField label="Project lead" value={pr.lead} />
                       <DetailField label="Client" value={pr.client_name} wide />
+                      <DetailField label="Start date" value={formatDate(pr.start_date)} />
+                      <DetailField label="End date" value={formatDate(pr.end_date)} />
                     </DetailGrid>
                   </DetailSection>
                   {pr.description && (
@@ -208,9 +187,7 @@ export default function ProjectsPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={handleSaveProject}
-        onSaveType={isAdmin ? handleSaveType : undefined}
         categories={categories || []}
-        onSaveCategory={isAdmin ? handleSaveCategory : undefined}
         editing={editingProject}
         clients={clients || []}
         projectTypes={types || []}

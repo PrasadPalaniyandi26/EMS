@@ -2,117 +2,88 @@
 
 import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
-import { Plus, Pencil, PlusCircle } from 'lucide-react';
+import { Plus, Pencil } from 'lucide-react';
 import { ModuleModal } from '@/components/shared/module/module-modal';
-import { Field, SectionHeader, EmailInput, PhoneInput, SegmentedControl, isValidEmail, isValidPhone, inp, sel } from '@/components/shared/modal-primitives';
+import { Field, NativeSelect, EmailInput, PhoneInput, SegmentedControl, isValidEmail, isValidPhone, inp } from '@/components/shared/modal-primitives';
+import { AddressFields, type AddressKey } from '@/components/shared/address-fields';
+import { PickSelect } from './pick-select';
+import type { ClientSector } from '@/hooks/use-queries';
 
-// ─── Country List ─────────────────────────────────────────────────────────────
-export const COUNTRY_LIST = [
-  'Afghanistan', 'Albania', 'Algeria', 'Argentina', 'Australia', 'Austria',
-  'Bahrain', 'Bangladesh', 'Belgium', 'Brazil', 'Canada', 'Chile', 'China',
-  'Colombia', 'Croatia', 'Czech Republic', 'Denmark', 'Egypt', 'Finland',
-  'France', 'Germany', 'Ghana', 'Greece', 'Hong Kong', 'Hungary', 'India',
-  'Indonesia', 'Iran', 'Iraq', 'Ireland', 'Israel', 'Italy', 'Japan',
-  'Jordan', 'Kenya', 'Kuwait', 'Lebanon', 'Malaysia', 'Mexico', 'Morocco',
-  'Netherlands', 'New Zealand', 'Nigeria', 'Norway', 'Oman', 'Pakistan',
-  'Philippines', 'Poland', 'Portugal', 'Qatar', 'Romania', 'Russia',
-  'Saudi Arabia', 'Singapore', 'South Africa', 'South Korea', 'Spain',
-  'Sri Lanka', 'Sweden', 'Switzerland', 'Taiwan', 'Thailand', 'Turkey',
-  'Ukraine', 'United Arab Emirates', 'United Kingdom', 'United States',
-  'Vietnam', 'Zimbabwe',
-];
-
-// ─── Shared Styles ────────────────────────────────────────────────────────────
-
-// ─── Field ────────────────────────────────────────────────────────────────────
-// ─── Section Header ───────────────────────────────────────────────────────────
-
-// ─── Props ────────────────────────────────────────────────────────────────────
 interface ClientModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (form: any) => void;
   editing: any | null;
-  businessTypes: string[];
-  countries?: string[];
+  sectors: ClientSector[];
 }
 
-// ─── ClientModal ──────────────────────────────────────────────────────────────
-export function ClientModal({ isOpen, onClose, onSave, editing, businessTypes: initialBusinessTypes }: ClientModalProps) {
-  const [form, setForm] = useState({
-    name: '',
-    description: '',
-    contact_name: '',
-    contact_email: '',
-    contact_phone: '',
-    business_type: '',
-    // address col 2
-    street: '',
-    address: '',
-    city: '',
-    country: '',
-    postal_code: '',
-    tax_id: '',
-    payment_terms: 'Net 30',
-    is_active: true,
-  });
+const EMPTY = {
+  name: '',
+  description: '',
+  contact_name: '',
+  contact_email: '',
+  contact_phone: '',
+  business_type: '',
+  street: '',
+  address_line2: '',
+  city: '',
+  state: '',
+  country: '',
+  postal_code: '',
+  tax_id: '',
+  payment_terms: 'Net 30',
+  is_active: true,
+};
 
-  const [businessTypes, setBusinessTypes] = useState(initialBusinessTypes);
-  const [showNewIndustry, setShowNewIndustry] = useState(false);
-  const [newIndustryName, setNewIndustryName] = useState('');
+// The shared address block names the second line "line2"; a client stores it as address_line2
+const ADDRESS_FIELD: Record<AddressKey, keyof typeof EMPTY> = {
+  street: 'street', line2: 'address_line2', city: 'city', state: 'state', country: 'country', postal_code: 'postal_code',
+};
+
+// ─── ClientModal ──────────────────────────────────────────────────────────────
+export function ClientModal({ isOpen, onClose, onSave, editing, sectors }: ClientModalProps) {
+  const [form, setForm] = useState<typeof EMPTY>(EMPTY);
 
   const set = (k: string, v: string | boolean) => setForm((p) => ({ ...p, [k]: v }));
 
   useEffect(() => {
     if (editing) {
-      // Safe address parsing: guard against fewer than expected parts
-      const rawParts = (editing.address || '').split(', ');
-      const [addrStreet = '', addrLine2 = '', addrCity = '', addrPostal = ''] = rawParts;
+      const e = editing as any;
+      // Clients saved before the address was stored in parts only have one joined line: street, line 2, city, postal code
+      const hasParts = e.street || e.address_line2 || e.city || e.state || e.postal_code;
+      const [oldStreet = '', oldLine2 = '', oldCity = '', oldPostal = ''] = hasParts ? [] : (e.address || '').split(', ');
       setForm({
-        name: editing.name || '',
-        description: editing.description || '',
-        contact_name: editing.contact_name || '',
-        contact_email: editing.contact_email || '',
-        contact_phone: editing.contact_phone || '',
-        business_type: editing.business_type || '',
-        street: (editing as any).street || addrStreet,
-        address: (editing as any).addr2 || addrLine2,
-        city: (editing as any).city || addrCity,
-        country: (editing as any).country || '',
-        postal_code: (editing as any).postal_code || addrPostal,
-        tax_id: (editing as any).tax_id || '',
-        payment_terms: (editing as any).payment_terms || 'Net 30',
-        is_active: editing.is_active === 1 || editing.is_active === true,
+        name: e.name || '',
+        description: e.description || '',
+        contact_name: e.contact_name || '',
+        contact_email: e.contact_email || '',
+        contact_phone: e.contact_phone || '',
+        business_type: e.business_type || '',
+        street: e.street || oldStreet,
+        address_line2: e.address_line2 || oldLine2,
+        city: e.city || oldCity,
+        state: e.state || '',
+        country: e.country || '',
+        postal_code: e.postal_code || oldPostal,
+        tax_id: e.tax_id || '',
+        payment_terms: e.payment_terms || 'Net 30',
+        is_active: e.is_active === 1 || e.is_active === true,
       });
     } else {
-      setForm({
-        name: '', description: '', contact_name: '', contact_email: '',
-        contact_phone: '', business_type: '',
-        street: '', address: '', city: '', country: '', postal_code: '',
-        tax_id: '', payment_terms: 'Net 30', is_active: true,
-      });
+      setForm(EMPTY);
     }
-    setShowNewIndustry(false);
-    setNewIndustryName('');
   }, [editing, isOpen]);
 
-  const handleAddIndustry = () => {
-    if (!newIndustryName.trim()) return;
-    setBusinessTypes((prev) => [...prev, newIndustryName.trim()]);
-    set('business_type', newIndustryName.trim());
-    setNewIndustryName('');
-    setShowNewIndustry(false);
-  };
+  // The sector is stored by name; keep a saved one that is no longer listed (archived)
+  const sectorOptions = sectors.map((s) => ({ id: s.name, name: s.name }));
+  if (form.business_type && !sectorOptions.some((o) => o.id === form.business_type)) sectorOptions.push({ id: form.business_type, name: form.business_type });
 
   const handleSubmit = () => {
     if (!form.name.trim()) return;
     if (form.contact_email && !isValidEmail(form.contact_email)) return;
     if (!isValidPhone(form.contact_phone)) return;
-    const addressStr = [form.street, form.address, form.city, form.postal_code]
-      .filter(Boolean).join(', ');
+    // The table and detail panel show the address as one line; the parts are saved too
+    const addressStr = [form.street, form.address_line2, form.city, form.state, form.postal_code].filter(Boolean).join(', ');
     onSave({ ...form, address: addressStr });
   };
 
@@ -123,139 +94,32 @@ export function ClientModal({ isOpen, onClose, onSave, editing, businessTypes: i
       title={editing ? 'Edit Client' : 'Add New Client'}
       icon={editing ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
       onSave={handleSubmit}
+      canSave={!!form.name.trim() && (!form.contact_email || isValidEmail(form.contact_email)) && isValidPhone(form.contact_phone)}
       saveLabel={editing ? 'Save Changes' : 'Create Client'}
-      size="lg"
+      size="xl"
     >
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+      <div className="grid grid-cols-1 items-start gap-x-6 gap-y-5 md:grid-cols-3">
 
-        {/* LEFT column: Client Info */}
-        <div className="space-y-2.5">
-
-          <SectionHeader label="Client Info" />
-
-          <Field label="Client Name *">
+        {/* Column 1: who the client is */}
+        <div className="space-y-3">
+          <Field label="Client Name" required>
             <Input className={inp} placeholder="Legal entity name" value={form.name} onChange={(e) => set('name', e.target.value)} />
           </Field>
-
           <Field label="Description">
             <Input className={inp} placeholder="Brief description" value={form.description} onChange={(e) => set('description', e.target.value)} />
           </Field>
-
-          <Field label="Contact Name">
-            <Input className={inp} placeholder="Primary contact person" value={form.contact_name} onChange={(e) => set('contact_name', e.target.value)} />
-          </Field>
-
-          <Field label="Email Address">
-            <EmailInput
-              value={form.contact_email}
-              onChange={(v) => set('contact_email', v)}
-              placeholder="official@company.com"
-            />
-          </Field>
-
-          <Field label="Contact No">
-            <PhoneInput
-              value={form.contact_phone}
-              onChange={(v) => set('contact_phone', v)}
-              placeholder="+1 555 0123"
-            />
-          </Field>
-
-          <Field label="Industry Sector">
-            <Select value={form.business_type} onValueChange={(v) => set('business_type', v)}>
-              <SelectTrigger className={sel}>
-                <SelectValue placeholder="Select sector" />
-              </SelectTrigger>
-              <SelectContent>
-                {businessTypes.map((t) => (
-                  <SelectItem key={t} value={t}>{t}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <button
-              type="button"
-              onClick={() => setShowNewIndustry(!showNewIndustry)}
-              className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--shell-accent)] hover:underline mt-1"
-            >
-              <PlusCircle className="w-3 h-3" /> Create new sector
-            </button>
-            {showNewIndustry && (
-              <div className="mt-1 flex gap-2">
-                <Input
-                  className="h-10 text-sm border-input bg-transparent text-[var(--shell-text)] border-[var(--shell-border)] text-[var(--shell-text)] rounded-lg flex-1"
-                  placeholder="e.g. Quantum Computing"
-                  value={newIndustryName}
-                  onChange={(e) => setNewIndustryName(e.target.value)}
-                />
-                <Button type="button" size="sm" onClick={handleAddIndustry}
-                  className="h-10 btn-action-primary font-semibold text-[13px] px-3 border border-[var(--shell-border)]">
-                  Add
-                </Button>
-              </div>
-            )}
-          </Field>
-
-        </div>
-
-        {/* RIGHT column: Address + Billing + Status */}
-        <div className="space-y-2.5">
-
-          <SectionHeader label="Address" />
-
-          <Field label="Street">
-            <Input className={inp} placeholder="123 Main Street" value={form.street} onChange={(e) => set('street', e.target.value)} />
-          </Field>
-
-          <Field label="Address (optional)">
-            <Input className={inp} placeholder="Apt / Suite / Building" value={form.address} onChange={(e) => set('address', e.target.value)} />
-          </Field>
-
-          <Field label="City">
-            <Input className={inp} placeholder="City" value={form.city} onChange={(e) => set('city', e.target.value)} />
-          </Field>
-
-          <Field label="Country">
-            <Select value={form.country} onValueChange={(v) => set('country', v)}>
-              <SelectTrigger className={sel}>
-                <SelectValue placeholder="Select country" />
-              </SelectTrigger>
-              <SelectContent className="max-h-56">
-                {COUNTRY_LIST.map((c) => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-
-          <Field label="Postal Code">
-            <Input className={inp} placeholder="ZIP / Postal" value={form.postal_code} onChange={(e) => set('postal_code', e.target.value)} />
-          </Field>
-
-          <SectionHeader label="Billing" />
-
-          <Field label="Tax ID / VAT Number">
-            <Input className={inp} placeholder="e.g. GB123456789" value={form.tax_id} onChange={(e) => set('tax_id', e.target.value)} />
-          </Field>
-
-          <Field label="Payment Terms">
-            <Select value={form.payment_terms} onValueChange={(v) => set('payment_terms', v)}>
-              <SelectTrigger className={sel}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {['Net 15', 'Net 30', 'Net 60', 'Due on Receipt'].map((t) => (
-                  <SelectItem key={t} value={t}>{t}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-
-          {/* ── STATUS TOGGLE ── */}
-          <div className="pt-1">
-            <p id="client-status-label" className="mb-2 block text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Status</p>
+          <PickSelect
+            label="Industry Sector"
+            placeholder="Select sector"
+            value={form.business_type}
+            onChange={(name) => set('business_type', name)}
+            options={sectorOptions}
+            emptyHint="No sectors yet. An admin can add them with Sectors."
+          />
+          <div>
+            <p id="client-status-label" className="mb-2 block text-[13px] font-medium" style={{ color: 'var(--shell-text)' }}>Status</p>
             <SegmentedControl
               labelledBy="client-status-label"
-              className="w-56"
               value={form.is_active}
               onChange={(v) => set('is_active', v)}
               options={[
@@ -264,7 +128,38 @@ export function ClientModal({ isOpen, onClose, onSave, editing, businessTypes: i
               ]}
             />
           </div>
+        </div>
 
+        {/* Column 2: how to reach and bill them */}
+        <div className="space-y-3">
+          <Field label="Contact Name">
+            <Input className={inp} placeholder="Primary contact person" value={form.contact_name} onChange={(e) => set('contact_name', e.target.value)} />
+          </Field>
+          <Field label="Email Address">
+            <EmailInput value={form.contact_email} onChange={(v) => set('contact_email', v)} placeholder="official@company.com" />
+          </Field>
+          <Field label="Contact No">
+            <PhoneInput value={form.contact_phone} onChange={(v) => set('contact_phone', v)} placeholder="+1 555 0123" />
+          </Field>
+          <Field label="Tax ID / VAT Number">
+            <Input className={inp} placeholder="e.g. GB123456789" value={form.tax_id} onChange={(e) => set('tax_id', e.target.value)} />
+          </Field>
+          <Field label="Payment Terms">
+            <NativeSelect value={form.payment_terms} onChange={(e) => set('payment_terms', e.target.value)}>
+              {['Net 15', 'Net 30', 'Net 60', 'Due on Receipt'].map((t) => <option key={t} value={t}>{t}</option>)}
+            </NativeSelect>
+          </Field>
+        </div>
+
+        {/* Column 3: where they are */}
+        <div className="space-y-3">
+          <AddressFields
+            value={{
+              street: form.street, line2: form.address_line2, city: form.city,
+              state: form.state, country: form.country, postal_code: form.postal_code,
+            }}
+            onChange={(key, v) => set(ADDRESS_FIELD[key], v)}
+          />
         </div>
 
       </div>

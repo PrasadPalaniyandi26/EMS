@@ -52,6 +52,7 @@ model User {
   city                             String?                @db.VarChar(100)
   country                          String?                @db.VarChar(100)
   postalCode                       String?                @map("postal_code") @db.VarChar(20)
+  state                            String?                @db.VarChar(100)
   userStatus                       String?                @default("ACTIVE") @map("user_status") @db.VarChar(20)
   dateOfBirth                      DateTime?              @map("date_of_birth") @db.Date
   loginName                        String?                @unique @map("login_name") @db.VarChar(50)
@@ -249,6 +250,11 @@ model Client {
   businessType String?                @map("business_type") @db.VarChar(100)
   code         String?                @db.VarChar(20)
   country      String?                @db.VarChar(100)
+  street       String?                @db.VarChar(200)
+  addressLine2 String?                @map("address_line2") @db.VarChar(200)
+  city         String?                @db.VarChar(100)
+  state        String?                @db.VarChar(100)
+  postalCode   String?                @map("postal_code") @db.VarChar(20)
   creator      User?                  @relation("ClientCreator", fields: [createdBy], references: [id])
   productTypes ProductType[]
   products     Product[]
@@ -277,6 +283,16 @@ model ProjectType {
   @@unique([clientId, name])
   @@index([clientId])
   @@map("project_types")
+}
+
+model ClientSector {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique @db.VarChar(100)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdBy Int?     @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("client_sectors")
 }
 
 model ProjectCategory {
@@ -564,4 +580,14 @@ model Notification {
   @@index([userId, isRead])
   @@index([createdAt(sort: Desc)])
   @@map("notifications")
+}
+
+model Department {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique @db.VarChar(100)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdBy Int?     @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("departments")
 }

@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, Pencil, Download, Send, Info, Trash2 } from 'lucide-react';
-import { useUsers } from '@/hooks/use-queries';
+import { useUsers, useDepartments } from '@/hooks/use-queries';
+import { PickSelect } from '@/components/manage/pick-select';
 import { useAuthStore } from '@/stores/auth-store';
 import { ModuleModal } from '@/components/shared/module/module-modal';
 import { Field, CurrencyInput, inp, sel } from '@/components/shared/modal-primitives';
@@ -25,16 +26,12 @@ interface BudgetModalProps {
   editingData?: any;
 }
 
-const DEPARTMENTS = [
-  'Product Development', 'Marketing Operations', 'IT Infrastructure',
-  'Human Resources', 'Finance', 'Operations', 'Legal', 'Sales', 'Research & Development',
-];
-
 export function AddBudgetModal({ isOpen, onClose, onSave, editingData }: BudgetModalProps) {
   const currentYear = new Date().getFullYear();
   const currency = useAuthStore((s) => s.user?.currency || 'INR');
   const currencySymbol = CURRENCY_SYMBOL[currency] || '₹';
   const { data: usersData } = useUsers();
+  const { data: departments } = useDepartments();
   const managers = useMemo(() =>
     (Array.isArray(usersData) ? usersData : []).filter((u: any) =>
       u.role_name?.toLowerCase() === 'manager' ||
@@ -69,6 +66,10 @@ export function AddBudgetModal({ isOpen, onClose, onSave, editingData }: BudgetM
     }
   }, [isOpen, editingData]);
 
+  // The department is stored by name; keep a saved one that is no longer listed (archived)
+  const departmentOptions = (departments ?? []).map((d) => ({ id: d.name, name: d.name }));
+  if (form.department && !departmentOptions.some((o) => o.id === form.department)) departmentOptions.push({ id: form.department, name: form.department });
+
   const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }));
 
   const yearOptions = [
@@ -86,12 +87,13 @@ export function AddBudgetModal({ isOpen, onClose, onSave, editingData }: BudgetM
       title={editingData ? 'Edit Budget' : 'Add Budget'}
       icon={editingData ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
       onSave={() => onSave?.(form)}
+      canSave={!!form.name.trim() && Number(form.allocated) > 0}
       saveLabel={editingData ? 'Update Budget' : 'Save Budget'}
       size="md"
     >
       <div className="space-y-3">
         <FormGrid className="gap-x-4 gap-y-3">
-          <Field label="Budget Name">
+          <Field label="Budget Name" required>
             <Input className={ctl} placeholder="e.g. Q1 Marketing Campaign" value={form.name} onChange={e => set('name', e.target.value)} />
           </Field>
           <Field label="Category">
@@ -107,14 +109,14 @@ export function AddBudgetModal({ isOpen, onClose, onSave, editingData }: BudgetM
             </Select>
           </Field>
 
-          <Field label="Department">
-            <Select value={form.department} onValueChange={v => set('department', v)}>
-              <SelectTrigger className={sel}><SelectValue placeholder="Select Department" /></SelectTrigger>
-              <SelectContent>
-                {DEPARTMENTS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </Field>
+          <PickSelect
+            label="Department"
+            placeholder="Select department"
+            value={form.department}
+            onChange={(name) => set('department', name)}
+            options={departmentOptions}
+            emptyHint="No departments yet. An admin can add them on the Team page."
+          />
           <Field label="Owner (Manager)">
             <Select value={form.owner_id} onValueChange={v => set('owner_id', v)}>
               <SelectTrigger className={sel}><SelectValue placeholder="Assign Owner" /></SelectTrigger>
@@ -139,7 +141,7 @@ export function AddBudgetModal({ isOpen, onClose, onSave, editingData }: BudgetM
               </SelectContent>
             </Select>
           </Field>
-          <Field label={`Total Allocation (${currencySymbol})`}>
+          <Field label={`Total Allocation (${currencySymbol})`} required>
             <CurrencyInput value={form.allocated} onChange={(v) => set('allocated', v)} symbol={currencySymbol} />
           </Field>
 

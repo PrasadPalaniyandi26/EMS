@@ -66,6 +66,7 @@ export function RecurringModal({
       title={isEdit ? 'Edit Recurring Transaction' : 'Add Recurring Transaction'}
       icon={isEdit ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
       onSave={onSave}
+      canSave={!!form.description?.trim() && !!form.amount && Number(form.amount) > 0 && !!form.category_id && !!form.frequency && !!form.next_run}
       saveLabel={isEdit ? 'Update Schedule' : 'Schedule Transaction'}
       size="lg"
     >
@@ -74,7 +75,7 @@ export function RecurringModal({
         {/* Vendor + Type */}
         <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
           <div className="sm:col-span-2">
-            <Field label="Service / Vendor">
+            <Field label="Service / Vendor" required>
               <Input
                 className={ctl}
                 placeholder="Enter vendor name..."
@@ -100,7 +101,7 @@ export function RecurringModal({
 
         {/* Category | Frequency | Payment Method */}
         <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
-          <Field label="Category">
+          <Field label="Category" required>
             <Select value={form.category_id} onValueChange={(v) => setForm({ ...form, category_id: v })}>
               <SelectTrigger className={sel}><SelectValue placeholder="Select Category" /></SelectTrigger>
               <SelectContent>
@@ -110,7 +111,7 @@ export function RecurringModal({
               </SelectContent>
             </Select>
           </Field>
-          <Field label="Frequency">
+          <Field label="Frequency" required>
             <Select value={form.frequency.toLowerCase()} onValueChange={(v) => setForm({ ...form, frequency: v })}>
               <SelectTrigger className={sel}><SelectValue placeholder="Select Frequency" /></SelectTrigger>
               <SelectContent>
@@ -145,14 +146,14 @@ export function RecurringModal({
           <Field label="GST included">
             <GstIncludedSwitch checked={form.gst_included} onChange={(v) => setForm({ ...form, gst_included: v })} />
           </Field>
-          <Field label={`Amount ${amountLabel(form.gst_rate, form.gst_included)}`}>
+          <Field label={`Amount ${amountLabel(form.gst_rate, form.gst_included)}`} required>
             <CurrencyInput value={form.amount} onChange={(v) => setForm({ ...form, amount: v })} />
           </Field>
         </div>
 
         {/* Start Date | End Date | Open-Ended */}
         <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
-          <Field label="Start Date">
+          <Field label="Start Date" required>
             <Input
               type="date"
               className={ctl}
@@ -359,7 +360,8 @@ export function ResumeRecurringModal({
           </Button>
           <button
             onClick={() => onConfirm(form)}
-            className="px-6 py-2.5 btn-action-primary border border-[var(--shell-border)] text-[var(--shell-text)] rounded-lg text-[12px] font-semibold shadow-none transition-all flex items-center gap-2"
+            disabled={!form.next_run || !form.amount || Number(form.amount) <= 0 || !form.frequency}
+            className="px-6 py-2.5 btn-action-primary border border-[var(--shell-border)] text-[var(--shell-text)] rounded-lg text-[12px] font-semibold shadow-none transition-all flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Play className="w-4 h-4" /> Resume Schedule
           </button>
@@ -381,7 +383,7 @@ export function ResumeRecurringModal({
         </div>
 
         <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-          <Field label="Next Billing Date">
+          <Field label="Next Billing Date" required>
             <div className="relative">
               <CalendarDays aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--shell-accent)]" />
               <Input
@@ -392,12 +394,12 @@ export function ResumeRecurringModal({
               />
             </div>
           </Field>
-          <Field label={`Amount ${amountLabel(form.gst_rate, form.gst_included)}`}>
+          <Field label={`Amount ${amountLabel(form.gst_rate, form.gst_included)}`} required>
             <CurrencyInput value={form.amount} onChange={(v) => setForm({ ...form, amount: v })} />
           </Field>
         </div>
 
-        <Field label="Frequency">
+        <Field label="Frequency" required>
           <Select value={form.frequency.toLowerCase()} onValueChange={(v) => setForm({ ...form, frequency: v })}>
             <SelectTrigger className={sel}>
               <SelectValue placeholder="Frequency" />

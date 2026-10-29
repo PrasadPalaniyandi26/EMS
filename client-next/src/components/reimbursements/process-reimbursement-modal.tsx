@@ -70,6 +70,7 @@ export function ProcessReimbursementModal({
       icon={<CreditCard className="w-4 h-4" />}
       onSave={handleSave}
       saveLabel={saving ? 'Processing...' : 'Confirm'}
+      canSave={!saving && (status !== 'PAID' || !!reference.trim())}
       size="sm"
     >
       <div className="space-y-4 p-1">

@@ -1,10 +1,12 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useHeaderStore } from '@/stores/header-store';
-import { useClients, useInvalidate } from '@/hooks/use-queries';
+import { useClients, useClientSectors, useInvalidate } from '@/hooks/use-queries';
+import { useAuthStore } from '@/stores/auth-store';
+import { ManageSectorsDialog } from '@/components/manage/manage-sectors-dialog';
 import api from '@/lib/api-client';
 import { toast } from 'sonner';
-import { Pencil, Trash2, Plus, MapPin, Phone, Mail } from 'lucide-react';
+import { Pencil, Trash2, Plus, MapPin, Phone, Mail, Layers } from 'lucide-react';
 import type { Client } from '@/lib/types';
 import { ClientModal } from '@/components/manage/client-modals';
 import { DataTable } from '@/components/data-table/data-table';
@@ -24,13 +26,16 @@ import { ModuleIntelligencePanel } from '@/components/shared/module/module-intel
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAllocation, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import { useConfirm } from '@/components/shared/modal-primitives';
 
-const BUSINESS_TYPES = ['Retail', 'Manufacturing', 'Technology', 'Healthcare', 'Finance', 'Consulting', 'Education', 'Logistics', 'Media', 'Construction', 'Other'];
 const COUNTRIES = ['United Kingdom', 'United States', 'India', 'Germany', 'Canada', 'Singapore', 'Australia'];
 
 export default function ClientsPage() {
   const setHeader = useHeaderStore((s) => s.setHeader);
   const { data: clients, isLoading } = useClients();
+  const { data: sectors } = useClientSectors();
   const invalidate = useInvalidate();
+  // Managing sectors is admin-only; the API checks the active role the same way
+  const isAdmin = (useAuthStore((s) => s.user)?.role_name || '').toUpperCase() === 'ADMIN';
+  const [sectorsOpen, setSectorsOpen] = useState(false);
   const { confirm: confirmDialog, dialog: confirmDialogEl } = useConfirm();
 
   const [rowSelection, setRowSelection] = useState({});
@@ -149,6 +154,11 @@ export default function ClientsPage() {
             <button className="btn-action" onClick={openAdd}>
               <Plus className="h-4 w-4 text-[var(--success)]" /> Add
             </button>
+            {isAdmin && (
+              <button className="btn-action" onClick={() => setSectorsOpen(true)}>
+                <Layers aria-hidden className="h-4 w-4 text-[var(--nav-violet)]" /> Sectors
+              </button>
+            )}
           <ToolbarActions actions={itemActions} /></>}
         />
       }
@@ -214,9 +224,10 @@ export default function ClientsPage() {
         onClose={() => setDialogOpen(false)}
         onSave={handleSave}
         editing={editing}
-        businessTypes={BUSINESS_TYPES}
-        countries={COUNTRIES}
+        sectors={sectors || []}
       />
+
+      <ManageSectorsDialog isOpen={sectorsOpen} onClose={() => setSectorsOpen(false)} sectors={sectors || []} />
     </ModuleShell>
   );
 }

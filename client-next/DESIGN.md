@@ -32,6 +32,7 @@ One set of rules for every page and dialog. Tokens live in `src/app/globals.css`
 ## Dialogs and forms
 - Every dialog is `ModuleModal` (or `ConfirmDialog` for confirmations): one surface for header, body and footer, 15px sentence-case title, footer Cancel then the main action. Never a raw `Dialog`.
 - Fields use `Field` (label linked to the control, hint and error) with `inp` / `NativeSelect` / `CurrencyInput` / `PhoneInput` / `EmailInput`: transparent fill, 3:1 border, visible focus ring. Same on pages and in dialogs.
+- Required fields are marked with the red asterisk (`Field required`). A dialog never lets you save while one is empty or invalid: pass `canSave` to `ModuleModal` (the save button stays disabled), and for custom footers disable the main button the same way. No "choose X first" hints; a dependent dropdown is simply disabled until its parent is chosen. `check:design` fails a dialog that has required fields but no `canSave`.
 - Toggles that pick one option are `SegmentedControl` (a labelled radio group). Approve/reject/void/send-back dialogs are `DecisionModal`; receipt upload is `FileDropzone`; GST rate and inclusion are `GstRateSelect` / `GstIncludedSwitch`. Reuse these; don't copy their markup.
 
 ## Accessibility floor

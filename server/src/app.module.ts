@@ -11,6 +11,7 @@ import { ClientsModule } from './clients/clients.module';
 import { ProjectsModule } from './projects/projects.module';
 import { ProductsModule } from './products/products.module';
 import { TypeCategoriesModule } from './type-categories/type-categories.module';
+import { DepartmentsModule } from './departments/departments.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { BudgetsModule } from './budgets/budgets.module';
 import { ApprovalsModule } from './approvals/approvals.module';
@@ -35,6 +36,7 @@ import { ReportingModule } from './reporting/reporting.module';
     ProjectsModule,
     ProductsModule,
     TypeCategoriesModule,
+    DepartmentsModule,
     TransactionsModule,
     BudgetsModule,
     ApprovalsModule,

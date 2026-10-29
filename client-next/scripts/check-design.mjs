@@ -39,6 +39,11 @@ for (const file of walk(SRC)) {
       problems++;
     }
   }
+  // A dialog with required fields must keep its save button disabled until they are filled (canSave)
+  if (/<ModuleModal/.test(text) && /\brequired\b/.test(text) && /onSave=/.test(text) && !/canSave=/.test(text)) {
+    console.log(`${relative(process.cwd(), file)}  dialog has required fields but no canSave on its save button`);
+    problems++;
+  }
 }
 console.log(problems === 0 ? 'Design check passed.' : `\n${problems} design problem(s).`);
 process.exit(problems === 0 ? 0 : 1);

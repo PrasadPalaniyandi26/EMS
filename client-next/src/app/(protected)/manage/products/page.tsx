@@ -5,9 +5,9 @@ import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useClients, useProducts, useProductTypes, useProductCategories, useUsers, useInvalidate } from '@/hooks/use-queries';
 import api from '@/lib/api-client';
-import { CURRENCY_SYMBOL } from '@/lib/currency';
+import { CURRENCY_SYMBOL, formatDate } from '@/lib/currency';
 import { ModuleModal } from '@/components/shared/module/module-modal';
-import { CreatableSelect } from '@/components/manage/creatable-select';
+import { PickSelect } from '@/components/manage/pick-select';
 import { toast } from 'sonner';
 import {
   Plus, Pencil, Tags,
@@ -36,11 +36,11 @@ import { CurrencyInput, Field, NativeSelect, ConfirmDialog, SegmentedControl, in
 interface ProductForm {
   name: string; description: string; typeId: string; clientId: string;
   model: string; leadEngineer: string; unitCost: string;
-  category: string; status: string;
+  category: string; status: string; startDate: string; endDate: string;
 }
 const defaultForm = (): ProductForm => ({
   name: '', description: '', typeId: '', clientId: '',
-  model: '', leadEngineer: '', unitCost: '', category: '', status: 'R&D',
+  model: '', leadEngineer: '', unitCost: '', category: '', status: 'R&D', startDate: '', endDate: '',
 });
 
 
@@ -95,29 +95,12 @@ export default function ProductsPage() {
   const selectedRows = table.getSelectedRowModel().rows;
   const selectedProduct = selectedRows.length > 0 ? selectedRows[0].original : null;
 
-  // ── Add type ──
-  const handleAddType = async (name: string) => {
-    try {
-      const res = await api.post('/product-types', { name, client_id: Number(form.clientId) || undefined });
-      invalidate('productTypes');
-      return res.data as any;
-    } catch { toast.error('Failed to create type'); throw new Error('Failed'); }
-  };
-
   // Types belong to a client, as for projects, so the list follows the chosen client
   const clientTypes = allTypes.filter((t: any) => String(t.client_id) === form.clientId);
 
   // Categories follow the chosen type; the category is stored by name, so keep a saved one that is no longer listed
   const categoryOptions = (categories || []).filter((c) => String(c.type_id) === form.typeId).map((c) => ({ id: c.name, name: c.name }));
   if (form.category && form.typeId && !categoryOptions.some((o) => o.id === form.category)) categoryOptions.push({ id: form.category, name: form.category });
-
-  const handleAddCategory = async (name: string) => {
-    try {
-      await api.post('/product-categories', { name, type_id: Number(form.typeId) });
-      invalidate('productCategories');
-      return { id: name };
-    } catch { toast.error('Failed to create category'); throw new Error('Failed'); }
-  };
 
   // ── Add ──
   const openAdd = () => { setForm(defaultForm()); setEditingId(null); setAddOpen(true); };
@@ -135,6 +118,8 @@ export default function ProductsPage() {
       unitCost: (selectedProduct as any).budget ? String((selectedProduct as any).budget) : '',
       category: (selectedProduct as any).category || '',
       status: (selectedProduct as any).status || 'R&D',
+      startDate: (selectedProduct as any).start_date ? String((selectedProduct as any).start_date).split('T')[0] : '',
+      endDate: (selectedProduct as any).end_date ? String((selectedProduct as any).end_date).split('T')[0] : '',
     });
     setEditingId(selectedProduct.id);
     setEditOpen(true);
@@ -146,7 +131,7 @@ export default function ProductsPage() {
     if (!form.clientId) { toast.error('Client is required'); return; }
     if (!form.typeId) { toast.error('Product type is required'); return; }
     try {
-      const payload = { name: form.name, description: form.description, client_id: Number(form.clientId) || undefined, type_id: Number(form.typeId), lead_id: Number(form.leadEngineer) || undefined, budget: form.unitCost ? Number(form.unitCost) : undefined, category: form.category || undefined, model: form.model || undefined, status: form.status };
+      const payload = { name: form.name, description: form.description, client_id: Number(form.clientId) || undefined, type_id: Number(form.typeId), lead_id: Number(form.leadEngineer) || undefined, budget: form.unitCost ? Number(form.unitCost) : undefined, category: form.category || undefined, model: form.model || undefined, status: form.status, start_date: form.startDate || null, end_date: form.endDate || null };
       if (isEdit && editingId) { await api.put(`/products/${editingId}`, payload); toast.success('Product updated'); setEditOpen(false); }
       else { await api.post('/products', payload); toast.success('Product created'); setAddOpen(false); }
       invalidate('products'); setRowSelection({});
@@ -214,6 +199,8 @@ export default function ProductsPage() {
                       <DetailField label="Lead / manager" value={pd.lead} />
                       <DetailField label="Category" value={pd.category} />
                       <DetailField label="Model / version" value={pd.model} wide />
+                      <DetailField label="Start date" value={formatDate(pd.start_date)} />
+                      <DetailField label="End date" value={formatDate(pd.end_date)} />
                     </DetailGrid>
                   </DetailSection>
                   {pd.description && (
@@ -241,34 +228,25 @@ export default function ProductsPage() {
           title={isEdit ? 'Edit Product' : 'Add New Product'}
           icon={isEdit ? <Pencil className="h-4 w-4" /> : <Package className="h-4 w-4" />}
           onSave={() => handleSave(isEdit)}
+          canSave={!!form.name.trim() && !!form.clientId && !!form.typeId}
           saveLabel={isEdit ? 'Save Changes' : 'Create Product'}
           size="xl"
         >
           <div className="grid grid-cols-1 items-start gap-x-6 gap-y-3 md:grid-cols-3">
-            {/* Column 1: what and who */}
+            {/* Column 1: the product and its schedule */}
             <div className="space-y-3">
               <Field label="Product Name" required>
                 <input className={inp} placeholder="e.g. Heavy-Duty Industrial Robot" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
               </Field>
-              <Field label="Lead / Manager">
-                <NativeSelect value={form.leadEngineer} onChange={e => setForm({ ...form, leadEngineer: e.target.value })}>
-                  <option value="">Assign lead</option>
-                  {allUsers.map((u: any) => <option key={u.id} value={String(u.id)}>{u.username}</option>)}
-                </NativeSelect>
+              <Field label="Start Date">
+                <input className={inp} type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} />
+              </Field>
+              <Field label="End Date">
+                <input className={inp} type="date" min={form.startDate || undefined} value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })} />
               </Field>
             </div>
 
-            {/* Column 2: model and cost */}
-            <div className="space-y-3">
-              <Field label="Model / Version">
-                <input className={inp} placeholder="e.g. v2.1.0" value={form.model} onChange={e => setForm({ ...form, model: e.target.value })} />
-              </Field>
-              <Field label="Est. Unit Cost">
-                <CurrencyInput value={form.unitCost} onChange={(v) => setForm({ ...form, unitCost: v })} />
-              </Field>
-            </div>
-
-            {/* Column 3: classification, top to bottom: client, type, then the type's categories */}
+            {/* Column 2: classification, top to bottom: client, type, then the type's categories */}
             <div className="space-y-3">
               <Field label="Client" required>
                 <NativeSelect value={form.clientId} onChange={e => setForm({ ...form, clientId: e.target.value, typeId: '', category: '' })}>
@@ -276,27 +254,41 @@ export default function ProductsPage() {
                   {(clients || []).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </NativeSelect>
               </Field>
-              <CreatableSelect
+              <PickSelect
                 label="Product Type"
                 required
-                noun="type"
                 placeholder="Select type"
                 value={form.typeId}
                 onChange={(id) => setForm(prev => ({ ...prev, typeId: id, category: '' }))}
                 options={clientTypes}
-                blockedHint={form.clientId ? undefined : 'Choose a client first'}
-                onCreate={isAdmin ? handleAddType : undefined}
+                disabled={!form.clientId}
+                emptyHint="No types for this client yet. An admin can add them with Types."
               />
-              <CreatableSelect
+              <PickSelect
                 label="Product Category"
-                noun="category"
                 placeholder="Select category"
                 value={form.category}
                 onChange={(name) => setForm(prev => ({ ...prev, category: name }))}
                 options={categoryOptions}
-                blockedHint={form.typeId ? undefined : 'Choose a type first'}
-                onCreate={isAdmin ? handleAddCategory : undefined}
+                disabled={!form.typeId}
+                emptyHint="No categories for this type yet. An admin can add them with Types."
               />
+            </div>
+
+            {/* Column 3: who leads it, model and cost */}
+            <div className="space-y-3">
+              <Field label="Lead / Manager">
+                <NativeSelect value={form.leadEngineer} onChange={e => setForm({ ...form, leadEngineer: e.target.value })}>
+                  <option value="">Assign lead</option>
+                  {allUsers.map((u: any) => <option key={u.id} value={String(u.id)}>{u.username}</option>)}
+                </NativeSelect>
+              </Field>
+              <Field label="Model / Version">
+                <input className={inp} placeholder="e.g. v2.1.0" value={form.model} onChange={e => setForm({ ...form, model: e.target.value })} />
+              </Field>
+              <Field label="Est. Unit Cost">
+                <CurrencyInput value={form.unitCost} onChange={(v) => setForm({ ...form, unitCost: v })} />
+              </Field>
             </div>
 
             <div className="md:col-span-3">

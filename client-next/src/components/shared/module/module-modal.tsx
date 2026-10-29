@@ -33,6 +33,8 @@ interface ModuleModalProps {
   icon?: React.ReactNode;
   headerBg?: string;
   onSave?: () => void;
+  /** False while a required field is empty or invalid: the save button stays disabled. Every form dialog passes it. */
+  canSave?: boolean;
   saveLabel?: string;
   isDestructive?: boolean;
 }
@@ -49,6 +51,7 @@ export function ModuleModal({
   icon,
   headerBg,
   onSave,
+  canSave = true,
   saveLabel = "Save Changes",
   isDestructive = false
 }: ModuleModalProps) {
@@ -161,6 +164,7 @@ export function ModuleModal({
                   className="font-medium text-[13px] h-9 px-5 rounded-md"
                   style={!isDestructive ? { background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' } : {}}
                   onClick={onSave}
+                  disabled={!canSave}
                 >
                   {saveLabel}
                 </Button>

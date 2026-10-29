@@ -3,7 +3,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
-import { useUsers, useRoles, useInvalidate } from '@/hooks/use-queries';
+import { useUsers, useRoles, useDepartments, useInvalidate } from '@/hooks/use-queries';
+import { ManageDepartmentsDialog } from '@/components/manage/manage-departments-dialog';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api-client';
 import { toast } from 'sonner';
@@ -65,6 +66,8 @@ export default function OrganizationPage() {
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [userModalOpen, setUserModalOpen] = useState(false);
+  const [departmentsOpen, setDepartmentsOpen] = useState(false);
+  const { data: departments } = useDepartments();
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [permissionsModalOpen, setPermissionsModalOpen] = useState(false);
   const [allocationModalOpen, setAllocationModalOpen] = useState(false);
@@ -172,6 +175,11 @@ export default function OrganizationPage() {
             <button className="btn-action" onClick={() => { setEditingUser(null); setUserModalOpen(true); }} disabled={!isAdmin} title={!isAdmin ? 'Admin access required' : undefined}>
               <Plus className="h-4 w-4 text-[var(--success)]" /> Add
             </button>
+            {isAdmin && (
+              <button className="btn-action" onClick={() => setDepartmentsOpen(true)}>
+                <Building2 aria-hidden className="h-4 w-4 text-[var(--nav-violet)]" /> Departments
+              </button>
+            )}
           <ToolbarActions actions={itemActions} /></>}
         />
       }
@@ -190,7 +198,7 @@ export default function OrganizationPage() {
               const statusClass = u.user_status === 'ON_HOLD' ? 'text-[var(--warning)]' : inactive ? 'text-[var(--danger)]' : 'text-[var(--success)]';
               const roles = (u.roles && u.roles.length > 0 ? u.roles : [{ role_name: u.role_name, is_default: true }])
                 .map((r: any) => `${r.role_name}${r.is_default ? ' (default)' : ''}`).join(', ');
-              const address = [u.house_apt, u.address, [u.city, u.postal_code].filter(Boolean).join(' '), u.country].filter(Boolean).join(', ');
+              const address = [u.house_apt, u.address, [u.city, u.state].filter(Boolean).join(', '), u.postal_code, u.country].filter(Boolean).join(', ');
               const joined = u.joining_date ? parseApiDate(u.joining_date)?.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : undefined;
               return (
                 <>
@@ -251,7 +259,10 @@ export default function OrganizationPage() {
         editing={editingUser}
         roles={roles ?? []}
         managers={managersList}
+        departments={departments ?? []}
       />
+
+      <ManageDepartmentsDialog isOpen={departmentsOpen} onClose={() => setDepartmentsOpen(false)} departments={departments ?? []} />
 
       <AllocationModal
         isOpen={allocationModalOpen}

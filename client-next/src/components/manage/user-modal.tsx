@@ -4,14 +4,16 @@ import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, PlusCircle, Eye, EyeOff, Check, Plus, Pencil, RefreshCw, Star } from 'lucide-react';
+import { Search, Eye, EyeOff, Check, Plus, Pencil, RefreshCw, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toLocalYMD } from '@/lib/currency';
 import { roleColor } from '@/lib/roles';
 import { toast } from 'sonner';
-import { COUNTRY_LIST } from './client-modals';
+
 import { ModuleModal } from '@/components/shared/module/module-modal';
-import { Field, AutoLabel, EmailInput, PhoneInput, SegmentedControl, isValidEmail, isValidPhone, inp } from '@/components/shared/modal-primitives';
+import { PickSelect } from './pick-select';
+import { AddressFields, type AddressKey } from '@/components/shared/address-fields';
+import { Field, EmailInput, PhoneInput, SegmentedControl, isValidEmail, isValidPhone, inp } from '@/components/shared/modal-primitives';
 
 function generatePassword(firstName: string, lastName: string): string {
   const specials = ['!', '@', '#', '$', '%', '&', '*'];
@@ -29,6 +31,11 @@ function getEmployeeId(userId?: number): string {
 
 // ─── UserModal ───────────────────────────────────────────────────────────────
 
+// The shared address block's keys, as a user stores them (street is house_apt, line 2 is address)
+const USER_ADDRESS_FIELD: Record<AddressKey, string> = {
+  street: 'house_apt', line2: 'address', city: 'city', state: 'state', country: 'country', postal_code: 'postal_code',
+};
+
 interface UserModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -36,19 +43,19 @@ interface UserModalProps {
   editing: any | null;
   roles: any[];
   managers: any[];
+  departments: { id: number; name: string }[];
 }
 
-export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }: UserModalProps) {
+export function UserModal({ isOpen, onClose, onSave, editing, roles, managers, departments }: UserModalProps) {
   const [form, setForm] = useState({
     first_name: '', last_name: '', date_of_birth: '', email: '', contact_no: '',
     login_name: '', password: '',
-    house_apt: '', address: '', city: '', country: '', postal_code: '',
+    house_apt: '', address: '', city: '', state: '', country: '', postal_code: '',
     reporting_manager_id: '', department: '', clearance_level: 'Level 1',
     joining_date: '', status: 'ACTIVE',
   });
   const [selectedRoles, setSelectedRoles] = useState<{ roleId: number; isDefault: boolean }[]>([]);
   const [showPassword, setShowPassword] = useState(false);
-  const [showNewDeptForm, setShowNewDeptForm] = useState(false);
   const [loginNameManuallyEdited, setLoginNameManuallyEdited] = useState(false);
 
   const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
@@ -86,6 +93,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
         house_apt: (editing as any).house_apt || '',
         address: (editing as any).address || '',
         city: (editing as any).city || '',
+        state: (editing as any).state || '',
         country: (editing as any).country || '',
         postal_code: (editing as any).postal_code || '',
         reporting_manager_id: (editing.manager_id ?? (editing as any).reporting_manager_id)?.toString() || '',
@@ -104,13 +112,12 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
       setForm({
         first_name: '', last_name: '', date_of_birth: '', email: '', contact_no: '',
         login_name: '', password: '',
-        house_apt: '', address: '', city: '', country: '', postal_code: '',
+        house_apt: '', address: '', city: '', state: '', country: '', postal_code: '',
         reporting_manager_id: '', department: '', clearance_level: 'Level 1',
         joining_date: toLocalYMD(), status: 'ACTIVE',
       });
       setSelectedRoles(employeeRole ? [{ roleId: employeeRole.role_id, isDefault: true }] : []);
     }
-    setShowNewDeptForm(false);
   }, [editing, isOpen]);
 
   const handleGenPassword = () => {
@@ -140,6 +147,10 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
     });
   };
 
+  // The department is stored by name; keep a saved one that is no longer listed (archived)
+  const departmentOptions = departments.map((d) => ({ id: d.name, name: d.name }));
+  if (form.department && !departmentOptions.some((o) => o.id === form.department)) departmentOptions.push({ id: form.department, name: form.department });
+
   const defaultRoleName = roles.find((r) => r.role_id === (selectedRoles.find((s) => s.isDefault) || selectedRoles[0])?.roleId)?.role_name;
 
   return (
@@ -149,6 +160,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
       title={editing ? 'Edit User Profile' : 'Add New User'}
       icon={editing ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
       onSave={handleSubmit}
+      canSave={!!form.first_name.trim() && isValidEmail(form.email) && isValidPhone(form.contact_no) && !!form.login_name.trim() && selectedRoles.length > 0 && (!!editing || !!form.password)}
       saveLabel={editing ? 'Save Changes' : 'Add User'}
       size="xl"
     >
@@ -169,7 +181,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
 
           {/* COL 1 — Personal & Contact */}
           <div className="space-y-2.5">
-            <Field label="First Name">
+            <Field label="First Name" required>
               <Input className={inp} placeholder="Jonathan" value={form.first_name}
                 onChange={(e) => set('first_name', e.target.value)}
                 onBlur={() => {
@@ -190,13 +202,13 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
             <Field label="Date of Birth">
               <Input className={inp} type="date" value={form.date_of_birth} onChange={(e) => set('date_of_birth', e.target.value)} />
             </Field>
-            <Field label="Email Address">
+            <Field label="Email Address" required>
               <EmailInput value={form.email} onChange={(v) => set('email', v)} placeholder="j.doe@company.com" readOnly={!!editing} required />
             </Field>
             <Field label="Contact No">
               <PhoneInput value={form.contact_no} onChange={(v) => set('contact_no', v)} placeholder="+91 98765 43210" />
             </Field>
-            <Field label="User Name">
+            <Field label="User Name" required>
               <Input
                 className={inp}
                 placeholder="Auto-generated"
@@ -208,7 +220,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
                 }}
               />
             </Field>
-            <Field label={editing ? 'New Password' : 'Password *'}>
+            <Field label={editing ? "New Password" : "Password"} required={!editing}>
               <div className="flex gap-1.5">
                 <div className="relative flex-1">
                   <Input className={inp + ' pr-8'} type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={form.password} onChange={(e) => set('password', e.target.value)} />
@@ -225,29 +237,16 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
 
           {/* COL 2 — Employment & Access */}
           <div className="space-y-2.5">
+            <PickSelect
+              label="Department"
+              placeholder="Select department"
+              value={form.department}
+              onChange={(name) => set('department', name)}
+              options={departmentOptions}
+              emptyHint="No departments yet. An admin can add them with Departments."
+            />
             <div className="space-y-1">
-              <AutoLabel className="text-xs font-medium text-[var(--shell-text)] normal-case tracking-normal">Department</AutoLabel>
-              <Select value={form.department} onValueChange={(v) => set('department', v)}>
-                <SelectTrigger className={inp}>
-                  <SelectValue placeholder="Select Department" />
-                </SelectTrigger>
-                <SelectContent>
-                  {['Engineering', 'Finance', 'Operations', 'Human Resource', 'Logistics', 'Sales'].map((d) => (
-                    <SelectItem key={d} value={d}>{d}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <button type="button" onClick={() => setShowNewDeptForm(!showNewDeptForm)} className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] mt-1">
-                <PlusCircle className="w-3 h-3" /> Create new department
-              </button>
-              {showNewDeptForm && (
-                <div className="mt-2 p-3 border border-[var(--shell-border)] rounded-lg space-y-2" style={{ background: 'var(--shell-bg)' }}>
-                  <Input className={inp} placeholder="Department name" />
-                </div>
-              )}
-            </div>
-            <div className="space-y-1">
-              <p id="user-roles-label" className="text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Roles Assigned</p>
+              <p id="user-roles-label" className="text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Roles Assigned<span aria-hidden className="ml-0.5 text-[var(--danger)]">*</span></p>
               <div role="group" aria-labelledby="user-roles-label" className="border border-[var(--shell-border)] rounded-lg overflow-hidden divide-y" style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)' }}>
                 {roles.map((r) => {
                   const isChecked = selectedRoles.some((s) => s.roleId === r.role_id);
@@ -297,30 +296,13 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
 
           {/* COL 3 — Address */}
           <div className="space-y-2.5">
-            <Field label="Street">
-              <Input className={inp} placeholder="123 Main Street" value={form.house_apt} onChange={(e) => set('house_apt', e.target.value)} />
-            </Field>
-            <Field label="Address (optional)">
-              <Input className={inp} placeholder="Apt / Suite / Building" value={form.address} onChange={(e) => set('address', e.target.value)} />
-            </Field>
-            <Field label="City">
-              <Input className={inp} placeholder="Mumbai" value={form.city} onChange={(e) => set('city', e.target.value)} />
-            </Field>
-            <Field label="Country">
-              <Select value={form.country} onValueChange={(v) => set('country', v)}>
-                <SelectTrigger className={inp}>
-                  <SelectValue placeholder="Select country" />
-                </SelectTrigger>
-                <SelectContent className="max-h-56">
-                  {COUNTRY_LIST.map((c) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Postal Code">
-              <Input className={inp} placeholder="400001" value={form.postal_code} onChange={(e) => set('postal_code', e.target.value)} />
-            </Field>
+            <AddressFields
+              value={{
+                street: form.house_apt, line2: form.address, city: form.city,
+                state: form.state, country: form.country, postal_code: form.postal_code,
+              }}
+              onChange={(key, v) => set(USER_ADDRESS_FIELD[key], v)}
+            />
             {/* Status segmented */}
             <div className="space-y-1 pt-1">
               <p id="user-status-label" className="text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Status</p>

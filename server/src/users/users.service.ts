@@ -46,6 +46,7 @@ export class UsersService {
       city: user.city ?? null,
       country: user.country ?? null,
       postal_code: user.postalCode ?? null,
+      state: user.state ?? null,
       user_status: !user.isActive ? 'INACTIVE' : (user.userStatus ? this.normalizeStatus(user.userStatus) : 'ACTIVE'),
       user_status_label: !user.isActive ? 'Inactive' : (this.normalizeStatus(user.userStatus) === 'ON_HOLD' ? 'On Hold' : 'Active'),
       date_of_birth: user.dateOfBirth ?? null,
@@ -67,7 +68,7 @@ export class UsersService {
     if (mapped.id === viewer.id || role === ROLES.ADMIN) return mapped;
     if (role === ROLES.MANAGER && mapped.manager_id === viewer.id) return mapped;
     const {
-      email, contact_no, house_apt, address, city, country, postal_code,
+      email, contact_no, house_apt, address, city, state, country, postal_code,
       date_of_birth, joining_date, clearance_level, login_name, created_at,
       ...directory
     } = mapped;
@@ -112,6 +113,7 @@ export class UsersService {
           city: dto.city || null,
           country: dto.country || null,
           postalCode: dto.postal_code || null,
+          state: dto.state || null,
           userStatus: this.normalizeStatus(dto.status),
           dateOfBirth: dto.date_of_birth ? new Date(dto.date_of_birth) : null,
           loginName: dto.login_name ? dto.login_name.toLowerCase().trim() : null,
@@ -174,6 +176,7 @@ export class UsersService {
     if (dto.city !== undefined) data.city = dto.city || null;
     if (dto.country !== undefined) data.country = dto.country || null;
     if (dto.postal_code !== undefined) data.postalCode = dto.postal_code || null;
+    if (dto.state !== undefined) data.state = dto.state || null;
     if (dto.status !== undefined || dto.user_status !== undefined)
       data.userStatus = this.normalizeStatus(dto.status || dto.user_status);
     if (dto.date_of_birth !== undefined)

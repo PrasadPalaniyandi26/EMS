@@ -320,6 +320,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
       title={isAdd ? `Add New ${isExpense ? 'Expense' : 'Income'}` : `Edit ${isExpense ? 'Expense' : 'Income'}`}
       icon={editing ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
       onSave={() => handleSave()}
+      canSave={!!amount && !isNaN(Number(amount)) && Number(amount) > 0 && !!dateRecorded}
       saveLabel={editing ? `Update ${isExpense ? 'Expense' : 'Income'}` : `Add ${isExpense ? 'Expense' : 'Income'}`}
       size="lg"
     >
@@ -409,7 +410,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
           </div>
         </Field>
 
-        <Field label={`Date of ${isExpense ? 'Expense' : 'Income'}`}>
+        <Field label={`Date of ${isExpense ? 'Expense' : 'Income'}`} required>
           <Input
             className={`${inp} border-input bg-transparent text-[var(--shell-text)]`}
             type="date"
@@ -429,7 +430,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
             </div>
           </Field>
 
-          <Field label={`Amount ${amountLabel(gstRate, gstAdded)}`}>
+          <Field label={`Amount ${amountLabel(gstRate, gstAdded)}`} required>
             <CurrencyInput value={amount} onChange={setAmount} symbol={currencySymbol} />
           </Field>
         </div>

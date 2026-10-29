@@ -7,7 +7,7 @@ import { Plus, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { ModuleModal } from '@/components/shared/module/module-modal';
 import { Field, NativeSelect, CurrencyInput, SegmentedControl, inp } from '@/components/shared/modal-primitives';
-import { CreatableSelect } from './creatable-select';
+import { PickSelect } from './pick-select';
 import type { TypeCategory } from '@/hooks/use-queries';
 
 interface ProjectModalProps {
@@ -18,10 +18,7 @@ interface ProjectModalProps {
   clients: any[];
   projectTypes: any[];
   users: any[];
-  /** Admin only: without these the dropdowns just pick, with no "Create new" option */
-  onSaveType?: (form: any) => Promise<any>;
   categories: TypeCategory[];
-  onSaveCategory?: (form: any) => Promise<any>;
 }
 
 const EMPTY = {
@@ -31,7 +28,7 @@ const EMPTY = {
 };
 
 export function ProjectModal({
-  isOpen, onClose, onSave, editing, clients, projectTypes, users, onSaveType, categories, onSaveCategory,
+  isOpen, onClose, onSave, editing, clients, projectTypes, users, categories,
 }: ProjectModalProps) {
   const [form, setForm] = useState(EMPTY);
   const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
@@ -80,28 +77,16 @@ export function ProjectModal({
       title={editing ? 'Edit Project' : 'Add New Project'}
       icon={editing ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
       onSave={handleSubmit}
+      canSave={!!form.name.trim() && !!form.client_id && !!form.type_id}
       saveLabel={editing ? 'Save Changes' : 'Create Project'}
       size="xl"
     >
       <div className="grid grid-cols-1 items-start gap-x-6 gap-y-3 md:grid-cols-3">
 
-        {/* Column 1: what and who */}
+        {/* Column 1: the project and its schedule */}
         <div className="space-y-3">
           <Field label="Project Name" required>
             <Input className={inp} placeholder="e.g. Phoenix Infrastructure Overhaul" value={form.name} onChange={(e) => set('name', e.target.value)} />
-          </Field>
-          <Field label="Lead / Manager">
-            <NativeSelect value={form.lead} onChange={(e) => set('lead', e.target.value)}>
-              <option value="">Assign lead</option>
-              {users.map((u) => <option key={u.id} value={u.id}>{u.username || u.name}</option>)}
-            </NativeSelect>
-          </Field>
-        </div>
-
-        {/* Column 2: money and time */}
-        <div className="space-y-3">
-          <Field label="Estimated Budget">
-            <CurrencyInput value={form.budget} onChange={(v) => set('budget', v)} />
           </Field>
           <Field label="Start Date">
             <Input className={inp} type="date" value={form.start_date} onChange={(e) => set('start_date', e.target.value)} />
@@ -111,7 +96,7 @@ export function ProjectModal({
           </Field>
         </div>
 
-        {/* Column 3: classification, top to bottom: client, then its types, then the type's categories */}
+        {/* Column 2: classification, top to bottom: client, then its types, then the type's categories */}
         <div className="space-y-3">
           <Field label="Client" required>
             <NativeSelect
@@ -122,30 +107,38 @@ export function ProjectModal({
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </NativeSelect>
           </Field>
-          <CreatableSelect
+          <PickSelect
             label="Project Type"
             required
-            noun="type"
             placeholder="Select type"
             value={form.type_id}
             onChange={(id) => setForm((p) => ({ ...p, type_id: id, category: '' }))}
             options={clientTypes}
-            blockedHint={form.client_id ? undefined : 'Choose a client first'}
-            onCreate={onSaveType && ((name) => onSaveType({ name, client_id: Number(form.client_id) || undefined }))}
+            disabled={!form.client_id}
+            emptyHint="No types for this client yet. An admin can add them with Types."
           />
-          <CreatableSelect
+          <PickSelect
             label="Project Category"
-            noun="category"
             placeholder="Select category"
             value={form.category}
             onChange={(name) => set('category', name)}
             options={categoryOptions}
-            blockedHint={form.type_id ? undefined : 'Choose a type first'}
-            onCreate={onSaveCategory && (async (name) => {
-              await onSaveCategory({ name, type_id: Number(form.type_id) });
-              return { id: name };
-            })}
+            disabled={!form.type_id}
+            emptyHint="No categories for this type yet. An admin can add them with Types."
           />
+        </div>
+
+        {/* Column 3: who leads it and what it costs */}
+        <div className="space-y-3">
+          <Field label="Lead / Manager">
+            <NativeSelect value={form.lead} onChange={(e) => set('lead', e.target.value)}>
+              <option value="">Assign lead</option>
+              {users.map((u) => <option key={u.id} value={u.id}>{u.username || u.name}</option>)}
+            </NativeSelect>
+          </Field>
+          <Field label="Estimated Budget">
+            <CurrencyInput value={form.budget} onChange={(v) => set('budget', v)} />
+          </Field>
         </div>
 
         <div className="md:col-span-3">

@@ -85,6 +85,11 @@ export class CreateUserDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
+  state?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(20)
   status?: string;
 
@@ -198,6 +203,11 @@ export class UpdateUserDto {
   @IsString()
   @MaxLength(20)
   postal_code?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  state?: string;
 
   @IsOptional()
   @IsString()
