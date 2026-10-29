@@ -12,14 +12,14 @@ import { cn } from '@/lib/utils';
 // Keyboard focus shows a 2px accent ring (focus-visible), so mouse clicks stay quiet and tabbing is obvious.
 // 40px high: the one control height for forms (the app mixed 32, 36 and 40px), and a comfortable touch target.
 export const inp = [
-  'w-full h-10 text-sm rounded-lg px-3',
-  'border outline-none transition-colors',
+  'w-full h-10 text-sm rounded-md px-3',
+  'border border-input bg-transparent text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] outline-none transition-colors',
   'focus-visible:ring-2 focus-visible:ring-[var(--shell-accent)] focus-visible:border-[var(--shell-accent)]',
 ].join(' ');
 
 export const sel = [
-  'w-full h-10 text-sm rounded-lg',
-  'border outline-none transition-colors',
+  'w-full h-10 text-sm rounded-md',
+  'border border-input bg-transparent text-[var(--shell-text)] outline-none transition-colors',
   'focus-visible:ring-2 focus-visible:ring-[var(--shell-accent)] focus-visible:border-[var(--shell-accent)]',
 ].join(' ');
 
@@ -40,8 +40,8 @@ export function NativeSelect({ className, children, ...props }: React.ComponentP
 }
 
 export const inputStyle = {
-  background: 'var(--shell-bg)',
-  borderColor: 'var(--shell-border)',
+  background: 'transparent',
+  borderColor: 'var(--input)',
   color: 'var(--shell-text)',
 };
 
@@ -91,13 +91,13 @@ export function Field({ label, required, hint, error, htmlFor, children }: Field
 
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={controlId} className="text-xs font-semibold" style={{ color: 'var(--shell-text-muted)' }}>
+      <Label htmlFor={controlId} className="text-[13px] font-medium" style={{ color: 'var(--shell-text)' }}>
         {label}
         {required && <span aria-hidden className="ml-0.5 text-[var(--danger)]">*</span>}
       </Label>
       <div ref={bodyRef}>{children}</div>
-      {hint && !error && <p id={hintId} className="text-[11px]" style={{ color: 'var(--shell-text-muted)' }}>{hint}</p>}
-      {error && <p id={errorId} role="alert" className="text-[11px] font-medium text-[var(--danger)]">{error}</p>}
+      {hint && !error && <p id={hintId} className="text-xs" style={{ color: 'var(--shell-text-muted)' }}>{hint}</p>}
+      {error && <p id={errorId} role="alert" className="text-xs font-medium text-[var(--danger)]">{error}</p>}
     </div>
   );
 }
@@ -121,9 +121,8 @@ export function AutoLabel({ className, children, style }: { className?: string; 
 // Section divider with label
 export function SectionHeader({ label }: { label: string }) {
   return (
-    <div className="flex items-center gap-2 mb-3 mt-1">
-      <span className="text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: 'var(--shell-text-muted)' }}>{label}</span>
-      <div className="h-px flex-1" style={{ background: 'var(--shell-border)' }} />
+    <div className="mb-3 mt-1 border-b pb-1.5" style={{ borderColor: 'var(--shell-border)' }}>
+      <span className="text-[13px] font-semibold" style={{ color: 'var(--shell-text)' }}>{label}</span>
     </div>
   );
 }
@@ -131,7 +130,7 @@ export function SectionHeader({ label }: { label: string }) {
 // Themed section card (replaces bg-white/8)
 export function SectionCard({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-lg p-4 ${className || ''}`} style={{ background: 'var(--shell-bg)', border: '1px solid var(--shell-border)' }}>
+    <div className={`rounded-lg p-4 ${className || ''}`} style={{ border: '1px solid var(--shell-border)' }}>
       {children}
     </div>
   );
@@ -140,7 +139,7 @@ export function SectionCard({ children, className }: { children: React.ReactNode
 // Toggle pill group (replaces bg-black/20 pill)
 export function ToggleGroup({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex p-1 gap-1 rounded-lg" style={{ background: 'var(--shell-bg)', border: '1px solid var(--shell-border)' }}>
+    <div className="flex p-1 gap-1 rounded-md" style={{ background: 'var(--shell-hover)', border: '1px solid var(--shell-border)' }}>
       {children}
     </div>
   );
@@ -153,7 +152,7 @@ export function ToggleOption({ active, onClick, children }: { active: boolean; o
       onClick={onClick}
       className="flex-1 px-3 py-1 text-[12px] font-medium rounded-md transition-all"
       style={active
-        ? { background: 'var(--shell-surface)', color: 'var(--shell-text)', border: '1px solid var(--shell-border)', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }
+        ? { background: 'var(--shell-surface)', color: 'var(--shell-text)', border: '1px solid var(--shell-border)' }
         : { color: 'var(--shell-text-muted)', border: '1px solid transparent' }
       }
     >

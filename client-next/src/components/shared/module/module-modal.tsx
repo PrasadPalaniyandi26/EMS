@@ -88,13 +88,12 @@ export function ModuleModal({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         className={cn(
-          "p-0 gap-0 overflow-hidden border shadow-2xl rounded-xl flex flex-col modal-glow",
+          "p-0 gap-0 overflow-hidden border rounded-lg flex flex-col modal-glow",
           maxWidth ?? MODAL_SIZES[size]
         )}
         style={{
-          background: 'var(--shell-surface)',
+          background: 'var(--popover)',
           borderColor: 'var(--shell-border)',
-          backdropFilter: 'blur(2px)',
           // 50vw/50vh = true viewport center, independent of sidebar or any layout.
           // Inline style wins over .dialog-centered CSS class.
           left: '50vw',
@@ -107,8 +106,8 @@ export function ModuleModal({
         <DialogHeader
           className={cn("px-5 gap-0 flex flex-row items-center justify-between shrink-0 border-none space-y-0", headerBg)}
           style={{
-            height: '44px',
-            background: isDestructive ? 'var(--destructive)' : 'var(--shell-surface)',
+            height: '52px',
+            background: 'transparent',
             borderBottom: '1px solid var(--shell-border)',
             cursor: 'grab',
             userSelect: 'none',
@@ -118,10 +117,9 @@ export function ModuleModal({
           onPointerUp={onPointerUp}
         >
           <div className="flex items-center gap-2.5">
-            {icon && <div style={{ color: isDestructive ? 'var(--destructive-foreground)' : 'var(--shell-text-muted)' }}>{icon}</div>}
             <DialogTitle
-              className="text-[11px] font-bold uppercase tracking-[0.18em]"
-              style={{ color: isDestructive ? 'var(--destructive-foreground)' : 'var(--shell-text-muted)' }}
+              className="text-[15px] font-semibold"
+              style={{ color: isDestructive ? 'var(--danger)' : 'var(--shell-text)' }}
             >
               {title}
             </DialogTitle>
@@ -129,7 +127,7 @@ export function ModuleModal({
           <button
             onClick={onClose}
             className="rounded p-1 transition-colors"
-            style={{ color: isDestructive ? 'var(--destructive-foreground)' : 'var(--shell-text-muted)', opacity: 0.8, cursor: 'pointer' }}
+            style={{ color: 'var(--shell-text-muted)', cursor: 'pointer' }}
             aria-label="Close Modal"
           >
             <X className="w-4 h-4" />
@@ -137,13 +135,13 @@ export function ModuleModal({
         </DialogHeader>
 
         {/* Content Body */}
-        <div ref={scrollRef} className="py-4 px-6 overflow-y-auto custom-scrollbar flex-1 min-h-0" style={{ color: 'var(--shell-text)', background: 'var(--shell-bg)', maxHeight: 'calc(90dvh - 44px - 60px - env(safe-area-inset-bottom, 0px))' }}>
+        <div ref={scrollRef} className="py-4 px-6 overflow-y-auto custom-scrollbar flex-1 min-h-0" style={{ color: 'var(--shell-text)', maxHeight: 'calc(90dvh - 52px - 60px - env(safe-area-inset-bottom, 0px))' }}>
           {children}
         </div>
 
         {/* Footer */}
         <DialogFooter className="px-5 py-3 flex flex-row items-center justify-between shrink-0"
-          style={{ borderTop: '1px solid var(--shell-border)', background: 'var(--shell-surface)' }}>
+          style={{ borderTop: '1px solid var(--shell-border)' }}>
           <div className="flex-1">
             {footerLeft}
           </div>
@@ -153,14 +151,14 @@ export function ModuleModal({
                 <Button
                   variant="ghost"
                   onClick={onClose}
-                  className="h-8 px-4 text-[11.5px] font-medium"
+                  className="h-9 px-4 text-[13px] font-medium"
                   style={{ color: 'var(--shell-text-muted)' }}
                 >
                   Cancel
                 </Button>
                 <Button
                   variant={isDestructive ? "destructive" : "default"}
-                  className="font-semibold text-[11.5px] h-8 px-5 rounded-lg transition-all active:scale-95"
+                  className="font-medium text-[13px] h-9 px-5 rounded-md"
                   style={!isDestructive ? { background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' } : {}}
                   onClick={onSave}
                 >

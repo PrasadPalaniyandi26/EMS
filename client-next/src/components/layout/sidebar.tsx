@@ -111,7 +111,7 @@ export function Sidebar() {
               return (
                 <div key={gi} className={gi > 0 ? 'pt-4' : ''}>
                   {group.label && !slim && (
-                    <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.14em] mb-1.5" style={{ color: 'var(--shell-text-muted)' }}>
+                    <p className="px-3 text-[12px] font-semibold mb-1" style={{ color: 'var(--shell-text-muted)' }}>
                       {group.label}
                     </p>
                   )}
@@ -128,7 +128,7 @@ export function Sidebar() {
                           onClick={closeMobile}
                           aria-current={isActive ? 'page' : undefined}
                           aria-label={slim ? item.name : undefined}
-                          className={`flex items-center transition-all rounded-full ${
+                          className={`flex items-center transition-all rounded-md ${
                             slim
                               ? 'justify-center w-9 h-9 mx-auto'
                               : 'w-full gap-2.5 px-3 py-[7px] text-[12.5px] font-medium'
@@ -181,7 +181,7 @@ export function Sidebar() {
             {slim ? (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className="w-9 h-9 mx-auto rounded-full flex items-center justify-center cursor-pointer transition-colors hover:bg-[var(--shell-hover)]"
+                  <div className="w-9 h-9 mx-auto rounded-md flex items-center justify-center cursor-pointer transition-colors hover:bg-[var(--shell-hover)]"
                     style={{ background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' }}>
                     <span className="text-[11px] font-bold">{initials}</span>
                   </div>

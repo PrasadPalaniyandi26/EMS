@@ -136,7 +136,7 @@ export default function DashboardPage() {
     <div className="h-full overflow-y-auto custom-scrollbar px-4 py-4 space-y-4">
 
       {/* Period selector */}
-      <div className="rounded-xl px-4 py-3 flex flex-wrap items-center gap-3" style={surface}>
+      <div className="rounded-lg px-4 py-3 flex flex-wrap items-center gap-3" style={surface}>
         <div className="flex flex-wrap gap-1.5">
           {presets.map((p) => (
             <button
@@ -168,7 +168,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Row 1 — 6 KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-px rounded-lg overflow-hidden border border-[var(--shell-border)]" style={{ background: 'var(--shell-border)' }}>
         {kpis.map((k) => {
           const Icon = k.icon;
           return (
@@ -178,17 +178,17 @@ export default function DashboardPage() {
               tabIndex={k.link ? 0 : undefined}
               onClick={() => k.link && router.push(k.link)}
               onKeyDown={(e) => { if (k.link && e.key === "Enter") router.push(k.link); }}
-              className={`rounded-xl p-4 flex items-center justify-between ${k.link ? 'cursor-pointer hover:opacity-80 transition-opacity focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]' : ''}`}
-              style={surface}
+              className={`bg-[var(--shell-surface)] p-4 flex items-center justify-between ${k.link ? 'cursor-pointer hover:bg-[var(--shell-hover)] transition-colors focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]' : ''}`}
+              
             >
               <div className="flex-1 min-w-0">
-                <p className="text-[11px] uppercase tracking-widest font-semibold mb-1 truncate" style={{ color: 'var(--shell-text-muted)' }}>{k.label}</p>
+                <p className="text-[12px] font-medium mb-1 truncate" style={{ color: 'var(--shell-text-muted)' }}>{k.label}</p>
                 {k.loading
                   ? <SkeletonRect w="60px" h="24px" className="mt-1" />
                   : <p className="text-[18px] font-black leading-none truncate" style={{ color: 'var(--shell-text)' }}>{k.value}</p>
                 }
               </div>
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ml-2 ${k.bg} ${k.color}`}>
+              <div className={`w-9 h-9 rounded-md flex items-center justify-center shrink-0 ml-2 ${k.bg} ${k.color}`}>
                 <Icon className="h-4 w-4" />
               </div>
             </div>
@@ -198,7 +198,7 @@ export default function DashboardPage() {
 
       {/* Row 2 — Monthly Trend + Category Pie */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 rounded-xl overflow-hidden" style={surface}>
+        <div className="lg:col-span-2 rounded-lg overflow-hidden" style={surface}>
           <div className="dialog-header px-4 py-2.5">Monthly Income vs Expenses</div>
           <div className="p-4">
             {trendLoading ? <SkeletonRect h="260px" /> : trendData.length > 0 ? (
@@ -222,7 +222,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-xl overflow-hidden" style={surface}>
+        <div className="rounded-lg overflow-hidden" style={surface}>
           <div className="dialog-header px-4 py-2.5">Expenses by Category</div>
           <div className="p-4">
             {categoryLoading ? <SkeletonRect h="260px" /> : categoryData.length > 0 ? (
@@ -245,7 +245,7 @@ export default function DashboardPage() {
       {/* Row 3 — Budget Utilization + Project Spend */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Budget Utilization */}
-        <div className="rounded-xl overflow-hidden" style={surface}>
+        <div className="rounded-lg overflow-hidden" style={surface}>
           <div className="dialog-header px-4 py-2.5 flex items-center justify-between">
             <span>Budget Utilization — This Month</span>
             <button onClick={() => router.push('/manage/budgets')} className="text-[11px] font-semibold hover:underline" style={{ color: 'var(--shell-accent)' }}>Manage</button>
@@ -279,7 +279,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Project Spend */}
-        <div className="rounded-xl overflow-hidden" style={surface}>
+        <div className="rounded-lg overflow-hidden" style={surface}>
           <div className="dialog-header px-4 py-2.5">Top Project Spend</div>
           <div className="p-4">
             {projectLoading ? <SkeletonRect h="200px" /> : (projectSpend || []).length > 0 ? (
@@ -305,14 +305,14 @@ export default function DashboardPage() {
       {/* Row 4 — Approval Pipeline + Recent Transactions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Approval Pipeline */}
-        <div className="rounded-xl overflow-hidden" style={surface}>
+        <div className="rounded-lg overflow-hidden" style={surface}>
           <div className="dialog-header px-4 py-2.5 flex items-center justify-between">
             <span>Approval Pipeline</span>
             <button onClick={() => router.push('/approvals')} className="text-[11px] font-semibold hover:underline" style={{ color: 'var(--shell-accent)' }}>View All</button>
           </div>
           <div className="p-4 space-y-2">
             {approvalStages.map((s) => (
-              <div key={s.label} className="flex items-center justify-between rounded-xl px-3 py-2.5" style={{ background: 'var(--shell-hover)', border: '1px solid var(--shell-border)' }}>
+              <div key={s.label} className="flex items-center justify-between rounded-lg px-3 py-2.5" style={{ background: 'var(--shell-hover)', border: '1px solid var(--shell-border)' }}>
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
                   <span className="text-[12px] font-medium" style={{ color: 'var(--shell-text)' }}>{s.label}</span>
@@ -324,7 +324,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Recent Transactions */}
-        <div className="lg:col-span-2 rounded-xl overflow-hidden" style={surface}>
+        <div className="lg:col-span-2 rounded-lg overflow-hidden" style={surface}>
           <div className="dialog-header px-4 py-2.5 flex items-center justify-between">
             <span>Recent Transactions</span>
             <button onClick={() => router.push('/transactions')} className="text-[11px] font-semibold hover:underline" style={{ color: 'var(--shell-accent)' }}>View All</button>
@@ -337,7 +337,7 @@ export default function DashboardPage() {
             ) : (recentTxns || []).length > 0 ? (
               <div className="space-y-2">
                 {(recentTxns || []).map((txn: any) => (
-                  <div key={txn.id} className="flex items-center justify-between rounded-xl px-3 py-2.5 transition-colors" style={{ background: 'var(--shell-hover)', border: '1px solid var(--shell-border)' }}>
+                  <div key={txn.id} className="flex items-center justify-between rounded-lg px-3 py-2.5 transition-colors" style={{ background: 'var(--shell-hover)', border: '1px solid var(--shell-border)' }}>
                     <div className="flex items-center gap-3 min-w-0">
                       <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${txn.type === 'income' ? 'bg-[color-mix(in_srgb,var(--success)_10%,transparent)]' : 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)]'}`}>
                         {txn.type === 'income'
@@ -366,7 +366,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Row 5 — Quick Actions */}
-      <div className="rounded-xl px-4 py-3 flex flex-wrap gap-2 items-center" style={surface}>
+      <div className="rounded-lg px-4 py-3 flex flex-wrap gap-2 items-center" style={surface}>
         <span className="text-[11px] font-semibold uppercase tracking-wider mr-2" style={{ color: 'var(--shell-text-muted)' }}>Quick Actions</span>
         {quickActions.map((a) => (
           <button

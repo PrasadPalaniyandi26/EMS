@@ -63,26 +63,26 @@ export function ModuleShell({
     : null;
 
   return (
-    <div className={cn("flex flex-col h-full w-full overflow-hidden", className)} style={{ background: 'var(--shell-bg)' }}>
+    <div className={cn("flex flex-col h-full w-full overflow-hidden", className)} style={{ background: 'var(--shell-surface)' }}>
       {/* Row 1: Action Controls — full width */}
       {actionsRow && (
-        <div className="px-4 py-2 flex items-center justify-between shrink-0">
+        <div className="px-4 py-2 flex items-center justify-between shrink-0 border-b border-[var(--shell-border)]">
           {actionsRow}
         </div>
       )}
 
       {/* Row 2: Tactical Filters & Search — full width */}
       {searchRow && (
-        <div className="px-4 h-[62px] flex items-center shrink-0">
+        <div className="px-4 h-12 flex items-center shrink-0 border-b border-[var(--shell-border)]">
           {searchRow}
         </div>
       )}
 
       {/* Table + panel side by side on desktop; panel as bottom sheet on mobile */}
-      <div className="flex flex-1 min-h-0 gap-3 px-3 pb-3 lg:pb-3 overflow-hidden relative" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))' }}>
+      <div className="flex flex-1 min-h-0 overflow-hidden relative">
 
-        {/* Table card */}
-        <main className="flex-1 flex flex-col min-w-0 rounded-xl shadow-sm overflow-hidden" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
+        {/* Table fills the content area edge to edge */}
+        <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {children}
         </main>
 
@@ -97,22 +97,22 @@ export function ModuleShell({
             className={cn(
               "transition-all duration-300 ease-in-out",
               /* Desktop — side panel */
-              "lg:flex lg:flex-col lg:rounded-xl lg:shadow-sm lg:relative lg:overflow-hidden",
+              "lg:flex lg:flex-col lg:relative lg:overflow-hidden lg:border-l lg:border-[var(--shell-border)]",
               panelVisible
                 ? "lg:w-[360px] lg:opacity-100"
                 : "lg:w-0 lg:opacity-0 lg:overflow-hidden lg:pointer-events-none",
               /* Mobile — bottom sheet */
               "fixed inset-x-0 bottom-0 z-40 lg:static lg:inset-auto lg:z-auto",
-              "rounded-t-2xl lg:rounded-xl",
+              "rounded-t-2xl lg:rounded-none",
               panelVisible
                 ? "translate-y-0 max-h-[80dvh]"
                 : "translate-y-full max-h-[80dvh]",
-              "flex flex-col overflow-hidden shadow-2xl lg:shadow-sm backdrop-blur-xl",
+              "flex flex-col overflow-hidden shadow-2xl lg:shadow-none",
               /* Below 1280px the empty "nothing selected" panel only wastes space (it covers the page on
                  phones and squeezes tables on laptops), so show it once a row is selected */
               !showPanel && "max-xl:hidden!",
             )}
-            style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}
+            style={{ background: 'var(--shell-surface)' }}
           >
             {/* Mobile drag handle */}
             <div className="lg:hidden flex justify-center pt-2 pb-1 shrink-0">

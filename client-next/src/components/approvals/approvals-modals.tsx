@@ -73,7 +73,7 @@ export function ApproveModal({ isOpen, onClose, onConfirm, selectedRequest }: Mo
           <button
             onClick={handleConfirm}
             disabled={saving}
-            className="px-8 py-2.5 btn-action-primary border border-[var(--shell-border)] text-[var(--shell-text)] text-[12px] font-bold uppercase tracking-widest rounded-lg shadow-none active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-8 py-2.5 btn-action-primary border border-[var(--shell-border)] text-[var(--shell-text)] text-[12px] font-bold rounded-lg shadow-none active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {saving && <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin inline-block" />}
             Confirm Approval
@@ -86,11 +86,11 @@ export function ApproveModal({ isOpen, onClose, onConfirm, selectedRequest }: Mo
           {selectedRequest.needs_reimbursement && (
             <div className="flex items-center gap-2 px-4 py-2 border-b border-[color-mix(in_srgb,var(--warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]">
               <Wallet className="w-3.5 h-3.5 text-[var(--warning)] shrink-0" />
-              <span className="text-[11px] font-black text-[var(--warning)] uppercase tracking-widest">Reimbursement Required — Employee paid out-of-pocket</span>
+              <span className="text-[11px] font-black text-[var(--warning)]">Reimbursement Required — Employee paid out-of-pocket</span>
             </div>
           )}
           <table className="w-full text-[12px]">
-            <thead className={`border-b font-bold uppercase tracking-tighter ${selectedRequest.needs_reimbursement ? 'border-[color-mix(in_srgb,var(--warning)_30%,transparent)] text-[var(--warning)]' : 'modal-section border-[var(--shell-border)] modal-label'}`}>
+            <thead className={`border-b font-bold ${selectedRequest.needs_reimbursement ? 'border-[color-mix(in_srgb,var(--warning)_30%,transparent)] text-[var(--warning)]' : 'modal-section border-[var(--shell-border)] modal-label'}`}>
               <tr>
                 <th className="px-4 py-2 text-left">Reference ID</th>
                 <th className="px-4 py-2 text-left">Employee</th>
@@ -106,7 +106,7 @@ export function ApproveModal({ isOpen, onClose, onConfirm, selectedRequest }: Mo
               {selectedRequest.description && (
                 <tr>
                   <td colSpan={3} className="px-4 py-2.5">
-                    <p className="text-[11px] font-bold modal-label uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                    <p className="text-[13px] font-medium modal-label mb-1 flex items-center gap-1.5">
                       <FileText size={11} /> Internal Notes
                     </p>
                     <p className="text-[12px]" style={{ color: 'var(--shell-text)' }}>{selectedRequest.description}</p>
@@ -118,7 +118,7 @@ export function ApproveModal({ isOpen, onClose, onConfirm, selectedRequest }: Mo
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="approve-comment" className="text-[11px] font-bold modal-label uppercase tracking-widest flex items-center gap-2">
+          <label htmlFor="approve-comment" className="text-[13px] font-medium modal-label flex items-center gap-2">
             <MessageSquare size={14} /> Approval Comments (Optional)
           </label>
           <Textarea id="approve-comment"
@@ -151,7 +151,7 @@ export function ApproveModal({ isOpen, onClose, onConfirm, selectedRequest }: Mo
                 <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">Employee paid out-of-pocket and needs to be reimbursed</p>
               </div>
             </div>
-            <span className="text-[11px] font-bold text-[var(--warning)] uppercase tracking-wider px-2 py-1 bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] rounded">Pending</span>
+            <span className="text-[11px] font-bold text-[var(--warning)] px-2 py-1 bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] rounded">Pending</span>
           </div>
         )}
 
@@ -205,7 +205,7 @@ export function RejectModal({ isOpen, onClose, onConfirm, selectedRequest }: Mod
           <button
             onClick={handleConfirm}
             disabled={saving}
-            className="px-8 py-2.5 bg-[var(--danger)] text-[var(--danger-foreground)] text-[12px] font-bold uppercase tracking-widest rounded-lg hover:brightness-110 active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-8 py-2.5 bg-[var(--danger)] text-[var(--danger-foreground)] text-[12px] font-bold rounded-lg hover:brightness-110 active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {saving && <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />}
             Confirm Rejection
@@ -216,7 +216,7 @@ export function RejectModal({ isOpen, onClose, onConfirm, selectedRequest }: Mod
       <div className="space-y-6">
         <div className="rounded-lg border border-[var(--shell-border)] modal-section overflow-x-auto">
           <table className="w-full text-[12px]">
-            <thead className="modal-section border-b border-[var(--shell-border)] modal-label font-bold uppercase tracking-tighter">
+            <thead className="modal-section border-b border-[var(--shell-border)] modal-label font-bold">
               <tr>
                 <th className="px-4 py-2 text-left">Reference ID</th>
                 <th className="px-4 py-2 text-left">Employee</th>
@@ -232,7 +232,7 @@ export function RejectModal({ isOpen, onClose, onConfirm, selectedRequest }: Mod
               {selectedRequest.description && (
                 <tr>
                   <td colSpan={3} className="px-4 py-2.5">
-                    <p className="text-[11px] font-bold modal-label uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                    <p className="text-[13px] font-medium modal-label mb-1 flex items-center gap-1.5">
                       <FileText size={11} /> Internal Notes
                     </p>
                     <p className="text-[12px]" style={{ color: 'var(--shell-text)' }}>{selectedRequest.description}</p>
@@ -244,7 +244,7 @@ export function RejectModal({ isOpen, onClose, onConfirm, selectedRequest }: Mod
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="reject-reason" className="text-[11px] font-bold modal-label uppercase tracking-widest flex items-center gap-2">
+          <label htmlFor="reject-reason" className="text-[13px] font-medium modal-label flex items-center gap-2">
             <MessageSquare size={14} /> Rejection Reason <span className="text-[var(--danger)]">*</span>
           </label>
           <Textarea id="reject-reason" aria-required="true" aria-invalid={error ? true : undefined} aria-describedby={error ? "reject-reason-error" : undefined}
@@ -297,7 +297,7 @@ export function VoidModal({ isOpen, onClose, onConfirm, selectedRequest }: Modal
           <button
             onClick={handleConfirm}
             disabled={saving}
-            className="px-8 py-2.5 bg-[var(--danger)] text-[var(--danger-foreground)] text-[12px] font-bold uppercase tracking-widest rounded-lg shadow-lg shadow-red-600/20 hover:brightness-110 active:scale-95 transition-all disabled:opacity-50"
+            className="px-8 py-2.5 bg-[var(--danger)] text-[var(--danger-foreground)] text-[12px] font-bold rounded-lg shadow-lg shadow-red-600/20 hover:brightness-110 active:scale-95 transition-all disabled:opacity-50"
           >
             {saving ? 'Voiding...' : 'Confirm Void'}
           </button>
@@ -307,7 +307,7 @@ export function VoidModal({ isOpen, onClose, onConfirm, selectedRequest }: Modal
       <div className="space-y-6">
         <div className="rounded-lg border border-[var(--shell-border)] modal-section overflow-x-auto">
           <table className="w-full text-[12px]">
-            <thead className="modal-section border-b border-[var(--shell-border)] modal-label font-bold uppercase tracking-tighter">
+            <thead className="modal-section border-b border-[var(--shell-border)] modal-label font-bold">
               <tr>
                 <th className="px-4 py-2 text-left">Reference ID</th>
                 <th className="px-4 py-2 text-left">Employee</th>
@@ -323,7 +323,7 @@ export function VoidModal({ isOpen, onClose, onConfirm, selectedRequest }: Modal
               {selectedRequest.description && (
                 <tr>
                   <td colSpan={3} className="px-4 py-2.5">
-                    <p className="text-[11px] font-bold modal-label uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                    <p className="text-[13px] font-medium modal-label mb-1 flex items-center gap-1.5">
                       <FileText size={11} /> Internal Notes
                     </p>
                     <p className="text-[12px]" style={{ color: 'var(--shell-text)' }}>{selectedRequest.description}</p>
@@ -335,7 +335,7 @@ export function VoidModal({ isOpen, onClose, onConfirm, selectedRequest }: Modal
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="void-reason" className="text-[11px] font-bold modal-label uppercase tracking-widest flex items-center gap-2">
+          <label htmlFor="void-reason" className="text-[13px] font-medium modal-label flex items-center gap-2">
             <MessageSquare size={14} /> Reason for Voiding (optional)
           </label>
           <Textarea id="void-reason"
@@ -382,7 +382,7 @@ export function SendBackModal({ isOpen, onClose, onConfirm, selectedRequest }: M
           </Button>
           <button
             onClick={() => onConfirm({ comment })}
-            className="px-8 py-2.5 bg-[var(--info)] text-[var(--info-foreground)] text-[12px] font-bold uppercase tracking-widest rounded-lg shadow-lg shadow-blue-600/20 hover:brightness-110 active:scale-95 transition-all"
+            className="px-8 py-2.5 bg-[var(--info)] text-[var(--info-foreground)] text-[12px] font-bold rounded-lg shadow-lg shadow-blue-600/20 hover:brightness-110 active:scale-95 transition-all"
           >
             Send Back
           </button>
@@ -392,7 +392,7 @@ export function SendBackModal({ isOpen, onClose, onConfirm, selectedRequest }: M
       <div className="space-y-6">
         <div className="rounded-lg border border-[var(--shell-border)] modal-section overflow-x-auto">
           <table className="w-full text-[12px]">
-            <thead className="modal-section border-b border-[var(--shell-border)] modal-label font-bold uppercase tracking-tighter">
+            <thead className="modal-section border-b border-[var(--shell-border)] modal-label font-bold">
               <tr>
                 <th className="px-4 py-2 text-left">Reference ID</th>
                 <th className="px-4 py-2 text-left">Employee</th>
@@ -408,7 +408,7 @@ export function SendBackModal({ isOpen, onClose, onConfirm, selectedRequest }: M
               {selectedRequest.description && (
                 <tr>
                   <td colSpan={3} className="px-4 py-2.5">
-                    <p className="text-[11px] font-bold modal-label uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                    <p className="text-[13px] font-medium modal-label mb-1 flex items-center gap-1.5">
                       <FileText size={11} /> Internal Notes
                     </p>
                     <p className="text-[12px]" style={{ color: 'var(--shell-text)' }}>{selectedRequest.description}</p>
@@ -420,7 +420,7 @@ export function SendBackModal({ isOpen, onClose, onConfirm, selectedRequest }: M
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="sendback-reason" className="text-[11px] font-bold modal-label uppercase tracking-widest flex items-center gap-2">
+          <label htmlFor="sendback-reason" className="text-[13px] font-medium modal-label flex items-center gap-2">
             <MessageSquare size={14} /> Reason for Sending Back
           </label>
           <Textarea id="sendback-reason"

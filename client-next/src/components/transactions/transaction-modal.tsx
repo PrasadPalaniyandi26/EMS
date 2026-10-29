@@ -508,7 +508,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
 
         {/* Receipt upload */}
         <div className="space-y-1.5 sm:col-span-2">
-          <p id="receipt-upload-label" className="text-xs font-semibold" style={{ color: 'var(--shell-text-muted)' }}>Receipt Upload</p>
+          <p id="receipt-upload-label" className="text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Receipt Upload</p>
           <input
             ref={fileInputRef}
             type="file"
@@ -545,7 +545,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
                     <span className="block text-[12px] font-medium text-[var(--shell-text-muted)]">
                       Drag &amp; drop or <span className="font-bold text-[var(--shell-accent)]">browse files</span>
                     </span>
-                    <span className="block text-[11px] uppercase tracking-tight text-[var(--shell-text-muted)]">PDF, JPG, PNG, WebP · max 10 MB</span>
+                    <span className="block text-[11px] text-[var(--shell-text-muted)]">PDF, JPG, PNG, WebP · max 10 MB</span>
                   </>
               }
             </span>
@@ -560,21 +560,21 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
                 </div>
                 <div className="min-w-0 leading-tight">
                   <p className="max-w-[280px] truncate text-[12px] font-bold text-[var(--shell-text)]">{fileName}</p>
-                  {fileSize && <p className="text-[11px] uppercase tracking-tighter text-[var(--shell-text-muted)]">{fileSize}</p>}
+                  {fileSize && <p className="text-[11px] text-[var(--shell-text-muted)]">{fileSize}</p>}
                 </div>
               </div>
               <div className="flex shrink-0 gap-2">
                 <button
                   type="button"
                   onClick={handleViewFile}
-                  className="modal-section flex h-10 items-center gap-1.5 rounded border border-[var(--shell-border)] px-3 text-[11px] font-bold uppercase tracking-wider transition-colors hover:border-[var(--shell-accent)] sm:h-8"
+                  className="modal-section flex h-10 items-center gap-1.5 rounded border border-[var(--shell-border)] px-3 text-[11px] font-bold transition-colors hover:border-[var(--shell-accent)] sm:h-8"
                 >
                   <Eye aria-hidden className="h-3.5 w-3.5 text-[var(--success)]" /> View
                 </button>
                 <button
                   type="button"
                   onClick={handleRemoveFile}
-                  className="modal-section flex h-10 items-center gap-1.5 rounded border border-[var(--shell-border)] px-3 text-[11px] font-bold uppercase tracking-wider transition-colors hover:border-[var(--danger)] sm:h-8"
+                  className="modal-section flex h-10 items-center gap-1.5 rounded border border-[var(--shell-border)] px-3 text-[11px] font-bold transition-colors hover:border-[var(--danger)] sm:h-8"
                 >
                   <Trash2 aria-hidden className="h-3.5 w-3.5 text-[var(--danger)]" /> Remove
                 </button>

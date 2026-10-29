@@ -129,48 +129,48 @@
 
   /* Shell tokens. surface/border/text/muted/accent are ALIASES of the shadcn tokens below (one source of
      truth); bg and hover have no shadcn equivalent and stay here. */
-  --shell-bg:          #eef2f8;  /* blue-tinted grey page background */
+  --shell-bg:          #f6f7f9;  /* canvas: sidebar, top bar, page edge */
   --shell-surface:     var(--card);
   --shell-border:      var(--border);
   --shell-text:        var(--foreground);
   --shell-text-muted:  var(--muted-foreground);
   --shell-accent:      var(--primary);
   --shell-accent-fg:   var(--primary-foreground);
-  --shell-hover:       #f0efee;  /* stone-100 — visible hover feedback */
+  --shell-hover:       #f0f2f5;  /* hover tint */
   --shell-brand:       #b45309;  /* amber-700: wordmark colour, 5:1 on white */
 
   /* shadcn tokens */
-  --background:        #f5f5f4;  /* stone-100  */
-  --foreground:        #1c1917;
+  --background:        #f6f7f9;  /* canvas */
+  --foreground:        #14171f;
   --card:              #ffffff;  /* white      */
-  --card-foreground:   #1c1917;
+  --card-foreground:   #14171f;
   --popover:           #ffffff;
-  --popover-foreground:#1c1917;
+  --popover-foreground:#14171f;
   --primary:           #2563eb;  /* blue-600: white text 5.2:1, and 5.2:1 as text on white */
   --primary-foreground:#ffffff;
-  --secondary:         #fafaf9;  /* stone-50   */
-  --secondary-foreground:#1c1917;
-  --muted:             #fafaf9;  /* stone-50   */
-  --muted-foreground:  #6a645f;  /* 5:1 on white and on the tinted page/hover surfaces (was #78716c, 4.2:1) */
-  --accent:            #fafaf9;
-  --accent-foreground: #1c1917;
+  --secondary:         #f3f5f8;
+  --secondary-foreground:#14171f;
+  --muted:             #f3f5f8;
+  --muted-foreground:  #586172;  /* 6:1 on white, 5.4:1 on the canvas and hover tints */
+  --accent:            #f0f2f5;
+  --accent-foreground: #14171f;
   --destructive:       #dc2626;  /* red-600: white text 4.8:1 (red-500 was 3.8:1) */
   --destructive-foreground:#ffffff;
-  --border:            #d6d3d1;  /* stone-300  */
-  --input:             #d6d3d1;
+  --border:            #e4e6eb;  /* hairline: separates regions and rows */
+  --input:             #8a909b;  /* control boundary, 3.3:1 on white (WCAG 1.4.11) */
   --ring:              #3b82f6;  /* blue-500   */
   --chart-1:           #3b82f6;  /* blue-500   */
   --chart-2:           #0ea5e9;
   --chart-3:           #10b981;
   --chart-4:           #8b5cf6;
   --chart-5:           #ef4444;
-  --sidebar:           #ffffff;
-  --sidebar-foreground:#6a645f;
+  --sidebar:           #f6f7f9;
+  --sidebar-foreground:#586172;
   --sidebar-primary:   #1c1917;
   --sidebar-primary-foreground:#ffffff;
-  --sidebar-accent:    #fafaf9;
-  --sidebar-accent-foreground:#1c1917;
-  --sidebar-border:    #d6d3d1;
+  --sidebar-accent:    #eceff3;
+  --sidebar-accent-foreground:#14171f;
+  --sidebar-border:    #e4e6eb;
   --sidebar-ring:      #3b82f6;  /* blue-500   */
 
   /* Semantic status colours — text-safe (>= 4.5:1) on white and on the tinted page surfaces */
@@ -215,9 +215,10 @@
   --nav-slate:  #475569;
 
   /* Elevation */
-  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
-  --shadow-md: 0 1px 2px rgba(16, 24, 40, 0.05), 0 4px 12px -2px rgba(16, 24, 40, 0.08);
-  --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  --shadow-sm: none;
+  --shadow-md: none;
+  /* menus and dialogs are the only elevated surfaces */
+  --shadow-lg: 0 12px 32px -8px rgba(16, 24, 40, 0.18), 0 0 0 1px rgba(16, 24, 40, 0.04);
 }
 
 /* Theme-independent design scale: layout sizes, stacking, motion, interaction states.
@@ -247,55 +248,55 @@
   --focus-ring-offset: 2px;
 }
 
-/* ─── Dark theme: glassmorphism ────────────────────────────────────── */
+/* ─── Dark theme: flat, solid surfaces ─────────────────────────────── */
 .dark {
-  /* Shell — translucent frosted surfaces over a deep gradient backdrop.
+  /* Shell: two solid surfaces (canvas and surface) separated by hairlines, no blur or gradient.
      surface/border/text/muted/accent alias the shadcn tokens below (same as light). */
-  --shell-bg:          #070c17;
+  --shell-bg:          #0b0f17;  /* canvas */
   --shell-surface:     var(--card);
   --shell-border:      var(--border);
   --shell-text:        var(--foreground);
   --shell-text-muted:  var(--muted-foreground);
   --shell-accent:      var(--primary);
   --shell-accent-fg:   var(--primary-foreground);
-  --shell-hover:       rgba(255,255,255,0.07);
+  --shell-hover:       #1a2132;
   --shell-brand:       #d97706;
 
   /* shadcn tokens */
-  --background:        #070c17;
-  --foreground:        #f4f7fc;
-  --card:              rgba(34,47,71,0.65);
-  --card-foreground:   #f4f7fc;
-  --popover:           rgba(30,41,59,0.75);
-  --popover-foreground:#f4f7fc;
+  --background:        #0b0f17;
+  --foreground:        #e8ecf4;
+  --card:              #121826;  /* surface */
+  --card-foreground:   #e8ecf4;
+  --popover:           #171e2e;  /* raised: menus and dialogs */
+  --popover-foreground:#e8ecf4;
   --primary:           #60a5fa;
   --primary-foreground:#0b1220;  /* near-black on the light blue: 7.5:1 (white was 2.5:1) */
-  --secondary:         rgba(30,41,59,0.55);
-  --secondary-foreground:#f4f7fc;
-  --muted:             rgba(30,41,59,0.55);
-  --muted-foreground:  #9aa7c4;
-  --accent:            rgba(148,163,184,0.16);
-  --accent-foreground: #f4f7fc;
+  --secondary:         #171e2e;
+  --secondary-foreground:#e8ecf4;
+  --muted:             #171e2e;
+  --muted-foreground:  #9aa4b8;
+  --accent:            #1d2536;
+  --accent-foreground: #e8ecf4;
   --destructive:       #f87171;
   --destructive-foreground:#2a0a0a;  /* near-black on the light red */
-  --border:            rgba(148,163,184,0.18);
-  --input:             rgba(148,163,184,0.18);
+  --border:            #273044;
+  --input:             #4a5570;  /* control boundary */
   --ring:              #60a5fa;
   --chart-1:           #60a5fa;
   --chart-2:           #22d3ee;
   --chart-3:           #34d399;
   --chart-4:           #fb923c;
   --chart-5:           #f87171;
-  --sidebar:           rgba(30,41,59,0.55);
-  --sidebar-foreground:#9aa7c4;
+  --sidebar:           #0b0f17;
+  --sidebar-foreground:#9aa4b8;
   --sidebar-primary:   #60a5fa;
   --sidebar-primary-foreground:#0b1220;
-  --sidebar-accent:    rgba(148,163,184,0.16);
-  --sidebar-accent-foreground:#f4f7fc;
-  --sidebar-border:    rgba(148,163,184,0.18);
+  --sidebar-accent:    #1d2536;
+  --sidebar-accent-foreground:#e8ecf4;
+  --sidebar-border:    #273044;
   --sidebar-ring:      #60a5fa;
 
-  /* Semantic status colours on the dark glass surfaces */
+  /* Semantic status colours on the dark surfaces */
   --success:           #34d399;
   --success-foreground:#052e22;
   --warning:           #fbbf24;
@@ -304,7 +305,7 @@
   --info-foreground:   #0b1220;
   --danger:            #f87171;
   --danger-foreground: #2a0a0a;
-  --surface-raised:    rgba(44, 60, 90, 0.7);
+  --surface-raised:    #171e2e;
   --overlay:           rgba(0, 0, 0, 0.6);
 
   --status-draft:           #38bdf8;
@@ -332,75 +333,21 @@
   --nav-red:    #f87171;
   --nav-slate:  #94a3b8;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 10px 30px -12px rgba(0, 0, 0, 0.6);
-  --shadow-lg: 0 25px 60px -10px rgba(0, 0, 0, 0.7);
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: 0 16px 40px -8px rgba(0, 0, 0, 0.6);
 }
 
-/* Ambient gradient glow behind the glass surfaces — gives the blur something to catch */
-.dark body {
-  background-image:
-    radial-gradient(1100px 600px at 85% -10%, rgba(99,102,241,0.28), transparent 60%),
-    radial-gradient(900px 550px at 8% 110%, rgba(34,211,238,0.16), transparent 60%),
-    radial-gradient(700px 400px at 50% 40%, rgba(59,130,246,0.06), transparent 70%);
-  background-attachment: fixed;
+/* Dialogs and menus sit on the raised surface; nothing else is elevated, translucent or blurred. */
+[data-slot="dialog-overlay"] {
+  background: var(--overlay);
 }
-
-/* Frosted-glass blur — fixed chrome & floating overlays only.
-   Content cards deliberately skip the blur: nothing scrolls behind them,
-   and blurring dozens of static nodes is pure GPU cost. */
-.dark .menu-fixed,
-.dark .fixed-top,
-.dark .footer-fixed,
-.dark .content-right-sidebar,
-.dark [data-slot="dialog-content"],
-.dark [data-slot="popover-content"],
-.dark [data-slot="select-content"],
-.dark [data-slot="dropdown-menu-content"] {
-  backdrop-filter: blur(20px) saturate(160%);
-}
-.dark [data-slot="dialog-overlay"] {
-  backdrop-filter: blur(4px);
-}
-/* Frosted modal surface — bg-background is opaque, so swap in the translucent popover tone */
-.dark [data-slot="dialog-content"] {
+[data-slot="dialog-content"],
+[data-slot="popover-content"],
+[data-slot="select-content"],
+[data-slot="dropdown-menu-content"] {
   background: var(--popover);
-}
-
-/* Elevation + glass edge on content surfaces: a hairline top highlight makes the
-   glass read as glass, and a deep soft shadow lifts cards off the backdrop.
-   [style*="shell-surface"] catches the inline-styled cards on dashboard/hub pages. */
-.dark .rounded-xl[style*="shell-surface"],
-.dark [data-slot="card"],
-.dark .glass-card,
-.dark .glass-panel,
-.dark .table-container {
-  box-shadow: var(--shadow-md);
-}
-
-/* Accent punch on primary actions and active nav */
-.dark .btn-action-primary {
-  box-shadow: 0 4px 16px -4px color-mix(in srgb, var(--shell-accent) 55%, transparent);
-}
-.dark .nav-active {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--shell-accent) 25%, transparent);
-}
-
-/* Light mode: soft ambient tint + layered elevation on the same surfaces */
-html:not(.dark) body {
-  background-image:
-    radial-gradient(1000px 500px at 85% -10%, rgba(59,130,246,0.07), transparent 60%),
-    radial-gradient(800px 450px at 5% 110%, rgba(14,165,233,0.05), transparent 60%);
-}
-html:not(.dark) .rounded-xl[style*="shell-surface"],
-html:not(.dark) [data-slot="card"],
-html:not(.dark) .glass-card,
-html:not(.dark) .glass-panel,
-html:not(.dark) .table-container {
-  box-shadow: var(--shadow-md);
-}
-html:not(.dark) .btn-action-primary {
-  box-shadow: 0 2px 8px -2px color-mix(in srgb, var(--shell-accent) 45%, transparent);
+  box-shadow: var(--shadow-lg);
 }
 
 @layer base {
@@ -426,15 +373,6 @@ html:not(.dark) .btn-action-primary {
     -webkit-text-fill-color: var(--shell-text) !important;
     caret-color: var(--shell-text);
   }
-  /* Dark surface is translucent — autofill needs an opaque fill (the inset-shadow
-     trick composites over the browser's yellow autofill layer, so alpha lets it bleed) */
-  .dark input:-webkit-autofill,
-  .dark input:-webkit-autofill:hover,
-  .dark input:-webkit-autofill:focus,
-  .dark input:-webkit-autofill:active {
-    -webkit-box-shadow: 0 0 0 9999px #192336 inset !important;
-    box-shadow: 0 0 0 9999px #192336 inset !important;
-  }
 }
 
 @layer utilities {
@@ -445,11 +383,10 @@ html:not(.dark) .btn-action-primary {
     top: 0;
     left: 0;
     bottom: 0;
-    background-color: var(--shell-surface);
+    background-color: var(--shell-bg);
     color: var(--shell-text-muted);
     z-index: var(--z-shell);
     border-right: 1px solid var(--shell-border);
-    box-shadow: 2px 0 8px rgba(0,0,0,0.08);
     transition: width var(--duration-slow) var(--ease-move), background-color var(--duration-base) var(--ease-standard), border-color var(--duration-base) var(--ease-standard);
     will-change: width;
   }
@@ -462,7 +399,7 @@ html:not(.dark) .btn-action-primary {
     right: 0;
     left: 0;
     height: var(--topbar-h);
-    background-color: var(--shell-surface);
+    background-color: var(--shell-bg);
     z-index: var(--z-nav);
     display: flex;
     align-items: center;
@@ -470,12 +407,11 @@ html:not(.dark) .btn-action-primary {
     padding: 0 1rem;
     color: var(--shell-text);
     border-bottom: 1px solid var(--shell-border);
-    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
     transition: left var(--duration-slow) var(--ease-move), background-color var(--duration-base) var(--ease-standard), border-color var(--duration-base) var(--ease-standard);
   }
   .main-workspace {
     margin-top: var(--topbar-h);
-    background-color: var(--shell-bg);
+    background-color: var(--shell-surface);
     /* mobile: subtract topbar + bottom-nav */
     height: calc(100dvh - var(--topbar-h) - var(--bottom-nav-h));
     padding: 0;
@@ -493,7 +429,7 @@ html:not(.dark) .btn-action-primary {
     right: 0;
     left: 0;
     height: var(--footer-h);
-    background-color: var(--shell-surface);
+    background-color: var(--shell-bg);
     border-top: 1px solid var(--shell-border);
     z-index: var(--z-nav);
     display: flex;
@@ -544,8 +480,6 @@ html:not(.dark) .btn-action-primary {
     background: var(--shell-surface);
     border-left: 1px solid var(--shell-border);
     flex-shrink: 0;
-    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.04);
-    border-radius: 12px 0 0 12px;
   }
   @media (min-width: 1024px) {
     .content-right-sidebar {
@@ -556,7 +490,7 @@ html:not(.dark) .btn-action-primary {
   .table-container {
     border: 1px solid var(--shell-border);
     background: var(--shell-surface);
-    border-radius: 10px;
+    border-radius: 8px;
     overflow: hidden;
   }
   .casper-grid th,
@@ -566,14 +500,12 @@ html:not(.dark) .btn-action-primary {
   .glass-card {
     background: var(--shell-surface);
     border: 1px solid var(--shell-border);
-    border-radius: 10px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
   }
   .glass-panel {
     background: var(--shell-surface);
     border: 1px solid var(--shell-border);
-    border-radius: 10px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+    border-radius: 8px;
   }
 
   /* ── Buttons ────────────────────────────────────────── */
@@ -584,15 +516,15 @@ html:not(.dark) .btn-action-primary {
     padding: 0 14px;
     background: var(--shell-surface);
     border: 1px solid var(--shell-border);
-    border-radius: 9999px;
-    font-size: 12.5px;
+    border-radius: 6px;
+    font-size: 13px;
     font-weight: 500;
     color: var(--shell-text);
     cursor: pointer;
     transition: all var(--duration-fast);
     white-space: nowrap;
-    height: 34px;
-    min-height: 34px;
+    height: 32px;
+    min-height: 32px;
   }
   .btn-action:hover {
     background: var(--shell-hover);
@@ -608,15 +540,15 @@ html:not(.dark) .btn-action-primary {
     padding: 0 14px;
     background: var(--shell-accent);
     border: 1px solid var(--shell-accent);
-    border-radius: 9999px;
-    font-size: 12.5px;
+    border-radius: 6px;
+    font-size: 13px;
     font-weight: 500;
     color: var(--shell-accent-fg);
     cursor: pointer;
     transition: all 0.15s;
     white-space: nowrap;
-    height: 34px;
-    min-height: 34px;
+    height: 32px;
+    min-height: 32px;
   }
   .btn-action-primary:hover { opacity: 0.88; }
   .btn-action-primary:disabled { opacity: 0.35; cursor: not-allowed; }
@@ -629,30 +561,22 @@ html:not(.dark) .btn-action-primary {
     border-radius: 8px;
   }
   .nav-active {
-    background: rgba(0, 168, 107, 0.12); /* fallback for browsers without color-mix() */
     background: color-mix(in srgb, var(--shell-accent) 12%, transparent);
     color: var(--shell-accent);
     font-weight: 600;
-    border-radius: 9999px;
-  }
-  .dark .nav-active {
-    background: rgba(0, 168, 107, 0.16); /* fallback */
-    background: color-mix(in srgb, var(--shell-accent) 16%, transparent);
+    border-radius: 6px;
   }
   .nav-active:hover {
-    background: rgba(0, 168, 107, 0.22); /* fallback */
-    background: color-mix(in srgb, var(--shell-accent) 22%, transparent);
+    background: color-mix(in srgb, var(--shell-accent) 18%, transparent);
   }
 
   /* ── Dialog header ──────────────────────────────────── */
   .dialog-header {
     background-color: var(--shell-surface);
     border-bottom: 1px solid var(--shell-border);
-    color: var(--shell-text-muted);
-    font-size: 11px;
+    color: var(--shell-text);
+    font-size: 13px;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
     height: 44px;
     display: flex;
     align-items: center;
@@ -671,65 +595,38 @@ html:not(.dark) .btn-action-primary {
     transform: translate(-50%, -50%);
   }
 
-  /* ── Modal edge glow — dark mode only, accent-tinted ring ── */
+  /* ── Dialog edge: one hairline plus the shared elevated shadow, same in both themes ── */
   .modal-glow {
-    box-shadow:
-      0 25px 50px -12px rgba(0,0,0,0.5),
-      0 0 0 1px var(--shell-border);
-  }
-  .dark .modal-glow {
-    box-shadow:
-      0 25px 60px -10px rgba(0,0,0,0.7),
-      0 0 0 1px rgba(0, 168, 107, 0.4),
-      0 0 28px -4px rgba(0, 168, 107, 0.2); /* fallback for browsers without color-mix() */
-    box-shadow:
-      0 25px 60px -10px rgba(0,0,0,0.7),
-      0 0 0 1px color-mix(in srgb, var(--shell-accent) 40%, var(--shell-border)),
-      0 0 28px -4px color-mix(in srgb, var(--shell-accent) 20%, transparent);
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--shell-border);
   }
 
   /* ── Misc ────────────────────────────────────────────── */
-  .btn-gradient,
-  .security-thread {
-    background: linear-gradient(to right, #00A86B, #007FFF);
-    color: #ffffff;
-    border: none;
-  }
-  .btn-gradient:hover,
-  .security-thread:hover {
-    background: linear-gradient(to right, #007FFF, #00A86B);
-  }
-  .security-thread-text {
-    background: linear-gradient(to right, #00A86B, #007FFF);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
   /* ── Modal internals ─────────────────────────────────────────── */
   .modal-body {
     background: var(--shell-surface);
     color: var(--shell-text);
   }
   .modal-input {
-    background: var(--shell-bg) !important;
-    border-color: var(--shell-border) !important;
+    background: transparent !important;
+    border-color: var(--input) !important;
     color: var(--shell-text) !important;
   }
   input[type="date"].modal-input { color-scheme: light; }
   .dark input[type="date"].modal-input { color-scheme: dark; }
   .modal-input::placeholder { color: var(--shell-text-muted) !important; opacity: 0.6; }
   .modal-input:focus { border-color: var(--shell-accent) !important; outline: none; }
-  .modal-label { color: var(--shell-text-muted) !important; }
+  .modal-label { color: var(--shell-text) !important; }
   .modal-divider { background: var(--shell-border) !important; }
   .modal-section {
-    background: var(--shell-bg);
+    background: transparent;
     border: 1px solid var(--shell-border);
     border-radius: 0.5rem;
   }
   .modal-toggle-track {
-    background: var(--shell-bg);
+    background: var(--shell-hover);
     border: 1px solid var(--shell-border);
-    border-radius: 0.75rem;
+    border-radius: 0.5rem;
   }
   .modal-toggle-btn {
     border-radius: 0.5rem;
@@ -764,20 +661,12 @@ html:not(.dark) .btn-action-primary {
 
   .hide-scrollbar::-webkit-scrollbar { display: none; }
   .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-  .glowing-indicator { box-shadow: 0 0 6px currentColor; }
 }
 
 .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--shell-border); border-radius: 10px; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--shell-text-muted); }
-
-.status-dot-glow {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  box-shadow: 0 0 6px currentColor;
-}
 
 /* Light-mode contrast bridge.
    Tailwind's 300-600 accent shades (text-blue-400, text-emerald-500, bg-rose-500, ...) are tuned for dark

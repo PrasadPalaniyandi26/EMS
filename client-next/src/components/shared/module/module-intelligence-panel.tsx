@@ -92,8 +92,8 @@ export function ModuleIntelligencePanel({
       className
     )}>
       {/* Header */}
-      <div className="h-10 px-5 dialog-header flex justify-between items-center shrink-0">
-        <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] mt-0.5 flex items-center gap-2">
+      <div className="h-12 px-4 flex justify-between items-center shrink-0 border-b border-[var(--shell-border)]">
+        <h3 className="text-[14px] font-semibold flex items-center gap-2" style={{ color: 'var(--shell-text)' }}>
           {icon}
           {title}
         </h3>
@@ -105,13 +105,13 @@ export function ModuleIntelligencePanel({
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = ''; }}
           aria-label="Close panel"
         >
-          <X className="w-5 h-5" />
+          <X className="w-4 h-4" />
         </button>
       </div>
 
       {/* Tab bar — only when hasSelection and tabs provided */}
       {hasSelection && tabs && tabs.length > 0 && (
-        <div className="flex px-4 gap-1 py-1.5 shrink-0 backdrop-blur-xl" style={{ borderBottom: '1px solid var(--shell-border)', background: 'var(--shell-surface)' }}>
+        <div className="flex px-4 gap-1 py-1.5 shrink-0" style={{ borderBottom: '1px solid var(--shell-border)', background: 'var(--shell-surface)' }}>
           {tabs.map(tab => (
             <button
               key={tab.id}
@@ -128,14 +128,14 @@ export function ModuleIntelligencePanel({
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar" style={{ background: 'var(--shell-bg)' }}>
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar" style={{ background: 'var(--shell-surface)' }}>
         {hasSelection ? (
           tabs && tabs.length > 0 ? activeTabContent : children
         ) : (
           <div className="flex flex-col h-full">
             {/* Empty state */}
             <div className="flex flex-col items-center text-center pt-10 pb-6 px-4 gap-3">
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'var(--shell-hover)' }}>
+              <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ background: 'var(--shell-hover)' }}>
                 {empty?.icon ?? <Activity className="w-8 h-8" style={{ color: 'var(--shell-text-muted)' }} />}
               </div>
               <div>
@@ -147,9 +147,9 @@ export function ModuleIntelligencePanel({
             {/* Tips */}
             {empty?.tips && (
               <div className="mt-2 space-y-2 px-1">
-                <p className="text-[11px] font-semibold uppercase tracking-widest px-1" style={{ color: 'var(--shell-text-muted)' }}>What you can do</p>
+                <p className="text-[12px] font-semibold px-1" style={{ color: 'var(--shell-text-muted)' }}>What you can do</p>
                 {empty.tips.map((tip, i) => (
-                  <div key={i} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
+                  <div key={i} className="flex items-center gap-2.5 px-1 py-1.5">
                     <ArrowRight className="w-3 h-3 shrink-0" style={{ color: 'var(--shell-text-muted)' }} />
                     <span className="text-[12px]" style={{ color: 'var(--shell-text)' }}>{tip}</span>
                   </div>

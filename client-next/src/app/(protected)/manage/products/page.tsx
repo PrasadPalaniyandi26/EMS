@@ -183,7 +183,7 @@ export default function ProductsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <h4 className="font-extrabold text-[15px] text-black dark:text-white leading-tight">{selectedProduct.name}</h4>
-                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest mt-0.5">
+                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mt-0.5">
                     {selectedProduct.code || `PRD-${String(selectedProduct.id).padStart(3, '0')}`}
                   </p>
                 </div>
@@ -193,11 +193,11 @@ export default function ProductsPage() {
               </div>
               <div className="grid grid-cols-2 gap-3 pt-2">
                 <div className="p-3 bg-[var(--shell-hover)] rounded-lg border border-[var(--shell-border)]">
-                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase mb-1">Type</p>
+                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-1">Type</p>
                   <p className="text-sm font-black text-[var(--shell-text-muted)] truncate">{selectedProduct.type_name || '—'}</p>
                 </div>
                 <div className="p-3 bg-[var(--shell-hover)] rounded-lg border border-[var(--shell-border)]">
-                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase mb-1">Client</p>
+                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-1">Client</p>
                   <p className="text-sm font-black text-[var(--shell-accent)] truncate">{selectedProduct.client_name || '—'}</p>
                 </div>
               </div>
@@ -261,7 +261,7 @@ export default function ProductsPage() {
                         onChange={e => setNewTypeName(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && handleAddType()}
                       />
-                      <Button type="button" onClick={handleAddType} className="h-10 px-4 text-[11px] font-bold uppercase tracking-widest">
+                      <Button type="button" onClick={handleAddType} className="h-10 px-4 text-[11px] font-bold">
                         Add
                       </Button>
                     </div>
@@ -302,7 +302,7 @@ export default function ProductsPage() {
                     role="radio"
                     aria-checked={form.status === opt}
                     onClick={() => setForm({ ...form, status: opt })}
-                    className={`min-w-[5.5rem] flex-1 rounded-md border py-1.5 text-center text-[11px] font-bold uppercase tracking-wider transition-all focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)] ${
+                    className={`min-w-[5.5rem] flex-1 rounded-md border py-1.5 text-center text-[11px] font-bold transition-all focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)] ${
                       form.status === opt ? 'border-[var(--shell-accent)] text-[var(--shell-accent)] shadow-sm' : 'border-transparent text-[var(--shell-text-muted)] hover:text-[var(--shell-text)]'
                     }`}
                   >

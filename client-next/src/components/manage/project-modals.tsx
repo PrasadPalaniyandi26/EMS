@@ -140,7 +140,7 @@ export function ProjectModal({
                   onKeyDown={(e) => e.key === 'Enter' && handleAddType()}
                 />
                 <Button type="button" onClick={handleAddType}
-                  className="h-10 px-3 btn-action-primary rounded-lg text-[11px] font-bold uppercase tracking-widest border border-[var(--shell-border)]">
+                  className="h-10 px-3 btn-action-primary rounded-lg text-[11px] font-bold border border-[var(--shell-border)]">
                   Add
                 </Button>
               </div>
@@ -193,7 +193,7 @@ export function ProjectModal({
 
         {/* Full-width: status + description */}
         <div className="sm:col-span-2">
-          <p id="project-status-label" className="mb-2 block text-xs font-semibold" style={{ color: "var(--shell-text-muted)" }}>Project Status</p>
+          <p id="project-status-label" className="mb-2 block text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Project Status</p>
           <div role="radiogroup" aria-labelledby="project-status-label" className="flex p-1 modal-toggle-track rounded-xl gap-1">
             {([
               { val: 'Active',    active: 'text-[var(--success)] border border-[var(--success)] shadow-sm' },
@@ -206,7 +206,7 @@ export function ProjectModal({
                 key={val}
                 type="button" role="radio" aria-checked={form.status === val}
                 onClick={() => set('status', val)}
-                className={`flex-1 py-1.5 text-center text-[11px] font-bold uppercase tracking-wider rounded-md transition-all ${
+                className={`flex-1 py-1.5 text-center text-[11px] font-bold rounded-md transition-all ${
                   form.status === val ? active : 'text-[var(--shell-text-muted)] border border-transparent hover:text-[var(--shell-text)]'
                 }`}
               >

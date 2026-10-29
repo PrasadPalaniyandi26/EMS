@@ -44,7 +44,7 @@ function roleColor(name?: string) {
 function SectionHeader({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-2 mb-3">
-      <span className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--shell-text-muted)]">{label}</span>
+      <span className="text-[11px] font-black text-[var(--shell-text-muted)]">{label}</span>
       <div className="h-[1px] flex-1" style={{ background: 'var(--shell-border)' }} />
     </div>
   );
@@ -182,9 +182,9 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
         {/* Employee ID badge for edit mode */}
         {editing && (
           <div className="flex items-center gap-3 modal-toggle-track rounded-lg px-4 py-2">
-            <span className="text-[11px] font-black uppercase tracking-widest text-[var(--shell-text-muted)]">Employee ID</span>
+            <span className="text-[11px] font-black text-[var(--shell-text-muted)]">Employee ID</span>
             <span className="font-mono text-[13px] font-black text-[var(--info)]">{getEmployeeId(editing.id)}</span>
-            <span className="ml-auto px-2 py-0.5 rounded text-[11px] font-black uppercase border border-[var(--shell-border)] text-[var(--shell-text)]">
+            <span className="ml-auto px-2 py-0.5 rounded text-[11px] font-black border border-[var(--shell-border)] text-[var(--shell-text)]">
               {editing.role_name || 'Staff'}
             </span>
           </div>
@@ -273,7 +273,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
               )}
             </div>
             <div className="space-y-1">
-              <p id="user-roles-label" className="text-xs font-semibold" style={{ color: "var(--shell-text-muted)" }}>Roles Assigned</p>
+              <p id="user-roles-label" className="text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Roles Assigned</p>
               <div role="group" aria-labelledby="user-roles-label" className="border border-[var(--shell-border)] rounded-lg overflow-hidden divide-y" style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)' }}>
                 {roles.map((r) => {
                   const isChecked = selectedRoles.some((s) => s.roleId === r.role_id);
@@ -285,7 +285,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
                         {isChecked && <Check className="w-2 h-2 text-white" />}
                       </div>
                       <div className={cn('w-2 h-2 rounded-full shrink-0 mr-2', rc.dot)} />
-                      <span onClick={() => toggleRole(r.role_id)} className={cn('text-[11px] font-bold uppercase tracking-wide select-none flex-1 cursor-pointer', isChecked ? 'text-[var(--shell-text)]' : 'text-[var(--shell-text-muted)]')}>
+                      <span onClick={() => toggleRole(r.role_id)} className={cn('text-[11px] font-bold select-none flex-1 cursor-pointer', isChecked ? 'text-[var(--shell-text)]' : 'text-[var(--shell-text-muted)]')}>
                         {r.role_name}
                       </span>
                       {isChecked && (
@@ -349,7 +349,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
             </Field>
             {/* Status segmented */}
             <div className="space-y-1 pt-1">
-              <p id="user-status-label" className="text-xs font-semibold" style={{ color: "var(--shell-text-muted)" }}>Status</p>
+              <p id="user-status-label" className="text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Status</p>
               <div role="radiogroup" aria-labelledby="user-status-label" className="flex p-1 modal-toggle-track rounded-xl gap-1">
                 {([
                   { s: 'ACTIVE',   active: 'text-[var(--success)] border border-[var(--success)] shadow-sm' },
@@ -357,7 +357,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
                   { s: 'Inactive', active: 'text-[var(--danger)] border border-[var(--danger)] shadow-sm' },
                 ] as const).map(({ s, active: activeClass }) => (
                   <button key={s} type="button" role="radio" aria-checked={form.status === s} onClick={() => set("status", s)}
-                    className={cn('flex-1 py-1.5 text-center text-[11px] font-bold uppercase tracking-wider rounded-md transition-all',
+                    className={cn('flex-1 py-1.5 text-center text-[11px] font-bold rounded-md transition-all',
                       form.status === s ? activeClass : 'text-[var(--shell-text-muted)] border border-transparent hover:text-[var(--shell-text)]')}
                   >
                     {s}
@@ -526,21 +526,21 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
         {/* Action row */}
         <div className="flex items-center justify-between">
           <div className="flex gap-2">
-            <Button className="btn-action-primary border border-[var(--shell-border)] text-[var(--shell-text)] font-bold text-[11px] uppercase h-8 px-4 rounded-lg flex items-center gap-1.5" onClick={handleAddAllocation} disabled={saving}>
+            <Button className="btn-action-primary border border-[var(--shell-border)] text-[var(--shell-text)] font-bold text-[11px] h-8 px-4 rounded-lg flex items-center gap-1.5" onClick={handleAddAllocation} disabled={saving}>
               <Plus className="w-3.5 h-3.5" /> Add Allocation
             </Button>
-            <Button variant="outline" className="border-[color-mix(in_srgb,var(--danger)_40%,transparent)] text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] font-bold text-[11px] uppercase h-8 px-4 rounded-lg flex items-center gap-1.5" onClick={handleRemove} disabled={saving || selected.size === 0}>
+            <Button variant="outline" className="border-[color-mix(in_srgb,var(--danger)_40%,transparent)] text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] font-bold text-[11px] h-8 px-4 rounded-lg flex items-center gap-1.5" onClick={handleRemove} disabled={saving || selected.size === 0}>
               <Trash2 className="w-3.5 h-3.5" /> Remove
             </Button>
           </div>
-          <span className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest">{allocations.length} Allocation{allocations.length !== 1 ? 's' : ''}</span>
+          <span className="text-[11px] font-bold text-[var(--shell-text-muted)]">{allocations.length} Allocation{allocations.length !== 1 ? 's' : ''}</span>
         </div>
 
         {/* Table */}
         <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden shadow-sm" style={{ background: 'var(--shell-surface)' }}>
           <table className="w-full text-left">
             <thead className="dialog-header">
-              <tr className="text-[11px] font-black uppercase tracking-widest">
+              <tr className="text-[11px] font-black">
                 <th className="w-10 px-4 py-3 text-center">
                   <input type="checkbox" className="size-3.5 rounded border-[var(--shell-border)]" onChange={(e) => setSelected(e.target.checked ? new Set(allocations.map((a) => a.id)) : new Set())} checked={selected.size === allocations.length && allocations.length > 0} />
                 </th>
@@ -734,13 +734,13 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
         <div className="flex-1 min-w-0">
           {/* Role template selector */}
           <div className="flex items-center gap-3 mb-4 pb-4 border-b border-[var(--shell-border)]">
-            <span className="text-[11px] font-black text-[var(--shell-text-muted)] uppercase tracking-widest shrink-0">Apply Template:</span>
+            <span className="text-[11px] font-black text-[var(--shell-text-muted)] shrink-0">Apply Template:</span>
             <div className="flex gap-2 flex-wrap">
               {Object.keys(ROLE_TEMPLATES).map((t) => {
                 const c = roleColor(t);
                 return (
                   <button key={t} onClick={() => applyTemplate(t)}
-                    className={cn('px-3 py-1 rounded-lg text-[11px] font-black uppercase border transition-all', template === t ? 'modal-input border-[var(--shell-border)] text-[var(--shell-text)] shadow-sm' : 'text-[var(--shell-text-muted)] border-[var(--shell-border)] hover:text-[var(--shell-text)]')}
+                    className={cn('px-3 py-1 rounded-lg text-[11px] font-black border transition-all', template === t ? 'modal-input border-[var(--shell-border)] text-[var(--shell-text)] shadow-sm' : 'text-[var(--shell-text-muted)] border-[var(--shell-border)] hover:text-[var(--shell-text)]')}
                     style={template !== t ? { background: 'var(--shell-bg)' } : {}}
                   >
                     <span className={cn('inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle', c.dot)} />
@@ -755,7 +755,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
           <div className="overflow-x-auto rounded-xl">
           <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden shadow-sm min-w-[480px]" style={{ background: 'var(--shell-surface)' }}>
             {/* Column header */}
-            <div className="dialog-header flex items-center text-[11px] font-black uppercase tracking-widest">
+            <div className="dialog-header flex items-center text-[11px] font-black">
               <div className="flex-1 px-4 py-3">Module</div>
               {PERMISSIONS.map((p) => (
                 <div key={p} className="w-[70px] py-3 text-center shrink-0">{p}</div>
@@ -767,7 +767,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
               <div key={group.label} className={gi > 0 ? 'border-t border-[var(--shell-border)]' : ''}>
                 {/* Group label */}
                 <div className="px-4 py-1.5 flex items-center gap-2" style={{ background: 'var(--shell-hover)' }}>
-                  <span className="text-[11px] font-black uppercase tracking-[0.2em]" style={{ color: '#C9A84C' }}>
+                  <span className="text-[11px] font-black" style={{ color: '#C9A84C' }}>
                     {group.label}
                   </span>
                   <div className="h-px flex-1" style={{ background: 'var(--shell-border)' }} />
@@ -822,15 +822,15 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
           {/* Approval Thresholds */}
           <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden shadow-sm" style={{ background: 'var(--shell-surface)' }}>
             <div className="dialog-header px-4 py-2.5">
-              <span className="text-[11px] font-black uppercase tracking-widest">Approval Limits</span>
+              <span className="text-[11px] font-black">Approval Limits</span>
             </div>
             <div className="p-4 space-y-2.5">
               <div className="space-y-1">
-                <AutoLabel className="text-xs font-medium modal-label uppercase">Single Transaction</AutoLabel>
+                <AutoLabel className="text-xs font-medium modal-label">Single Transaction</AutoLabel>
                 <CurrencyInput value={thresholds.single} onChange={(v) => setThresholds((p) => ({ ...p, single: v }))} className={INP3} />
               </div>
               <div className="space-y-1">
-                <AutoLabel className="text-xs font-medium modal-label uppercase">Monthly Ceiling</AutoLabel>
+                <AutoLabel className="text-xs font-medium modal-label">Monthly Ceiling</AutoLabel>
                 <CurrencyInput value={thresholds.monthly} onChange={(v) => setThresholds((p) => ({ ...p, monthly: v }))} className={INP3} />
               </div>
             </div>
@@ -839,7 +839,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
           {/* Data Scope */}
           <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden shadow-sm" style={{ background: 'var(--shell-surface)' }}>
             <div className="dialog-header px-4 py-2.5">
-              <span className="text-[11px] font-black uppercase tracking-widest">Data Visibility</span>
+              <span className="text-[11px] font-black">Data Visibility</span>
             </div>
             <div className="p-3 space-y-2">
               {['Own Records', 'Department', 'Global'].map((s) => (
@@ -863,7 +863,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
           {/* Summary */}
           <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden shadow-sm" style={{ background: 'var(--shell-surface)' }}>
             <div className="dialog-header px-4 py-2.5">
-              <span className="text-[11px] font-black uppercase tracking-widest">Summary</span>
+              <span className="text-[11px] font-black">Summary</span>
             </div>
             <div className="p-4 space-y-2">
               {PERMISSIONS.map((p, i) => {
@@ -872,7 +872,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
                 return (
                   <div key={p}>
                     <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-xs font-medium text-[var(--shell-text-muted)] uppercase">{p}</span>
+                      <span className="text-xs font-medium text-[var(--shell-text-muted)]">{p}</span>
                       <span className="text-[11px] font-black text-[var(--shell-accent)]">{count}/{MODULES.length}</span>
                     </div>
                     <div className="w-full h-1 modal-toggle-track rounded-full overflow-hidden">

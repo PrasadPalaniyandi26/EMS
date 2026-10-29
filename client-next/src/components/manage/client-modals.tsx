@@ -34,7 +34,7 @@ const sel = 'w-full h-10 text-sm modal-input rounded-lg';
 function SectionHeader({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-2 mb-3">
-      <span className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--shell-text-muted)]">{label}</span>
+      <span className="text-[11px] font-black text-[var(--shell-text-muted)]">{label}</span>
       <div className="h-[1px] flex-1" style={{ background: 'var(--shell-border)' }} />
     </div>
   );
@@ -262,7 +262,7 @@ export function ClientModal({ isOpen, onClose, onSave, editing, businessTypes: i
 
           {/* ── STATUS TOGGLE ── */}
           <div className="pt-1">
-            <p id="client-status-label" className="mb-2 block text-xs font-semibold" style={{ color: 'var(--shell-text-muted)' }}>Status</p>
+            <p id="client-status-label" className="mb-2 block text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Status</p>
             <div role="radiogroup" aria-labelledby="client-status-label" className="flex p-1 modal-toggle-track rounded-lg gap-1 h-9 w-56">
               {([
                 { label: 'Active',   val: true,  active: 'text-[var(--success)] border border-[var(--success)] shadow-sm' },
@@ -274,7 +274,7 @@ export function ClientModal({ isOpen, onClose, onSave, editing, businessTypes: i
                   role="radio"
                   aria-checked={form.is_active === val}
                   onClick={() => set('is_active', val)}
-                  className={`flex-1 py-1.5 text-center text-[11px] font-bold uppercase tracking-wider rounded-md transition-all ${
+                  className={`flex-1 py-1.5 text-center text-[11px] font-bold rounded-md transition-all ${
                     form.is_active === val ? active : 'text-[var(--shell-text-muted)] border border-transparent hover:text-[var(--shell-text)]'
                   }`}
                 >

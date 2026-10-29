@@ -105,7 +105,7 @@ export function RecurringModal({
             </Field>
           </div>
           <div className="space-y-1.5">
-            <p id="recurring-type-label" className="text-xs font-semibold" style={{ color: 'var(--shell-text-muted)' }}>Transaction Type</p>
+            <p id="recurring-type-label" className="text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Transaction Type</p>
             <div role="radiogroup" aria-labelledby="recurring-type-label" className="flex p-1 modal-toggle-track rounded-xl gap-1 h-10">
               {([
                 { val: 'expense', active: 'text-[var(--danger)] border border-[var(--danger)] shadow-sm' },
@@ -222,12 +222,12 @@ export function RecurringModal({
         <div className="pt-2 border-t border-[var(--shell-border)]">
           <div className="flex items-center gap-2 mb-2">
             <Settings aria-hidden className="w-3.5 h-3.5 text-[var(--shell-accent)]" />
-            <span className="text-xs font-black uppercase tracking-[0.2em] text-[var(--shell-accent)]">Automation Rules</span>
+            <span className="text-xs font-black text-[var(--shell-accent)]">Automation Rules</span>
             <div className="h-[1px] flex-1 modal-divider" />
           </div>
           <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <p className="text-xs font-semibold" style={{ color: 'var(--shell-text-muted)' }}>Next Run Date</p>
+              <p className="text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Next Run Date</p>
               <p className="flex h-10 items-center text-[12px] text-[var(--shell-text-muted)]">
                 {form.next_run
                   ? (() => {
@@ -261,7 +261,7 @@ export function RecurringModal({
 
         {/* File upload */}
         <div className="space-y-1.5">
-          <p id="recurring-doc-label" className="text-xs font-semibold" style={{ color: 'var(--shell-text-muted)' }}>Supporting Document</p>
+          <p id="recurring-doc-label" className="text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Supporting Document</p>
           <input ref={fileInputRef} type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp" tabIndex={-1} aria-hidden onChange={handleFileInput} />
           {/* A real button so the drop zone works from the keyboard */}
           <button
@@ -278,7 +278,7 @@ export function RecurringModal({
               <span className="block text-[12px] font-medium text-[var(--shell-text-muted)]">
                 Drag &amp; drop or <span className="font-bold text-[var(--shell-accent)]">browse files</span>
               </span>
-              <span className="block text-[11px] uppercase tracking-tight text-[var(--shell-text-muted)]">PDF, JPG, PNG, WebP · max 10 MB</span>
+              <span className="block text-[11px] text-[var(--shell-text-muted)]">PDF, JPG, PNG, WebP · max 10 MB</span>
             </span>
           </button>
           {(file || (isEdit && editing?.receipt_path)) && (
@@ -289,7 +289,7 @@ export function RecurringModal({
                   <p className="text-[12px] font-bold text-[var(--shell-text)] truncate max-w-[280px]">
                     {file?.name || (editing?.receipt_path ? editing.receipt_path.split('/').pop() : '')}
                   </p>
-                  {file && <p className="text-[11px] text-[var(--shell-text-muted)] uppercase tracking-tighter">{(file.size / 1024 / 1024).toFixed(1)} MB</p>}
+                  {file && <p className="text-[11px] text-[var(--shell-text-muted)]">{(file.size / 1024 / 1024).toFixed(1)} MB</p>}
                 </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
@@ -351,7 +351,7 @@ export function PauseRecurringModal({
           </Button>
           <button
             onClick={onConfirm}
-            className="px-6 py-2.5 bg-[var(--warning)] hover:opacity-90 text-[var(--warning-foreground)] rounded-lg text-[11px] font-bold uppercase tracking-widest shadow-none transition-all flex items-center gap-2"
+            className="px-6 py-2.5 bg-[var(--warning)] hover:opacity-90 text-[var(--warning-foreground)] rounded-lg text-[11px] font-bold shadow-none transition-all flex items-center gap-2"
           >
             <Pause className="w-4 h-4" /> Pause Schedule
           </button>
@@ -416,7 +416,7 @@ export function ResumeRecurringModal({
           </Button>
           <button
             onClick={() => onConfirm(form)}
-            className="px-6 py-2.5 btn-action-primary border border-[var(--shell-border)] text-[var(--shell-text)] rounded-lg text-[11px] font-bold uppercase tracking-widest shadow-none transition-all flex items-center gap-2"
+            className="px-6 py-2.5 btn-action-primary border border-[var(--shell-border)] text-[var(--shell-text)] rounded-lg text-[11px] font-bold shadow-none transition-all flex items-center gap-2"
           >
             <Play className="w-4 h-4" /> Resume Schedule
           </button>
@@ -426,11 +426,11 @@ export function ResumeRecurringModal({
       <div className="space-y-3">
         <div className="border border-[var(--shell-border)] rounded-xl p-4 flex items-center justify-between shadow-sm" style={{ background: 'var(--shell-bg)' }}>
           <div>
-            <p className="text-[11px] text-[var(--info)] font-bold uppercase tracking-wider">Target Schedule</p>
+            <p className="text-[11px] text-[var(--info)] font-bold">Target Schedule</p>
             <p className="text-[14px] font-bold" style={{ color: 'var(--shell-text)' }}>{target.description}</p>
           </div>
           <div className="text-right">
-            <p className="text-[11px] text-[var(--info)] font-bold uppercase tracking-wider">Last Run</p>
+            <p className="text-[11px] text-[var(--info)] font-bold">Last Run</p>
             <p className="text-[14px] font-bold" style={{ color: 'var(--shell-text)' }}>
               {target.last_run ? new Date(target.last_run).toLocaleDateString() : 'None'}
             </p>
@@ -495,7 +495,7 @@ export function DeleteRecurringModal({ isOpen, onClose, onConfirm, count }: any)
           </Button>
           <button
             onClick={onConfirm}
-            className="px-6 py-2.5 bg-[var(--danger)] text-[var(--danger-foreground)] rounded-lg text-[11px] font-bold uppercase tracking-widest hover:brightness-110 shadow-lg shadow-red-200/10 transition-all flex items-center gap-2"
+            className="px-6 py-2.5 bg-[var(--danger)] text-[var(--danger-foreground)] rounded-lg text-[11px] font-bold hover:brightness-110 shadow-lg shadow-red-200/10 transition-all flex items-center gap-2"
           >
             <Trash2 className="w-4 h-4" /> Delete Permanently
           </button>

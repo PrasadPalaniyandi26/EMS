@@ -80,14 +80,14 @@ function BellDropdown() {
 
       <DropdownMenuContent
         align="end"
-        className="w-[340px] mt-1 rounded-xl shadow-2xl p-0 overflow-hidden"
+        className="w-[340px] mt-1 rounded-lg p-0 overflow-hidden"
         style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--shell-border)' }}>
           <div className="flex items-center gap-2">
             <Bell className="w-3.5 h-3.5" style={{ color: 'var(--shell-accent)' }} />
-            <span className="text-[12px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--shell-text)' }}>
+            <span className="text-[13px] font-semibold" style={{ color: 'var(--shell-text)' }}>
               Notifications
             </span>
             {unreadCount > 0 && (
@@ -142,7 +142,7 @@ function BellDropdown() {
                         {n.message}
                       </p>
                     )}
-                    <p className="text-[11px] font-semibold uppercase tracking-wide mt-1" style={{ color: 'var(--shell-text-muted)', opacity: 0.7 }}>
+                    <p className="text-[11px] font-medium mt-1" style={{ color: 'var(--shell-text-muted)', opacity: 0.7 }}>
                       {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
                     </p>
                   </div>
@@ -254,9 +254,9 @@ export function TopBar() {
               </div>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52 mt-1 rounded-xl shadow-xl"
+          <DropdownMenuContent align="end" className="w-52 mt-1 rounded-lg"
             style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
-            <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-wider px-3 py-2"
+            <DropdownMenuLabel className="text-[12px] font-semibold px-3 py-2"
               style={{ color: 'var(--shell-text-muted)' }}>
               Account
             </DropdownMenuLabel>
@@ -282,7 +282,7 @@ export function TopBar() {
                     <RefreshCw className="w-3.5 h-3.5" style={{ color: 'var(--shell-text-muted)' }} />
                     <span className="text-[12.5px]">Switch Role</span>
                   </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent className="rounded-xl shadow-xl min-w-[160px]"
+                  <DropdownMenuSubContent className="rounded-lg min-w-[160px]"
                     style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
                     {user.roles.map((r) => (
                       <DropdownMenuItem
