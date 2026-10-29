@@ -123,13 +123,29 @@ export class ProductsService {
     return this.mapType(pt);
   }
 
+  // Type names are unique per client, ignoring case. Returns the clashing type, if any.
+  private findTypeClash(name: string, clientId: number | null, exceptId?: number) {
+    return this.prisma.productType.findFirst({
+      where: { clientId, name: { equals: String(name).trim(), mode: 'insensitive' }, ...(exceptId && { NOT: { id: exceptId } }) },
+    });
+  }
+
   async createType(data: any) {
     try {
       const clientId = data.clientId ? Number(data.clientId) : (data.client_id ? Number(data.client_id) : null);
+      const name = String(data.name ?? '').trim();
+      if (!name) throw new HttpException('Name is required.', HttpStatus.BAD_REQUEST);
+      if (!clientId) throw new HttpException('Client is required.', HttpStatus.BAD_REQUEST);
+      const clash = await this.findTypeClash(name, clientId);
+      if (clash?.isActive) throw new HttpException('A type with this name already exists.', HttpStatus.CONFLICT);
+      if (clash) {
+        await this.prisma.productType.update({ where: { id: clash.id }, data: { isActive: true } });
+        return this.findTypeById(clash.id);
+      }
       const pt = await this.prisma.productType.create({
         data: {
           clientId: clientId || null,
-          name: data.name,
+          name,
           createdBy: data.createdBy ? Number(data.createdBy) : (data.created_by ? Number(data.created_by) : null),
         },
       });
@@ -142,11 +158,18 @@ export class ProductsService {
 
   async updateType(id: number, data: any) {
     try {
+      const name = data.name !== undefined ? String(data.name).trim() : undefined;
+      if (name !== undefined) {
+        if (!name) throw new HttpException('Name is required.', HttpStatus.BAD_REQUEST);
+        const current = await this.prisma.productType.findUnique({ where: { id } });
+        const clientId = data.clientId ? Number(data.clientId) : (data.client_id ? Number(data.client_id) : (current?.clientId ?? null));
+        if (await this.findTypeClash(name, clientId, id)) throw new HttpException('A type with this name already exists.', HttpStatus.CONFLICT);
+      }
       await this.prisma.productType.update({
         where: { id },
         data: {
           clientId: data.clientId ? Number(data.clientId) : (data.client_id ? Number(data.client_id) : undefined),
-          name: data.name,
+          name,
           isActive: data.isActive !== undefined ? Boolean(data.isActive) : (data.is_active !== undefined ? Boolean(data.is_active) : undefined),
         },
       });
@@ -157,8 +180,14 @@ export class ProductsService {
     }
   }
 
+  // A type nothing ever used is deleted (its categories go with it); one that products reference is archived
   async deleteType(id: number) {
+    const used = await this.prisma.product.count({ where: { typeId: id } });
+    if (used === 0) {
+      await this.prisma.productType.delete({ where: { id } });
+      return { archived: false };
+    }
     await this.prisma.productType.update({ where: { id }, data: { isActive: false } });
-    return true;
+    return { archived: true };
   }
 }

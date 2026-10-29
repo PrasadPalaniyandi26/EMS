@@ -20,6 +20,9 @@ export const QUERY_KEYS = {
   PROJECT_TYPES: 'projectTypes',
   PRODUCTS: 'products',
   PRODUCT_TYPES: 'productTypes',
+  TYPE_USAGE: 'typeUsage',
+  PROJECT_CATEGORIES: 'projectCategories',
+  PRODUCT_CATEGORIES: 'productCategories',
   TRANSACTIONS: 'transactions',
   BUDGETS: 'budgets',
   RECURRING: 'recurring',
@@ -88,6 +91,35 @@ export function useProductTypes(clientId?: number) {
     queryKey: [QUERY_KEYS.PRODUCT_TYPES, clientId],
     queryFn: () => api.get<ProductType[]>(`/product-types${qs}`).then((r) => r.data),
     staleTime: REF_STALE,
+  });
+}
+
+// Categories of one project type or product type (all of them when no type is given)
+export interface TypeCategory { id: number; type_id: number; name: string }
+
+export function useProjectCategories() {
+  return useQuery({
+    queryKey: [QUERY_KEYS.PROJECT_CATEGORIES],
+    queryFn: () => api.get<TypeCategory[]>('/project-categories').then((r) => r.data),
+    staleTime: REF_STALE,
+  });
+}
+
+export function useProductCategories() {
+  return useQuery({
+    queryKey: [QUERY_KEYS.PRODUCT_CATEGORIES],
+    queryFn: () => api.get<TypeCategory[]>('/product-categories').then((r) => r.data),
+    staleTime: REF_STALE,
+  });
+}
+
+// How many projects/products use each type and category, for the manage dialog
+export function useTypeUsage(kind: 'project' | 'product', enabled: boolean) {
+  return useQuery({
+    queryKey: [QUERY_KEYS.TYPE_USAGE, kind],
+    queryFn: () => api.get<{ types: Record<number, number>; categories: Record<number, number> }>(`/${kind}-categories/usage`).then((r) => r.data),
+    enabled,
+    staleTime: LIVE_STALE,
   });
 }
 

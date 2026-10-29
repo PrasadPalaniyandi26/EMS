@@ -272,10 +272,25 @@ model ProjectType {
   client    Client    @relation(fields: [clientId], references: [id])
   creator   User?     @relation("ProjectTypeCreator", fields: [createdBy], references: [id])
   projects  Project[]
+  categories ProjectCategory[]
 
   @@unique([clientId, name])
   @@index([clientId])
   @@map("project_types")
+}
+
+model ProjectCategory {
+  id        Int         @id @default(autoincrement())
+  typeId    Int         @map("type_id")
+  name      String      @db.VarChar(100)
+  isActive  Boolean     @default(true) @map("is_active")
+  createdBy Int?        @map("created_by")
+  createdAt DateTime    @default(now()) @map("created_at")
+  type      ProjectType @relation(fields: [typeId], references: [id], onDelete: Cascade)
+
+  @@unique([typeId, name])
+  @@index([typeId])
+  @@map("project_categories")
 }
 
 model Project {
@@ -318,10 +333,25 @@ model ProductType {
   client    Client?   @relation(fields: [clientId], references: [id], onDelete: Restrict)
   creator   User?     @relation("ProductTypeCreator", fields: [createdBy], references: [id])
   products  Product[]
+  categories ProductCategory[]
 
   @@unique([clientId, name])
   @@index([clientId])
   @@map("product_types")
+}
+
+model ProductCategory {
+  id        Int         @id @default(autoincrement())
+  typeId    Int         @map("type_id")
+  name      String      @db.VarChar(100)
+  isActive  Boolean     @default(true) @map("is_active")
+  createdBy Int?        @map("created_by")
+  createdAt DateTime    @default(now()) @map("created_at")
+  type      ProductType @relation(fields: [typeId], references: [id], onDelete: Cascade)
+
+  @@unique([typeId, name])
+  @@index([typeId])
+  @@map("product_categories")
 }
 
 model Product {

@@ -2,15 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import { useHeaderStore } from '@/stores/header-store';
-import { useClients, useProjects, useProjectTypes, useUsers, useInvalidate } from '@/hooks/use-queries';
+import { useAuthStore } from '@/stores/auth-store';
+import { useClients, useProjects, useProjectTypes, useProjectCategories, useUsers, useInvalidate } from '@/hooks/use-queries';
 import api from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/shared/modal-primitives';
 import { toast } from 'sonner';
 import {
-  Plus, Pencil, Trash2,
+  Plus, Pencil, Trash2, Tags,
   Target, ArrowUpRight
 } from 'lucide-react';
+import { ManageTypesDialog } from '@/components/manage/manage-types-dialog';
 import { ProjectModal } from '@/components/manage/project-modals';
 import type { Project } from '@/lib/types';
 import { DataTable } from '@/components/data-table/data-table';
@@ -33,17 +35,21 @@ import { formatCurrency } from '@/lib/currency';
 export default function ProjectsPage() {
   const setHeader = useHeaderStore((s) => s.setHeader);
   const { data: clients } = useClients();
+  // Managing types and categories is admin-only; the API checks the active role the same way
+  const isAdmin = (useAuthStore((s) => s.user)?.role_name || '').toUpperCase() === 'ADMIN';
   const invalidate = useInvalidate();
 
   const { data: projects, isLoading } = useProjects();
   const { data: usersData } = useUsers();
   const allUsers = Array.isArray(usersData) ? usersData : [];
   const { data: types } = useProjectTypes();
+  const { data: categories } = useProjectCategories();
 
   const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");
   
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
 
@@ -102,6 +108,17 @@ export default function ProjectsPage() {
     }
   };
 
+  const handleSaveCategory = async (form: any) => {
+    try {
+      const res = await api.post('/project-categories', form);
+      invalidate('projectCategories');
+      return (res.data as any);
+    } catch {
+      toast.error('Failed to create category');
+      throw new Error('Failed');
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteId) return;
     try {
@@ -130,6 +147,11 @@ export default function ProjectsPage() {
             <button className="btn-action" onClick={() => { setEditingProject(null); setIsModalOpen(true); }}>
               <Plus className="h-4 w-4 text-[var(--success)]" /> Add
             </button>
+            {isAdmin && (
+              <button className="btn-action" onClick={() => setManageOpen(true)}>
+                <Tags aria-hidden className="h-4 w-4 text-[var(--nav-violet)]" /> Types
+              </button>
+            )}
           <ToolbarActions actions={itemActions} /></>}
         />
       }
@@ -186,11 +208,22 @@ export default function ProjectsPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={handleSaveProject}
-        onSaveType={handleSaveType}
+        onSaveType={isAdmin ? handleSaveType : undefined}
+        categories={categories || []}
+        onSaveCategory={isAdmin ? handleSaveCategory : undefined}
         editing={editingProject}
         clients={clients || []}
         projectTypes={types || []}
         users={allUsers}
+      />
+
+      <ManageTypesDialog
+        kind="project"
+        isOpen={manageOpen}
+        onClose={() => setManageOpen(false)}
+        clients={clients || []}
+        types={types || []}
+        categories={categories || []}
       />
 
       {/* Simplified Delete Confirm */}

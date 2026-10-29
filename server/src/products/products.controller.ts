@@ -31,12 +31,12 @@ export class ProductTypesController {
   constructor(private service: ProductsService) {}
 
   @Get() findAll(@Query('clientId') clientId?: number) { return this.service.findAllTypes({ clientId }); }
-  @Post() @UseGuards(RolesGuard) @Roles('manager', 'admin')
+  @Post() @UseGuards(RolesGuard) @Roles('admin')
   create(@Body() body: any, @CurrentUser('id') userId: number) {
     return this.service.createType({ ...body, createdBy: userId });
   }
-  @Put(':id') @UseGuards(RolesGuard) @Roles('manager', 'admin')
+  @Put(':id') @UseGuards(RolesGuard) @Roles('admin')
   update(@Param('id', ParseIntPipe) id: number, @Body() body: any) { return this.service.updateType(id, body); }
-  @Delete(':id') @UseGuards(RolesGuard) @Roles('manager', 'admin')
+  @Delete(':id') @UseGuards(RolesGuard) @Roles('admin')
   delete(@Param('id', ParseIntPipe) id: number) { return this.service.deleteType(id); }
 }

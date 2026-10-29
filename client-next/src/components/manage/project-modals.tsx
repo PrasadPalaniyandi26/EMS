@@ -1,20 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Pencil, PlusCircle } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Plus, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { ModuleModal } from '@/components/shared/module/module-modal';
-import { Field, AutoLabel, CurrencyInput, SegmentedControl, inp, sel } from '@/components/shared/modal-primitives';
+import { Field, NativeSelect, CurrencyInput, SegmentedControl, inp } from '@/components/shared/modal-primitives';
+import { CreatableSelect } from './creatable-select';
+import type { TypeCategory } from '@/hooks/use-queries';
 
-// ─── Shared Styles ─────────────────────────────────────────────────────────────
-
-// ─── Field ─────────────────────────────────────────────────────────────────────
-// ─── Props ─────────────────────────────────────────────────────────────────────
 interface ProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -23,21 +18,22 @@ interface ProjectModalProps {
   clients: any[];
   projectTypes: any[];
   users: any[];
-  onSaveType: (form: any) => Promise<any>;
+  /** Admin only: without these the dropdowns just pick, with no "Create new" option */
+  onSaveType?: (form: any) => Promise<any>;
+  categories: TypeCategory[];
+  onSaveCategory?: (form: any) => Promise<any>;
 }
 
-// ─── ProjectModal ──────────────────────────────────────────────────────────────
-export function ProjectModal({
-  isOpen, onClose, onSave, editing, clients, projectTypes, users, onSaveType,
-}: ProjectModalProps) {
-  const [form, setForm] = useState({
-    name: '', client_id: '', type_id: '',
-    lead: '', category: '', budget: '', start_date: '', end_date: '',
-    status: 'Active', description: '',
-  });
-  const [showNewType, setShowNewType] = useState(false);
-  const [newTypeName, setNewTypeName] = useState('');
+const EMPTY = {
+  name: '', client_id: '', type_id: '',
+  lead: '', category: '', budget: '', start_date: '', end_date: '',
+  status: 'Active', description: '',
+};
 
+export function ProjectModal({
+  isOpen, onClose, onSave, editing, clients, projectTypes, users, onSaveType, categories, onSaveCategory,
+}: ProjectModalProps) {
+  const [form, setForm] = useState(EMPTY);
   const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
 
   useEffect(() => {
@@ -55,11 +51,15 @@ export function ProjectModal({
         description: editing.description || '',
       });
     } else {
-      setForm({ name: '', client_id: '', type_id: '', lead: '', category: '', budget: '', start_date: '', end_date: '', status: 'Active', description: '' });
+      setForm(EMPTY);
     }
-    setShowNewType(false);
-    setNewTypeName('');
   }, [editing, isOpen]);
+
+  // Types belong to a client, so the list follows the chosen client
+  const clientTypes = projectTypes.filter((t) => String(t.client_id) === form.client_id);
+  // ...and categories follow the chosen type. The category is stored by name; keep a saved one that is no longer listed
+  const categoryOptions = categories.filter((c) => String(c.type_id) === form.type_id).map((c) => ({ id: c.name, name: c.name }));
+  if (form.category && form.type_id && !categoryOptions.some((o) => o.id === form.category)) categoryOptions.push({ id: form.category, name: form.category });
 
   const handleSubmit = () => {
     if (!form.name.trim()) { toast.error('Project name is required'); return; }
@@ -73,18 +73,6 @@ export function ProjectModal({
     });
   };
 
-  const handleAddType = async () => {
-    if (!newTypeName.trim()) return;
-    try {
-      const created = await onSaveType({ name: newTypeName.trim(), client_id: Number(form.client_id) || undefined });
-      if (created?.id) set('type_id', String(created.id));
-      setNewTypeName('');
-      setShowNewType(false);
-    } catch {
-      // error handled in parent
-    }
-  };
-
   return (
     <ModuleModal
       isOpen={isOpen}
@@ -93,105 +81,75 @@ export function ProjectModal({
       icon={editing ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
       onSave={handleSubmit}
       saveLabel={editing ? 'Save Changes' : 'Create Project'}
-      size="lg"
+      size="xl"
     >
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+      <div className="grid grid-cols-1 items-start gap-x-6 gap-y-3 md:grid-cols-3">
 
-        {/* LEFT column: name / client / type */}
-        <div className="space-y-2.5">
-
-          <Field label="Project Name *">
+        {/* Column 1: what and who */}
+        <div className="space-y-3">
+          <Field label="Project Name" required>
             <Input className={inp} placeholder="e.g. Phoenix Infrastructure Overhaul" value={form.name} onChange={(e) => set('name', e.target.value)} />
           </Field>
-
-          <Field label="Client *">
-            <Select value={form.client_id} onValueChange={(v) => set('client_id', v)}>
-              <SelectTrigger className={sel}><SelectValue placeholder="Select client" /></SelectTrigger>
-              <SelectContent>
-                {clients.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+          <Field label="Lead / Manager">
+            <NativeSelect value={form.lead} onChange={(e) => set('lead', e.target.value)}>
+              <option value="">Assign lead</option>
+              {users.map((u) => <option key={u.id} value={u.id}>{u.username || u.name}</option>)}
+            </NativeSelect>
           </Field>
-
-          <div className="space-y-1">
-            <AutoLabel className="text-xs font-semibold text-[var(--shell-text)] normal-case tracking-normal">Project Type *</AutoLabel>
-            <Select value={form.type_id} onValueChange={(v) => set('type_id', v)}>
-              <SelectTrigger className={sel}><SelectValue placeholder="Select type" /></SelectTrigger>
-              <SelectContent>
-                {projectTypes.map((t) => <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <button
-              type="button"
-              onClick={() => { setShowNewType(!showNewType); setNewTypeName(''); }}
-              className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--shell-accent)] hover:underline mt-1"
-            >
-              <PlusCircle className="w-3 h-3" /> {showNewType ? 'Cancel' : 'Create new type'}
-            </button>
-            {showNewType && (
-              <div className="mt-1 flex gap-2">
-                <Input
-                  className="h-10 text-sm border-input bg-transparent text-[var(--shell-text)] border-[var(--shell-border)] text-[var(--shell-text)] rounded-lg flex-1"
-                  placeholder="e.g. Infrastructure"
-                  value={newTypeName}
-                  onChange={(e) => setNewTypeName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddType()}
-                />
-                <Button type="button" onClick={handleAddType}
-                  className="h-10 px-3 btn-action-primary rounded-lg text-[12px] font-semibold border border-[var(--shell-border)]">
-                  Add
-                </Button>
-              </div>
-            )}
-          </div>
-
         </div>
 
-        {/* RIGHT column: lead / category / budget / dates */}
-        <div className="space-y-2.5">
-
-          <Field label="Lead / Manager">
-            <Select value={form.lead} onValueChange={(v) => set('lead', v)}>
-              <SelectTrigger className={sel}><SelectValue placeholder="Assign lead" /></SelectTrigger>
-              <SelectContent>
-                {users.map((u) => (
-                  <SelectItem key={u.id} value={String(u.id)}>
-                    {u.username || u.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-
-          <Field label="Project Category">
-            <Select value={form.category} onValueChange={(v) => set('category', v)}>
-              <SelectTrigger className={sel}><SelectValue placeholder="Select category" /></SelectTrigger>
-              <SelectContent>
-                {['Enterprise Level', 'Internal Operations', 'R&D Initiatives', 'Client Delivery', 'Infrastructure'].map((c) => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-
+        {/* Column 2: money and time */}
+        <div className="space-y-3">
           <Field label="Estimated Budget">
             <CurrencyInput value={form.budget} onChange={(v) => set('budget', v)} />
           </Field>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Start Date">
-              <Input className={inp} type="date" value={form.start_date} onChange={(e) => set('start_date', e.target.value)} />
-            </Field>
-            <Field label="End Date">
-              <Input className={inp} type="date" value={form.end_date} onChange={(e) => set('end_date', e.target.value)} />
-            </Field>
-          </div>
-
+          <Field label="Start Date">
+            <Input className={inp} type="date" value={form.start_date} onChange={(e) => set('start_date', e.target.value)} />
+          </Field>
+          <Field label="End Date">
+            <Input className={inp} type="date" min={form.start_date || undefined} value={form.end_date} onChange={(e) => set('end_date', e.target.value)} />
+          </Field>
         </div>
 
-        {/* Full-width: status + description */}
-        <div className="sm:col-span-2">
-          <p id="project-status-label" className="mb-2 block text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Project Status</p>
+        {/* Column 3: classification, top to bottom: client, then its types, then the type's categories */}
+        <div className="space-y-3">
+          <Field label="Client" required>
+            <NativeSelect
+              value={form.client_id}
+              onChange={(e) => setForm((p) => ({ ...p, client_id: e.target.value, type_id: '', category: '' }))}
+            >
+              <option value="">Select client</option>
+              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </NativeSelect>
+          </Field>
+          <CreatableSelect
+            label="Project Type"
+            required
+            noun="type"
+            placeholder="Select type"
+            value={form.type_id}
+            onChange={(id) => setForm((p) => ({ ...p, type_id: id, category: '' }))}
+            options={clientTypes}
+            blockedHint={form.client_id ? undefined : 'Choose a client first'}
+            onCreate={onSaveType && ((name) => onSaveType({ name, client_id: Number(form.client_id) || undefined }))}
+          />
+          <CreatableSelect
+            label="Project Category"
+            noun="category"
+            placeholder="Select category"
+            value={form.category}
+            onChange={(name) => set('category', name)}
+            options={categoryOptions}
+            blockedHint={form.type_id ? undefined : 'Choose a type first'}
+            onCreate={onSaveCategory && (async (name) => {
+              await onSaveCategory({ name, type_id: Number(form.type_id) });
+              return { id: name };
+            })}
+          />
+        </div>
+
+        <div className="md:col-span-3">
+          <p id="project-status-label" className="mb-2 block text-[13px] font-medium" style={{ color: 'var(--shell-text)' }}>Project Status</p>
           <SegmentedControl
             labelledBy="project-status-label"
             value={form.status}
@@ -206,10 +164,10 @@ export function ProjectModal({
           />
         </div>
 
-        <div className="sm:col-span-2">
+        <div className="md:col-span-3">
           <Field label="Description">
             <Textarea
-              className="w-full text-sm border-input bg-transparent text-[var(--shell-text)] border-[var(--shell-border)] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[var(--shell-accent)]/50 focus:border-[var(--info)] rounded-lg resize-none min-h-[72px]"
+              className="min-h-[72px] w-full resize-none rounded-md border border-input bg-transparent text-sm text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus-visible:border-[var(--shell-accent)] focus-visible:ring-2 focus-visible:ring-[var(--shell-accent)]"
               placeholder="Detailed scope of work and milestones..."
               value={form.description}
               onChange={(e) => set('description', e.target.value)}

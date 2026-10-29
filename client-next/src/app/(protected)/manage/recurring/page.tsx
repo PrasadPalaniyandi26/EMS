@@ -441,11 +441,11 @@ export default function RecurringPage() {
         <DataTableToolbar
           table={table}
           actions={<>
-            canManage ? (
+            {canManage ? (
               <button className="btn-action" onClick={openAdd}>
                 <Plus className="h-4 w-4 text-[var(--success)]" /> Add
               </button>
-            ) : null
+            ) : null}
           <ToolbarActions actions={itemActions} /></>}
         />
       }
