@@ -80,47 +80,6 @@
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
 
-  /* Legacy aliases — keeps existing components working */
-  --color-juniper: #4F46E5;
-  --color-mystic: #EEF2FF;
-  --color-casper: #D1D5DB;
-  --color-storm-grey: #6B7280;
-  --color-jungle-mist: #E5E7EB;
-  --color-charcoal: #111827;
-  --color-deep-charcoal: #111827;
-  --color-sharp-white: #ffffff;
-  --color-ink: #1F2937;
-  --color-alabaster: #F9FAFB;
-  --color-beige: #D1D5DB;
-  --color-parchment: #F9FAFB;
-  --color-currency: #4F46E5;
-  --color-sage: #818CF8;
-  --color-pure-white: #ffffff;
-  --color-zinc-950: #111827;
-  --color-zinc-900: #1F2937;
-  --color-zinc-800: #374151;
-  --color-zinc-700: #4B5563;
-  --color-zinc-500: #6B7280;
-  --color-zinc-400: #9CA3AF;
-  --color-zinc-300: #D1D5DB;
-  --color-zinc-200: #E5E7EB;
-  --color-zinc-100: #F3F4F6;
-  --color-zinc-50: #F9FAFB;
-  --color-emerald: #4F46E5;
-  --color-emerald-dark: #4338CA;
-  --color-slate-50: #F9FAFB;
-  --color-slate-100: #F3F4F6;
-  --color-slate-200: #E5E7EB;
-  --color-slate-300: #D1D5DB;
-  --color-slate-400: #9CA3AF;
-  --color-slate-500: #6B7280;
-  --color-slate-600: #4B5563;
-  --color-slate-700: #374151;
-  --color-slate-800: #1F2937;
-  --color-slate-900: #111827;
-  --color-indigo-600: #4F46E5;
-  --color-indigo-500: #6366F1;
-  --color-indigo-50: #EEF2FF;
 }
 
 /* ─── Light theme: warm ivory ─────────────────────────────────────── */
@@ -605,62 +564,9 @@
   }
 
   /* ── Misc ────────────────────────────────────────────── */
-  /* ── Modal internals ─────────────────────────────────────────── */
-  .modal-body {
-    background: var(--shell-surface);
-    color: var(--shell-text);
-  }
-  .modal-input {
-    background: transparent !important;
-    border-color: var(--input) !important;
-    color: var(--shell-text) !important;
-  }
-  input[type="date"].modal-input { color-scheme: light; }
-  .dark input[type="date"].modal-input { color-scheme: dark; }
-  .modal-input::placeholder { color: var(--shell-text-muted) !important; opacity: 0.6; }
-  .modal-input:focus { border-color: var(--shell-accent) !important; outline: none; }
-  .modal-label { color: var(--shell-text) !important; }
-  .modal-divider { background: var(--shell-border) !important; }
-  .modal-section {
-    background: transparent;
-    border: 1px solid var(--shell-border);
-    border-radius: 0.5rem;
-  }
-  .modal-toggle-track {
-    background: var(--shell-hover);
-    border: 1px solid var(--shell-border);
-    border-radius: 0.5rem;
-  }
-  .modal-toggle-btn {
-    border-radius: 0.5rem;
-    font-size: 11px;
-    font-weight: 600;
-    transition: all 0.15s;
-    color: var(--shell-text-muted);
-  }
-  .modal-toggle-btn.active {
-    background: var(--shell-surface);
-    border: 1px solid var(--shell-border);
-    color: var(--shell-text);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-  }
-  .modal-btn-cancel {
-    color: var(--shell-text-muted);
-    background: transparent;
-    border: none;
-    font-size: 11px;
-    font-weight: 600;
-  }
-  .modal-btn-cancel:hover { color: var(--shell-text); }
-  .modal-btn-save {
-    background: var(--shell-accent);
-    color: var(--shell-accent-fg);
-    border: none;
-    border-radius: 0.5rem;
-    font-size: 11px;
-    font-weight: 600;
-  }
-  .modal-btn-save:hover { opacity: 0.88; }
+  /* Native date inputs follow the theme (calendar icon and picker) */
+  input[type="date"] { color-scheme: light; }
+  .dark input[type="date"] { color-scheme: dark; }
 
   .hide-scrollbar::-webkit-scrollbar { display: none; }
   .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -670,45 +576,6 @@
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--shell-border); border-radius: 10px; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--shell-text-muted); }
-
-/* Light-mode contrast bridge.
-   Tailwind's 300-600 accent shades (text-blue-400, text-emerald-500, bg-rose-500, ...) are tuned for dark
-   surfaces and measured 2.0-3.8:1 on white, so light mode remaps them to the 700 step (>= 5:1 as text on
-   white and on the tinted page/hover surfaces). Overriding the palette variables fixes every raw-palette
-   use at once, and tinted fills (bg-emerald-500/10) simply get a deeper tint. Dark mode is untouched.
-   TEMPORARY: delete this block in Phase 5 once components use the semantic tokens (--success, --status-*, ...). */
-html:not(.dark) {
-  --color-red-300: #b91c1c;     --color-red-400: #b91c1c;     --color-red-500: #b91c1c;
-  --color-orange-300: #c2410c;  --color-orange-400: #c2410c;  --color-orange-500: #c2410c;  --color-orange-600: #c2410c;
-  --color-amber-300: #b45309;   --color-amber-400: #b45309;   --color-amber-500: #b45309;   --color-amber-600: #b45309;
-  --color-yellow-400: #a16207;  --color-yellow-500: #a16207;  --color-yellow-600: #a16207;
-  --color-green-400: #15803d;   --color-green-500: #15803d;   --color-green-600: #15803d;
-  --color-emerald-300: #047857; --color-emerald-400: #047857; --color-emerald-500: #047857; --color-emerald-600: #047857;
-  --color-teal-400: #0f766e;    --color-teal-500: #0f766e;    --color-teal-600: #0f766e;
-  --color-cyan-400: #0e7490;    --color-cyan-500: #0e7490;    --color-cyan-600: #0e7490;
-  --color-sky-400: #0369a1;     --color-sky-500: #0369a1;
-  --color-blue-300: #1d4ed8;    --color-blue-400: #1d4ed8;    --color-blue-500: #1d4ed8;
-  --color-indigo-300: #4338ca;  --color-indigo-400: #4338ca;  --color-indigo-500: #4338ca;
-  --color-violet-400: #6d28d9;  --color-violet-500: #6d28d9;
-  --color-purple-400: #7e22ce;
-  --color-rose-300: #be123c;    --color-rose-400: #be123c;    --color-rose-500: #be123c;    --color-rose-600: #be123c;
-}
-/* Dark-mode bridge, text only. Raw palette TEXT classes that were written without a dark: variant
-   (text-rose-700, text-blue-500, ...) are too dark on the glass surfaces (2.3-4.2:1). Elements that already
-   carry any dark: class are left alone, and fills (bg-rose-500 with white text) are not touched. */
-.dark :is(.text-blue-500, .text-blue-600, .text-blue-700):not([class*="dark:"]) { color: var(--color-blue-400); }
-.dark :is(.text-rose-500, .text-rose-600, .text-rose-700):not([class*="dark:"]) { color: var(--color-rose-400); }
-.dark :is(.text-red-500, .text-red-600, .text-red-700):not([class*="dark:"]) { color: var(--color-red-400); }
-.dark :is(.text-amber-600, .text-amber-700):not([class*="dark:"]) { color: var(--color-amber-400); }
-.dark :is(.text-emerald-600, .text-emerald-700):not([class*="dark:"]) { color: var(--color-emerald-400); }
-.dark :is(.text-indigo-500, .text-indigo-600, .text-indigo-700):not([class*="dark:"]) { color: var(--color-indigo-400); }
-
-/* Same bridge for translucent black secondary text (text-black/40..50 measured 2.9-4.0:1 on white) */
-html:not(.dark) .text-black\/40,
-html:not(.dark) .text-black\/45,
-html:not(.dark) .text-black\/50 {
-  color: rgb(0 0 0 / 0.62);
-}
 
 /* Move Sonner close button to the right side */
 [data-sonner-toast] [data-close-button] {

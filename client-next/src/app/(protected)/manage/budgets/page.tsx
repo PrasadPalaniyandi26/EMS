@@ -138,7 +138,7 @@ export default function BudgetsPage() {
                 <Pencil className="h-4 w-4 text-[var(--info)]" /> Edit
               </button>
               <button className="btn-action" onClick={() => { if (selectedCount !== 1) { toast.error('Select exactly one budget to submit'); return; } setIsSubmitOpen(true); }} disabled={selectedCount !== 1}>
-                <Send className="h-4 w-4 text-currency" /> Allocation
+                <Send className="h-4 w-4 text-[var(--shell-accent)]" /> Allocation
               </button>
               <button className="btn-action" onClick={() => { if (selectedCount === 0) { toast.error('Select budgets to delete'); return; } setIsDeleteOpen(true); }} disabled={selectedCount === 0}>
                 <Trash2 className="h-4 w-4 text-[var(--danger)]" /> Delete{selectedCount > 0 ? ` (${selectedCount})` : ''}

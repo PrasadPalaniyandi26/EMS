@@ -51,7 +51,7 @@ function SectionHeader({ label }: { label: string }) {
 }
 
 // ─── Shared input class ───────────────────────────────────────────────────────
-const INP = 'w-full h-10 text-sm modal-input border-[var(--shell-border)] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[var(--shell-accent)]/50 focus:border-[var(--shell-accent)]/50 rounded-lg';
+const INP = 'w-full h-10 text-sm border-input bg-transparent text-[var(--shell-text)] border-[var(--shell-border)] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[var(--shell-accent)]/50 focus:border-[var(--shell-accent)]/50 rounded-lg';
 
 // ─── UserModal ───────────────────────────────────────────────────────────────
 
@@ -181,7 +181,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
       <div className="space-y-2.5">
         {/* Employee ID badge for edit mode */}
         {editing && (
-          <div className="flex items-center gap-3 modal-toggle-track rounded-lg px-4 py-2">
+          <div className="flex items-center gap-3 rounded-lg border bg-[var(--shell-hover)] rounded-lg px-4 py-2">
             <span className="text-[11px] font-black text-[var(--shell-text-muted)]">Employee ID</span>
             <span className="font-mono text-[13px] font-black text-[var(--info)]">{getEmployeeId(editing.id)}</span>
             <span className="ml-auto px-2 py-0.5 rounded text-[11px] font-black border border-[var(--shell-border)] text-[var(--shell-text)]">
@@ -242,7 +242,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
                     {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                   </button>
                 </div>
-                <button type="button" onClick={handleGenPassword} title="Auto-generate password" className="h-8 px-2 modal-divider border border-[var(--shell-border)] rounded-lg modal-label hover:bg-[var(--shell-hover)] transition-colors shrink-0">
+                <button type="button" onClick={handleGenPassword} title="Auto-generate password" className="h-8 px-2 bg-[var(--shell-border)] border border-[var(--shell-border)] rounded-lg text-[var(--shell-text)] hover:bg-[var(--shell-hover)] transition-colors shrink-0">
                   <RefreshCw className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -252,7 +252,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
           {/* COL 2 — Employment & Access */}
           <div className="space-y-2.5">
             <div className="space-y-1">
-              <AutoLabel className="text-xs font-medium modal-label normal-case tracking-normal">Department</AutoLabel>
+              <AutoLabel className="text-xs font-medium text-[var(--shell-text)] normal-case tracking-normal">Department</AutoLabel>
               <Select value={form.department} onValueChange={(v) => set('department', v)}>
                 <SelectTrigger className={INP}>
                   <SelectValue placeholder="Select Department" />
@@ -280,7 +280,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
                   const isDefault = selectedRoles.find((s) => s.roleId === r.role_id)?.isDefault ?? false;
                   const rc = roleColor(r.role_name);
                   return (
-                    <div key={r.role_id} className={cn('flex items-center px-3 py-2 transition-colors', isChecked ? 'modal-section' : 'hover:modal-section')} style={{ borderColor: 'var(--shell-border)' }}>
+                    <div key={r.role_id} className={cn('flex items-center px-3 py-2 transition-colors', isChecked ? 'rounded-lg border' : 'hover:rounded-lg border')} style={{ borderColor: 'var(--shell-border)' }}>
                       <div onClick={() => toggleRole(r.role_id)} className={cn('w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-all cursor-pointer shrink-0 mr-2.5', isChecked ? 'bg-[var(--shell-accent)] border-[var(--shell-accent)]' : 'border-[var(--shell-border)]')}>
                         {isChecked && <Check className="w-2 h-2 text-white" />}
                       </div>
@@ -350,7 +350,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
             {/* Status segmented */}
             <div className="space-y-1 pt-1">
               <p id="user-status-label" className="text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Status</p>
-              <div role="radiogroup" aria-labelledby="user-status-label" className="flex p-1 modal-toggle-track rounded-xl gap-1">
+              <div role="radiogroup" aria-labelledby="user-status-label" className="flex p-1 rounded-lg border bg-[var(--shell-hover)] rounded-xl gap-1">
                 {([
                   { s: 'ACTIVE',   active: 'text-[var(--success)] border border-[var(--success)]' },
                   { s: 'On Hold',  active: 'text-[var(--warning)] border border-[var(--warning)]' },
@@ -460,7 +460,7 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
     setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
 
-  const INP2 = 'h-10 text-sm modal-input border-[var(--shell-border)] text-[var(--shell-text)] focus:ring-1 focus:ring-[var(--shell-accent)]/50 rounded-lg w-full';
+  const INP2 = 'h-10 text-sm border-input bg-transparent text-[var(--shell-text)] border-[var(--shell-border)] text-[var(--shell-text)] focus:ring-1 focus:ring-[var(--shell-accent)]/50 rounded-lg w-full';
 
   return (
     <ModuleModal
@@ -477,7 +477,7 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
         {/* Add form — 4 equal-width fields in one row, no section box */}
         <div className="grid grid-cols-4 gap-2">
           <div className="space-y-1">
-            <AutoLabel className="text-xs font-medium modal-label normal-case tracking-normal">Client</AutoLabel>
+            <AutoLabel className="text-xs font-medium text-[var(--shell-text)] normal-case tracking-normal">Client</AutoLabel>
             <Select value={form.client_id} onValueChange={(v) => setF('client_id', v)}>
               <SelectTrigger className={INP2}>
                 <SelectValue placeholder="Select client" />
@@ -488,7 +488,7 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
             </Select>
           </div>
           <div className="space-y-1">
-            <AutoLabel className="text-xs font-medium modal-label normal-case tracking-normal">Category</AutoLabel>
+            <AutoLabel className="text-xs font-medium text-[var(--shell-text)] normal-case tracking-normal">Category</AutoLabel>
             <Select value={form.category} onValueChange={(v) => setF('category', v)}>
               <SelectTrigger className={INP2}>
                 <SelectValue />
@@ -500,7 +500,7 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
             </Select>
           </div>
           <div className="space-y-1">
-            <AutoLabel className="text-xs font-medium modal-label normal-case tracking-normal">Type</AutoLabel>
+            <AutoLabel className="text-xs font-medium text-[var(--shell-text)] normal-case tracking-normal">Type</AutoLabel>
             <Select value={form.type_id} onValueChange={(v) => setF('type_id', v)} disabled={typeOptions.length === 0}>
               <SelectTrigger className={INP2}>
                 <SelectValue placeholder={!form.client_id ? 'Select client first' : typeOptions.length === 0 ? 'No types available' : 'Select type'} />
@@ -511,7 +511,7 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
             </Select>
           </div>
           <div className="space-y-1">
-            <AutoLabel className="text-xs font-medium modal-label normal-case tracking-normal">{form.category} Code</AutoLabel>
+            <AutoLabel className="text-xs font-medium text-[var(--shell-text)] normal-case tracking-normal">{form.category} Code</AutoLabel>
             <Select value={form.code} onValueChange={(v) => setF('code', v)} disabled={codeOptions.length === 0}>
               <SelectTrigger className={INP2}>
                 <SelectValue placeholder={codeOptions.length === 0 ? 'Select type first' : 'Select code'} />
@@ -556,13 +556,13 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
               ) : allocations.length === 0 ? (
                 <tr><td colSpan={5} className="px-4 py-10 text-center text-[var(--shell-text-muted)] italic font-medium">No allocations yet.</td></tr>
               ) : allocations.map((a) => (
-                <tr key={a.id} className={cn('transition-colors', selected.has(a.id) ? 'bg-[var(--shell-accent)]/10' : 'hover:modal-section')}>
+                <tr key={a.id} className={cn('transition-colors', selected.has(a.id) ? 'bg-[var(--shell-accent)]/10' : 'hover:rounded-lg border')}>
                   <td className="px-4 py-3 text-center">
                     <input type="checkbox" className="size-3.5 rounded border-[var(--shell-border)]" checked={selected.has(a.id)} onChange={() => toggleSelect(a.id)} />
                   </td>
                   <td className="px-4 py-3 font-bold text-[var(--shell-text)]">{a.client_name}</td>
-                  <td className="px-4 py-3 modal-label">{a.category}</td>
-                  <td className="px-4 py-3 modal-label">{a.type}</td>
+                  <td className="px-4 py-3 text-[var(--shell-text)]">{a.category}</td>
+                  <td className="px-4 py-3 text-[var(--shell-text)]">{a.type}</td>
                   <td className="px-4 py-3 font-mono text-[var(--info)] font-bold">{a.code}</td>
                 </tr>
               ))}
@@ -643,7 +643,7 @@ const ROLE_TEMPLATES: Record<string, PermMap> = {
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
-  Core: 'modal-label', Finance: 'text-[var(--success)]', Operations: 'text-[var(--info)]', Governance: 'text-[var(--warning)]',
+  Core: 'text-[var(--shell-text)]', Finance: 'text-[var(--success)]', Operations: 'text-[var(--info)]', Governance: 'text-[var(--warning)]',
 };
 
 export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; onClose: () => void; user: any }) {
@@ -711,7 +711,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
     }
   };
 
-  const INP3 = 'pl-6 h-10 text-sm modal-input border-[var(--shell-border)] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] rounded-lg';
+  const INP3 = 'pl-6 h-10 text-sm border-input bg-transparent text-[var(--shell-text)] border-[var(--shell-border)] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] rounded-lg';
 
   return (
     <ModuleModal
@@ -740,7 +740,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
                 const c = roleColor(t);
                 return (
                   <button key={t} onClick={() => applyTemplate(t)}
-                    className={cn('px-3 py-1 rounded-lg text-[11px] font-black border transition-all', template === t ? 'modal-input border-[var(--shell-border)] text-[var(--shell-text)]' : 'text-[var(--shell-text-muted)] border-[var(--shell-border)] hover:text-[var(--shell-text)]')}
+                    className={cn('px-3 py-1 rounded-lg text-[11px] font-black border transition-all', template === t ? 'border-input bg-transparent text-[var(--shell-text)] border-[var(--shell-border)] text-[var(--shell-text)]' : 'text-[var(--shell-text-muted)] border-[var(--shell-border)] hover:text-[var(--shell-text)]')}
                     style={template !== t ? { background: 'var(--shell-bg)' } : {}}
                   >
                     <span className={cn('inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle', c.dot)} />
@@ -778,7 +778,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
                   const modPerms = perms[modName] || [false, false, false, false, false];
                   const allOn = modPerms.every(Boolean);
                   return (
-                    <div key={modName} className="flex items-center hover:modal-section transition-colors border-t border-[var(--shell-border)] group">
+                    <div key={modName} className="flex items-center hover:rounded-lg border transition-colors border-t border-[var(--shell-border)] group">
                       <div className="flex-1 flex items-center gap-2 pl-7 pr-4 py-2.5 min-w-0">
                         <div className="w-px h-3 shrink-0" style={{ background: 'var(--shell-border)' }} />
                         <div className="w-3 h-px shrink-0" style={{ background: 'var(--shell-border)' }} />
@@ -826,11 +826,11 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
             </div>
             <div className="p-4 space-y-2.5">
               <div className="space-y-1">
-                <AutoLabel className="text-xs font-medium modal-label">Single Transaction</AutoLabel>
+                <AutoLabel className="text-xs font-medium text-[var(--shell-text)]">Single Transaction</AutoLabel>
                 <CurrencyInput value={thresholds.single} onChange={(v) => setThresholds((p) => ({ ...p, single: v }))} className={INP3} />
               </div>
               <div className="space-y-1">
-                <AutoLabel className="text-xs font-medium modal-label">Monthly Ceiling</AutoLabel>
+                <AutoLabel className="text-xs font-medium text-[var(--shell-text)]">Monthly Ceiling</AutoLabel>
                 <CurrencyInput value={thresholds.monthly} onChange={(v) => setThresholds((p) => ({ ...p, monthly: v }))} className={INP3} />
               </div>
             </div>
@@ -875,7 +875,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
                       <span className="text-xs font-medium text-[var(--shell-text-muted)]">{p}</span>
                       <span className="text-[11px] font-black text-[var(--shell-accent)]">{count}/{MODULES.length}</span>
                     </div>
-                    <div className="w-full h-1 modal-toggle-track rounded-full overflow-hidden">
+                    <div className="w-full h-1 rounded-lg border bg-[var(--shell-hover)] rounded-full overflow-hidden">
                       <div className="h-full bg-[var(--shell-accent)] rounded-full transition-all duration-300" style={{ width: `${pct}%` }} />
                     </div>
                   </div>

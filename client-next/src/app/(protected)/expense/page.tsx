@@ -463,7 +463,7 @@ export default function ExpensePage() {
                 onClick={handleSubmit}
                 disabled={selectedCount === 0 || !sr.some(r => ['DRAFT', 'SENT_BACK'].includes((r.original.status || '').toUpperCase()))}
               >
-                <Send className="h-4 w-4 text-currency" /> Submit
+                <Send className="h-4 w-4 text-[var(--shell-accent)]" /> Submit
               </button>
               <button
                 className="btn-action"
@@ -1025,9 +1025,9 @@ export default function ExpensePage() {
             This will permanently mark <strong>{selectedTxn?.reference_id || `#${selectedTxn?.id}`}</strong> as VOIDED. The record is kept for audit purposes but will no longer count in reports.
           </div>
           <div className="space-y-2">
-            <label className="text-[11px] font-bold modal-label block">Void Reason (optional)</label>
+            <label className="text-[11px] font-bold text-[var(--shell-text)] block">Void Reason (optional)</label>
             <textarea
-              className="w-full h-20 p-3 modal-input border border-[var(--shell-border)] rounded-lg text-[13px] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[color-mix(in_srgb,var(--danger)_50%,transparent)] focus:border-[color-mix(in_srgb,var(--danger)_50%,transparent)] resize-none outline-none"
+              className="w-full h-20 p-3 border-input bg-transparent text-[var(--shell-text)] border border-[var(--shell-border)] rounded-lg text-[13px] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[color-mix(in_srgb,var(--danger)_50%,transparent)] focus:border-[color-mix(in_srgb,var(--danger)_50%,transparent)] resize-none outline-none"
               placeholder="Describe why this transaction is being voided..."
               value={voidReason}
               onChange={(e) => setVoidReason(e.target.value)}

@@ -388,7 +388,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
 
         <Field label="Detail">
           <Input
-            className={`${inp} modal-input`}
+            className={`${inp} border-input bg-transparent text-[var(--shell-text)]`}
             type="text"
             placeholder="Enter full description and justification..."
             value={description}
@@ -409,7 +409,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
         <Field label={`Reference No${isExpense ? ' & Reimburse' : ''}`}>
           <div className="flex items-center gap-2">
             <Input
-              className={`${inp} modal-input min-w-0 flex-1`}
+              className={`${inp} border-input bg-transparent text-[var(--shell-text)] min-w-0 flex-1`}
               type="text"
               placeholder="INV-0000 / REC-0000"
               value={receiptNumber}
@@ -426,7 +426,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
 
         <Field label={`Date of ${isExpense ? 'Expense' : 'Income'}`}>
           <Input
-            className={`${inp} modal-input`}
+            className={`${inp} border-input bg-transparent text-[var(--shell-text)]`}
             type="date"
             value={dateRecorded}
             onChange={(e) => setDateRecorded(e.target.value)}
@@ -523,7 +523,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
             type="button"
             aria-labelledby="receipt-upload-label"
             aria-busy={ocrLoading}
-            className={`group flex w-full cursor-pointer items-center gap-3 rounded-lg border-2 border-dashed px-4 py-3 text-left transition-colors modal-section focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--shell-accent)] ${dragging ? 'border-[var(--shell-accent)]' : 'border-[var(--shell-border)] hover:border-[var(--shell-accent)]'}`}
+            className={`group flex w-full cursor-pointer items-center gap-3 rounded-lg border-2 border-dashed px-4 py-3 text-left transition-colors rounded-lg border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--shell-accent)] ${dragging ? 'border-[var(--shell-accent)]' : 'border-[var(--shell-border)] hover:border-[var(--shell-accent)]'}`}
             onClick={() => !ocrLoading && fileInputRef.current?.click()}
             onDrop={handleDrop}
             onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
@@ -553,9 +553,9 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
 
           {/* File card: visible when a file exists */}
           {hasFile && (
-            <div className="modal-section mt-2 flex items-center justify-between gap-2 rounded-lg border border-[var(--shell-border)] px-3 py-2">
+            <div className="rounded-lg border mt-2 flex items-center justify-between gap-2 rounded-lg border border-[var(--shell-border)] px-3 py-2">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="modal-divider rounded border border-[var(--shell-border)] p-1.5">
+                <div className="bg-[var(--shell-border)] rounded border border-[var(--shell-border)] p-1.5">
                   <FileText aria-hidden className="h-5 w-5 text-[var(--shell-accent)]" />
                 </div>
                 <div className="min-w-0 leading-tight">
@@ -567,14 +567,14 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
                 <button
                   type="button"
                   onClick={handleViewFile}
-                  className="modal-section flex h-10 items-center gap-1.5 rounded border border-[var(--shell-border)] px-3 text-[11px] font-bold transition-colors hover:border-[var(--shell-accent)] sm:h-8"
+                  className="rounded-lg border flex h-10 items-center gap-1.5 rounded border border-[var(--shell-border)] px-3 text-[11px] font-bold transition-colors hover:border-[var(--shell-accent)] sm:h-8"
                 >
                   <Eye aria-hidden className="h-3.5 w-3.5 text-[var(--success)]" /> View
                 </button>
                 <button
                   type="button"
                   onClick={handleRemoveFile}
-                  className="modal-section flex h-10 items-center gap-1.5 rounded border border-[var(--shell-border)] px-3 text-[11px] font-bold transition-colors hover:border-[var(--danger)] sm:h-8"
+                  className="rounded-lg border flex h-10 items-center gap-1.5 rounded border border-[var(--shell-border)] px-3 text-[11px] font-bold transition-colors hover:border-[var(--danger)] sm:h-8"
                 >
                   <Trash2 aria-hidden className="h-3.5 w-3.5 text-[var(--danger)]" /> Remove
                 </button>

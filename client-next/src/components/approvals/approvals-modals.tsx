@@ -82,7 +82,7 @@ export function ApproveModal({ isOpen, onClose, onConfirm, selectedRequest }: Mo
       }
     >
       <div className="space-y-6">
-        <div className={`rounded-lg border overflow-x-auto ${selectedRequest.needs_reimbursement ? 'border-[color-mix(in_srgb,var(--warning)_40%,transparent)] bg-[color-mix(in_srgb,var(--warning)_5%,transparent)]' : 'border-[var(--shell-border)] modal-section'}`}>
+        <div className={`rounded-lg border overflow-x-auto ${selectedRequest.needs_reimbursement ? 'border-[color-mix(in_srgb,var(--warning)_40%,transparent)] bg-[color-mix(in_srgb,var(--warning)_5%,transparent)]' : 'border-[var(--shell-border)] rounded-lg border'}`}>
           {selectedRequest.needs_reimbursement && (
             <div className="flex items-center gap-2 px-4 py-2 border-b border-[color-mix(in_srgb,var(--warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]">
               <Wallet className="w-3.5 h-3.5 text-[var(--warning)] shrink-0" />
@@ -90,7 +90,7 @@ export function ApproveModal({ isOpen, onClose, onConfirm, selectedRequest }: Mo
             </div>
           )}
           <table className="w-full text-[12px]">
-            <thead className={`border-b font-bold ${selectedRequest.needs_reimbursement ? 'border-[color-mix(in_srgb,var(--warning)_30%,transparent)] text-[var(--warning)]' : 'modal-section border-[var(--shell-border)] modal-label'}`}>
+            <thead className={`border-b font-bold ${selectedRequest.needs_reimbursement ? 'border-[color-mix(in_srgb,var(--warning)_30%,transparent)] text-[var(--warning)]' : 'rounded-lg border border-[var(--shell-border)] text-[var(--shell-text)]'}`}>
               <tr>
                 <th className="px-4 py-2 text-left">Reference ID</th>
                 <th className="px-4 py-2 text-left">Employee</th>
@@ -106,7 +106,7 @@ export function ApproveModal({ isOpen, onClose, onConfirm, selectedRequest }: Mo
               {selectedRequest.description && (
                 <tr>
                   <td colSpan={3} className="px-4 py-2.5">
-                    <p className="text-[13px] font-medium modal-label mb-1 flex items-center gap-1.5">
+                    <p className="text-[13px] font-medium text-[var(--shell-text)] mb-1 flex items-center gap-1.5">
                       <FileText size={11} /> Internal Notes
                     </p>
                     <p className="text-[12px]" style={{ color: 'var(--shell-text)' }}>{selectedRequest.description}</p>
@@ -118,11 +118,11 @@ export function ApproveModal({ isOpen, onClose, onConfirm, selectedRequest }: Mo
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="approve-comment" className="text-[13px] font-medium modal-label flex items-center gap-2">
+          <label htmlFor="approve-comment" className="text-[13px] font-medium text-[var(--shell-text)] flex items-center gap-2">
             <MessageSquare size={14} /> Approval Comments (Optional)
           </label>
           <Textarea id="approve-comment"
-            className="w-full h-24 p-3 modal-input border border-[var(--shell-border)] rounded-lg text-[13px] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[var(--shell-accent)]/50 focus:border-[var(--shell-accent)]/50 resize-none"
+            className="w-full h-24 p-3 border-input bg-transparent text-[var(--shell-text)] border border-[var(--shell-border)] rounded-lg text-[13px] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[var(--shell-accent)]/50 focus:border-[var(--shell-accent)]/50 resize-none"
             placeholder="Enter any notes or justification for this approval..."
             value={comment}
             onChange={(e) => setComment(e.target.value)}
@@ -130,7 +130,7 @@ export function ApproveModal({ isOpen, onClose, onConfirm, selectedRequest }: Mo
         </div>
 
         {selectedRequest.gst_rate != null && (
-          <div className="flex items-center justify-between modal-section p-4 rounded-xl border border-[var(--shell-border)]">
+          <div className="flex items-center justify-between rounded-lg border p-4 rounded-xl border border-[var(--shell-border)]">
             <div className="flex items-center gap-3">
               <Settings className="text-[var(--success)]" size={20} />
               <div>
@@ -143,7 +143,7 @@ export function ApproveModal({ isOpen, onClose, onConfirm, selectedRequest }: Mo
         )}
 
         {selectedRequest.needs_reimbursement && (
-          <div className="flex items-center justify-between modal-section p-4 rounded-xl border border-[color-mix(in_srgb,var(--warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--warning)_5%,transparent)]">
+          <div className="flex items-center justify-between rounded-lg border p-4 rounded-xl border border-[color-mix(in_srgb,var(--warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--warning)_5%,transparent)]">
             <div className="flex items-center gap-3">
               <Wallet className="text-[var(--warning)]" size={20} />
               <div>
@@ -214,9 +214,9 @@ export function RejectModal({ isOpen, onClose, onConfirm, selectedRequest }: Mod
       }
     >
       <div className="space-y-6">
-        <div className="rounded-lg border border-[var(--shell-border)] modal-section overflow-x-auto">
+        <div className="rounded-lg border border-[var(--shell-border)] rounded-lg border overflow-x-auto">
           <table className="w-full text-[12px]">
-            <thead className="modal-section border-b border-[var(--shell-border)] modal-label font-bold">
+            <thead className="rounded-lg border border-b border-[var(--shell-border)] text-[var(--shell-text)] font-bold">
               <tr>
                 <th className="px-4 py-2 text-left">Reference ID</th>
                 <th className="px-4 py-2 text-left">Employee</th>
@@ -232,7 +232,7 @@ export function RejectModal({ isOpen, onClose, onConfirm, selectedRequest }: Mod
               {selectedRequest.description && (
                 <tr>
                   <td colSpan={3} className="px-4 py-2.5">
-                    <p className="text-[13px] font-medium modal-label mb-1 flex items-center gap-1.5">
+                    <p className="text-[13px] font-medium text-[var(--shell-text)] mb-1 flex items-center gap-1.5">
                       <FileText size={11} /> Internal Notes
                     </p>
                     <p className="text-[12px]" style={{ color: 'var(--shell-text)' }}>{selectedRequest.description}</p>
@@ -244,11 +244,11 @@ export function RejectModal({ isOpen, onClose, onConfirm, selectedRequest }: Mod
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="reject-reason" className="text-[13px] font-medium modal-label flex items-center gap-2">
+          <label htmlFor="reject-reason" className="text-[13px] font-medium text-[var(--shell-text)] flex items-center gap-2">
             <MessageSquare size={14} /> Rejection Reason <span className="text-[var(--danger)]">*</span>
           </label>
           <Textarea id="reject-reason" aria-required="true" aria-invalid={error ? true : undefined} aria-describedby={error ? "reject-reason-error" : undefined}
-            className={`w-full h-24 p-3 modal-input border rounded-lg text-[13px] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[var(--shell-accent)]/50 focus:border-[var(--shell-accent)]/50 resize-none ${error ? 'border-[var(--danger)]' : 'border-[var(--shell-border)]'}`}
+            className={`w-full h-24 p-3 border-input bg-transparent text-[var(--shell-text)] border rounded-lg text-[13px] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[var(--shell-accent)]/50 focus:border-[var(--shell-accent)]/50 resize-none ${error ? 'border-[var(--danger)]' : 'border-[var(--shell-border)]'}`}
             placeholder="Provide a detailed reason for rejecting this request..."
             value={comment}
             onChange={(e) => { setComment(e.target.value); if (e.target.value.trim()) setError(''); }}
@@ -305,9 +305,9 @@ export function VoidModal({ isOpen, onClose, onConfirm, selectedRequest }: Modal
       }
     >
       <div className="space-y-6">
-        <div className="rounded-lg border border-[var(--shell-border)] modal-section overflow-x-auto">
+        <div className="rounded-lg border border-[var(--shell-border)] rounded-lg border overflow-x-auto">
           <table className="w-full text-[12px]">
-            <thead className="modal-section border-b border-[var(--shell-border)] modal-label font-bold">
+            <thead className="rounded-lg border border-b border-[var(--shell-border)] text-[var(--shell-text)] font-bold">
               <tr>
                 <th className="px-4 py-2 text-left">Reference ID</th>
                 <th className="px-4 py-2 text-left">Employee</th>
@@ -323,7 +323,7 @@ export function VoidModal({ isOpen, onClose, onConfirm, selectedRequest }: Modal
               {selectedRequest.description && (
                 <tr>
                   <td colSpan={3} className="px-4 py-2.5">
-                    <p className="text-[13px] font-medium modal-label mb-1 flex items-center gap-1.5">
+                    <p className="text-[13px] font-medium text-[var(--shell-text)] mb-1 flex items-center gap-1.5">
                       <FileText size={11} /> Internal Notes
                     </p>
                     <p className="text-[12px]" style={{ color: 'var(--shell-text)' }}>{selectedRequest.description}</p>
@@ -335,11 +335,11 @@ export function VoidModal({ isOpen, onClose, onConfirm, selectedRequest }: Modal
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="void-reason" className="text-[13px] font-medium modal-label flex items-center gap-2">
+          <label htmlFor="void-reason" className="text-[13px] font-medium text-[var(--shell-text)] flex items-center gap-2">
             <MessageSquare size={14} /> Reason for Voiding (optional)
           </label>
           <Textarea id="void-reason"
-            className="w-full h-24 p-3 modal-input border border-[var(--shell-border)] rounded-lg text-[13px] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[color-mix(in_srgb,var(--danger)_50%,transparent)] focus:border-[color-mix(in_srgb,var(--danger)_50%,transparent)] resize-none"
+            className="w-full h-24 p-3 border-input bg-transparent text-[var(--shell-text)] border border-[var(--shell-border)] rounded-lg text-[13px] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[color-mix(in_srgb,var(--danger)_50%,transparent)] focus:border-[color-mix(in_srgb,var(--danger)_50%,transparent)] resize-none"
             placeholder="Explain why this approved transaction is being voided..."
             value={reason}
             onChange={(e) => setReason(e.target.value)}
@@ -390,9 +390,9 @@ export function SendBackModal({ isOpen, onClose, onConfirm, selectedRequest }: M
       }
     >
       <div className="space-y-6">
-        <div className="rounded-lg border border-[var(--shell-border)] modal-section overflow-x-auto">
+        <div className="rounded-lg border border-[var(--shell-border)] rounded-lg border overflow-x-auto">
           <table className="w-full text-[12px]">
-            <thead className="modal-section border-b border-[var(--shell-border)] modal-label font-bold">
+            <thead className="rounded-lg border border-b border-[var(--shell-border)] text-[var(--shell-text)] font-bold">
               <tr>
                 <th className="px-4 py-2 text-left">Reference ID</th>
                 <th className="px-4 py-2 text-left">Employee</th>
@@ -408,7 +408,7 @@ export function SendBackModal({ isOpen, onClose, onConfirm, selectedRequest }: M
               {selectedRequest.description && (
                 <tr>
                   <td colSpan={3} className="px-4 py-2.5">
-                    <p className="text-[13px] font-medium modal-label mb-1 flex items-center gap-1.5">
+                    <p className="text-[13px] font-medium text-[var(--shell-text)] mb-1 flex items-center gap-1.5">
                       <FileText size={11} /> Internal Notes
                     </p>
                     <p className="text-[12px]" style={{ color: 'var(--shell-text)' }}>{selectedRequest.description}</p>
@@ -420,11 +420,11 @@ export function SendBackModal({ isOpen, onClose, onConfirm, selectedRequest }: M
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="sendback-reason" className="text-[13px] font-medium modal-label flex items-center gap-2">
+          <label htmlFor="sendback-reason" className="text-[13px] font-medium text-[var(--shell-text)] flex items-center gap-2">
             <MessageSquare size={14} /> Reason for Sending Back
           </label>
           <Textarea id="sendback-reason"
-            className="w-full h-24 p-3 modal-input border border-[var(--shell-border)] rounded-lg text-[13px] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[var(--shell-accent)]/50 focus:border-[var(--shell-accent)]/50 resize-none"
+            className="w-full h-24 p-3 border-input bg-transparent text-[var(--shell-text)] border border-[var(--shell-border)] rounded-lg text-[13px] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[var(--shell-accent)]/50 focus:border-[var(--shell-accent)]/50 resize-none"
             placeholder="Explain what the employee needs to correct or provide..."
             value={comment}
             onChange={(e) => setComment(e.target.value)}

@@ -30,7 +30,7 @@ export function NativeSelect({ className, children, ...props }: React.ComponentP
     <div className="relative">
       <select
         {...props}
-        className={cn(sel, 'modal-input appearance-none pr-8 pl-3 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50', className)}
+        className={cn(sel, 'border-input bg-transparent text-[var(--shell-text)] appearance-none pr-8 pl-3 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50', className)}
       >
         {children}
       </select>
@@ -193,7 +193,7 @@ export function PhoneInput({
     <div>
       <Input
         type="tel"
-        className={`${inp} modal-input ${className}`}
+        className={`${inp} border-input bg-transparent text-[var(--shell-text)] ${className}`}
         placeholder={placeholder}
         value={value}
         disabled={disabled}
@@ -247,7 +247,7 @@ export function EmailInput({
     <div>
       <Input
         type="email"
-        className={`${inp} modal-input ${className}`}
+        className={`${inp} border-input bg-transparent text-[var(--shell-text)] ${className}`}
         placeholder={placeholder}
         value={value}
         readOnly={readOnly}
@@ -372,7 +372,7 @@ export function CurrencyInput({
       </span>
       <Input
         type="number"
-        className={`${inp} modal-input pl-7 font-bold ${className}`}
+        className={`${inp} border-input bg-transparent text-[var(--shell-text)] pl-7 font-bold ${className}`}
         placeholder={placeholder}
         min={min}
         step="0.01"

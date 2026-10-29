@@ -33,8 +33,8 @@ import { Field, NativeSelect, CurrencyInput, inp } from '@/components/shared/mod
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 
 // Shared control styles for these dialogs: 40px, keyboard focus ring
-const ctl = `${inp} modal-input placeholder:text-[var(--shell-text-muted)]`;
-const sel = 'w-full h-10 text-sm modal-input border border-[var(--shell-border)] text-[var(--shell-text)] focus-visible:ring-2 focus-visible:ring-[var(--shell-accent)] rounded-lg';
+const ctl = `${inp} border-input bg-transparent text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)]`;
+const sel = 'w-full h-10 text-sm border-input bg-transparent text-[var(--shell-text)] border border-[var(--shell-border)] text-[var(--shell-text)] focus-visible:ring-2 focus-visible:ring-[var(--shell-accent)] rounded-lg';
 
 interface RecurringModalProps {
   isOpen: boolean;
@@ -106,7 +106,7 @@ export function RecurringModal({
           </div>
           <div className="space-y-1.5">
             <p id="recurring-type-label" className="text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Transaction Type</p>
-            <div role="radiogroup" aria-labelledby="recurring-type-label" className="flex p-1 modal-toggle-track rounded-xl gap-1 h-10">
+            <div role="radiogroup" aria-labelledby="recurring-type-label" className="flex p-1 rounded-lg border bg-[var(--shell-hover)] rounded-xl gap-1 h-10">
               {([
                 { val: 'expense', active: 'text-[var(--danger)] border border-[var(--danger)]' },
                 { val: 'income',  active: 'text-[var(--success)] border border-[var(--success)]' },
@@ -223,7 +223,7 @@ export function RecurringModal({
           <div className="flex items-center gap-2 mb-2">
             <Settings aria-hidden className="w-3.5 h-3.5 text-[var(--shell-accent)]" />
             <span className="text-xs font-black text-[var(--shell-accent)]">Automation Rules</span>
-            <div className="h-[1px] flex-1 modal-divider" />
+            <div className="h-[1px] flex-1 bg-[var(--shell-border)]" />
           </div>
           <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
             <div className="space-y-1.5">
@@ -252,7 +252,7 @@ export function RecurringModal({
         {/* Notes */}
         <Field label="Recurring Purpose / Notes">
           <Textarea
-            className="w-full text-sm modal-input rounded-lg resize-none min-h-[64px]"
+            className="w-full text-sm border-input bg-transparent text-[var(--shell-text)] rounded-lg resize-none min-h-[64px]"
             placeholder="Provide a reason for this recurring transaction..."
             value={form.notes || ''}
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
@@ -267,7 +267,7 @@ export function RecurringModal({
           <button
             type="button"
             aria-labelledby="recurring-doc-label"
-            className={`group flex w-full cursor-pointer items-center gap-3 rounded-lg border-2 border-dashed px-4 py-3 text-left transition-colors modal-section focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--shell-accent)] ${dragging ? 'border-[var(--shell-accent)]' : 'border-[var(--shell-border)] hover:border-[var(--shell-accent)]'}`}
+            className={`group flex w-full cursor-pointer items-center gap-3 rounded-lg border-2 border-dashed px-4 py-3 text-left transition-colors rounded-lg border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--shell-accent)] ${dragging ? 'border-[var(--shell-accent)]' : 'border-[var(--shell-border)] hover:border-[var(--shell-accent)]'}`}
             onClick={() => fileInputRef.current?.click()}
             onDrop={handleDrop}
             onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
@@ -282,7 +282,7 @@ export function RecurringModal({
             </span>
           </button>
           {(file || (isEdit && editing?.receipt_path)) && (
-            <div className="mt-1 modal-section border border-[var(--shell-border)] rounded-lg px-3 py-2 flex items-center justify-between">
+            <div className="mt-1 rounded-lg border border border-[var(--shell-border)] rounded-lg px-3 py-2 flex items-center justify-between">
               <div className="flex items-center gap-2.5 min-w-0">
                 <FileText aria-hidden className="w-5 h-5 text-[var(--shell-accent)] shrink-0" />
                 <div className="leading-tight min-w-0">

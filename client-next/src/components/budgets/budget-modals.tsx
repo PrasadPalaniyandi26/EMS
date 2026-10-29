@@ -77,8 +77,8 @@ export function AddBudgetModal({ isOpen, onClose, onSave, editingData }: BudgetM
     { value: String(currentYear + 1), label: `${currentYear + 1} (Forecast)` },
   ];
 
-  const ctl = `${inp} modal-input`;
-  const sel = 'w-full modal-input rounded-lg h-10 text-sm text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)]';
+  const ctl = `${inp} border-input bg-transparent text-[var(--shell-text)]`;
+  const sel = 'w-full border-input bg-transparent text-[var(--shell-text)] rounded-lg h-10 text-sm text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)]';
 
   return (
     <ModuleModal
@@ -154,7 +154,7 @@ export function AddBudgetModal({ isOpen, onClose, onSave, editingData }: BudgetM
 
         <Field label="Details">
           <Textarea
-            className="w-full modal-input border-[var(--shell-border)] focus-visible:ring-2 focus-visible:ring-[var(--shell-accent)] rounded-lg text-sm text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] resize-none"
+            className="w-full border-input bg-transparent text-[var(--shell-text)] border-[var(--shell-border)] focus-visible:ring-2 focus-visible:ring-[var(--shell-accent)] rounded-lg text-sm text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] resize-none"
             style={{ minHeight: '64px', maxHeight: '64px' }}
             placeholder="Budget scope, objectives, and allocation rationale..."
             value={form.details}
@@ -164,14 +164,14 @@ export function AddBudgetModal({ isOpen, onClose, onSave, editingData }: BudgetM
 
         {/* Switch cards: the whole card is the label, so clicking the text toggles it and it is announced */}
         <FormGrid className="gap-4 border-t border-[var(--shell-border)] pt-3">
-          <label className="modal-section flex cursor-pointer items-center justify-between rounded-xl border border-[var(--shell-border)] p-4">
+          <label className="rounded-lg border flex cursor-pointer items-center justify-between rounded-xl border border-[var(--shell-border)] p-4">
             <span>
               <span className="block text-[12px] font-bold" style={{ color: 'var(--shell-text)' }}>Strict Enforcement</span>
               <span className="block text-[11px] font-medium text-[var(--shell-text-muted)]">Prevent overspending strictly</span>
             </span>
             <Switch checked={form.strict} onCheckedChange={v => set('strict', v)} aria-label="Strict enforcement" />
           </label>
-          <label className="modal-section flex cursor-pointer items-center justify-between rounded-xl border border-[var(--shell-border)] p-4">
+          <label className="rounded-lg border flex cursor-pointer items-center justify-between rounded-xl border border-[var(--shell-border)] p-4">
             <span>
               <span className="block text-[12px] font-bold" style={{ color: 'var(--shell-text)' }}>Auto-Rollover</span>
               <span className="block text-[11px] font-medium text-[var(--shell-text-muted)]">Carry over unused balance</span>
@@ -198,14 +198,14 @@ export function ExportBudgetModal({ isOpen, onClose }: BudgetModalProps) {
         <div className="space-y-2.5">
           <p className="text-xs font-semibold" style={{ color: 'var(--shell-text-muted)' }}>Select Format</p>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <button className="flex flex-col items-center justify-center p-6 modal-section border border-[var(--shell-border)] rounded-xl hover:border-[var(--shell-accent)]/30 hover:modal-section transition-all group scale-100 active:scale-95">
+            <button className="flex flex-col items-center justify-center p-6 rounded-lg border border border-[var(--shell-border)] rounded-xl hover:border-[var(--shell-accent)]/30 hover:rounded-lg border transition-all group scale-100 active:scale-95">
               <div className="w-12 h-12 rounded-full bg-[var(--shell-accent)]/20 text-[var(--success)] flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <Download className="w-6 h-6" />
               </div>
               <span className="text-xs font-bold" style={{ color: 'var(--shell-text)' }}>Excel Spreadsheet</span>
               <span className="text-[11px] text-[var(--shell-text-muted)] mt-1 font-bold">.XLSX Format</span>
             </button>
-            <button className="flex flex-col items-center justify-center p-6 modal-section border border-[var(--shell-border)] rounded-xl hover:border-[var(--shell-accent)]/30 hover:modal-section transition-all group scale-100 active:scale-95">
+            <button className="flex flex-col items-center justify-center p-6 rounded-lg border border border-[var(--shell-border)] rounded-xl hover:border-[var(--shell-accent)]/30 hover:rounded-lg border transition-all group scale-100 active:scale-95">
               <div className="w-12 h-12 rounded-full bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] text-[var(--danger)] flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <Download className="w-6 h-6" />
               </div>
@@ -257,7 +257,7 @@ export function SubmitBudgetModal({ isOpen, onClose, onSubmit }: BudgetModalProp
         </div>
         <div className="space-y-2">
           <h3 className="text-lg font-bold tracking-tight" style={{ color: 'var(--shell-text)' }}>Finalize Allocation?</h3>
-          <p className="text-[11px] modal-label leading-relaxed font-medium">
+          <p className="text-[11px] text-[var(--shell-text)] leading-relaxed font-medium">
             You are about to submit the current budget allocation for approval. Once submitted, changes may requires administrative override.
           </p>
         </div>
@@ -265,7 +265,7 @@ export function SubmitBudgetModal({ isOpen, onClose, onSubmit }: BudgetModalProp
         <div className="w-full text-left">
           <Field label="Comments (Optional)">
             <Textarea
-              className="modal-input border-[var(--shell-border)] focus-visible:ring-2 focus-visible:ring-[var(--shell-accent)] min-h-[80px] text-xs text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] resize-none rounded-lg p-3"
+              className="border-input bg-transparent text-[var(--shell-text)] border-[var(--shell-border)] focus-visible:ring-2 focus-visible:ring-[var(--shell-accent)] min-h-[80px] text-xs text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] resize-none rounded-lg p-3"
               placeholder="Provide justification for this allocation..."
             />
           </Field>
@@ -293,7 +293,7 @@ export function DeleteBudgetModal({ isOpen, onClose, onConfirm, count }: { isOpe
         </div>
         <div className="space-y-2">
           <h3 className="text-lg font-bold tracking-tight" style={{ color: 'var(--shell-text)' }}>Delete {count} budget record(s)?</h3>
-          <p className="text-[11px] modal-label leading-relaxed font-medium">
+          <p className="text-[11px] text-[var(--shell-text)] leading-relaxed font-medium">
             This action is irreversible. All data associated with these budget allocations will be permanently removed from the system.
           </p>
         </div>

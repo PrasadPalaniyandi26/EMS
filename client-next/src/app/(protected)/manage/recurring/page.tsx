@@ -421,7 +421,7 @@ export default function RecurringPage() {
                   onClick={handleSubmit}
                   disabled={selectedCount !== 1 || !['DRAFT', 'SENT_BACK'].includes(((selectedRows[0]?.original as any)?.status || 'DRAFT').toUpperCase())}
                 >
-                  <Send className="h-4 w-4 text-currency" /> Submit
+                  <Send className="h-4 w-4 text-[var(--shell-accent)]" /> Submit
                 </button>
                 {canApprove && (
                   <>
@@ -479,7 +479,7 @@ export default function RecurringPage() {
                       {activeRow.is_active ? 'Active' : 'Inactive'}
                     </span>
                   ) : (
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-black/10 dark:bg-white/10 text-black/50 dark:text-white/50">
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[var(--shell-hover)] text-[var(--shell-text-muted)]">
                       {((activeRow as any).status || 'DRAFT').replace('_', ' ')}
                     </span>
                   )}
@@ -600,7 +600,7 @@ export default function RecurringPage() {
                           <th className="px-3 py-2 text-right">Amount</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-casper/10">
+                      <tbody className="divide-y divide-[var(--shell-border)]">
                         {runHistory.map((run: any) => (
                           <tr key={run.id}>
                             <td className="px-3 py-2 text-[var(--shell-text-muted)]">

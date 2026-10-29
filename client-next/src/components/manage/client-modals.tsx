@@ -26,8 +26,8 @@ export const COUNTRY_LIST = [
 ];
 
 // ─── Shared Styles ────────────────────────────────────────────────────────────
-const inp = 'w-full h-10 text-sm modal-input rounded-lg';
-const sel = 'w-full h-10 text-sm modal-input rounded-lg';
+const inp = 'w-full h-10 text-sm border-input bg-transparent text-[var(--shell-text)] rounded-lg';
+const sel = 'w-full h-10 text-sm border-input bg-transparent text-[var(--shell-text)] rounded-lg';
 
 // ─── Field ────────────────────────────────────────────────────────────────────
 // ─── Section Header ───────────────────────────────────────────────────────────
@@ -192,7 +192,7 @@ export function ClientModal({ isOpen, onClose, onSave, editing, businessTypes: i
             {showNewIndustry && (
               <div className="mt-1 flex gap-2">
                 <Input
-                  className="h-10 text-sm modal-input border-[var(--shell-border)] text-[var(--shell-text)] rounded-lg flex-1"
+                  className="h-10 text-sm border-input bg-transparent text-[var(--shell-text)] border-[var(--shell-border)] text-[var(--shell-text)] rounded-lg flex-1"
                   placeholder="e.g. Quantum Computing"
                   value={newIndustryName}
                   onChange={(e) => setNewIndustryName(e.target.value)}
@@ -263,7 +263,7 @@ export function ClientModal({ isOpen, onClose, onSave, editing, businessTypes: i
           {/* ── STATUS TOGGLE ── */}
           <div className="pt-1">
             <p id="client-status-label" className="mb-2 block text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Status</p>
-            <div role="radiogroup" aria-labelledby="client-status-label" className="flex p-1 modal-toggle-track rounded-lg gap-1 h-9 w-56">
+            <div role="radiogroup" aria-labelledby="client-status-label" className="flex p-1 rounded-lg border bg-[var(--shell-hover)] rounded-lg gap-1 h-9 w-56">
               {([
                 { label: 'Active',   val: true,  active: 'text-[var(--success)] border border-[var(--success)]' },
                 { label: 'Inactive', val: false, active: 'text-[var(--danger)] border border-[var(--danger)]' },
