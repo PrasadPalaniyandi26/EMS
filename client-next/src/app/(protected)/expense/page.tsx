@@ -497,7 +497,7 @@ export default function ExpensePage() {
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePanelFileUpload(f); e.target.value = ''; }}
                 />
                 <div
-                  className={`h-20 rounded-xl flex flex-col items-center justify-center group cursor-pointer transition-all ${selectedTxn?.receipt_path ? 'border-2 border-[var(--shell-accent)]/40 hover:border-[var(--shell-accent)]' : 'hover:brightness-105'}`}
+                  className={`h-20 rounded-lg flex flex-col items-center justify-center group cursor-pointer transition-all ${selectedTxn?.receipt_path ? 'border-2 border-[var(--shell-accent)]/40 hover:border-[var(--shell-accent)]' : 'hover:brightness-105'}`}
                   style={selectedTxn?.receipt_path ? { background: 'linear-gradient(135deg, rgba(74,111,83,0.12) 0%, rgba(74,111,83,0.05) 100%)' } : { background: 'var(--shell-bg)', border: '1px solid var(--shell-border)' }}
                   onClick={handlePanelDocClick}
                 >
@@ -538,7 +538,7 @@ export default function ExpensePage() {
                 </div>
 
                 {/* Amount breakdown */}
-                <div className="col-span-2 rounded-xl border border-[var(--shell-border)] overflow-hidden">
+                <div className="col-span-2 rounded-lg border border-[var(--shell-border)] overflow-hidden">
                   {selectedTxn.gst_rate != null && (
                     <>
                       <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--shell-border)]">
@@ -856,6 +856,7 @@ export default function ExpensePage() {
       }
     >
       <DataTable
+        isLoading={isLoading}
         columns={expenseColumns}
         data={rawTransactions}
         tableInstance={table}
@@ -1021,7 +1022,7 @@ export default function ExpensePage() {
         }
       >
         <div className="space-y-4">
-          <div className="p-3 bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] border border-[color-mix(in_srgb,var(--danger)_20%,transparent)] rounded-xl text-[11px] text-[var(--danger)] font-medium">
+          <div className="p-3 bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] border border-[color-mix(in_srgb,var(--danger)_20%,transparent)] rounded-lg text-[11px] text-[var(--danger)] font-medium">
             This will permanently mark <strong>{selectedTxn?.reference_id || `#${selectedTxn?.id}`}</strong> as VOIDED. The record is kept for audit purposes but will no longer count in reports.
           </div>
           <div className="space-y-2">

@@ -192,7 +192,7 @@ export default function OrganizationPage() {
               {/* Avatar + Identity */}
               <div className="flex items-center gap-4 pb-4" style={{ borderBottom: '1px solid var(--shell-border)' }}>
                 <div className="relative shrink-0">
-                  <div className="h-14 w-14 rounded-2xl flex items-center justify-center font-black text-lg"
+                  <div className="h-14 w-14 rounded-lg flex items-center justify-center font-black text-lg"
                     style={{ background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' }}>
                     {(() => { const p = selectedUser.username.trim().split(/\s+/); return p.length >= 2 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : p[0].slice(0, 2).toUpperCase(); })()}
                   </div>
@@ -314,6 +314,7 @@ export default function OrganizationPage() {
       }
     >
       <DataTable
+        isLoading={isLoading}
         columns={userColumns}
         data={users}
         tableInstance={table}

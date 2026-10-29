@@ -20,7 +20,7 @@ const DATE_PRESETS = [
   { label: 'Financial Year',  key: 'finYear' },
 ];
 
-const HEATMAP_COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899'];
+const HEATMAP_COLORS = ['var(--chart-1)', 'var(--success)', 'var(--warning)', 'var(--danger)', 'var(--chart-4)', 'var(--chart-2)'];
 
 // Opaque bins with their own dark text, so every cell is >= 7:1 and reads the same in light and dark
 // (the translucent colours this replaces took their contrast from whatever surface sat underneath).
@@ -34,7 +34,7 @@ function heatColor(val: number, max: number): { background: string; color: strin
 }
 
 function SkeletonRect({ h = '120px' }: { h?: string }) {
-  return <div className="animate-pulse rounded-xl" style={{ height: h, background: 'var(--shell-hover)' }} />;
+  return <div className="animate-pulse rounded-lg" style={{ height: h, background: 'var(--shell-hover)' }} />;
 }
 
 function CurrencyTooltip({ active, payload, label, fmt }: any) {
@@ -129,7 +129,7 @@ export default function SpendAnalyticsPage() {
     <div className="h-full overflow-y-auto custom-scrollbar px-4 py-4 space-y-4">
 
       {/* Period selector */}
-      <div className="rounded-xl px-4 py-3 flex flex-wrap items-center gap-3" style={surface}>
+      <div className="rounded-lg px-4 py-3 flex flex-wrap items-center gap-3" style={surface}>
         <div className="flex flex-wrap gap-1.5">
           {DATE_PRESETS.map((p) => (
             <button key={p.label} onClick={() => handlePreset(p.label, p.key)}
@@ -157,7 +157,7 @@ export default function SpendAnalyticsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         {/* Top Spenders */}
-        <div className="rounded-xl overflow-hidden" style={surface}>
+        <div className="rounded-lg overflow-hidden" style={surface}>
           <div className="dialog-header px-4 py-2.5 flex items-center gap-2">
             <Users className="h-3.5 w-3.5" style={{ color: 'var(--shell-accent)' }} />
             Top Spenders
@@ -183,7 +183,7 @@ export default function SpendAnalyticsPage() {
         </div>
 
         {/* Category Spend Heatmap */}
-        <div className="rounded-xl overflow-hidden" style={surface}>
+        <div className="rounded-lg overflow-hidden" style={surface}>
           <div className="dialog-header px-4 py-2.5 flex items-center gap-2">
             <Flame className="h-3.5 w-3.5" style={{ color: 'var(--shell-accent)' }} />
             Category Spend Heatmap
@@ -229,7 +229,7 @@ export default function SpendAnalyticsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         {/* Project Budget Burn */}
-        <div className="rounded-xl overflow-hidden" style={surface}>
+        <div className="rounded-lg overflow-hidden" style={surface}>
           <div className="dialog-header px-4 py-2.5 flex items-center gap-2">
             <Briefcase className="h-3.5 w-3.5" style={{ color: 'var(--shell-accent)' }} />
             Project Budget Burn
@@ -244,7 +244,7 @@ export default function SpendAnalyticsPage() {
         </div>
 
         {/* Product Budget Burn */}
-        <div className="rounded-xl overflow-hidden" style={surface}>
+        <div className="rounded-lg overflow-hidden" style={surface}>
           <div className="dialog-header px-4 py-2.5 flex items-center gap-2">
             <Package className="h-3.5 w-3.5" style={{ color: 'var(--shell-accent)' }} />
             Product Budget Burn

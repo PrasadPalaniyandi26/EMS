@@ -4,10 +4,10 @@
 @custom-variant dark (&:is(.dark *));
 
 /* Fonts: `inline` so the utility resolves next/font's variables on the element that uses it
-   (they are defined on <body>, not :root). Inter and JetBrains Mono are loaded in layout.tsx. */
+   (they are defined on <body>, not :root). IBM Plex Sans and IBM Plex Mono are loaded in layout.tsx. */
 @theme inline {
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 @theme {
@@ -85,53 +85,53 @@
 /* ─── Light theme: warm ivory ─────────────────────────────────────── */
 :root {
   color-scheme: light;
-  --radius: 0.5rem;
+  --radius: 0.375rem;
 
   /* Shell tokens. surface/border/text/muted/accent are ALIASES of the shadcn tokens below (one source of
      truth); bg and hover have no shadcn equivalent and stay here. */
-  --shell-bg:          #f6f7f9;  /* canvas: sidebar, top bar, page edge */
+  --shell-bg:          #f4f4f5;  /* canvas: sidebar, top bar, page edge */
   --shell-surface:     var(--card);
   --shell-border:      var(--border);
   --shell-text:        var(--foreground);
   --shell-text-muted:  var(--muted-foreground);
   --shell-accent:      var(--primary);
   --shell-accent-fg:   var(--primary-foreground);
-  --shell-hover:       #f0f2f5;  /* hover tint */
-  --shell-brand:       #b45309;  /* amber-700: wordmark colour, 5:1 on white */
+  --shell-hover:       #efeff1;  /* hover tint */
+  --shell-brand:       var(--foreground);  /* amber-700: wordmark colour, 5:1 on white */
 
   /* shadcn tokens */
-  --background:        #f6f7f9;  /* canvas */
-  --foreground:        #14171f;
+  --background:        #f4f4f5;  /* canvas */
+  --foreground:        #18181b;
   --card:              #ffffff;  /* white      */
-  --card-foreground:   #14171f;
+  --card-foreground:   #18181b;
   --popover:           #ffffff;
-  --popover-foreground:#14171f;
-  --primary:           #2563eb;  /* blue-600: white text 5.2:1, and 5.2:1 as text on white */
+  --popover-foreground:#18181b;
+  --primary:           #2b50d8;  /* blue-600: white text 5.2:1, and 5.2:1 as text on white */
   --primary-foreground:#ffffff;
-  --secondary:         #f3f5f8;
-  --secondary-foreground:#14171f;
-  --muted:             #f3f5f8;
-  --muted-foreground:  #586172;  /* 6:1 on white, 5.4:1 on the canvas and hover tints */
-  --accent:            #f0f2f5;
-  --accent-foreground: #14171f;
+  --secondary:         #f1f1f3;
+  --secondary-foreground:#18181b;
+  --muted:             #f1f1f3;
+  --muted-foreground:  #52525b;  /* 6:1 on white, 5.4:1 on the canvas and hover tints */
+  --accent:            #efeff1;
+  --accent-foreground: #18181b;
   --destructive:       #dc2626;  /* red-600: white text 4.8:1 (red-500 was 3.8:1) */
   --destructive-foreground:#ffffff;
-  --border:            #e4e6eb;  /* hairline: separates regions and rows */
-  --input:             #8a909b;  /* control boundary, 3.3:1 on white (WCAG 1.4.11) */
-  --ring:              #3b82f6;  /* blue-500   */
-  --chart-1:           #3b82f6;  /* blue-500   */
+  --border:            #e4e4e7;  /* hairline: separates regions and rows */
+  --input:             #8b8b94;  /* control boundary, 3.3:1 on white (WCAG 1.4.11) */
+  --ring:              #2b50d8;  /* blue-500   */
+  --chart-1:           #2b50d8;  /* blue-500   */
   --chart-2:           #0ea5e9;
   --chart-3:           #10b981;
   --chart-4:           #8b5cf6;
   --chart-5:           #ef4444;
-  --sidebar:           #f6f7f9;
-  --sidebar-foreground:#586172;
-  --sidebar-primary:   #1c1917;
+  --sidebar:           #f4f4f5;
+  --sidebar-foreground:#52525b;
+  --sidebar-primary:   #18181b;
   --sidebar-primary-foreground:#ffffff;
-  --sidebar-accent:    #eceff3;
-  --sidebar-accent-foreground:#14171f;
-  --sidebar-border:    #e4e6eb;
-  --sidebar-ring:      #3b82f6;  /* blue-500   */
+  --sidebar-accent:    #e9e9ec;
+  --sidebar-accent-foreground:#18181b;
+  --sidebar-border:    #e4e4e7;
+  --sidebar-ring:      #2b50d8;  /* blue-500   */
 
   /* Semantic status colours — text-safe (>= 4.5:1) on white and on the tinted page surfaces */
   --success:           #047857;  /* emerald-700 */
@@ -143,7 +143,7 @@
   --danger:            #b91c1c;  /* red-700     */
   --danger-foreground: #ffffff;
   --surface-raised:    #ffffff;
-  --overlay:           rgba(15, 23, 42, 0.5);
+  --overlay:           rgba(15, 15, 20, 0.5);
 
   /* Approval workflow states (consumed by lib/status.ts as components migrate, Phase 4) */
   --status-draft:           #0369a1;
@@ -213,49 +213,49 @@
   color-scheme: dark;
   /* Shell: two solid surfaces (canvas and surface) separated by hairlines, no blur or gradient.
      surface/border/text/muted/accent alias the shadcn tokens below (same as light). */
-  --shell-bg:          #0b0f17;  /* canvas */
+  --shell-bg:          #141416;  /* canvas */
   --shell-surface:     var(--card);
   --shell-border:      var(--border);
   --shell-text:        var(--foreground);
   --shell-text-muted:  var(--muted-foreground);
   --shell-accent:      var(--primary);
   --shell-accent-fg:   var(--primary-foreground);
-  --shell-hover:       #1a2132;
-  --shell-brand:       #d97706;
+  --shell-hover:       #26262a;
+  --shell-brand:       var(--foreground);
 
   /* shadcn tokens */
-  --background:        #0b0f17;
-  --foreground:        #e8ecf4;
-  --card:              #121826;  /* surface */
-  --card-foreground:   #e8ecf4;
-  --popover:           #171e2e;  /* raised: menus and dialogs */
-  --popover-foreground:#e8ecf4;
-  --primary:           #60a5fa;
-  --primary-foreground:#0b1220;  /* near-black on the light blue: 7.5:1 (white was 2.5:1) */
-  --secondary:         #171e2e;
-  --secondary-foreground:#e8ecf4;
-  --muted:             #171e2e;
-  --muted-foreground:  #9aa4b8;
-  --accent:            #1d2536;
-  --accent-foreground: #e8ecf4;
+  --background:        #141416;
+  --foreground:        #ececee;
+  --card:              #18181a;  /* surface */
+  --card-foreground:   #ececee;
+  --popover:           #1f1f22;  /* raised: menus and dialogs */
+  --popover-foreground:#ececee;
+  --primary:           #7c9bff;
+  --primary-foreground:#0d1020;  /* near-black on the light blue: 7.5:1 (white was 2.5:1) */
+  --secondary:         #1f1f22;
+  --secondary-foreground:#ececee;
+  --muted:             #1f1f22;
+  --muted-foreground:  #a1a1a8;
+  --accent:            #26262a;
+  --accent-foreground: #ececee;
   --destructive:       #f87171;
   --destructive-foreground:#2a0a0a;  /* near-black on the light red */
-  --border:            #273044;
-  --input:             #4a5570;  /* control boundary */
-  --ring:              #60a5fa;
-  --chart-1:           #60a5fa;
+  --border:            #2a2a2e;
+  --input:             #68686f;  /* control boundary */
+  --ring:              #7c9bff;
+  --chart-1:           #7c9bff;
   --chart-2:           #22d3ee;
   --chart-3:           #34d399;
   --chart-4:           #fb923c;
   --chart-5:           #f87171;
-  --sidebar:           #0b0f17;
-  --sidebar-foreground:#9aa4b8;
-  --sidebar-primary:   #60a5fa;
-  --sidebar-primary-foreground:#0b1220;
-  --sidebar-accent:    #1d2536;
-  --sidebar-accent-foreground:#e8ecf4;
-  --sidebar-border:    #273044;
-  --sidebar-ring:      #60a5fa;
+  --sidebar:           #141416;
+  --sidebar-foreground:#a1a1a8;
+  --sidebar-primary:   #7c9bff;
+  --sidebar-primary-foreground:#0d1020;
+  --sidebar-accent:    #26262a;
+  --sidebar-accent-foreground:#ececee;
+  --sidebar-border:    #2a2a2e;
+  --sidebar-ring:      #7c9bff;
 
   /* Semantic status colours on the dark surfaces */
   --success:           #34d399;
@@ -266,7 +266,7 @@
   --info-foreground:   #0b1220;
   --danger:            #f87171;
   --danger-foreground: #2a0a0a;
-  --surface-raised:    #171e2e;
+  --surface-raised:    #1f1f22;
   --overlay:           rgba(0, 0, 0, 0.6);
 
   --status-draft:           #38bdf8;
@@ -323,6 +323,7 @@
     min-height: 100dvh;
     overflow: hidden;
     font-size: 13.5px;
+    font-feature-settings: 'tnum' 1, 'zero' 0, 'ss01' 0;
   }
   /* Native controls (select popups, date pickers, scrollbars, autofill) follow the theme. Without this the
      browser draws them light on the dark surface. Options also get explicit colours because some browsers

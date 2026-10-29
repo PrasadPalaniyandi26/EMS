@@ -28,7 +28,7 @@ const COUNTRIES = ['United Kingdom', 'United States', 'India', 'Germany', 'Canad
 
 export default function ClientsPage() {
   const setHeader = useHeaderStore((s) => s.setHeader);
-  const { data: clients } = useClients();
+  const { data: clients, isLoading } = useClients();
   const invalidate = useInvalidate();
   const { confirm: confirmDialog, dialog: confirmDialogEl } = useConfirm();
 
@@ -164,7 +164,7 @@ export default function ClientsPage() {
             <div className="space-y-2.5">
               {/* Avatar + Name */}
               <div className="flex items-center gap-4 pb-4 border-b border-[var(--shell-border)]">
-                <div className="w-14 h-14 bg-[var(--shell-accent)] rounded-xl flex items-center justify-center text-lg font-bold text-[var(--shell-accent-fg)] shrink-0">
+                <div className="w-14 h-14 bg-[var(--shell-accent)] rounded-lg flex items-center justify-center text-lg font-bold text-[var(--shell-accent-fg)] shrink-0">
                   {selectedClient.name.substring(0, 2).toUpperCase()}
                 </div>
                 <div className="min-w-0">
@@ -185,7 +185,7 @@ export default function ClientsPage() {
 
               {/* Contact */}
               {(selectedClient.contact_name || selectedClient.contact_email || selectedClient.contact_phone) && (
-                <div className="bg-[var(--shell-hover)] p-3 rounded-xl border border-[var(--shell-border)] space-y-2">
+                <div className="bg-[var(--shell-hover)] p-3 rounded-lg border border-[var(--shell-border)] space-y-2">
                   <p className="text-[11px] font-black text-[var(--shell-text-muted)] mb-2">Contact</p>
                   {selectedClient.contact_name && (
                     <div className="flex items-center gap-2">
@@ -212,7 +212,7 @@ export default function ClientsPage() {
 
               {/* Address */}
               {((selectedClient as any).country || selectedClient.address) && (
-                <div className="bg-[var(--shell-hover)] p-3 rounded-xl border border-[var(--shell-border)] space-y-2">
+                <div className="bg-[var(--shell-hover)] p-3 rounded-lg border border-[var(--shell-border)] space-y-2">
                   <p className="text-[11px] font-black text-[var(--shell-text-muted)] mb-2">Location</p>
                   <div className="flex items-start gap-2">
                     <MapPin className="w-3.5 h-3.5 text-[var(--shell-text-muted)] shrink-0 mt-0.5" />
@@ -228,7 +228,7 @@ export default function ClientsPage() {
 
               {/* Activity summary */}
               {activitySummary && (
-                <div className="bg-[var(--shell-hover)] p-3 rounded-xl border border-[var(--shell-border)]">
+                <div className="bg-[var(--shell-hover)] p-3 rounded-lg border border-[var(--shell-border)]">
                   <p className="text-[11px] font-black text-[var(--shell-text-muted)] mb-3">Activity</p>
                   <div className="grid grid-cols-3 gap-2 sm:grid-cols-3">
                     {[
@@ -250,6 +250,7 @@ export default function ClientsPage() {
       }
     >
       <DataTable
+        isLoading={isLoading}
         columns={columns}
         data={clients || []}
         tableInstance={table}

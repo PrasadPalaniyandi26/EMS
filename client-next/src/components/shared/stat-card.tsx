@@ -36,7 +36,7 @@ export function StatCard({ label, value, icon, tone = 'default', hint, onClick, 
       </div>
     </>
   );
-  const base = 'rounded-xl px-4 py-3 flex items-start gap-3 border border-[var(--shell-border)] bg-[var(--shell-surface)]';
+  const base = 'rounded-lg px-4 py-3 flex items-start gap-3 border border-[var(--shell-border)] bg-[var(--shell-surface)]';
 
   if (onClick) {
     return (

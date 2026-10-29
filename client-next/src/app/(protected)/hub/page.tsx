@@ -100,7 +100,7 @@ export default function HubPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Recent Transactions */}
-        <div className="rounded-xl overflow-hidden" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
+        <div className="rounded-lg overflow-hidden" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
           <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--shell-border)' }}>
             <p className="text-[11px] font-bold text-[var(--shell-text-muted)]">Recent Transactions</p>
             <button onClick={() => router.push('/transactions')} className="flex items-center gap-1 text-[11px] font-semibold text-[var(--shell-accent)] hover:opacity-80 transition-opacity">
@@ -139,7 +139,7 @@ export default function HubPage() {
         </div>
 
         {/* Budget Overview */}
-        <div className="rounded-xl overflow-hidden" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
+        <div className="rounded-lg overflow-hidden" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
           <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--shell-border)' }}>
             <p className="text-[11px] font-bold text-[var(--shell-text-muted)]">Budget Overview</p>
             <button onClick={() => router.push('/manage/budgets')} className="flex items-center gap-1 text-[11px] font-semibold text-[var(--shell-accent)] hover:opacity-80 transition-opacity">

@@ -9,7 +9,7 @@ export function Footer() {
   const status = ((user as any)?.user_status || 'ACTIVE').toUpperCase();
   const isActive = status === 'ACTIVE';
   const statusLabel = isActive ? 'Active' : status === 'ON_HOLD' ? 'On Hold' : 'Inactive';
-  const dotColor = isActive ? '#22c55e' : status === 'ON_HOLD' ? '#f97316' : '#ef4444';
+  const dotColor = isActive ? 'var(--success)' : status === 'ON_HOLD' ? 'var(--warning)' : 'var(--danger)';
 
   return (
     <footer className="footer-fixed">

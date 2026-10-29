@@ -223,7 +223,7 @@ export function ReimbursementsTab() {
             {selected && (
               <div className="flex-1 space-y-6">
                 {/* Employee */}
-                <div className="bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)] p-4 space-y-3">
+                <div className="bg-[var(--shell-hover)] rounded-lg border border-[var(--shell-border)] p-4 space-y-3">
                   <p className="text-[11px] font-bold text-[var(--shell-text-muted)]">Employee</p>
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-[13px] font-bold"
@@ -254,7 +254,7 @@ export function ReimbursementsTab() {
                 </div>
 
                 {/* Amount breakdown */}
-                <div className="bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)] p-4 space-y-2">
+                <div className="bg-[var(--shell-hover)] rounded-lg border border-[var(--shell-border)] p-4 space-y-2">
                   <p className="text-[11px] font-bold text-[var(--shell-text-muted)]">Amount</p>
                   {selected.gst_rate ? (
                     <>
@@ -370,7 +370,7 @@ export function ReimbursementsTab() {
         }
       >
         {isLoading ? (
-          <div className="flex items-center justify-center h-40 text-[var(--shell-text-muted)] text-sm">Loading...</div>
+          <DataTable isLoading columns={columns} data={[]} tableInstance={table} />
         ) : rows.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 gap-3 text-[var(--shell-text-muted)]">
             {statusTab === 'PENDING'

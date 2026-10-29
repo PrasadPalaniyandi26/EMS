@@ -200,7 +200,7 @@ export default function ReportingPage() {
     <div className="h-full overflow-y-auto custom-scrollbar px-4 py-4 space-y-4">
 
       {/* Filters */}
-      <div className="rounded-xl overflow-hidden" style={surface}>
+      <div className="rounded-lg overflow-hidden" style={surface}>
         {/* Row 1: Report type selector */}
         <div className="px-4 pt-3 pb-2 flex flex-wrap items-center gap-2" style={{ borderBottom: '1px solid var(--shell-border)' }}>
           {REPORTS.map((r) => {
@@ -299,7 +299,7 @@ export default function ReportingPage() {
 
       {/* Results */}
       {result && (
-        <div className="rounded-xl overflow-hidden" style={surface}>
+        <div className="rounded-lg overflow-hidden" style={surface}>
           {/* Result header */}
           <div className="dialog-header px-4 py-2.5 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
@@ -419,7 +419,7 @@ export default function ReportingPage() {
 
       {/* Empty state before generation */}
       {!result && !loading && (
-        <div className="rounded-xl p-12 text-center" style={surface}>
+        <div className="rounded-lg p-12 text-center" style={surface}>
           <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-30" style={{ color: 'var(--shell-text-muted)' }} />
           <p className="text-[14px] font-semibold" style={{ color: 'var(--shell-text)' }}>Select a report and click Generate</p>
           <p className="text-[12px] mt-1" style={{ color: 'var(--shell-text-muted)' }}>Results will appear here with export options</p>

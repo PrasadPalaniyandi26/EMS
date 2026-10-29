@@ -106,7 +106,7 @@ export function RecurringModal({
           </div>
           <div className="space-y-1.5">
             <p id="recurring-type-label" className="text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Transaction Type</p>
-            <div role="radiogroup" aria-labelledby="recurring-type-label" className="flex p-1 rounded-lg border bg-[var(--shell-hover)] rounded-xl gap-1 h-10">
+            <div role="radiogroup" aria-labelledby="recurring-type-label" className="flex p-1 rounded-lg border bg-[var(--shell-hover)] rounded-lg gap-1 h-10">
               {([
                 { val: 'expense', active: 'text-[var(--danger)] border border-[var(--danger)]' },
                 { val: 'income',  active: 'text-[var(--success)] border border-[var(--success)]' },
@@ -358,7 +358,7 @@ export function PauseRecurringModal({
         </>
       }
     >
-      <div className="p-4 bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] rounded-xl border border-[color-mix(in_srgb,var(--warning)_20%,transparent)] flex gap-3">
+      <div className="p-4 bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] rounded-lg border border-[color-mix(in_srgb,var(--warning)_20%,transparent)] flex gap-3">
         <Pause className="w-5 h-5 text-[var(--warning)] shrink-0 mt-0.5" />
         <p className="text-[12px] text-[var(--warning)] leading-relaxed">
           Are you sure you want to pause <span className="font-bold underline">{targetName}</span>? No new transactions will be auto-generated until resumed.
@@ -424,7 +424,7 @@ export function ResumeRecurringModal({
       }
     >
       <div className="space-y-3">
-        <div className="border border-[var(--shell-border)] rounded-xl p-4 flex items-center justify-between" style={{ background: 'var(--shell-bg)' }}>
+        <div className="border border-[var(--shell-border)] rounded-lg p-4 flex items-center justify-between" style={{ background: 'var(--shell-bg)' }}>
           <div>
             <p className="text-[11px] text-[var(--info)] font-bold">Target Schedule</p>
             <p className="text-[14px] font-bold" style={{ color: 'var(--shell-text)' }}>{target.description}</p>
@@ -503,7 +503,7 @@ export function DeleteRecurringModal({ isOpen, onClose, onConfirm, count }: any)
       }
     >
       <div className="space-y-2.5">
-        <div className="p-4 bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] rounded-xl border border-[color-mix(in_srgb,var(--danger)_20%,transparent)] flex gap-3">
+        <div className="p-4 bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] rounded-lg border border-[color-mix(in_srgb,var(--danger)_20%,transparent)] flex gap-3">
           <Trash2 className="w-5 h-5 text-[var(--danger)] shrink-0 mt-0.5" />
           <p className="text-[12px] text-[var(--danger)] leading-relaxed">
             Are you sure you want to delete <span className="font-bold text-[var(--danger)]">{count} recurring schedule(s)</span>? Future transactions will no longer be generated. This action cannot be undone.

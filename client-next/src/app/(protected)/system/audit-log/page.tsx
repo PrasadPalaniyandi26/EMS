@@ -50,7 +50,7 @@ function AuditDetailPanel({ log }: { log: AuditLog }) {
   return (
     <div className="space-y-4">
       {/* Header card */}
-      <div className="rounded-xl p-4 border" style={{ background: 'var(--shell-hover)', borderColor: 'var(--shell-border)' }}>
+      <div className="rounded-lg p-4 border" style={{ background: 'var(--shell-hover)', borderColor: 'var(--shell-border)' }}>
         <div className="flex items-center gap-2 mb-3">
           <div className={`px-2 py-0.5 rounded text-[11px] font-black ${action.bg} ${action.color}`}>
             {action.label}

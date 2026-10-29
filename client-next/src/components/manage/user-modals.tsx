@@ -350,7 +350,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
             {/* Status segmented */}
             <div className="space-y-1 pt-1">
               <p id="user-status-label" className="text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Status</p>
-              <div role="radiogroup" aria-labelledby="user-status-label" className="flex p-1 rounded-lg border bg-[var(--shell-hover)] rounded-xl gap-1">
+              <div role="radiogroup" aria-labelledby="user-status-label" className="flex p-1 rounded-lg border bg-[var(--shell-hover)] rounded-lg gap-1">
                 {([
                   { s: 'ACTIVE',   active: 'text-[var(--success)] border border-[var(--success)]' },
                   { s: 'On Hold',  active: 'text-[var(--warning)] border border-[var(--warning)]' },
@@ -537,7 +537,7 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
         </div>
 
         {/* Table */}
-        <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden" style={{ background: 'var(--shell-surface)' }}>
+        <div className="border border-[var(--shell-border)] rounded-lg overflow-hidden" style={{ background: 'var(--shell-surface)' }}>
           <table className="w-full text-left">
             <thead className="dialog-header">
               <tr className="text-[11px] font-black">
@@ -593,27 +593,27 @@ const MODULES = [
 const MODULE_GROUPS = [
   {
     label: 'MAIN',
-    color: '#C9A84C',
+    color: 'var(--shell-text)',
     items: ['Dashboard & Analytics'],
   },
   {
     label: 'Transactions',
-    color: '#C9A84C',
+    color: 'var(--shell-text)',
     items: ['Approvals & Workflow', 'Expense Management', 'Income Tracking'],
   },
   {
     label: 'Operations',
-    color: '#C9A84C',
+    color: 'var(--shell-text)',
     items: ['Client Database', 'Projects & Milestones', 'Products & BOM'],
   },
   {
     label: 'Manage',
-    color: '#C9A84C',
+    color: 'var(--shell-text)',
     items: ['Organization & Users', 'Budgets & Forecasts'],
   },
   {
     label: 'Analytics',
-    color: '#C9A84C',
+    color: 'var(--shell-text)',
     items: ['Reports & Audit'],
   },
 ];
@@ -752,8 +752,8 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
           </div>
 
           {/* Permission matrix — sidebar-mirrored tree view */}
-          <div className="overflow-x-auto rounded-xl">
-          <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden min-w-[480px]" style={{ background: 'var(--shell-surface)' }}>
+          <div className="overflow-x-auto rounded-lg">
+          <div className="border border-[var(--shell-border)] rounded-lg overflow-hidden min-w-[480px]" style={{ background: 'var(--shell-surface)' }}>
             {/* Column header */}
             <div className="dialog-header flex items-center text-[11px] font-black">
               <div className="flex-1 px-4 py-3">Module</div>
@@ -767,7 +767,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
               <div key={group.label} className={gi > 0 ? 'border-t border-[var(--shell-border)]' : ''}>
                 {/* Group label */}
                 <div className="px-4 py-1.5 flex items-center gap-2" style={{ background: 'var(--shell-hover)' }}>
-                  <span className="text-[11px] font-black" style={{ color: '#C9A84C' }}>
+                  <span className="text-[11px] font-black" style={{ color: 'var(--shell-text)' }}>
                     {group.label}
                   </span>
                   <div className="h-px flex-1" style={{ background: 'var(--shell-border)' }} />
@@ -820,7 +820,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
         {/* Right: Config panel */}
         <div className="w-[220px] shrink-0 space-y-2.5">
           {/* Approval Thresholds */}
-          <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden" style={{ background: 'var(--shell-surface)' }}>
+          <div className="border border-[var(--shell-border)] rounded-lg overflow-hidden" style={{ background: 'var(--shell-surface)' }}>
             <div className="dialog-header px-4 py-2.5">
               <span className="text-[11px] font-black">Approval Limits</span>
             </div>
@@ -837,7 +837,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
           </div>
 
           {/* Data Scope */}
-          <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden" style={{ background: 'var(--shell-surface)' }}>
+          <div className="border border-[var(--shell-border)] rounded-lg overflow-hidden" style={{ background: 'var(--shell-surface)' }}>
             <div className="dialog-header px-4 py-2.5">
               <span className="text-[11px] font-black">Data Visibility</span>
             </div>
@@ -861,7 +861,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
           </div>
 
           {/* Summary */}
-          <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden" style={{ background: 'var(--shell-surface)' }}>
+          <div className="border border-[var(--shell-border)] rounded-lg overflow-hidden" style={{ background: 'var(--shell-surface)' }}>
             <div className="dialog-header px-4 py-2.5">
               <span className="text-[11px] font-black">Summary</span>
             </div>

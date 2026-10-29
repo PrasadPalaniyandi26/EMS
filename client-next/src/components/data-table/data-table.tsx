@@ -35,6 +35,8 @@ interface DataTableProps<TData, TValue> {
   fullHeight?: boolean;
   mobileHiddenColumns?: string[]; // Column IDs to hide below the sm breakpoint (640px)
   emptyMessage?: string;
+  // First load of the data: show skeleton rows instead of flashing the empty message
+  isLoading?: boolean;
 }
 
 export function DataTable<TData, TValue>({
@@ -46,6 +48,7 @@ export function DataTable<TData, TValue>({
   fullHeight = false,
   mobileHiddenColumns,
   emptyMessage = "No results found.",
+  isLoading = false,
 }: DataTableProps<TData, TValue>) {
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
@@ -102,7 +105,20 @@ export function DataTable<TData, TValue>({
       <div className="flex-1 overflow-hidden relative flex flex-col" style={{ background: 'var(--shell-surface)' }}>
         {/* Phones: one card per row (label above value) so nothing scrolls sideways */}
         <div className="md:hidden flex-1 overflow-y-auto">
-          {table.getRowModel().rows?.length ? table.getRowModel().rows.map((row: any) => {
+          {isLoading ? (
+            <div aria-busy="true" aria-label="Loading">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="grid grid-cols-2 gap-x-4 gap-y-3 border-b border-[var(--shell-border)] px-4 py-3">
+                  {[...Array(4)].map((__, j) => (
+                    <div key={j} className="space-y-1.5">
+                      <div className="h-2.5 w-14 rounded-sm bg-[var(--shell-hover)] motion-safe:animate-pulse" />
+                      <div className="h-3.5 w-24 rounded-sm bg-[var(--shell-hover)] motion-safe:animate-pulse" />
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          ) : table.getRowModel().rows?.length ? table.getRowModel().rows.map((row: any) => {
             const isSelected = tableInstance
               ? row.getIsSelected()
               : effectiveSelectedId !== undefined && (row.original as any).id === effectiveSelectedId;
@@ -152,8 +168,21 @@ export function DataTable<TData, TValue>({
                 </TableRow>
               ))}
             </TableHeader>
-            <TableBody>
-              {table.getRowModel().rows?.length ? (
+            <TableBody aria-busy={isLoading || undefined}>
+              {isLoading ? (
+                [...Array(8)].map((_, i) => (
+                  <TableRow key={`sk-${i}`} className="cursor-default hover:bg-transparent">
+                    {table.getVisibleLeafColumns().map((col: any, j: number) => (
+                      <TableCell key={col.id}>
+                        <div
+                          className="h-3.5 rounded-sm bg-[var(--shell-hover)] motion-safe:animate-pulse"
+                          style={{ width: `${[56, 72, 48, 64, 40, 60][(i + j) % 6]}%` }}
+                        />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : table.getRowModel().rows?.length ? (
                 table.getRowModel().rows.map((row: any) => {
                   const isSelected = tableInstance
                     ? row.getIsSelected()
@@ -192,7 +221,7 @@ export function DataTable<TData, TValue>({
         </div>
         <div className="px-4 py-2 flex items-center justify-between shrink-0" style={{ borderTop: '1px solid var(--shell-border)', background: 'var(--shell-surface)' }}>
           <div className="flex-1 text-[11.5px]" style={{ color: 'var(--shell-text-muted)' }}>
-            {table.getFilteredRowModel().rows.length} results
+            {isLoading ? 'Loading…' : `${table.getFilteredRowModel().rows.length} results`}
           </div>
           <div className="flex items-center gap-1.5">
             <button

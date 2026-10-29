@@ -115,7 +115,7 @@ export default function TransactionsPage() {
         >
           {selectedTxn && (
             <div className="space-y-5">
-              <div className={`rounded-xl p-4 border ${selectedTxn.type === 'income' ? 'bg-[color-mix(in_srgb,var(--info)_15%,transparent)] border-[color-mix(in_srgb,var(--info)_20%,transparent)]' : 'bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] border-[color-mix(in_srgb,var(--danger)_20%,transparent)]'}`}>
+              <div className={`rounded-lg p-4 border ${selectedTxn.type === 'income' ? 'bg-[color-mix(in_srgb,var(--info)_15%,transparent)] border-[color-mix(in_srgb,var(--info)_20%,transparent)]' : 'bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] border-[color-mix(in_srgb,var(--danger)_20%,transparent)]'}`}>
                 <div className="flex justify-between items-start mb-3">
                   <div>
                     <p className={`text-[11px] font-bold mb-1 ${selectedTxn.type === 'income' ? 'text-[var(--info)]' : 'text-[var(--danger)]'}`}>Total Amount</p>
@@ -225,14 +225,14 @@ export default function TransactionsPage() {
                         toast.error('Could not load receipt. Please try again.');
                       }
                     }}
-                    className="flex w-full items-center gap-2.5 rounded-xl border border-[var(--shell-border)] bg-[var(--shell-hover)] px-3 py-3 text-left hover:border-[var(--shell-accent)] focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]"
+                    className="flex w-full items-center gap-2.5 rounded-lg border border-[var(--shell-border)] bg-[var(--shell-hover)] px-3 py-3 text-left hover:border-[var(--shell-accent)] focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]"
                   >
                     <FileText aria-hidden className="h-4 w-4 shrink-0 text-[var(--shell-text-muted)]" />
                     <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-[var(--shell-text)]">{selectedTxn.receipt_path.split('/').pop()}</span>
                     <span className="flex items-center gap-1 text-[11px] font-bold text-[var(--shell-text-muted)]">OPEN <ArrowUpRight aria-hidden className="h-3 w-3" /></span>
                   </button>
                 ) : (
-                  <p className="rounded-xl border border-dashed border-[var(--shell-border)] px-3 py-3 text-[12px] text-[var(--shell-text-muted)]">No document attached.</p>
+                  <p className="rounded-lg border border-dashed border-[var(--shell-border)] px-3 py-3 text-[12px] text-[var(--shell-text-muted)]">No document attached.</p>
                 )}
               </div>
             </div>
@@ -344,7 +344,7 @@ export default function TransactionsPage() {
                 <td className="px-3 py-3"><div className="h-3 w-48 rounded bg-[var(--shell-hover)]" /></td>
                 <td className="px-3 py-3"><div className="h-3 w-24 rounded bg-[var(--shell-hover)]" /></td>
                 <td className="px-3 py-3"><div className="h-3 w-20 rounded bg-[var(--shell-hover)]" /></td>
-                <td className="px-3 py-3"><div className="h-5 w-16 rounded-full bg-[var(--shell-hover)]" /></td>
+                <td className="px-3 py-3"><div className="h-5 w-16 rounded-sm bg-[var(--shell-hover)]" /></td>
                 <td className="px-3 py-3"><div className="h-3 w-16 rounded bg-[var(--shell-hover)]" /></td>
                 <td className="px-4 py-3"><div className="h-3 w-20 rounded bg-[var(--shell-hover)] ml-auto" /></td>
               </tr>

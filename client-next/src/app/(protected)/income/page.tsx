@@ -472,7 +472,7 @@ export default function IncomePage() {
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePanelFileUpload(f); e.target.value = ''; }}
                 />
                 <div
-                  className={`h-32 rounded-xl flex flex-col items-center justify-center group cursor-pointer transition-all ${selectedTxn?.receipt_path ? 'border-2 border-[var(--shell-accent)]/40 hover:border-[var(--shell-accent)]' : 'hover:brightness-105'}`}
+                  className={`h-32 rounded-lg flex flex-col items-center justify-center group cursor-pointer transition-all ${selectedTxn?.receipt_path ? 'border-2 border-[var(--shell-accent)]/40 hover:border-[var(--shell-accent)]' : 'hover:brightness-105'}`}
                   style={selectedTxn?.receipt_path ? { background: 'linear-gradient(135deg, rgba(74,111,83,0.12) 0%, rgba(74,111,83,0.05) 100%)' } : { background: 'var(--shell-bg)', border: '1px solid var(--shell-border)' }}
                   onClick={handlePanelDocClick}
                 >
@@ -483,7 +483,7 @@ export default function IncomePage() {
                     </>
                   ) : selectedTxn?.receipt_path ? (
                     <>
-                      <div className="w-10 h-10 rounded-xl bg-[var(--shell-accent)]/20 border border-[var(--shell-accent)]/30 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                      <div className="w-10 h-10 rounded-lg bg-[var(--shell-accent)]/20 border border-[var(--shell-accent)]/30 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
                         <FileText className="w-5 h-5 text-[var(--shell-accent)]" />
                       </div>
                       <p className="text-[11px] font-bold text-[var(--shell-accent)] truncate max-w-[160px] px-2">{selectedTxn.receipt_path.split('/').pop()}</p>
@@ -491,7 +491,7 @@ export default function IncomePage() {
                     </>
                   ) : (
                     <>
-                      <div className="w-10 h-10 rounded-xl bg-[var(--shell-hover)] border border-[var(--shell-border)] flex items-center justify-center mb-2">
+                      <div className="w-10 h-10 rounded-lg bg-[var(--shell-hover)] border border-[var(--shell-border)] flex items-center justify-center mb-2">
                         <FileText className="w-5 h-5 text-[var(--shell-text-muted)]" />
                       </div>
                       <p className="text-[11px] font-bold text-[var(--shell-text-muted)]">No Receipt or Invoice</p>
@@ -509,7 +509,7 @@ export default function IncomePage() {
                 </div>
 
                 {/* Amount breakdown */}
-                <div className="col-span-2 rounded-xl border border-[var(--shell-border)] overflow-hidden">
+                <div className="col-span-2 rounded-lg border border-[var(--shell-border)] overflow-hidden">
                   {selectedTxn.gst_rate != null && (
                     <>
                       <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--shell-border)]">
@@ -769,6 +769,7 @@ export default function IncomePage() {
       }
     >
       <DataTable
+        isLoading={isLoading}
         columns={incomeColumns}
         data={rawTransactions}
         tableInstance={table}
@@ -907,7 +908,7 @@ export default function IncomePage() {
         }
       >
         <div className="space-y-4">
-          <div className="p-3 bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] border border-[color-mix(in_srgb,var(--danger)_20%,transparent)] rounded-xl text-[11px] text-[var(--danger)] font-medium">
+          <div className="p-3 bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] border border-[color-mix(in_srgb,var(--danger)_20%,transparent)] rounded-lg text-[11px] text-[var(--danger)] font-medium">
             This will permanently mark <strong>{selectedTxn?.reference_id || `#${selectedTxn?.id}`}</strong> as VOIDED. The record is kept for audit purposes but will no longer count in reports.
           </div>
           <div className="space-y-2">

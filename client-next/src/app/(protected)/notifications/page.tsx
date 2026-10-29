@@ -56,7 +56,7 @@ function NotifRow({ n, onMarkRead, onDelete, selected, onSelect }: {
       </div>
 
       {/* Icon */}
-      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${cfg.bg}`}>
+      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${cfg.bg}`}>
         <Icon className={`w-4 h-4 ${cfg.color}`} />
       </div>
 
@@ -295,7 +295,7 @@ export default function NotificationsPage() {
           [...Array(8)].map((_, i) => (
             <div key={i} className="flex items-start gap-4 px-5 py-4 border-b" style={{ borderColor: 'var(--shell-border)' }}>
               <div className="w-4 h-4 rounded bg-[var(--shell-hover)] animate-pulse shrink-0 mt-1" />
-              <div className="w-9 h-9 rounded-xl bg-[var(--shell-hover)] animate-pulse shrink-0" />
+              <div className="w-9 h-9 rounded-lg bg-[var(--shell-hover)] animate-pulse shrink-0" />
               <div className="flex-1 space-y-2">
                 <div className="h-3 w-48 rounded bg-[var(--shell-hover)] animate-pulse" />
                 <div className="h-2.5 w-72 rounded bg-[var(--shell-hover)] animate-pulse" />

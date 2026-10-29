@@ -33,7 +33,7 @@ export default function ProjectsPage() {
   const { data: clients } = useClients();
   const invalidate = useInvalidate();
 
-  const { data: projects } = useProjects();
+  const { data: projects, isLoading } = useProjects();
   const { data: usersData } = useUsers();
   const allUsers = Array.isArray(usersData) ? usersData : [];
   const { data: types } = useProjectTypes();
@@ -145,7 +145,7 @@ export default function ProjectsPage() {
             hasSelection={!!selectedProject}
           >
             {selectedProject && (<>
-            <div className="bg-[var(--shell-hover)] border border-[var(--shell-border)] rounded-xl p-4 space-y-2.5">
+            <div className="bg-[var(--shell-hover)] border border-[var(--shell-border)] rounded-lg p-4 space-y-2.5">
                <div className="flex items-center justify-between">
                  <div>
                    <h4 className="font-extrabold text-[15px] text-black dark:text-white leading-tight">{selectedProject.name}</h4>
@@ -157,7 +157,7 @@ export default function ProjectsPage() {
                </div>
             </div>
 
-            <div className="bg-[var(--shell-hover)] border border-[var(--shell-border)] rounded-xl p-4 space-y-3">
+            <div className="bg-[var(--shell-hover)] border border-[var(--shell-border)] rounded-lg p-4 space-y-3">
                <h4 className="text-[11px] font-bold text-black dark:text-white">Project Team</h4>
                <div className="space-y-2">
                  {((selectedProject as any).lead ? [{ name: (selectedProject as any).lead as string, role: 'Project Lead' }] : []).map((member, i) => {
@@ -190,6 +190,7 @@ export default function ProjectsPage() {
       }
     >
       <DataTable
+        isLoading={isLoading}
         columns={columns}
         data={projects || []}
         tableInstance={table}

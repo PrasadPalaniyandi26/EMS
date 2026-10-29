@@ -471,7 +471,7 @@ export default function RecurringPage() {
           >
             {activeRow && (
             <div className="flex-1 space-y-8">
-              <div className="bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)] p-4 space-y-2.5">
+              <div className="bg-[var(--shell-hover)] rounded-lg border border-[var(--shell-border)] p-4 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <label className="text-[11px] font-bold text-[var(--shell-text-muted)]">Schedule Info</label>
                   {(activeRow as any).status === 'APPROVED' ? (
@@ -546,7 +546,7 @@ export default function RecurringPage() {
                     <FileText className="w-3.5 h-3.5" /> Supporting Document
                   </label>
                   <div
-                    className="h-12 rounded-xl flex items-center gap-3 px-3 cursor-pointer border-2 border-[var(--shell-accent)]/40 hover:border-[var(--shell-accent)] transition-all"
+                    className="h-12 rounded-lg flex items-center gap-3 px-3 cursor-pointer border-2 border-[var(--shell-accent)]/40 hover:border-[var(--shell-accent)] transition-all"
                     style={{ background: 'linear-gradient(135deg, rgba(74,111,83,0.12) 0%, rgba(74,111,83,0.05) 100%)' }}
                     onClick={() => handleViewReceipt((activeRow as any).receipt_path)}
                   >
@@ -562,16 +562,16 @@ export default function RecurringPage() {
                   <CreditCard className="w-4 h-4" /> Payment Info
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)] p-3">
+                  <div className="bg-[var(--shell-hover)] rounded-lg border border-[var(--shell-border)] p-3">
                     <p className="text-[11px] font-bold text-[var(--shell-text-muted)]">Method</p>
                     <p className="text-[12px] font-bold text-black dark:text-white capitalize">{(activeRow as any).payment_method || '—'}</p>
                   </div>
-                  <div className="bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)] p-3">
+                  <div className="bg-[var(--shell-hover)] rounded-lg border border-[var(--shell-border)] p-3">
                     <p className="text-[11px] font-bold text-[var(--shell-text-muted)]">Auto-Run</p>
                     <p className="text-[12px] font-bold text-black dark:text-white">{activeRow.is_active ? 'Enabled' : 'Paused'}</p>
                   </div>
                   {(activeRow as any).gst_rate && (
-                    <div className="col-span-2 bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)] p-3">
+                    <div className="col-span-2 bg-[var(--shell-hover)] rounded-lg border border-[var(--shell-border)] p-3">
                       <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-1">GST</p>
                       <p className="text-[12px] font-bold text-black dark:text-white">{(activeRow as any).gst_rate}% · {(activeRow as any).gst_included ? 'Included in amount' : 'Added on top'}</p>
                       <p className="text-[11px] text-[var(--shell-text-muted)] mt-0.5">
@@ -586,7 +586,7 @@ export default function RecurringPage() {
                 <label className="text-[11px] font-bold text-[var(--shell-text-muted)] border-b border-[var(--shell-border)] pb-2 flex items-center gap-2">
                   <History className="w-4 h-4" /> Run History
                 </label>
-                <div className="rounded-xl overflow-hidden border border-[var(--shell-border)] bg-[var(--shell-hover)]">
+                <div className="rounded-lg overflow-hidden border border-[var(--shell-border)] bg-[var(--shell-hover)]">
                   {runHistoryLoading ? (
                     <p className="px-3 py-4 text-[11px] text-[var(--shell-text-muted)]">Loading...</p>
                   ) : !runHistory || runHistory.length === 0 ? (
@@ -625,6 +625,7 @@ export default function RecurringPage() {
       }
     >
       <DataTable
+        isLoading={isLoading}
         columns={columns(currency)}
         data={recurring || []}
         tableInstance={table}

@@ -54,7 +54,7 @@ export default function ProductsPage() {
   const allUsers = Array.isArray(usersData) ? usersData : [];
   const invalidate = useInvalidate();
 
-  const { data: products } = useProducts();
+  const { data: products, isLoading } = useProducts();
   const { data: types } = useProductTypes();
   const allTypes = types || [];
 
@@ -179,7 +179,7 @@ export default function ProductsPage() {
           >
             {selectedProduct && (<>
             {/* Identity card */}
-            <div className="bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)] p-4 space-y-2.5">
+            <div className="bg-[var(--shell-hover)] rounded-lg border border-[var(--shell-border)] p-4 space-y-2.5">
               <div className="flex items-center justify-between">
                 <div>
                   <h4 className="font-extrabold text-[15px] text-black dark:text-white leading-tight">{selectedProduct.name}</h4>
@@ -210,7 +210,7 @@ export default function ProductsPage() {
           </ModuleIntelligencePanel>
       }
     >
-      <DataTable columns={columns} data={products || []} tableInstance={table} emptyMessage="No products found. Click Add to create one." />
+      <DataTable isLoading={isLoading} columns={columns} data={products || []} tableInstance={table} emptyMessage="No products found. Click Add to create one." />
 
       {/* ══ ADD / EDIT PRODUCT (shared layout) ══ */}
       {[
@@ -294,7 +294,7 @@ export default function ProductsPage() {
             </div>
             <div>
               <p id="product-status-label" className="mb-1 text-xs font-semibold" style={{ color: 'var(--shell-text-muted)' }}>Production Status</p>
-              <div role="radiogroup" aria-labelledby="product-status-label" className="rounded-lg border bg-[var(--shell-hover)] flex flex-wrap gap-1 rounded-xl p-1">
+              <div role="radiogroup" aria-labelledby="product-status-label" className="rounded-lg border bg-[var(--shell-hover)] flex flex-wrap gap-1 rounded-lg p-1">
                 {['R&D', 'Prototype', 'Assembly', 'Quality', 'Market Ready'].map(opt => (
                   <button
                     key={opt}

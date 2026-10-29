@@ -194,7 +194,7 @@ export function ProjectModal({
         {/* Full-width: status + description */}
         <div className="sm:col-span-2">
           <p id="project-status-label" className="mb-2 block text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Project Status</p>
-          <div role="radiogroup" aria-labelledby="project-status-label" className="flex p-1 rounded-lg border bg-[var(--shell-hover)] rounded-xl gap-1">
+          <div role="radiogroup" aria-labelledby="project-status-label" className="flex p-1 rounded-lg border bg-[var(--shell-hover)] rounded-lg gap-1">
             {([
               { val: 'Active',    active: 'text-[var(--success)] border border-[var(--success)]' },
               { val: 'Proposed',  active: 'text-[var(--shell-text)] border border-[var(--shell-border)]' },

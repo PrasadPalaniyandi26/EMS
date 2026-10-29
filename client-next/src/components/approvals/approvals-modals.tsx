@@ -130,7 +130,7 @@ export function ApproveModal({ isOpen, onClose, onConfirm, selectedRequest }: Mo
         </div>
 
         {selectedRequest.gst_rate != null && (
-          <div className="flex items-center justify-between rounded-lg border p-4 rounded-xl border border-[var(--shell-border)]">
+          <div className="flex items-center justify-between rounded-lg border p-4 rounded-lg border border-[var(--shell-border)]">
             <div className="flex items-center gap-3">
               <Settings className="text-[var(--success)]" size={20} />
               <div>
@@ -143,7 +143,7 @@ export function ApproveModal({ isOpen, onClose, onConfirm, selectedRequest }: Mo
         )}
 
         {selectedRequest.needs_reimbursement && (
-          <div className="flex items-center justify-between rounded-lg border p-4 rounded-xl border border-[color-mix(in_srgb,var(--warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--warning)_5%,transparent)]">
+          <div className="flex items-center justify-between rounded-lg border p-4 rounded-lg border border-[color-mix(in_srgb,var(--warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--warning)_5%,transparent)]">
             <div className="flex items-center gap-3">
               <Wallet className="text-[var(--warning)]" size={20} />
               <div>
@@ -346,7 +346,7 @@ export function VoidModal({ isOpen, onClose, onConfirm, selectedRequest }: Modal
           />
         </div>
 
-        <div className="p-3 bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] border border-[color-mix(in_srgb,var(--danger)_20%,transparent)] rounded-xl text-[11px] text-[var(--danger)] font-medium">
+        <div className="p-3 bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] border border-[color-mix(in_srgb,var(--danger)_20%,transparent)] rounded-lg text-[11px] text-[var(--danger)] font-medium">
           The transaction will be marked <strong>VOIDED</strong>. The record is kept for audit purposes but will be excluded from reports and balances.
         </div>
       </div>
@@ -431,7 +431,7 @@ export function SendBackModal({ isOpen, onClose, onConfirm, selectedRequest }: M
           />
         </div>
 
-        <div className="p-3 bg-[color-mix(in_srgb,var(--info)_10%,transparent)] border border-[color-mix(in_srgb,var(--info)_20%,transparent)] rounded-xl text-[11px] text-[var(--info)] font-medium">
+        <div className="p-3 bg-[color-mix(in_srgb,var(--info)_10%,transparent)] border border-[color-mix(in_srgb,var(--info)_20%,transparent)] rounded-lg text-[11px] text-[var(--info)] font-medium">
           The expense will return to <strong>DRAFT</strong> status and the employee can edit and resubmit it.
         </div>
       </div>

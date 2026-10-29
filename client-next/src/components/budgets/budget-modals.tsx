@@ -164,14 +164,14 @@ export function AddBudgetModal({ isOpen, onClose, onSave, editingData }: BudgetM
 
         {/* Switch cards: the whole card is the label, so clicking the text toggles it and it is announced */}
         <FormGrid className="gap-4 border-t border-[var(--shell-border)] pt-3">
-          <label className="rounded-lg border flex cursor-pointer items-center justify-between rounded-xl border border-[var(--shell-border)] p-4">
+          <label className="rounded-lg border flex cursor-pointer items-center justify-between rounded-lg border border-[var(--shell-border)] p-4">
             <span>
               <span className="block text-[12px] font-bold" style={{ color: 'var(--shell-text)' }}>Strict Enforcement</span>
               <span className="block text-[11px] font-medium text-[var(--shell-text-muted)]">Prevent overspending strictly</span>
             </span>
             <Switch checked={form.strict} onCheckedChange={v => set('strict', v)} aria-label="Strict enforcement" />
           </label>
-          <label className="rounded-lg border flex cursor-pointer items-center justify-between rounded-xl border border-[var(--shell-border)] p-4">
+          <label className="rounded-lg border flex cursor-pointer items-center justify-between rounded-lg border border-[var(--shell-border)] p-4">
             <span>
               <span className="block text-[12px] font-bold" style={{ color: 'var(--shell-text)' }}>Auto-Rollover</span>
               <span className="block text-[11px] font-medium text-[var(--shell-text-muted)]">Carry over unused balance</span>
@@ -198,14 +198,14 @@ export function ExportBudgetModal({ isOpen, onClose }: BudgetModalProps) {
         <div className="space-y-2.5">
           <p className="text-xs font-semibold" style={{ color: 'var(--shell-text-muted)' }}>Select Format</p>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <button className="flex flex-col items-center justify-center p-6 rounded-lg border border border-[var(--shell-border)] rounded-xl hover:border-[var(--shell-accent)]/30 hover:rounded-lg border transition-all group scale-100 active:scale-95">
+            <button className="flex flex-col items-center justify-center p-6 rounded-lg border border border-[var(--shell-border)] rounded-lg hover:border-[var(--shell-accent)]/30 hover:rounded-lg border transition-all group scale-100 active:scale-95">
               <div className="w-12 h-12 rounded-full bg-[var(--shell-accent)]/20 text-[var(--success)] flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <Download className="w-6 h-6" />
               </div>
               <span className="text-xs font-bold" style={{ color: 'var(--shell-text)' }}>Excel Spreadsheet</span>
               <span className="text-[11px] text-[var(--shell-text-muted)] mt-1 font-bold">.XLSX Format</span>
             </button>
-            <button className="flex flex-col items-center justify-center p-6 rounded-lg border border border-[var(--shell-border)] rounded-xl hover:border-[var(--shell-accent)]/30 hover:rounded-lg border transition-all group scale-100 active:scale-95">
+            <button className="flex flex-col items-center justify-center p-6 rounded-lg border border border-[var(--shell-border)] rounded-lg hover:border-[var(--shell-accent)]/30 hover:rounded-lg border transition-all group scale-100 active:scale-95">
               <div className="w-12 h-12 rounded-full bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] text-[var(--danger)] flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <Download className="w-6 h-6" />
               </div>

@@ -351,7 +351,7 @@ export default function ApprovalsPage() {
                   tabIndex={selectedApproval?.receipt_path ? 0 : undefined}
                   aria-label={selectedApproval?.receipt_path ? "Open receipt in a new tab" : undefined}
                   onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } }}
-                  className="focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)] h-20 rounded-xl flex items-center justify-center group cursor-pointer transition-all px-4"
+                  className="focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)] h-20 rounded-lg flex items-center justify-center group cursor-pointer transition-all px-4"
                   style={{ background: 'var(--shell-bg)', border: '1px solid var(--shell-border)' }}
                   onClick={async () => {
                     if (selectedApproval?.receipt_path) {
@@ -563,19 +563,19 @@ export default function ApprovalsPage() {
                 <div className="grid grid-cols-3 gap-2 pt-1">
                   <button
                     onClick={() => setIsApproveOpen(true)}
-                    className="bg-[var(--shell-accent)] text-[var(--shell-accent-fg)] py-2.5 rounded-xl text-[11px] font-black transition-all active:scale-95"
+                    className="bg-[var(--shell-accent)] text-[var(--shell-accent-fg)] py-2.5 rounded-lg text-[11px] font-black transition-all active:scale-95"
                   >
                     Approve
                   </button>
                   <button
                     onClick={() => setIsSendBackOpen(true)}
-                    className="bg-[var(--info)] text-[var(--info-foreground)] py-2.5 rounded-xl text-[11px] font-black transition-all active:scale-95"
+                    className="bg-[var(--info)] text-[var(--info-foreground)] py-2.5 rounded-lg text-[11px] font-black transition-all active:scale-95"
                   >
                     Send Back
                   </button>
                   <button
                     onClick={() => setIsRejectOpen(true)}
-                    className="bg-[var(--shell-hover)] border border-[color-mix(in_srgb,var(--danger)_30%,transparent)] text-[var(--danger)] py-2.5 rounded-xl text-[11px] font-black hover:bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] transition-all active:scale-95"
+                    className="bg-[var(--shell-hover)] border border-[color-mix(in_srgb,var(--danger)_30%,transparent)] text-[var(--danger)] py-2.5 rounded-lg text-[11px] font-black hover:bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] transition-all active:scale-95"
                   >
                     Reject
                   </button>
@@ -588,18 +588,7 @@ export default function ApprovalsPage() {
       }
     >
       {isLoading ? (
-        <div className="h-full overflow-y-auto custom-scrollbar px-4 py-4 space-y-2">
-          {[...Array(8)].map((_, i) => (
-            <div key={i} className="flex items-center gap-4 bg-[var(--shell-bg)] border border-black/10 rounded-xl px-4 py-3">
-              <div className="h-4 w-4 rounded bg-[var(--shell-hover)] animate-pulse shrink-0" />
-              <div className="h-3 w-20 rounded bg-[var(--shell-hover)] animate-pulse" />
-              <div className="h-3 w-32 rounded bg-[var(--shell-hover)] animate-pulse flex-1" />
-              <div className="h-3 w-24 rounded bg-[var(--shell-hover)] animate-pulse" />
-              <div className="h-5 w-16 rounded bg-[var(--shell-hover)] animate-pulse" />
-              <div className="h-4 w-20 rounded bg-[var(--shell-hover)] animate-pulse" />
-            </div>
-          ))}
-        </div>
+        <DataTable isLoading columns={cols} data={[]} tableInstance={table} />
       ) : approvals.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-full space-y-4 py-20">
           <div className="w-16 h-16 rounded-full bg-[var(--shell-accent)]/10 flex items-center justify-center text-[var(--shell-accent)]">

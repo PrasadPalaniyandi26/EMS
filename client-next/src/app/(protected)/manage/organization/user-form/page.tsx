@@ -33,7 +33,7 @@ function generatePassword(firstName: string, lastName: string): string {
 }
 
 // ─── Field ─────────────────────────────────────────────────────────────────────
-const INP = 'w-full h-10 text-sm focus:ring-1 focus:outline-none rounded-xl';
+const INP = 'w-full h-10 text-sm focus:ring-1 focus:outline-none rounded-lg';
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
 const TABS = [
@@ -278,7 +278,7 @@ function UserForm() {
                 <h2 className="text-base font-semibold text-[var(--shell-text)]">Personal Information</h2>
                 <p className="text-sm text-[var(--shell-text-muted)] mt-0.5">Basic identity and contact details</p>
               </div>
-              <div className="rounded-2xl p-6 space-y-5" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
+              <div className="rounded-lg p-6 space-y-5" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <Field label="First Name" required>
                     <Input className={INP} style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }} placeholder="Jonathan" value={form.first_name} onChange={(e) => set('first_name', e.target.value)} />
@@ -310,7 +310,7 @@ function UserForm() {
                       </button>
                     </div>
                     <Button type="button" variant="outline" onClick={() => { set('password', generatePassword(form.first_name, form.last_name)); setShowPassword(true); }}
-                      className="h-10 px-3 border-[var(--shell-border)] text-[var(--shell-text-muted)] hover:text-[var(--info)] hover:border-[color-mix(in_srgb,var(--success)_35%,transparent)] rounded-xl">
+                      className="h-10 px-3 border-[var(--shell-border)] text-[var(--shell-text-muted)] hover:text-[var(--info)] hover:border-[color-mix(in_srgb,var(--success)_35%,transparent)] rounded-lg">
                       <RefreshCw className="w-4 h-4" />
                     </Button>
                   </div>
@@ -318,9 +318,9 @@ function UserForm() {
               </div>
 
               {/* Status card */}
-              <div className="rounded-2xl p-6" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
+              <div className="rounded-lg p-6" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
                 <Label className="text-xs font-medium text-[var(--shell-text-muted)] block mb-3">Account Status</Label>
-                <div className="flex p-1 border rounded-xl gap-1">
+                <div className="flex p-1 border rounded-lg gap-1">
                   {[
                     { val: 'ACTIVE',   label: 'Active',   color: 'text-[var(--info)]' },
                     { val: 'On Hold',  label: 'On Hold',  color: 'text-[var(--warning)]' },
@@ -346,7 +346,7 @@ function UserForm() {
                 <p className="text-sm text-[var(--shell-text-muted)] mt-0.5">Role assignments, department, and reporting structure</p>
               </div>
 
-              <div className="rounded-2xl p-6 space-y-5" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
+              <div className="rounded-lg p-6 space-y-5" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <Field label="Department">
                     <Select value={form.department} onValueChange={(v) => set('department', v)}>
@@ -390,12 +390,12 @@ function UserForm() {
               </div>
 
               {/* Roles */}
-              <div className="rounded-2xl p-6 space-y-2.5" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
+              <div className="rounded-lg p-6 space-y-2.5" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
                 <div>
                   <h3 className="text-sm font-semibold text-[var(--shell-text)]">Roles Assigned</h3>
                   <p className="text-xs text-[var(--shell-text-muted)] mt-0.5">A user can hold multiple roles. Star (★) marks the default active role.</p>
                 </div>
-                <div className="border rounded-xl overflow-hidden divide-y divide-[var(--shell-border)]">
+                <div className="border rounded-lg overflow-hidden divide-y divide-[var(--shell-border)]">
                   {(roles || []).map((r) => {
                     const isChecked = selectedRoles.some((s) => s.roleId === r.id);
                     const isDefault = selectedRoles.find((s) => s.roleId === r.id)?.isDefault ?? false;
@@ -443,7 +443,7 @@ function UserForm() {
                 <h2 className="text-base font-semibold text-[var(--shell-text)]">Address & Location</h2>
                 <p className="text-sm text-[var(--shell-text-muted)] mt-0.5">Residential or mailing address</p>
               </div>
-              <div className="rounded-2xl p-6 space-y-5" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
+              <div className="rounded-lg p-6 space-y-5" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
                 <Field label="Street / House / Apt">
                   <Input className={INP} style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }} placeholder="123 Main Street, Apt 4B" value={form.house_apt} onChange={(e) => set('house_apt', e.target.value)} />
                 </Field>
@@ -478,7 +478,7 @@ function UserForm() {
                 <p className="text-sm text-[var(--shell-text-muted)] mt-0.5">Financial limits and module access controls</p>
               </div>
 
-              <div className="rounded-2xl p-6 space-y-5" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
+              <div className="rounded-lg p-6 space-y-5" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
                 <h3 className="text-sm font-semibold text-[var(--shell-text)]">Spending Limits</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <Field label="Single Transaction Limit (₹)">
@@ -510,7 +510,7 @@ function UserForm() {
                 </Field>
               </div>
 
-              <div className="rounded-2xl p-6 space-y-2.5" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
+              <div className="rounded-lg p-6 space-y-2.5" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
                 <h3 className="text-sm font-semibold text-[var(--shell-text)]">Module Access</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {PERM_MODULES.map(({ key, label }) => {
@@ -518,7 +518,7 @@ function UserForm() {
                     return (
                       <button key={key} type="button"
                         onClick={() => setPermissions((p) => ({ ...p, permissions: { ...p.permissions, [key]: !enabled } }))}
-                        className={cn('flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-all',
+                        className={cn('flex items-center justify-between px-4 py-3 rounded-lg border text-sm font-medium transition-all',
                           enabled
                             ? 'bg-[color-mix(in_srgb,var(--info)_12%,transparent)] border-[color-mix(in_srgb,var(--info)_35%,transparent)] text-[var(--info)]'
                             : 'border-[var(--shell-border)] text-[var(--shell-text-muted)] hover:border-[var(--shell-border)]',
@@ -543,7 +543,7 @@ function UserForm() {
               ← Back to Team
             </button>
             <Button onClick={handleSave} disabled={saving}
-              className="h-10 px-6 bg-[var(--info)] hover:opacity-90 text-[var(--info-foreground)] rounded-xl text-sm font-semibold flex items-center gap-2">
+              className="h-10 px-6 bg-[var(--info)] hover:opacity-90 text-[var(--info-foreground)] rounded-lg text-sm font-semibold flex items-center gap-2">
               {saving ? 'Saving…' : isEdit ? <><Save className="w-4 h-4" /> Save Changes</> : <><Send className="w-4 h-4" /> Create Member</>}
             </Button>
           </div>
