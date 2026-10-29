@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { COUNTRY_LIST } from '@/components/manage/client-modals';
 import { getRoleStyle } from '@/lib/roles';
-import { Field } from '@/components/shared/modal-primitives';
+import { Field, inputStyle } from '@/components/shared/modal-primitives';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -33,7 +33,7 @@ function generatePassword(firstName: string, lastName: string): string {
 }
 
 // ─── Field ─────────────────────────────────────────────────────────────────────
-const INP = 'w-full h-10 text-sm focus:ring-1 focus:outline-none rounded-lg';
+const INP = 'w-full h-10 text-sm rounded-md';
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
 const TABS = [
@@ -281,22 +281,22 @@ function UserForm() {
               <div className="rounded-lg p-6 space-y-5" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <Field label="First Name" required>
-                    <Input className={INP} style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }} placeholder="Jonathan" value={form.first_name} onChange={(e) => set('first_name', e.target.value)} />
+                    <Input className={INP} style={inputStyle} placeholder="Jonathan" value={form.first_name} onChange={(e) => set('first_name', e.target.value)} />
                   </Field>
                   <Field label="Last Name">
-                    <Input className={INP} style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }} placeholder="Doe" value={form.last_name} onChange={(e) => set('last_name', e.target.value)} />
+                    <Input className={INP} style={inputStyle} placeholder="Doe" value={form.last_name} onChange={(e) => set('last_name', e.target.value)} />
                   </Field>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <Field label="Date of Birth">
-                    <Input className={INP} style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }} type="date" value={form.date_of_birth} onChange={(e) => set('date_of_birth', e.target.value)} />
+                    <Input className={INP} style={inputStyle} type="date" value={form.date_of_birth} onChange={(e) => set('date_of_birth', e.target.value)} />
                   </Field>
                   <Field label="Contact No">
-                    <Input className={INP} style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }} placeholder="+91 98765 43210" value={form.contact_no} onChange={(e) => set('contact_no', e.target.value)} />
+                    <Input className={INP} style={inputStyle} placeholder="+91 98765 43210" value={form.contact_no} onChange={(e) => set('contact_no', e.target.value)} />
                   </Field>
                 </div>
                 <Field label="Email Address" required>
-                  <Input className={INP} style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }} type="email" placeholder="j.doe@company.com" value={form.email}
+                  <Input className={INP} style={inputStyle} type="email" placeholder="j.doe@company.com" value={form.email}
                     readOnly={!!isEdit} onChange={(e) => set('email', e.target.value)} />
                 </Field>
                 <Field label={isEdit ? 'New Password (leave blank to keep current)' : 'Password'}>
@@ -350,7 +350,7 @@ function UserForm() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <Field label="Department">
                     <Select value={form.department} onValueChange={(v) => set('department', v)}>
-                      <SelectTrigger className={INP} style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }}><SelectValue placeholder="Select department" /></SelectTrigger>
+                      <SelectTrigger className={INP} style={inputStyle}><SelectValue placeholder="Select department" /></SelectTrigger>
                       <SelectContent>
                         {['Engineering', 'Finance', 'Operations', 'Human Resource', 'Logistics', 'Sales'].map((d) => (
                           <SelectItem key={d} value={d}>{d}</SelectItem>
@@ -360,7 +360,7 @@ function UserForm() {
                   </Field>
                   <Field label="Clearance Level">
                     <Select value={form.clearance_level} onValueChange={(v) => set('clearance_level', v)}>
-                      <SelectTrigger className={INP} style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }}><SelectValue /></SelectTrigger>
+                      <SelectTrigger className={INP} style={inputStyle}><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {['Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level 5'].map((l) => (
                           <SelectItem key={l} value={l}>{l}</SelectItem>
@@ -384,7 +384,7 @@ function UserForm() {
                     </div>
                   </Field>
                   <Field label="Joining Date">
-                    <Input className={INP} style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }} type="date" value={form.joining_date} onChange={(e) => set('joining_date', e.target.value)} />
+                    <Input className={INP} style={inputStyle} type="date" value={form.joining_date} onChange={(e) => set('joining_date', e.target.value)} />
                   </Field>
                 </div>
               </div>
@@ -445,22 +445,22 @@ function UserForm() {
               </div>
               <div className="rounded-lg p-6 space-y-5" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
                 <Field label="Street / House / Apt">
-                  <Input className={INP} style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }} placeholder="123 Main Street, Apt 4B" value={form.house_apt} onChange={(e) => set('house_apt', e.target.value)} />
+                  <Input className={INP} style={inputStyle} placeholder="123 Main Street, Apt 4B" value={form.house_apt} onChange={(e) => set('house_apt', e.target.value)} />
                 </Field>
                 <Field label="Address line 2">
-                  <Input className={INP} style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }} placeholder="Building, landmark (optional)" value={form.address} onChange={(e) => set('address', e.target.value)} />
+                  <Input className={INP} style={inputStyle} placeholder="Building, landmark (optional)" value={form.address} onChange={(e) => set('address', e.target.value)} />
                 </Field>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <Field label="City">
-                    <Input className={INP} style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }} placeholder="Mumbai" value={form.city} onChange={(e) => set('city', e.target.value)} />
+                    <Input className={INP} style={inputStyle} placeholder="Mumbai" value={form.city} onChange={(e) => set('city', e.target.value)} />
                   </Field>
                   <Field label="Postal Code">
-                    <Input className={INP} style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }} placeholder="400001" value={form.postal_code} onChange={(e) => set('postal_code', e.target.value)} />
+                    <Input className={INP} style={inputStyle} placeholder="400001" value={form.postal_code} onChange={(e) => set('postal_code', e.target.value)} />
                   </Field>
                 </div>
                 <Field label="Country">
                   <Select value={form.country} onValueChange={(v) => set('country', v)}>
-                    <SelectTrigger className={INP} style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }}><SelectValue placeholder="Select country" /></SelectTrigger>
+                    <SelectTrigger className={INP} style={inputStyle}><SelectValue placeholder="Select country" /></SelectTrigger>
                     <SelectContent className="max-h-64">
                       {COUNTRY_LIST.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                     </SelectContent>
@@ -500,7 +500,7 @@ function UserForm() {
                 </div>
                 <Field label="Data Scope">
                   <Select value={permissions.data_scope} onValueChange={(v) => setPermissions((p) => ({ ...p, data_scope: v }))}>
-                    <SelectTrigger className={INP} style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }}><SelectValue /></SelectTrigger>
+                    <SelectTrigger className={INP} style={inputStyle}><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {['Own', 'Department', 'Organization'].map((s) => (
                         <SelectItem key={s} value={s}>{s}</SelectItem>

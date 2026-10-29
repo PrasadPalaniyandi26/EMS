@@ -6,7 +6,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useDashboardSummary, useApprovals, useBudgets } from '@/hooks/use-queries';
 import { formatCurrency, formatDate } from '@/lib/currency';
 import { getStatusConfig } from '@/lib/status';
-import { StatCard } from '@/components/shared/stat-card';
+import { StatCard, StatStrip } from '@/components/shared/stat-card';
 import {
   TrendingDown, TrendingUp, ShieldCheck, Target,
   Plus, ArrowRight, Wallet, CheckCircle2,
@@ -35,7 +35,7 @@ export default function HubPage() {
   const canApprove = isManager || isFinance || isAdmin;
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-5 space-y-5" style={{ background: 'var(--shell-bg)' }}>
+    <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-5 space-y-5">
 
       {/* Quick Actions */}
       <div>
@@ -67,7 +67,7 @@ export default function HubPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <StatStrip cols={4}>
         {[
           {
             label: 'Total Income',
@@ -96,7 +96,7 @@ export default function HubPage() {
         ].map((card) => (
           <StatCard key={card.label} label={card.label} value={card.value} icon={card.icon} tone={card.tone} />
         ))}
-      </div>
+      </StatStrip>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Recent Transactions */}

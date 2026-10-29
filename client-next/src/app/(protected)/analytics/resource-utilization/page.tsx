@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { inputStyle } from '@/components/shared/modal-primitives';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { formatCurrency, getDateRange } from '@/lib/currency';
@@ -144,12 +145,12 @@ export default function SpendAnalyticsPage() {
           <input type="date" value={dateFrom}
             onChange={(e) => { setDateFrom(e.target.value); setPreset('Custom'); }}
             className="rounded-lg px-3 py-1.5 text-[12px] border outline-none"
-            style={{ background: 'var(--shell-bg)', color: 'var(--shell-text)', borderColor: 'var(--shell-border)' }} />
+            style={inputStyle} />
           <span className="text-[11px]" style={{ color: 'var(--shell-text-muted)' }}>—</span>
           <input type="date" value={dateTo}
             onChange={(e) => { setDateTo(e.target.value); setPreset('Custom'); }}
             className="rounded-lg px-3 py-1.5 text-[12px] border outline-none"
-            style={{ background: 'var(--shell-bg)', color: 'var(--shell-text)', borderColor: 'var(--shell-border)' }} />
+            style={inputStyle} />
         </div>
       </div>
 

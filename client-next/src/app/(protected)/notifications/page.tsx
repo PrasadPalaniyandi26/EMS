@@ -12,7 +12,7 @@ import {
   RefreshCw, BellOff,
 } from 'lucide-react';
 import type { Notification } from '@/lib/types';
-import { useConfirm } from '@/components/shared/modal-primitives';
+import { useConfirm, inputStyle } from '@/components/shared/modal-primitives';
 
 // ─── Type config ──────────────────────────────────
 const TYPE_CFG: Record<string, { icon: React.ElementType; color: string; bg: string; label: string }> = {
@@ -199,7 +199,7 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div className="h-full flex flex-col overflow-hidden" style={{ background: 'var(--shell-bg)' }}>
+    <div className="h-full flex flex-col overflow-hidden" style={{ background: 'var(--shell-surface)' }}>
       {confirmDialogEl}
 
       {/* ── Toolbar ── */}
@@ -209,7 +209,7 @@ export default function NotificationsPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'var(--shell-text-muted)' }} />
           <input
             className="h-8 w-52 pl-9 pr-3 text-[12px] rounded-lg border outline-none transition-colors"
-            style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }}
+            style={inputStyle}
             placeholder="Search notifications..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}

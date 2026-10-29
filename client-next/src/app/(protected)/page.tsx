@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { inputStyle } from '@/components/shared/modal-primitives';
+import { StatCard, StatStrip } from '@/components/shared/stat-card';
 import { useRouter } from 'next/navigation';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
@@ -105,12 +107,12 @@ export default function DashboardPage() {
   }, [budgetUtil]);
 
   const kpis = [
-    { label: 'Total Income', value: fmt(summary?.totalIncome || 0), icon: TrendingUp, color: 'text-[var(--success)]', bg: 'bg-[color-mix(in_srgb,var(--success)_10%,transparent)]', loading: summaryLoading },
-    { label: 'Total Expenses', value: fmt(summary?.totalExpenses || 0), icon: TrendingDown, color: 'text-[var(--danger)]', bg: 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)]', loading: summaryLoading },
-    { label: 'Net Balance', value: fmt(summary?.balance || 0), icon: Wallet, color: 'text-[var(--info)]', bg: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]', loading: summaryLoading },
-    { label: 'Transactions', value: String(summary?.transactionCount || 0), icon: ArrowLeftRight, color: 'text-[var(--warning)]', bg: 'bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]', loading: summaryLoading },
-    { label: 'Pending Approvals', value: String(pendingApprovals), icon: ClipboardCheck, color: 'text-[var(--info)]', bg: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]', loading: false, link: '/approvals' },
-    { label: 'Budget Used', value: budgetPct !== null ? `${budgetPct}%` : '—', icon: Target, color: budgetPct !== null && budgetPct > 90 ? 'text-[var(--danger)]' : 'text-[var(--info)]', bg: budgetPct !== null && budgetPct > 90 ? 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)]' : 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]', loading: budgetLoading, link: '/manage/budgets' },
+    { tone: 'success' as const, label: 'Total Income', value: fmt(summary?.totalIncome || 0), icon: TrendingUp, color: 'text-[var(--success)]', bg: 'bg-[color-mix(in_srgb,var(--success)_10%,transparent)]', loading: summaryLoading },
+    { tone: 'danger' as const, label: 'Total Expenses', value: fmt(summary?.totalExpenses || 0), icon: TrendingDown, color: 'text-[var(--danger)]', bg: 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)]', loading: summaryLoading },
+    { tone: 'info' as const, label: 'Net Balance', value: fmt(summary?.balance || 0), icon: Wallet, color: 'text-[var(--info)]', bg: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]', loading: summaryLoading },
+    { tone: 'warning' as const, label: 'Transactions', value: String(summary?.transactionCount || 0), icon: ArrowLeftRight, color: 'text-[var(--warning)]', bg: 'bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]', loading: summaryLoading },
+    { tone: 'info' as const, label: 'Pending Approvals', value: String(pendingApprovals), icon: ClipboardCheck, color: 'text-[var(--info)]', bg: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]', loading: false, link: '/approvals' },
+    { tone: (budgetPct !== null && budgetPct > 90 ? 'danger' : 'info') as 'danger' | 'info', label: 'Budget Used', value: budgetPct !== null ? `${budgetPct}%` : '—', icon: Target, color: budgetPct !== null && budgetPct > 90 ? 'text-[var(--danger)]' : 'text-[var(--info)]', bg: budgetPct !== null && budgetPct > 90 ? 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)]' : 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]', loading: budgetLoading, link: '/manage/budgets' },
   ];
 
   const approvalStages = [
@@ -158,43 +160,32 @@ export default function DashboardPage() {
           <input type="date" aria-label="From date" value={dateFrom}
             onChange={(e) => { setDateFrom(e.target.value); setActivePreset('Custom'); }}
             className="rounded-lg px-3 py-1.5 text-[12px] border outline-none"
-            style={{ background: 'var(--shell-bg)', color: 'var(--shell-text)', borderColor: 'var(--shell-border)' }} />
+            style={inputStyle} />
           <span className="text-[11px]" style={{ color: 'var(--shell-text-muted)' }}>—</span>
           <input type="date" aria-label="To date" value={dateTo}
             onChange={(e) => { setDateTo(e.target.value); setActivePreset('Custom'); }}
             className="rounded-lg px-3 py-1.5 text-[12px] border outline-none"
-            style={{ background: 'var(--shell-bg)', color: 'var(--shell-text)', borderColor: 'var(--shell-border)' }} />
+            style={inputStyle} />
         </div>
       </div>
 
-      {/* Row 1 — 6 KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-px rounded-lg overflow-hidden border border-[var(--shell-border)]" style={{ background: 'var(--shell-border)' }}>
+      {/* Row 1: KPI strip */}
+      <StatStrip cols={6}>
         {kpis.map((k) => {
           const Icon = k.icon;
           return (
-            <div
+            <StatCard
               key={k.label}
-              role={k.link ? "link" : undefined}
-              tabIndex={k.link ? 0 : undefined}
-              onClick={() => k.link && router.push(k.link)}
-              onKeyDown={(e) => { if (k.link && e.key === "Enter") router.push(k.link); }}
-              className={`bg-[var(--shell-surface)] p-4 flex items-center justify-between ${k.link ? 'cursor-pointer hover:bg-[var(--shell-hover)] transition-colors focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]' : ''}`}
-              
-            >
-              <div className="flex-1 min-w-0">
-                <p className="text-[12px] font-medium mb-1 truncate" style={{ color: 'var(--shell-text-muted)' }}>{k.label}</p>
-                {k.loading
-                  ? <SkeletonRect w="60px" h="24px" className="mt-1" />
-                  : <p className="text-[18px] font-black leading-none truncate" style={{ color: 'var(--shell-text)' }}>{k.value}</p>
-                }
-              </div>
-              <div className={`w-9 h-9 rounded-md flex items-center justify-center shrink-0 ml-2 ${k.bg} ${k.color}`}>
-                <Icon className="h-4 w-4" />
-              </div>
-            </div>
+              label={k.label}
+              value={k.value}
+              loading={k.loading}
+              tone={k.tone}
+              icon={<Icon className="h-4 w-4" />}
+              onClick={k.link ? () => router.push(k.link as string) : undefined}
+            />
           );
         })}
-      </div>
+      </StatStrip>
 
       {/* Row 2 — Monthly Trend + Category Pie */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

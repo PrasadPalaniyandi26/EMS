@@ -13,7 +13,7 @@ import { User, Lock, SlidersHorizontal, ClipboardList } from 'lucide-react';
 import api from '@/lib/api-client';
 import { toast } from 'sonner';
 
-const INP = 'h-8 text-[12.5px]';
+const INP = 'h-10 text-sm';
 const LBL = 'text-[11.5px] font-medium';
 
 export default function SettingsPage() {
@@ -117,7 +117,7 @@ export default function SettingsPage() {
   ];
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] w-full overflow-hidden flex-col" style={{ background: 'var(--shell-bg)' }}>
+    <div className="flex h-[calc(100vh-4rem)] w-full overflow-hidden flex-col" style={{ background: 'var(--shell-surface)' }}>
 
       {/* ── Tab bar ── */}
       <div className="px-4 flex items-end gap-0 shrink-0" style={{ borderBottom: '1px solid var(--shell-border)' }}>

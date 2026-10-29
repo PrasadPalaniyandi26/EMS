@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { inputStyle } from '@/components/shared/modal-primitives';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
 import api from '@/lib/api-client';
@@ -193,7 +194,7 @@ export default function ReportingPage() {
   const selectedReport = REPORTS.find((r) => r.id === selectedType);
   const isBudgetReport = selectedType === 'budget-vs-actual';
   const isClientSummary = selectedType === 'client-summary';
-  const selectStyle = { background: 'var(--shell-bg)', color: 'var(--shell-text)', borderColor: 'var(--shell-border)' };
+  const selectStyle = inputStyle;
   const selectClass = 'rounded-lg px-3 py-2 text-[13px] font-medium border outline-none focus:ring-2 focus:ring-[var(--shell-accent)]';
 
   return (
@@ -258,11 +259,11 @@ export default function ReportingPage() {
                 ))}
                 <input type="date" aria-label="From date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setDatePreset('Custom'); }}
                   className="rounded-lg px-3 py-1.5 text-[12px] border outline-none"
-                  style={{ background: 'var(--shell-bg)', color: 'var(--shell-text)', borderColor: 'var(--shell-border)' }} />
+                  style={inputStyle} />
                 <span className="text-[11px]" style={{ color: 'var(--shell-text-muted)' }}>—</span>
                 <input type="date" aria-label="To date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setDatePreset('Custom'); }}
                   className="rounded-lg px-3 py-1.5 text-[12px] border outline-none"
-                  style={{ background: 'var(--shell-bg)', color: 'var(--shell-text)', borderColor: 'var(--shell-border)' }} />
+                  style={inputStyle} />
               </div>
 
               {(selectedType === 'transaction-ledger' || isClientSummary) && (
@@ -320,7 +321,7 @@ export default function ReportingPage() {
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search..."
                   className="pl-8 pr-3 py-1.5 rounded-lg text-[12px] border outline-none w-40"
-                  style={{ background: 'var(--shell-bg)', color: 'var(--shell-text)', borderColor: 'var(--shell-border)' }}
+                  style={inputStyle}
                 />
               </div>
               {/* Export buttons */}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useRef } from 'react';
+import { inputStyle } from '@/components/shared/modal-primitives';
 import { useFitPageSize } from '@/hooks/use-fit-page-size';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuditLogs, useAuditStats } from '@/hooks/use-queries';
@@ -159,7 +160,7 @@ export default function AuditLogPage() {
             <input
               aria-label="Search audit log"
               className="h-8 w-48 pl-9 pr-3 text-[12px] rounded-lg border outline-none"
-              style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }}
+              style={inputStyle}
               placeholder="Search user, table, ref..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
@@ -189,7 +190,7 @@ export default function AuditLogPage() {
           <select
             aria-label="Filter by table"
             className="h-8 px-3 text-[11px] rounded-lg border outline-none"
-            style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }}
+            style={inputStyle}
             value={tableFilter}
             onChange={(e) => setTableFilter(e.target.value)}
           >
@@ -200,12 +201,12 @@ export default function AuditLogPage() {
           {/* Date range */}
           <input type="date" aria-label="From date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
             className="h-8 px-3 text-[11px] rounded-lg border outline-none"
-            style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }}
+            style={inputStyle}
           />
           <span className="text-[11px]" style={{ color: 'var(--shell-text-muted)' }}>to</span>
           <input type="date" aria-label="To date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
             className="h-8 px-3 text-[11px] rounded-lg border outline-none"
-            style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }}
+            style={inputStyle}
           />
 
           <div className="flex-1" />

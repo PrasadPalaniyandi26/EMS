@@ -51,7 +51,7 @@ function SectionHeader({ label }: { label: string }) {
 }
 
 // ─── Shared input class ───────────────────────────────────────────────────────
-const INP = 'w-full h-10 text-sm border-input bg-transparent text-[var(--shell-text)] border-[var(--shell-border)] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[var(--shell-accent)]/50 focus:border-[var(--shell-accent)]/50 rounded-lg';
+const INP = 'w-full h-10 text-sm border-input bg-transparent text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[var(--shell-accent)]/50 focus:border-[var(--shell-accent)]/50 rounded-lg';
 
 // ─── UserModal ───────────────────────────────────────────────────────────────
 
@@ -460,7 +460,7 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
     setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
 
-  const INP2 = 'h-10 text-sm border-input bg-transparent text-[var(--shell-text)] border-[var(--shell-border)] text-[var(--shell-text)] focus:ring-1 focus:ring-[var(--shell-accent)]/50 rounded-lg w-full';
+  const INP2 = 'h-10 text-sm border-input bg-transparent text-[var(--shell-text)] focus:ring-1 focus:ring-[var(--shell-accent)]/50 rounded-lg w-full';
 
   return (
     <ModuleModal
@@ -711,7 +711,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
     }
   };
 
-  const INP3 = 'pl-6 h-10 text-sm border-input bg-transparent text-[var(--shell-text)] border-[var(--shell-border)] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] rounded-lg';
+  const INP3 = 'pl-6 h-10 text-sm border-input bg-transparent text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] rounded-lg';
 
   return (
     <ModuleModal
