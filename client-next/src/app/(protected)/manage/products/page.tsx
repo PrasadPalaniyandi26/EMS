@@ -7,7 +7,7 @@ import { useClients, useProducts, useProductTypes, useProductCategories, useUser
 import api from '@/lib/api-client';
 import { CURRENCY_SYMBOL, formatDate } from '@/lib/currency';
 import { ModuleModal } from '@/components/shared/module/module-modal';
-import { PickSelect } from '@/components/manage/pick-select';
+import { TypeCategoryFields } from '@/components/shared/type-category-fields';
 import { toast } from 'sonner';
 import {
   Plus, Pencil, Tags,
@@ -95,10 +95,6 @@ export default function ProductsPage() {
   const selectedRows = table.getSelectedRowModel().rows;
   const selectedProduct = selectedRows.length > 0 ? selectedRows[0].original : null;
 
-
-  // Categories follow the chosen type; the category is stored by name, so keep a saved one that is no longer listed
-  const categoryOptions = (categories || []).filter((c) => String(c.type_id) === form.typeId).map((c) => ({ id: c.name, name: c.name }));
-  if (form.category && form.typeId && !categoryOptions.some((o) => o.id === form.category)) categoryOptions.push({ id: form.category, name: form.category });
 
   // ── Add ──
   const openAdd = () => { setForm(defaultForm()); setEditingId(null); setAddOpen(true); };
@@ -252,23 +248,18 @@ export default function ProductsPage() {
                   {(clients || []).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </NativeSelect>
               </Field>
-              <PickSelect
-                label="Product Type"
-                required
-                placeholder="Select type"
-                value={form.typeId}
-                onChange={(id) => setForm(prev => ({ ...prev, typeId: id, category: '' }))}
-                options={allTypes}
-                emptyHint="No types yet. An admin can add them with Types."
-              />
-              <PickSelect
-                label="Product Category"
-                placeholder="Select category"
-                value={form.category}
-                onChange={(name) => setForm(prev => ({ ...prev, category: name }))}
-                options={categoryOptions}
-                disabled={!form.typeId}
-                emptyHint="No categories for this type yet. An admin can add them with Types."
+              <TypeCategoryFields
+                typeLabel="Product Type"
+                categoryLabel="Product Category"
+                typeRequired
+                types={allTypes}
+                categories={categories || []}
+                typeId={form.typeId}
+                category={form.category}
+                categoryBy="name"
+                onChange={(v) => setForm(prev => ({ ...prev, typeId: v.typeId, category: v.category }))}
+                typeEmptyHint="No types yet. An admin can add them with Types."
+                categoryEmptyHint="No categories for this type yet. An admin can add them with Types."
               />
             </div>
 

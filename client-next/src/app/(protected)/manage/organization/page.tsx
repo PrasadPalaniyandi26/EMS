@@ -259,7 +259,6 @@ export default function OrganizationPage() {
         editing={editingUser}
         roles={roles ?? []}
         managers={managersList}
-        departments={departments ?? []}
       />
 
       <ManageDepartmentsDialog isOpen={departmentsOpen} onClose={() => setDepartmentsOpen(false)} departments={departments ?? []} />

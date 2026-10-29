@@ -10,7 +10,7 @@ import { Plus, Pencil, Eye, Trash2, FileText, Sparkles } from 'lucide-react';
 import type { Transaction } from '@/lib/types';
 import { ModuleModal } from '@/components/shared/module/module-modal';
 import { Field, NativeSelect, CurrencyInput, inp } from '@/components/shared/modal-primitives';
-import { PickSelect } from '@/components/manage/pick-select';
+import { TypeCategoryFields } from '@/components/shared/type-category-fields';
 import { InlineAlert } from '@/components/shared/inline-alert';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { Input } from '@/components/ui/input';
@@ -109,13 +109,6 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
   const chosen = named.find((p) => String(p.id) === codeId);
   const effectiveClientId = chosen?.client_id ?? (clientId ? Number(clientId) : null);
 
-  // Categories follow the chosen type. Keep a saved one even if its type was archived.
-  const typeOptions = (categoryTypes || []).map((t) => ({ id: t.id, name: t.name }));
-  const categoryOptions = filteredCategories.filter((c) => String(c.type_id ?? '') === typeId).map((c) => ({ id: c.id, name: c.name }));
-  if (categoryId && !categoryOptions.some((o) => String(o.id) === categoryId)) {
-    const saved = filteredCategories.find((c) => String(c.id) === categoryId);
-    if (saved) categoryOptions.push({ id: saved.id, name: saved.name });
-  }
 
   useEffect(() => {
     if (!open) {
@@ -143,7 +136,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
       setPaymentMethod(editing.payment_method || 'cash');
       setReceiptNumber(editing.receipt_number || '');
       const editGstIncluded = editing.gst_included ?? false;
-      setGstRate(editing.gst_rate ? `${editing.gst_rate}%` : '');
+      setGstRate(editing.gst_rate != null ? `${Number(editing.gst_rate)}%` : '');
       setGstAdded(editGstIncluded);
       setAmount(String(restoreEnteredAmount(editing.net_amount, editing.total_amount, editGstIncluded, editing.amount ?? 0)));
       setNeedsReimbursement(editing.needs_reimbursement ?? false);
@@ -340,42 +333,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
     >
       <div className="grid grid-cols-1 items-start gap-x-6 gap-y-3 md:grid-cols-3">
 
-        {/* Column 1: the entry itself */}
-        <div className="space-y-3">
-          <Field label={`Date of ${isExpense ? 'Expense' : 'Income'}`} required>
-            <Input
-              className={`${inp} border-input bg-transparent text-[var(--shell-text)]`}
-              type="date"
-              value={dateRecorded}
-              onChange={(e) => setDateRecorded(e.target.value)}
-            />
-          </Field>
-
-          <Field label="Detail">
-            <Input
-              className={`${inp} border-input bg-transparent text-[var(--shell-text)]`}
-              type="text"
-              placeholder="Enter full description and justification..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </Field>
-
-          <Field label="GST & Inclusion">
-            <div className="flex items-center gap-2">
-              <div className="min-w-0 flex-1">
-                <GstRateSelect value={gstRate} onChange={setGstRate} emptyLabel="Select GST..." />
-              </div>
-              <GstIncludedSwitch checked={gstAdded} onChange={setGstAdded} />
-            </div>
-          </Field>
-
-          <Field label={`Amount ${amountLabel(gstRate, gstAdded)}`} required>
-            <CurrencyInput value={amount} onChange={setAmount} symbol={currencySymbol} />
-          </Field>
-        </div>
-
-        {/* Column 2: what it is charged to and how it is classified */}
+        {/* Column 1: what it is charged to, and how it is classified */}
         <div className="space-y-3">
           <Field label="Charge To">
             <NativeSelect
@@ -401,54 +359,40 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
             </NativeSelect>
           </Field>
 
-          <PickSelect
-            label={isExpense ? 'Expense Type' : 'Income Type'}
-            placeholder="Select type..."
-            value={typeId}
-            onChange={(id) => { setTypeId(id); setCategoryId(''); }}
-            options={typeOptions}
-            emptyHint="No types yet. An admin can add them with Category."
-          />
-
-          <PickSelect
-            label={isExpense ? 'Expense Category' : 'Income Category'}
-            placeholder="Select category..."
-            value={categoryId}
-            onChange={setCategoryId}
-            options={categoryOptions}
-            disabled={!typeId}
-            emptyHint="No categories for this type yet. An admin can add them with Category."
+          <TypeCategoryFields
+            typeLabel={isExpense ? 'Expense Type' : 'Income Type'}
+            categoryLabel={isExpense ? 'Expense Category' : 'Income Category'}
+            types={categoryTypes || []}
+            categories={filteredCategories}
+            typeId={typeId}
+            category={categoryId}
+            categoryBy="id"
+            onChange={(v) => { setTypeId(v.typeId); setCategoryId(v.category); }}
+            typeEmptyHint="No types yet. An admin can add them with Category."
+            categoryEmptyHint="No categories for this type yet. An admin can add them with Category."
           />
         </div>
 
-        {/* Column 3: payment and proof */}
+        {/* Column 2: the entry, and the proof */}
         <div className="space-y-3">
-          <Field label="Payment Method">
-            <NativeSelect value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
-              <option value="cash">Cash</option>
-              <option value="card">Card</option>
-              <option value="bank_transfer">Bank Transfer</option>
-              <option value="upi">UPI</option>
-              <option value="cheque">Cheque</option>
-            </NativeSelect>
-          </Field>
-
-          <Field label="Reference No">
+          <Field label="Detail">
             <Input
               className={`${inp} border-input bg-transparent text-[var(--shell-text)]`}
               type="text"
-              placeholder="INV-0000 / REC-0000"
-              value={receiptNumber}
-              onChange={(e) => setReceiptNumber(e.target.value)}
+              placeholder="Enter full description and justification..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
             />
           </Field>
 
-          {isExpense && (
-            <label className="flex h-10 cursor-pointer items-center justify-between gap-3 rounded-md border border-input px-3 text-[13px] font-medium text-[var(--shell-text)]">
-              <span>Needs reimbursement</span>
-              <Switch checked={needsReimbursement} onCheckedChange={setNeedsReimbursement} aria-label="Needs reimbursement" />
-            </label>
-          )}
+          <Field label={`Date of ${isExpense ? 'Expense' : 'Income'}`} required>
+            <Input
+              className={`${inp} border-input bg-transparent text-[var(--shell-text)]`}
+              type="date"
+              value={dateRecorded}
+              onChange={(e) => setDateRecorded(e.target.value)}
+            />
+          </Field>
 
         {/* Receipt upload */}
         <div className="space-y-1.5">
@@ -491,6 +435,52 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
             </div>
           )}
         </div>
+        </div>
+
+        {/* Column 3: payment and money */}
+        <div className="space-y-3">
+          <Field label="Payment Method">
+            <NativeSelect value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+              <option value="cash">Cash</option>
+              <option value="card">Card</option>
+              <option value="bank_transfer">Bank Transfer</option>
+              <option value="upi">UPI</option>
+              <option value="cheque">Cheque</option>
+            </NativeSelect>
+          </Field>
+
+          <Field label="Reference No">
+            <Input
+              className={`${inp} border-input bg-transparent text-[var(--shell-text)]`}
+              type="text"
+              placeholder="INV-0000 / REC-0000"
+              value={receiptNumber}
+              onChange={(e) => setReceiptNumber(e.target.value)}
+            />
+          </Field>
+
+          <Field label="GST & Inclusion">
+            <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <GstRateSelect value={gstRate} onChange={setGstRate} emptyLabel="Select GST..." />
+              </div>
+              <GstIncludedSwitch checked={gstAdded} onChange={setGstAdded} />
+            </div>
+          </Field>
+
+          <Field label={`Amount ${amountLabel(gstRate, gstAdded)}`} required>
+            <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <CurrencyInput value={amount} onChange={setAmount} symbol={currencySymbol} />
+              </div>
+              {isExpense && (
+                <label className="flex h-10 w-[124px] shrink-0 cursor-pointer items-center gap-2.5 text-[12px] font-semibold text-[var(--shell-text-muted)]">
+                  <Switch checked={needsReimbursement} onCheckedChange={setNeedsReimbursement} aria-label="Needs reimbursement" />
+                  <span className="whitespace-nowrap">{needsReimbursement ? 'Reimburse' : 'No reimburse'}</span>
+                </label>
+              )}
+            </div>
+          </Field>
         </div>
 
         {/* Budget warning: expense only */}

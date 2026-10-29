@@ -224,7 +224,6 @@ export default function ClientsPage() {
         onClose={() => setDialogOpen(false)}
         onSave={handleSave}
         editing={editing}
-        sectors={sectors || []}
       />
 
       <ManageSectorsDialog isOpen={sectorsOpen} onClose={() => setSectorsOpen(false)} sectors={sectors || []} />

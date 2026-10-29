@@ -16,7 +16,7 @@ export function GstRateSelect({ value, onChange, emptyLabel }: { value: string; 
 
 export function GstIncludedSwitch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <label className="flex h-10 shrink-0 cursor-pointer items-center gap-2.5 text-[12px] font-semibold text-[var(--shell-text-muted)]">
+    <label className="flex h-10 w-[124px] shrink-0 cursor-pointer items-center gap-2.5 text-[12px] font-semibold text-[var(--shell-text-muted)]">
       <Switch checked={checked} onCheckedChange={onChange} aria-label="GST included in amount" />
       <span className="whitespace-nowrap">{checked ? 'Included' : 'Not included'}</span>
     </label>

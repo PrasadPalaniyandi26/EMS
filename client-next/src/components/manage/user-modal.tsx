@@ -11,7 +11,7 @@ import { roleColor } from '@/lib/roles';
 import { toast } from 'sonner';
 
 import { ModuleModal } from '@/components/shared/module/module-modal';
-import { PickSelect } from './pick-select';
+import { DepartmentSelect } from '@/components/shared/reference-selects';
 import { AddressFields, type AddressKey } from '@/components/shared/address-fields';
 import { Field, EmailInput, PhoneInput, SegmentedControl, isValidEmail, isValidPhone, inp } from '@/components/shared/modal-primitives';
 
@@ -43,10 +43,9 @@ interface UserModalProps {
   editing: any | null;
   roles: any[];
   managers: any[];
-  departments: { id: number; name: string }[];
 }
 
-export function UserModal({ isOpen, onClose, onSave, editing, roles, managers, departments }: UserModalProps) {
+export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }: UserModalProps) {
   const [form, setForm] = useState({
     first_name: '', last_name: '', date_of_birth: '', email: '', contact_no: '',
     login_name: '', password: '',
@@ -147,9 +146,6 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers, d
     });
   };
 
-  // The department is stored by name; keep a saved one that is no longer listed (archived)
-  const departmentOptions = departments.map((d) => ({ id: d.name, name: d.name }));
-  if (form.department && !departmentOptions.some((o) => o.id === form.department)) departmentOptions.push({ id: form.department, name: form.department });
 
   const defaultRoleName = roles.find((r) => r.role_id === (selectedRoles.find((s) => s.isDefault) || selectedRoles[0])?.roleId)?.role_name;
 
@@ -237,14 +233,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers, d
 
           {/* COL 2 — Employment & Access */}
           <div className="space-y-2.5">
-            <PickSelect
-              label="Department"
-              placeholder="Select department"
-              value={form.department}
-              onChange={(name) => set('department', name)}
-              options={departmentOptions}
-              emptyHint="No departments yet. An admin can add them with Departments."
-            />
+            <DepartmentSelect value={form.department} onChange={(name) => set('department', name)} />
             <div className="space-y-1">
               <p id="user-roles-label" className="text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Roles Assigned<span aria-hidden className="ml-0.5 text-[var(--danger)]">*</span></p>
               <div role="group" aria-labelledby="user-roles-label" className="border border-[var(--shell-border)] rounded-lg overflow-hidden divide-y" style={{ background: 'var(--shell-bg)', borderColor: 'var(--shell-border)' }}>

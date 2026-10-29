@@ -7,7 +7,7 @@ import { Plus, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { ModuleModal } from '@/components/shared/module/module-modal';
 import { Field, NativeSelect, CurrencyInput, SegmentedControl, inp } from '@/components/shared/modal-primitives';
-import { PickSelect } from './pick-select';
+import { TypeCategoryFields } from '@/components/shared/type-category-fields';
 import type { TypeCategory } from '@/hooks/use-queries';
 
 interface ProjectModalProps {
@@ -51,10 +51,6 @@ export function ProjectModal({
       setForm(EMPTY);
     }
   }, [editing, isOpen]);
-
-  // Categories follow the chosen type. The category is stored by name; keep a saved one that is no longer listed
-  const categoryOptions = categories.filter((c) => String(c.type_id) === form.type_id).map((c) => ({ id: c.name, name: c.name }));
-  if (form.category && form.type_id && !categoryOptions.some((o) => o.id === form.category)) categoryOptions.push({ id: form.category, name: form.category });
 
   const handleSubmit = () => {
     if (!form.name.trim()) { toast.error('Project name is required'); return; }
@@ -105,23 +101,18 @@ export function ProjectModal({
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </NativeSelect>
           </Field>
-          <PickSelect
-            label="Project Type"
-            required
-            placeholder="Select type"
-            value={form.type_id}
-            onChange={(id) => setForm((p) => ({ ...p, type_id: id, category: '' }))}
-            options={projectTypes}
-            emptyHint="No types yet. An admin can add them with Types."
-          />
-          <PickSelect
-            label="Project Category"
-            placeholder="Select category"
-            value={form.category}
-            onChange={(name) => set('category', name)}
-            options={categoryOptions}
-            disabled={!form.type_id}
-            emptyHint="No categories for this type yet. An admin can add them with Types."
+          <TypeCategoryFields
+            typeLabel="Project Type"
+            categoryLabel="Project Category"
+            typeRequired
+            types={projectTypes}
+            categories={categories}
+            typeId={form.type_id}
+            category={form.category}
+            categoryBy="name"
+            onChange={(v) => setForm((p) => ({ ...p, type_id: v.typeId, category: v.category }))}
+            typeEmptyHint="No types yet. An admin can add them with Types."
+            categoryEmptyHint="No categories for this type yet. An admin can add them with Types."
           />
         </div>
 

@@ -6,15 +6,13 @@ import { Plus, Pencil } from 'lucide-react';
 import { ModuleModal } from '@/components/shared/module/module-modal';
 import { Field, NativeSelect, EmailInput, PhoneInput, SegmentedControl, isValidEmail, isValidPhone, inp } from '@/components/shared/modal-primitives';
 import { AddressFields, type AddressKey } from '@/components/shared/address-fields';
-import { PickSelect } from './pick-select';
-import type { ClientSector } from '@/hooks/use-queries';
+import { SectorSelect } from '@/components/shared/reference-selects';
 
 interface ClientModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (form: any) => void;
   editing: any | null;
-  sectors: ClientSector[];
 }
 
 const EMPTY = {
@@ -41,7 +39,7 @@ const ADDRESS_FIELD: Record<AddressKey, keyof typeof EMPTY> = {
 };
 
 // ─── ClientModal ──────────────────────────────────────────────────────────────
-export function ClientModal({ isOpen, onClose, onSave, editing, sectors }: ClientModalProps) {
+export function ClientModal({ isOpen, onClose, onSave, editing }: ClientModalProps) {
   const [form, setForm] = useState<typeof EMPTY>(EMPTY);
 
   const set = (k: string, v: string | boolean) => setForm((p) => ({ ...p, [k]: v }));
@@ -74,9 +72,6 @@ export function ClientModal({ isOpen, onClose, onSave, editing, sectors }: Clien
     }
   }, [editing, isOpen]);
 
-  // The sector is stored by name; keep a saved one that is no longer listed (archived)
-  const sectorOptions = sectors.map((s) => ({ id: s.name, name: s.name }));
-  if (form.business_type && !sectorOptions.some((o) => o.id === form.business_type)) sectorOptions.push({ id: form.business_type, name: form.business_type });
 
   const handleSubmit = () => {
     if (!form.name.trim()) return;
@@ -108,14 +103,7 @@ export function ClientModal({ isOpen, onClose, onSave, editing, sectors }: Clien
           <Field label="Description">
             <Input className={inp} placeholder="Brief description" value={form.description} onChange={(e) => set('description', e.target.value)} />
           </Field>
-          <PickSelect
-            label="Industry Sector"
-            placeholder="Select sector"
-            value={form.business_type}
-            onChange={(name) => set('business_type', name)}
-            options={sectorOptions}
-            emptyHint="No sectors yet. An admin can add them with Sectors."
-          />
+          <SectorSelect value={form.business_type} onChange={(name) => set('business_type', name)} />
           <div>
             <p id="client-status-label" className="mb-2 block text-[13px] font-medium" style={{ color: 'var(--shell-text)' }}>Status</p>
             <SegmentedControl

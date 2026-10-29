@@ -28,7 +28,7 @@ import { ModuleModal } from '@/components/shared/module/module-modal';
 import { Field, NativeSelect, CurrencyInput, SegmentedControl, inp, sel } from '@/components/shared/modal-primitives';
 import { FileDropzone } from '@/components/shared/file-dropzone';
 import { GstRateSelect, GstIncludedSwitch } from '@/components/shared/gst-fields';
-import { PickSelect } from '@/components/manage/pick-select';
+import { TypeCategoryFields } from '@/components/shared/type-category-fields';
 import { useCategoryTypes } from '@/hooks/use-queries';
 
 // Shared control styles for these dialogs: 40px, keyboard focus ring
@@ -68,15 +68,6 @@ export function RecurringModal({
     setTypeId(saved?.type_id ? String(saved.type_id) : '');
   }, [isOpen, editing]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const typeOptions = (categoryTypes || []).map((t) => ({ id: t.id, name: t.name }));
-  const categoryOptions = categories
-    .filter((c) => c.type === form.type && String(c.type_id ?? '') === typeId)
-    .map((c) => ({ id: c.id, name: c.name }));
-  if (form.category_id && !categoryOptions.some((o) => String(o.id) === String(form.category_id))) {
-    const saved = categories.find((c) => String(c.id) === String(form.category_id));
-    if (saved) categoryOptions.push({ id: saved.id, name: saved.name });
-  }
-
   return (
     <ModuleModal
       isOpen={isOpen}
@@ -90,7 +81,44 @@ export function RecurringModal({
     >
       <div className="grid grid-cols-1 items-start gap-x-6 gap-y-3 md:grid-cols-3">
 
-        {/* Column 1: what is billed and when */}
+        {/* Column 1: what kind of transaction, and its type and category */}
+        <div className="space-y-3">
+          <div>
+            <p id="recurring-type-label" className="mb-2 block text-[13px] font-medium" style={{ color: 'var(--shell-text)' }}>Transaction Type</p>
+            <SegmentedControl
+              labelledBy="recurring-type-label"
+              value={form.type}
+              onChange={(v) => { setForm({ ...form, type: v, category_id: '' }); setTypeId(''); }}
+              options={[
+                { value: 'expense', label: 'Expense', tone: 'danger' },
+                { value: 'income', label: 'Income', tone: 'success' },
+              ]}
+            />
+          </div>
+          <TypeCategoryFields
+            typeLabel={form.type === 'income' ? 'Income Type' : 'Expense Type'}
+            categoryLabel={form.type === 'income' ? 'Income Category' : 'Expense Category'}
+            categoryRequired
+            types={categoryTypes || []}
+            categories={categories.filter((c) => c.type === form.type)}
+            typeId={typeId}
+            category={form.category_id ? String(form.category_id) : ''}
+            categoryBy="id"
+            onChange={(v) => { setTypeId(v.typeId); setForm({ ...form, category_id: v.category }); }}
+            typeEmptyHint="No types yet. An admin can add them with Category."
+            categoryEmptyHint="No categories for this type yet. An admin can add them with Category."
+          />
+          <Field label="Recurring Purpose / Notes">
+            <Textarea
+              className="min-h-[112px] w-full resize-none rounded-md border border-input bg-transparent text-sm text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus-visible:border-[var(--shell-accent)] focus-visible:ring-2 focus-visible:ring-[var(--shell-accent)]"
+              placeholder="Provide a reason for this recurring transaction..."
+              value={form.notes || ''}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            />
+          </Field>
+        </div>
+
+        {/* Column 2: what is billed and when */}
         <div className="space-y-3">
           <Field label="Service / Vendor" required>
             <Input
@@ -139,40 +167,6 @@ export function RecurringModal({
           </label>
         </div>
 
-        {/* Column 2: what kind of transaction, and its type and category */}
-        <div className="space-y-3">
-          <div>
-            <p id="recurring-type-label" className="mb-2 block text-[13px] font-medium" style={{ color: 'var(--shell-text)' }}>Transaction Type</p>
-            <SegmentedControl
-              labelledBy="recurring-type-label"
-              value={form.type}
-              onChange={(v) => { setForm({ ...form, type: v, category_id: '' }); setTypeId(''); }}
-              options={[
-                { value: 'expense', label: 'Expense', tone: 'danger' },
-                { value: 'income', label: 'Income', tone: 'success' },
-              ]}
-            />
-          </div>
-          <PickSelect
-            label={form.type === 'income' ? 'Income Type' : 'Expense Type'}
-            placeholder="Select type..."
-            value={typeId}
-            onChange={(id) => { setTypeId(id); setForm({ ...form, category_id: '' }); }}
-            options={typeOptions}
-            emptyHint="No types yet. An admin can add them with Category."
-          />
-          <PickSelect
-            label={form.type === 'income' ? 'Income Category' : 'Expense Category'}
-            required
-            placeholder="Select category..."
-            value={form.category_id ? String(form.category_id) : ''}
-            onChange={(id) => setForm({ ...form, category_id: id })}
-            options={categoryOptions}
-            disabled={!typeId}
-            emptyHint="No categories for this type yet. An admin can add them with Category."
-          />
-        </div>
-
         {/* Column 3: how it is paid and how much */}
         <div className="space-y-3">
           <Field label="Payment Method">
@@ -199,20 +193,6 @@ export function RecurringModal({
             <span>Auto-submit for approval</span>
             <Switch checked={!!form.auto_submit} onCheckedChange={(v) => setForm({ ...form, auto_submit: v })} aria-label="Auto-submit for approval" />
           </label>
-        </div>
-
-        {/* Notes and proof, across the full width */}
-        <div className="md:col-span-2">
-          <Field label="Recurring Purpose / Notes">
-            <Textarea
-              className="min-h-[96px] w-full resize-none rounded-md border border-input bg-transparent text-sm text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus-visible:border-[var(--shell-accent)] focus-visible:ring-2 focus-visible:ring-[var(--shell-accent)]"
-              placeholder="Provide a reason for this recurring transaction..."
-              value={form.notes || ''}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            />
-          </Field>
-        </div>
-
         <div className="space-y-1.5">
           <FileDropzone label="Supporting document" onFile={onFileChange} />
           {(file || (isEdit && editing?.receipt_path)) && (
@@ -240,6 +220,7 @@ export function RecurringModal({
               </div>
             </div>
           )}
+        </div>
         </div>
       </div>
     </ModuleModal>

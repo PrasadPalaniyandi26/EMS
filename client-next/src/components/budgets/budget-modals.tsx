@@ -9,8 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, Pencil, Download, Send, Info, Trash2 } from 'lucide-react';
-import { useUsers, useDepartments } from '@/hooks/use-queries';
-import { PickSelect } from '@/components/manage/pick-select';
+import { useUsers } from '@/hooks/use-queries';
+import { DepartmentSelect } from '@/components/shared/reference-selects';
 import { useAuthStore } from '@/stores/auth-store';
 import { ModuleModal } from '@/components/shared/module/module-modal';
 import { Field, CurrencyInput, inp, sel } from '@/components/shared/modal-primitives';
@@ -31,7 +31,6 @@ export function AddBudgetModal({ isOpen, onClose, onSave, editingData }: BudgetM
   const currency = useAuthStore((s) => s.user?.currency || 'INR');
   const currencySymbol = CURRENCY_SYMBOL[currency] || '₹';
   const { data: usersData } = useUsers();
-  const { data: departments } = useDepartments();
   const managers = useMemo(() =>
     (Array.isArray(usersData) ? usersData : []).filter((u: any) =>
       u.role_name?.toLowerCase() === 'manager' ||
@@ -66,9 +65,6 @@ export function AddBudgetModal({ isOpen, onClose, onSave, editingData }: BudgetM
     }
   }, [isOpen, editingData]);
 
-  // The department is stored by name; keep a saved one that is no longer listed (archived)
-  const departmentOptions = (departments ?? []).map((d) => ({ id: d.name, name: d.name }));
-  if (form.department && !departmentOptions.some((o) => o.id === form.department)) departmentOptions.push({ id: form.department, name: form.department });
 
   const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }));
 
@@ -109,14 +105,7 @@ export function AddBudgetModal({ isOpen, onClose, onSave, editingData }: BudgetM
             </Select>
           </Field>
 
-          <PickSelect
-            label="Department"
-            placeholder="Select department"
-            value={form.department}
-            onChange={(name) => set('department', name)}
-            options={departmentOptions}
-            emptyHint="No departments yet. An admin can add them on the Team page."
-          />
+          <DepartmentSelect value={form.department} onChange={(name) => set('department', name)} />
           <Field label="Owner (Manager)">
             <Select value={form.owner_id} onValueChange={v => set('owner_id', v)}>
               <SelectTrigger className={sel}><SelectValue placeholder="Assign Owner" /></SelectTrigger>
