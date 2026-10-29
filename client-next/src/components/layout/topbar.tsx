@@ -71,7 +71,7 @@ function BellDropdown() {
         >
           <Bell className="h-3.5 w-3.5" />
           {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] rounded-full bg-[var(--danger)] text-[var(--danger-foreground)] text-[10px] font-black flex items-center justify-center px-[3px] leading-none">
+            <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] rounded-full bg-[var(--danger)] text-[var(--danger-foreground)] text-[12px] font-semibold flex items-center justify-center px-[3px] leading-none">
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}
@@ -91,7 +91,7 @@ function BellDropdown() {
               Notifications
             </span>
             {unreadCount > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] text-[var(--danger)] text-[11px] font-black">
+              <span className="px-1.5 py-0.5 rounded-full bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] text-[var(--danger)] text-[12px] font-semibold">
                 {unreadCount} new
               </span>
             )}
@@ -99,7 +99,7 @@ function BellDropdown() {
           {unreadCount > 0 && (
             <button
               onClick={handleMarkAllRead}
-              className="flex items-center gap-1 text-[11px] font-semibold transition-colors hover:text-[var(--shell-accent)]"
+              className="flex items-center gap-1 text-[12px] font-semibold transition-colors hover:text-[var(--shell-accent)]"
               style={{ color: 'var(--shell-text-muted)' }}
             >
               <CheckCheck className="w-3 h-3" /> Mark all read
@@ -112,7 +112,7 @@ function BellDropdown() {
           {notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 gap-2">
               <Bell className="w-8 h-8" style={{ color: 'var(--shell-text-muted)', opacity: 0.3 }} />
-              <p className="text-[11px] font-semibold" style={{ color: 'var(--shell-text-muted)' }}>All caught up!</p>
+              <p className="text-[12px] font-semibold" style={{ color: 'var(--shell-text-muted)' }}>All caught up!</p>
             </div>
           ) : (
             notifications.map((n: any) => {
@@ -138,11 +138,11 @@ function BellDropdown() {
                       {!n.is_read && <div className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1 ${cfg.dot}`} />}
                     </div>
                     {n.message && (
-                      <p className="text-[11px] mt-0.5 leading-snug line-clamp-2" style={{ color: 'var(--shell-text-muted)' }}>
+                      <p className="text-[12px] mt-0.5 leading-snug line-clamp-2" style={{ color: 'var(--shell-text-muted)' }}>
                         {n.message}
                       </p>
                     )}
-                    <p className="text-[11px] font-medium mt-1" style={{ color: 'var(--shell-text-muted)', opacity: 0.7 }}>
+                    <p className="text-[12px] font-medium mt-1" style={{ color: 'var(--shell-text-muted)', opacity: 0.7 }}>
                       {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
                     </p>
                   </div>
@@ -156,7 +156,7 @@ function BellDropdown() {
         <div className="px-4 py-2.5 border-t" style={{ borderColor: 'var(--shell-border)' }}>
           <button
             onClick={() => { setOpen(false); router.push('/notifications'); }}
-            className="flex items-center gap-1.5 text-[11px] font-semibold w-full justify-center py-1 rounded-lg transition-colors hover:bg-[var(--shell-hover)]"
+            className="flex items-center gap-1.5 text-[12px] font-semibold w-full justify-center py-1 rounded-lg transition-colors hover:bg-[var(--shell-hover)]"
             style={{ color: 'var(--shell-accent)' }}
           >
             View all notifications <ArrowRight className="w-3 h-3" />
@@ -199,7 +199,7 @@ export function TopBar() {
           {title || 'Dashboard'}
         </h1>
         {subtitle && (
-          <span className="hidden sm:inline text-[11px] font-normal" style={{ color: 'var(--shell-text-muted)' }}>{subtitle}</span>
+          <span className="hidden sm:inline text-[12px] font-normal" style={{ color: 'var(--shell-text-muted)' }}>{subtitle}</span>
         )}
       </div>
 
@@ -240,7 +240,7 @@ export function TopBar() {
             <button className="flex items-center gap-2 px-2 py-1 rounded-lg outline-none focus:outline-none focus-visible:ring-0 transition-colors hover:bg-[var(--shell-hover)]"
               style={{ color: 'var(--shell-text)' }}
             >
-              <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[11px] font-bold"
+              <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[12px] font-semibold"
                 style={{ background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' }}>
                 {(() => { const p = (user?.username || 'U').trim().split(/\s+/); return p.length >= 2 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : p[0].slice(0, 2).toUpperCase(); })()}
               </div>
@@ -248,7 +248,7 @@ export function TopBar() {
                 <p className="text-[12px] font-semibold leading-none" style={{ color: 'var(--shell-text)' }}>
                   {user?.username || 'Admin'}
                 </p>
-                <p className="text-[11px] mt-0.5" style={{ color: 'var(--shell-text-muted)' }}>
+                <p className="text-[12px] mt-0.5" style={{ color: 'var(--shell-text-muted)' }}>
                   {user?.role_name || user?.role || 'System Admin'}
                 </p>
               </div>
@@ -265,13 +265,13 @@ export function TopBar() {
               style={{ color: 'var(--shell-text)' }}
               onClick={() => router.push('/settings')}>
               <UserCircle className="w-3.5 h-3.5" style={{ color: 'var(--shell-text-muted)' }} />
-              <span className="text-[12.5px]">Profile</span>
+              <span className="text-[13px]">Profile</span>
             </DropdownMenuItem>
             <DropdownMenuItem className="cursor-pointer gap-2.5 px-3 py-2 rounded-lg mx-1"
               style={{ color: 'var(--shell-text)' }}
               onClick={() => router.push('/settings?tab=preferences')}>
               <Settings className="w-3.5 h-3.5" style={{ color: 'var(--shell-text-muted)' }} />
-              <span className="text-[12.5px]">Preferences</span>
+              <span className="text-[13px]">Preferences</span>
             </DropdownMenuItem>
             {user?.roles && user.roles.length > 0 && (
               <>
@@ -280,7 +280,7 @@ export function TopBar() {
                   <DropdownMenuSubTrigger className="cursor-pointer gap-2.5 px-3 py-2 rounded-lg mx-1"
                     style={{ color: 'var(--shell-text)' }}>
                     <RefreshCw className="w-3.5 h-3.5" style={{ color: 'var(--shell-text-muted)' }} />
-                    <span className="text-[12.5px]">Switch Role</span>
+                    <span className="text-[13px]">Switch Role</span>
                   </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent className="rounded-lg min-w-[160px]"
                     style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
@@ -292,7 +292,7 @@ export function TopBar() {
                       >
                         <Check className={`w-3 h-3 ${r.role_id === user.role_id ? '' : 'opacity-0'}`}
                           style={{ color: r.role_id === user.role_id ? 'var(--shell-accent)' : undefined }} />
-                        <span className="text-[12.5px]"
+                        <span className="text-[13px]"
                           style={{ color: r.role_id === user.role_id ? 'var(--shell-accent)' : 'var(--shell-text)', fontWeight: r.role_id === user.role_id ? 600 : 400 }}>
                           {r.role_name}
                         </span>
@@ -308,7 +308,7 @@ export function TopBar() {
               onClick={() => logout()}
             >
               <LogOut className="w-3.5 h-3.5" />
-              <span className="text-[12.5px] font-medium">Sign Out</span>
+              <span className="text-[13px] font-medium">Sign Out</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -429,7 +429,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
               onChange={(e) => setReceiptNumber(e.target.value)}
             />
             {isExpense && (
-              <label className="flex h-10 shrink-0 cursor-pointer items-center gap-2 text-[11px] font-semibold text-[var(--shell-text-muted)]">
+              <label className="flex h-10 shrink-0 cursor-pointer items-center gap-2 text-[12px] font-semibold text-[var(--shell-text-muted)]">
                 <Switch checked={needsReimbursement} onCheckedChange={setNeedsReimbursement} aria-label="Needs reimbursement" />
                 <span className="whitespace-nowrap">{needsReimbursement ? 'Reimburse' : 'No reimburse'}</span>
               </label>
@@ -458,7 +458,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
                   ))}
                 </NativeSelect>
               </div>
-              <label className="flex h-10 shrink-0 cursor-pointer items-center gap-2 text-[11px] font-semibold text-[var(--shell-text-muted)]">
+              <label className="flex h-10 shrink-0 cursor-pointer items-center gap-2 text-[12px] font-semibold text-[var(--shell-text-muted)]">
                 <Switch checked={gstAdded} onCheckedChange={setGstAdded} aria-label="GST included in amount" />
                 <span className="whitespace-nowrap">{gstAdded ? 'Included' : 'Not included'}</span>
               </label>
@@ -507,8 +507,8 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
           >
             <ul className="space-y-1.5">
               {dupWarning.matches.slice(0, 3).map((m: any) => (
-                <li key={m.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[var(--shell-text-muted)]">
-                  <span className="font-bold text-[var(--info)]">{m.reference_id || `#${m.id}`}</span>
+                <li key={m.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--shell-text-muted)]">
+                  <span className="font-semibold text-[var(--info)]">{m.reference_id || `#${m.id}`}</span>
                   <span>{m.category_name || '—'}</span>
                   <span className="font-semibold">{Number(m.net_amount ?? m.amount).toLocaleString()}</span>
                   <span>{m.date_recorded?.slice(0, 10)}</span>
@@ -552,13 +552,13 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
                     <span className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--shell-accent)]">
                       <Sparkles aria-hidden className="h-3 w-3" /> Extracting data from receipt...
                     </span>
-                    <span className="block text-[11px] text-[var(--shell-text-muted)]">Fields will be auto-filled shortly</span>
+                    <span className="block text-[12px] text-[var(--shell-text-muted)]">Fields will be auto-filled shortly</span>
                   </>
                 : <>
                     <span className="block text-[12px] font-medium text-[var(--shell-text-muted)]">
-                      Drag &amp; drop or <span className="font-bold text-[var(--shell-accent)]">browse files</span>
+                      Drag &amp; drop or <span className="font-semibold text-[var(--shell-accent)]">browse files</span>
                     </span>
-                    <span className="block text-[11px] text-[var(--shell-text-muted)]">PDF, JPG, PNG, WebP · max 10 MB</span>
+                    <span className="block text-[12px] text-[var(--shell-text-muted)]">PDF, JPG, PNG, WebP · max 10 MB</span>
                   </>
               }
             </span>
@@ -568,26 +568,26 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
           {hasFile && (
             <div className="rounded-lg border mt-2 flex items-center justify-between gap-2 rounded-lg border border-[var(--shell-border)] px-3 py-2">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="bg-[var(--shell-border)] rounded border border-[var(--shell-border)] p-1.5">
+                <div className="bg-[var(--shell-border)] rounded-md border border-[var(--shell-border)] p-1.5">
                   <FileText aria-hidden className="h-5 w-5 text-[var(--shell-accent)]" />
                 </div>
                 <div className="min-w-0 leading-tight">
-                  <p className="max-w-[280px] truncate text-[12px] font-bold text-[var(--shell-text)]">{fileName}</p>
-                  {fileSize && <p className="text-[11px] text-[var(--shell-text-muted)]">{fileSize}</p>}
+                  <p className="max-w-[280px] truncate text-[12px] font-semibold text-[var(--shell-text)]">{fileName}</p>
+                  {fileSize && <p className="text-[12px] text-[var(--shell-text-muted)]">{fileSize}</p>}
                 </div>
               </div>
               <div className="flex shrink-0 gap-2">
                 <button
                   type="button"
                   onClick={handleViewFile}
-                  className="rounded-lg border flex h-10 items-center gap-1.5 rounded border border-[var(--shell-border)] px-3 text-[11px] font-bold transition-colors hover:border-[var(--shell-accent)] sm:h-8"
+                  className="rounded-lg border flex h-10 items-center gap-1.5 rounded-md border border-[var(--shell-border)] px-3 text-[12px] font-semibold transition-colors hover:border-[var(--shell-accent)] sm:h-8"
                 >
                   <Eye aria-hidden className="h-3.5 w-3.5 text-[var(--success)]" /> View
                 </button>
                 <button
                   type="button"
                   onClick={handleRemoveFile}
-                  className="rounded-lg border flex h-10 items-center gap-1.5 rounded border border-[var(--shell-border)] px-3 text-[11px] font-bold transition-colors hover:border-[var(--danger)] sm:h-8"
+                  className="rounded-lg border flex h-10 items-center gap-1.5 rounded-md border border-[var(--shell-border)] px-3 text-[12px] font-semibold transition-colors hover:border-[var(--danger)] sm:h-8"
                 >
                   <Trash2 aria-hidden className="h-3.5 w-3.5 text-[var(--danger)]" /> Remove
                 </button>

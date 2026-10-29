@@ -126,7 +126,7 @@ export function ModuleModal({
           </div>
           <button
             onClick={onClose}
-            className="rounded p-1 transition-colors"
+            className="rounded-md p-1 transition-colors"
             style={{ color: 'var(--shell-text-muted)', cursor: 'pointer' }}
             aria-label="Close Modal"
           >

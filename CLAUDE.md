@@ -258,6 +258,7 @@ Columns on `users`: `contact_no`, `house_apt`, `address`, `city`, `country`, `po
   - Never hardcode OS-specific paths (`D:\`, `C:\`, `/var/`, `/home/`, etc.) — use `process.env` or `process.cwd()`
   - Shell scripts: keep `.bat` for Windows and `.sh` for Linux in sync when logic changes
   - Do not use `os.platform()` or `process.platform` guards as a substitute for writing portable code
+- **UI changes must follow `client-next/DESIGN.md`** (tokens, type scale, shared components for tables, panels, dialogs and forms). Run `npm run check:design` in `client-next/` before finishing a UI change; it must pass.
 - Do not refactor working code unless explicitly asked
 - Do not add comments, docstrings, or type annotations to code you didn't change
 - Prefer editing existing files over creating new ones

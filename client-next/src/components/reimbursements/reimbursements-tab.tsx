@@ -168,8 +168,8 @@ export function ReimbursementsTab() {
     <div className="flex items-start gap-2">
       <span className="mt-0.5 text-[var(--shell-text-muted)] shrink-0">{icon}</span>
       <div>
-        <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-0.5">{label}</p>
-        <p className="text-[12px] font-bold text-black dark:text-white">{value}</p>
+        <p className="text-[12px] font-semibold text-[var(--shell-text-muted)] mb-0.5">{label}</p>
+        <p className="text-[12px] font-semibold text-black dark:text-white">{value}</p>
       </div>
     </div>
   );
@@ -198,7 +198,7 @@ export function ReimbursementsTab() {
               <select
                 value={statusTab}
                 onChange={(e) => setStatusTab(e.target.value as StatusTab)}
-                className="rounded-lg px-3 py-1.5 text-[12.5px] font-medium border outline-none focus:ring-2 focus:ring-[var(--shell-accent)] h-8"
+                className="rounded-lg px-3 py-1.5 text-[13px] font-medium border outline-none focus:ring-2 focus:ring-[var(--shell-accent)] h-8"
                 style={selectStyle}
               >
                 {STATUS_TABS.map((t) => (

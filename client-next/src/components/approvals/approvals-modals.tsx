@@ -65,7 +65,7 @@ export function ApproveModal({ isOpen, onClose, onConfirm, selectedRequest }: Mo
             variant="ghost"
             onClick={onClose}
             disabled={saving}
-            className="h-8 px-4 text-[11.5px] font-medium"
+            className="h-8 px-4 text-[12px] font-medium"
             style={{ color: 'var(--shell-text-muted)' }}
           >
             Cancel
@@ -73,7 +73,7 @@ export function ApproveModal({ isOpen, onClose, onConfirm, selectedRequest }: Mo
           <button
             onClick={handleConfirm}
             disabled={saving}
-            className="px-8 py-2.5 btn-action-primary border border-[var(--shell-border)] text-[var(--shell-text)] text-[12px] font-bold rounded-lg shadow-none active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-8 py-2.5 btn-action-primary border border-[var(--shell-border)] text-[var(--shell-text)] text-[12px] font-semibold rounded-lg shadow-none active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {saving && <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin inline-block" />}
             Confirm Approval
@@ -86,11 +86,11 @@ export function ApproveModal({ isOpen, onClose, onConfirm, selectedRequest }: Mo
           {selectedRequest.needs_reimbursement && (
             <div className="flex items-center gap-2 px-4 py-2 border-b border-[color-mix(in_srgb,var(--warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]">
               <Wallet className="w-3.5 h-3.5 text-[var(--warning)] shrink-0" />
-              <span className="text-[11px] font-black text-[var(--warning)]">Reimbursement Required — Employee paid out-of-pocket</span>
+              <span className="text-[12px] font-semibold text-[var(--warning)]">Reimbursement Required — Employee paid out-of-pocket</span>
             </div>
           )}
           <table className="w-full text-[12px]">
-            <thead className={`border-b font-bold ${selectedRequest.needs_reimbursement ? 'border-[color-mix(in_srgb,var(--warning)_30%,transparent)] text-[var(--warning)]' : 'rounded-lg border border-[var(--shell-border)] text-[var(--shell-text)]'}`}>
+            <thead className={`border-b font-semibold ${selectedRequest.needs_reimbursement ? 'border-[color-mix(in_srgb,var(--warning)_30%,transparent)] text-[var(--warning)]' : 'rounded-lg border border-[var(--shell-border)] text-[var(--shell-text)]'}`}>
               <tr>
                 <th className="px-4 py-2 text-left">Reference ID</th>
                 <th className="px-4 py-2 text-left">Employee</th>
@@ -99,9 +99,9 @@ export function ApproveModal({ isOpen, onClose, onConfirm, selectedRequest }: Mo
             </thead>
             <tbody>
               <tr className={`border-b ${selectedRequest.needs_reimbursement ? 'border-[color-mix(in_srgb,var(--warning)_20%,transparent)]' : 'border-[var(--shell-border)]'}`}>
-                <td className="px-4 py-3 font-bold text-[var(--info)]">{selectedRequest.code || `#${selectedRequest.id}`}</td>
+                <td className="px-4 py-3 font-semibold text-[var(--info)]">{selectedRequest.code || `#${selectedRequest.id}`}</td>
                 <td className="px-4 py-3 font-medium" style={{ color: 'var(--shell-text)' }}>{selectedRequest.submitted_by_name || '—'}</td>
-                <td className="px-4 py-3 text-right font-bold" style={{ color: 'var(--shell-text)' }}>{formatCurrency(selectedRequest.amount, currency)}</td>
+                <td className="px-4 py-3 text-right font-semibold" style={{ color: 'var(--shell-text)' }}>{formatCurrency(selectedRequest.amount, currency)}</td>
               </tr>
               {selectedRequest.description && (
                 <tr>
@@ -134,8 +134,8 @@ export function ApproveModal({ isOpen, onClose, onConfirm, selectedRequest }: Mo
             <div className="flex items-center gap-3">
               <Settings className="text-[var(--success)]" size={20} />
               <div>
-                <p className="text-[12px] font-bold" style={{ color: 'var(--shell-text)' }}>Is Claimable?</p>
-                <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">GST ({selectedRequest.gst_rate}%) can be claimed back from Government</p>
+                <p className="text-[12px] font-semibold" style={{ color: 'var(--shell-text)' }}>Is Claimable?</p>
+                <p className="text-[12px] text-[var(--shell-text-muted)] font-medium">GST ({selectedRequest.gst_rate}%) can be claimed back from Government</p>
               </div>
             </div>
             <Switch checked={isClaimable} onCheckedChange={setIsClaimable} />
@@ -147,11 +147,11 @@ export function ApproveModal({ isOpen, onClose, onConfirm, selectedRequest }: Mo
             <div className="flex items-center gap-3">
               <Wallet className="text-[var(--warning)]" size={20} />
               <div>
-                <p className="text-[12px] font-bold" style={{ color: 'var(--shell-text)' }}>Reimbursement Requested</p>
-                <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">Employee paid out-of-pocket and needs to be reimbursed</p>
+                <p className="text-[12px] font-semibold" style={{ color: 'var(--shell-text)' }}>Reimbursement Requested</p>
+                <p className="text-[12px] text-[var(--shell-text-muted)] font-medium">Employee paid out-of-pocket and needs to be reimbursed</p>
               </div>
             </div>
-            <span className="text-[11px] font-bold text-[var(--warning)] px-2 py-1 bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] rounded">Pending</span>
+            <span className="text-[12px] font-semibold text-[var(--warning)] px-2 py-1 bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] rounded-md">Pending</span>
           </div>
         )}
 
@@ -197,7 +197,7 @@ export function RejectModal({ isOpen, onClose, onConfirm, selectedRequest }: Mod
             variant="ghost"
             onClick={onClose}
             disabled={saving}
-            className="h-8 px-4 text-[11.5px] font-medium"
+            className="h-8 px-4 text-[12px] font-medium"
             style={{ color: 'var(--shell-text-muted)' }}
           >
             Cancel
@@ -205,7 +205,7 @@ export function RejectModal({ isOpen, onClose, onConfirm, selectedRequest }: Mod
           <button
             onClick={handleConfirm}
             disabled={saving}
-            className="px-8 py-2.5 bg-[var(--danger)] text-[var(--danger-foreground)] text-[12px] font-bold rounded-lg active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-8 py-2.5 bg-[var(--danger)] text-[var(--danger-foreground)] text-[12px] font-semibold rounded-lg active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {saving && <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />}
             Confirm Rejection
@@ -216,7 +216,7 @@ export function RejectModal({ isOpen, onClose, onConfirm, selectedRequest }: Mod
       <div className="space-y-6">
         <div className="rounded-lg border border-[var(--shell-border)] rounded-lg border overflow-x-auto">
           <table className="w-full text-[12px]">
-            <thead className="rounded-lg border border-b border-[var(--shell-border)] text-[var(--shell-text)] font-bold">
+            <thead className="rounded-lg border border-b border-[var(--shell-border)] text-[var(--shell-text)] font-semibold">
               <tr>
                 <th className="px-4 py-2 text-left">Reference ID</th>
                 <th className="px-4 py-2 text-left">Employee</th>
@@ -225,9 +225,9 @@ export function RejectModal({ isOpen, onClose, onConfirm, selectedRequest }: Mod
             </thead>
             <tbody>
               <tr className="border-b border-[var(--shell-border)]">
-                <td className="px-4 py-3 font-bold text-[var(--info)]">{selectedRequest.code || `#${selectedRequest.id}`}</td>
+                <td className="px-4 py-3 font-semibold text-[var(--info)]">{selectedRequest.code || `#${selectedRequest.id}`}</td>
                 <td className="px-4 py-3 font-medium" style={{ color: 'var(--shell-text)' }}>{selectedRequest.submitted_by_name || '—'}</td>
-                <td className="px-4 py-3 text-right font-bold" style={{ color: 'var(--shell-text)' }}>{formatCurrency(selectedRequest.amount, currency)}</td>
+                <td className="px-4 py-3 text-right font-semibold" style={{ color: 'var(--shell-text)' }}>{formatCurrency(selectedRequest.amount, currency)}</td>
               </tr>
               {selectedRequest.description && (
                 <tr>
@@ -253,7 +253,7 @@ export function RejectModal({ isOpen, onClose, onConfirm, selectedRequest }: Mod
             value={comment}
             onChange={(e) => { setComment(e.target.value); if (e.target.value.trim()) setError(''); }}
           />
-          {error && <p id="reject-reason-error" role="alert" className="text-[11px] text-[var(--danger)] font-medium">{error}</p>}
+          {error && <p id="reject-reason-error" role="alert" className="text-[12px] text-[var(--danger)] font-medium">{error}</p>}
         </div>
       </div>
     </ModuleModal>
@@ -289,7 +289,7 @@ export function VoidModal({ isOpen, onClose, onConfirm, selectedRequest }: Modal
           <Button
             variant="ghost"
             onClick={onClose}
-            className="h-8 px-4 text-[11.5px] font-medium"
+            className="h-8 px-4 text-[12px] font-medium"
             style={{ color: 'var(--shell-text-muted)' }}
           >
             Cancel
@@ -297,7 +297,7 @@ export function VoidModal({ isOpen, onClose, onConfirm, selectedRequest }: Modal
           <button
             onClick={handleConfirm}
             disabled={saving}
-            className="px-8 py-2.5 bg-[var(--danger)] text-[var(--danger-foreground)] text-[12px] font-bold rounded-lg active:scale-95 transition-all disabled:opacity-50"
+            className="px-8 py-2.5 bg-[var(--danger)] text-[var(--danger-foreground)] text-[12px] font-semibold rounded-lg active:scale-95 transition-all disabled:opacity-50"
           >
             {saving ? 'Voiding...' : 'Confirm Void'}
           </button>
@@ -307,7 +307,7 @@ export function VoidModal({ isOpen, onClose, onConfirm, selectedRequest }: Modal
       <div className="space-y-6">
         <div className="rounded-lg border border-[var(--shell-border)] rounded-lg border overflow-x-auto">
           <table className="w-full text-[12px]">
-            <thead className="rounded-lg border border-b border-[var(--shell-border)] text-[var(--shell-text)] font-bold">
+            <thead className="rounded-lg border border-b border-[var(--shell-border)] text-[var(--shell-text)] font-semibold">
               <tr>
                 <th className="px-4 py-2 text-left">Reference ID</th>
                 <th className="px-4 py-2 text-left">Employee</th>
@@ -316,9 +316,9 @@ export function VoidModal({ isOpen, onClose, onConfirm, selectedRequest }: Modal
             </thead>
             <tbody>
               <tr className="border-b border-[var(--shell-border)]">
-                <td className="px-4 py-3 font-bold text-[var(--info)]">{selectedRequest.code || `#${selectedRequest.transaction_id}`}</td>
+                <td className="px-4 py-3 font-semibold text-[var(--info)]">{selectedRequest.code || `#${selectedRequest.transaction_id}`}</td>
                 <td className="px-4 py-3 font-medium" style={{ color: 'var(--shell-text)' }}>{selectedRequest.submitted_by_name || '—'}</td>
-                <td className="px-4 py-3 text-right font-bold" style={{ color: 'var(--shell-text)' }}>{formatCurrency(selectedRequest.amount, currency)}</td>
+                <td className="px-4 py-3 text-right font-semibold" style={{ color: 'var(--shell-text)' }}>{formatCurrency(selectedRequest.amount, currency)}</td>
               </tr>
               {selectedRequest.description && (
                 <tr>
@@ -346,7 +346,7 @@ export function VoidModal({ isOpen, onClose, onConfirm, selectedRequest }: Modal
           />
         </div>
 
-        <div className="p-3 bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] border border-[color-mix(in_srgb,var(--danger)_20%,transparent)] rounded-lg text-[11px] text-[var(--danger)] font-medium">
+        <div className="p-3 bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] border border-[color-mix(in_srgb,var(--danger)_20%,transparent)] rounded-lg text-[12px] text-[var(--danger)] font-medium">
           The transaction will be marked <strong>VOIDED</strong>. The record is kept for audit purposes but will be excluded from reports and balances.
         </div>
       </div>
@@ -375,14 +375,14 @@ export function SendBackModal({ isOpen, onClose, onConfirm, selectedRequest }: M
           <Button
             variant="ghost"
             onClick={onClose}
-            className="h-8 px-4 text-[11.5px] font-medium"
+            className="h-8 px-4 text-[12px] font-medium"
             style={{ color: 'var(--shell-text-muted)' }}
           >
             Cancel
           </Button>
           <button
             onClick={() => onConfirm({ comment })}
-            className="px-8 py-2.5 bg-[var(--info)] text-[var(--info-foreground)] text-[12px] font-bold rounded-lg active:scale-95 transition-all"
+            className="px-8 py-2.5 bg-[var(--info)] text-[var(--info-foreground)] text-[12px] font-semibold rounded-lg active:scale-95 transition-all"
           >
             Send Back
           </button>
@@ -392,7 +392,7 @@ export function SendBackModal({ isOpen, onClose, onConfirm, selectedRequest }: M
       <div className="space-y-6">
         <div className="rounded-lg border border-[var(--shell-border)] rounded-lg border overflow-x-auto">
           <table className="w-full text-[12px]">
-            <thead className="rounded-lg border border-b border-[var(--shell-border)] text-[var(--shell-text)] font-bold">
+            <thead className="rounded-lg border border-b border-[var(--shell-border)] text-[var(--shell-text)] font-semibold">
               <tr>
                 <th className="px-4 py-2 text-left">Reference ID</th>
                 <th className="px-4 py-2 text-left">Employee</th>
@@ -401,9 +401,9 @@ export function SendBackModal({ isOpen, onClose, onConfirm, selectedRequest }: M
             </thead>
             <tbody>
               <tr className="border-b border-[var(--shell-border)]">
-                <td className="px-4 py-3 font-bold text-[var(--info)]">{selectedRequest.code || `#${selectedRequest.id}`}</td>
+                <td className="px-4 py-3 font-semibold text-[var(--info)]">{selectedRequest.code || `#${selectedRequest.id}`}</td>
                 <td className="px-4 py-3 font-medium" style={{ color: 'var(--shell-text)' }}>{selectedRequest.submitted_by_name || '—'}</td>
-                <td className="px-4 py-3 text-right font-bold" style={{ color: 'var(--shell-text)' }}>{formatCurrency(selectedRequest.amount, currency)}</td>
+                <td className="px-4 py-3 text-right font-semibold" style={{ color: 'var(--shell-text)' }}>{formatCurrency(selectedRequest.amount, currency)}</td>
               </tr>
               {selectedRequest.description && (
                 <tr>
@@ -431,7 +431,7 @@ export function SendBackModal({ isOpen, onClose, onConfirm, selectedRequest }: M
           />
         </div>
 
-        <div className="p-3 bg-[color-mix(in_srgb,var(--info)_10%,transparent)] border border-[color-mix(in_srgb,var(--info)_20%,transparent)] rounded-lg text-[11px] text-[var(--info)] font-medium">
+        <div className="p-3 bg-[color-mix(in_srgb,var(--info)_10%,transparent)] border border-[color-mix(in_srgb,var(--info)_20%,transparent)] rounded-lg text-[12px] text-[var(--info)] font-medium">
           The expense will return to <strong>DRAFT</strong> status and the employee can edit and resubmit it.
         </div>
       </div>

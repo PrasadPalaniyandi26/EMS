@@ -14,10 +14,10 @@ export function Footer() {
   return (
     <footer className="footer-fixed">
       <div className="w-full flex items-center justify-between">
-        <p className="text-[11px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>
+        <p className="text-[12px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>
           © {year} NTEMS — NilaTech Expense Management System
         </p>
-        <div className="flex items-center gap-3 text-[11px]" style={{ color: 'var(--shell-text-muted)' }}>
+        <div className="flex items-center gap-3 text-[12px]" style={{ color: 'var(--shell-text-muted)' }}>
           <span className="flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: dotColor }} />
             {statusLabel}

@@ -145,6 +145,11 @@
   --danger-foreground: #ffffff;
   --surface-raised:    #ffffff;
   --overlay:           rgba(22, 22, 22, 0.5);
+  /* Heatmap bins (spend intensity): opaque fills with their own dark text so every cell stays >= 7:1 */
+  --heat-1: #dbeafe; --heat-1-text: #1e3a8a;
+  --heat-2: #93c5fd; --heat-2-text: #172554;
+  --heat-3: #fcd34d; --heat-3-text: #451a03;
+  --heat-4: #fca5a5; --heat-4-text: #450a0a;
   --table-header:      #e0e0e0;  /* table header band: clearly stronger than the white rows */
 
   /* Approval workflow states (consumed by lib/status.ts as components migrate, Phase 4) */
@@ -447,38 +452,13 @@
   }
 
   /* ── Content surfaces ──────────────────────────────── */
-  .content-right-sidebar {
-    display: none;
-    width: var(--panel-w);
-    background: var(--shell-surface);
-    border-left: 1px solid var(--shell-border);
-    flex-shrink: 0;
-  }
   @media (min-width: 1024px) {
-    .content-right-sidebar {
-      display: flex;
-      flex-direction: column;
-    }
   }
   .table-container {
     border: 1px solid var(--shell-border);
     background: var(--shell-surface);
     border-radius: 8px;
     overflow: hidden;
-  }
-  .casper-grid th,
-  .casper-grid td {
-    border-color: var(--shell-border);
-  }
-  .glass-card {
-    background: var(--shell-surface);
-    border: 1px solid var(--shell-border);
-    border-radius: 8px;
-  }
-  .glass-panel {
-    background: var(--shell-surface);
-    border: 1px solid var(--shell-border);
-    border-radius: 8px;
   }
 
   /* ── Buttons ────────────────────────────────────────── */
@@ -530,12 +510,6 @@
   .btn-action-primary:disabled { opacity: 0.35; cursor: not-allowed; }
 
   /* ── Nav ────────────────────────────────────────────── */
-  .sidebar-link-active {
-    background: var(--shell-accent);
-    color: var(--shell-accent-fg);
-    font-weight: 600;
-    border-radius: 8px;
-  }
   .nav-active {
     background: color-mix(in srgb, var(--shell-accent) 12%, transparent);
     color: var(--shell-accent);

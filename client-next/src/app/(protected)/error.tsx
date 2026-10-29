@@ -14,17 +14,17 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
         <AlertTriangle className="w-7 h-7 text-[var(--danger)]" />
       </div>
       <div className="text-center space-y-1.5 max-w-sm">
-        <h2 className="text-[15px] font-bold" style={{ color: 'var(--shell-text)' }}>Something went wrong</h2>
-        <p className="text-[12.5px]" style={{ color: 'var(--shell-text-muted)' }}>
+        <h2 className="text-[15px] font-semibold" style={{ color: 'var(--shell-text)' }}>Something went wrong</h2>
+        <p className="text-[13px]" style={{ color: 'var(--shell-text-muted)' }}>
           {error?.message || 'An unexpected error occurred. Please try again.'}
         </p>
         {error?.digest && (
-          <p className="text-[11px]" style={{ color: 'var(--shell-text-muted)' }}>Error ID: {error.digest}</p>
+          <p className="text-[12px]" style={{ color: 'var(--shell-text-muted)' }}>Error ID: {error.digest}</p>
         )}
       </div>
       <button
         onClick={reset}
-        className="flex items-center gap-2 h-9 px-5 rounded-lg text-[12.5px] font-semibold text-white transition-all hover:brightness-110"
+        className="flex items-center gap-2 h-9 px-5 rounded-lg text-[13px] font-semibold text-white transition-all hover:brightness-110"
         style={{ background: 'var(--shell-accent)' }}
       >
         <RefreshCw className="w-4 h-4" /> Try again

@@ -117,7 +117,7 @@ export function RecurringModal({
                   role="radio"
                   aria-checked={form.type === val}
                   onClick={() => setForm({ ...form, type: val, category_id: '' })}
-                  className={`flex-1 text-xs font-bold rounded-md transition-all focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)] ${
+                  className={`flex-1 text-xs font-semibold rounded-md transition-all focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)] ${
                     form.type === val ? active : 'text-[var(--shell-text-muted)] border border-transparent hover:text-[var(--shell-text)]'
                   }`}
                 >
@@ -178,7 +178,7 @@ export function RecurringModal({
             </NativeSelect>
           </Field>
           <Field label="GST Included">
-            <label className="flex h-10 cursor-pointer items-center gap-2.5 text-[11px] font-semibold text-[var(--shell-text-muted)]">
+            <label className="flex h-10 cursor-pointer items-center gap-2.5 text-[12px] font-semibold text-[var(--shell-text-muted)]">
               <Switch checked={form.gst_included} onCheckedChange={(v) => setForm({ ...form, gst_included: v })} />
               <span className="whitespace-nowrap">{form.gst_included ? 'Included' : 'Not included'}</span>
             </label>
@@ -208,7 +208,7 @@ export function RecurringModal({
             />
           </Field>
           <Field label="Open-Ended">
-            <label className="flex h-10 cursor-pointer items-center gap-2.5 text-[11px] font-semibold text-[var(--shell-text-muted)]">
+            <label className="flex h-10 cursor-pointer items-center gap-2.5 text-[12px] font-semibold text-[var(--shell-text-muted)]">
               <Switch
                 checked={form.open_ended}
                 onCheckedChange={(v) => setForm({ ...form, open_ended: v, end_date: v ? '' : form.end_date })}
@@ -222,7 +222,7 @@ export function RecurringModal({
         <div className="pt-2 border-t border-[var(--shell-border)]">
           <div className="flex items-center gap-2 mb-2">
             <Settings aria-hidden className="w-3.5 h-3.5 text-[var(--shell-accent)]" />
-            <span className="text-xs font-black text-[var(--shell-accent)]">Automation Rules</span>
+            <span className="text-xs font-semibold text-[var(--shell-accent)]">Automation Rules</span>
             <div className="h-[1px] flex-1 bg-[var(--shell-border)]" />
           </div>
           <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
@@ -241,7 +241,7 @@ export function RecurringModal({
               </p>
             </div>
             <Field label="Auto-submit for Approval">
-              <label className="flex h-10 cursor-pointer items-center gap-2.5 text-[11px] font-medium text-[var(--shell-text)]">
+              <label className="flex h-10 cursor-pointer items-center gap-2.5 text-[12px] font-medium text-[var(--shell-text)]">
                 <Switch checked={!!form.auto_submit} onCheckedChange={(v) => setForm({ ...form, auto_submit: v })} />
                 <span>{form.auto_submit ? 'Enabled' : 'Disabled'}</span>
               </label>
@@ -276,9 +276,9 @@ export function RecurringModal({
             <UploadCloud aria-hidden className={`h-7 w-7 shrink-0 transition-colors ${dragging ? 'text-[var(--shell-accent)]' : 'text-[var(--shell-text-muted)] group-hover:text-[var(--shell-accent)]'}`} />
             <span>
               <span className="block text-[12px] font-medium text-[var(--shell-text-muted)]">
-                Drag &amp; drop or <span className="font-bold text-[var(--shell-accent)]">browse files</span>
+                Drag &amp; drop or <span className="font-semibold text-[var(--shell-accent)]">browse files</span>
               </span>
-              <span className="block text-[11px] text-[var(--shell-text-muted)]">PDF, JPG, PNG, WebP · max 10 MB</span>
+              <span className="block text-[12px] text-[var(--shell-text-muted)]">PDF, JPG, PNG, WebP · max 10 MB</span>
             </span>
           </button>
           {(file || (isEdit && editing?.receipt_path)) && (
@@ -286,21 +286,21 @@ export function RecurringModal({
               <div className="flex items-center gap-2.5 min-w-0">
                 <FileText aria-hidden className="w-5 h-5 text-[var(--shell-accent)] shrink-0" />
                 <div className="leading-tight min-w-0">
-                  <p className="text-[12px] font-bold text-[var(--shell-text)] truncate max-w-[280px]">
+                  <p className="text-[12px] font-semibold text-[var(--shell-text)] truncate max-w-[280px]">
                     {file?.name || (editing?.receipt_path ? editing.receipt_path.split('/').pop() : '')}
                   </p>
-                  {file && <p className="text-[11px] text-[var(--shell-text-muted)]">{(file.size / 1024 / 1024).toFixed(1)} MB</p>}
+                  {file && <p className="text-[12px] text-[var(--shell-text-muted)]">{(file.size / 1024 / 1024).toFixed(1)} MB</p>}
                 </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 {file && (
                   <button type="button" aria-label="View file" onClick={() => window.open(URL.createObjectURL(file), '_blank')}
-                    className="flex h-9 w-9 items-center justify-center rounded hover:bg-[var(--shell-hover)] text-[var(--shell-text-muted)] hover:text-[var(--shell-accent)] transition-colors">
+                    className="flex h-9 w-9 items-center justify-center rounded-md hover:bg-[var(--shell-hover)] text-[var(--shell-text-muted)] hover:text-[var(--shell-accent)] transition-colors">
                     <Eye aria-hidden className="w-4 h-4" />
                   </button>
                 )}
                 <button type="button" aria-label="Remove file" onClick={() => onFileChange(null)}
-                  className="flex h-9 w-9 items-center justify-center rounded hover:bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] text-[var(--shell-text-muted)] hover:text-[var(--danger)] transition-colors">
+                  className="flex h-9 w-9 items-center justify-center rounded-md hover:bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] text-[var(--shell-text-muted)] hover:text-[var(--danger)] transition-colors">
                   <XIcon aria-hidden className="w-4 h-4" />
                 </button>
               </div>
@@ -344,14 +344,14 @@ export function PauseRecurringModal({
           <Button
             variant="ghost"
             onClick={onClose}
-            className="h-8 px-4 text-[11.5px] font-medium"
+            className="h-8 px-4 text-[12px] font-medium"
             style={{ color: 'var(--shell-text-muted)' }}
           >
             Keep Active
           </Button>
           <button
             onClick={onConfirm}
-            className="px-6 py-2.5 bg-[var(--warning)] hover:opacity-90 text-[var(--warning-foreground)] rounded-lg text-[11px] font-bold shadow-none transition-all flex items-center gap-2"
+            className="px-6 py-2.5 bg-[var(--warning)] hover:opacity-90 text-[var(--warning-foreground)] rounded-lg text-[12px] font-semibold shadow-none transition-all flex items-center gap-2"
           >
             <Pause className="w-4 h-4" /> Pause Schedule
           </button>
@@ -361,7 +361,7 @@ export function PauseRecurringModal({
       <div className="p-4 bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] rounded-lg border border-[color-mix(in_srgb,var(--warning)_20%,transparent)] flex gap-3">
         <Pause className="w-5 h-5 text-[var(--warning)] shrink-0 mt-0.5" />
         <p className="text-[12px] text-[var(--warning)] leading-relaxed">
-          Are you sure you want to pause <span className="font-bold underline">{targetName}</span>? No new transactions will be auto-generated until resumed.
+          Are you sure you want to pause <span className="font-semibold underline">{targetName}</span>? No new transactions will be auto-generated until resumed.
         </p>
       </div>
     </ModuleModal>
@@ -409,14 +409,14 @@ export function ResumeRecurringModal({
           <Button
             variant="ghost"
             onClick={onClose}
-            className="h-8 px-4 text-[11.5px] font-medium"
+            className="h-8 px-4 text-[12px] font-medium"
             style={{ color: 'var(--shell-text-muted)' }}
           >
             Keep Paused
           </Button>
           <button
             onClick={() => onConfirm(form)}
-            className="px-6 py-2.5 btn-action-primary border border-[var(--shell-border)] text-[var(--shell-text)] rounded-lg text-[11px] font-bold shadow-none transition-all flex items-center gap-2"
+            className="px-6 py-2.5 btn-action-primary border border-[var(--shell-border)] text-[var(--shell-text)] rounded-lg text-[12px] font-semibold shadow-none transition-all flex items-center gap-2"
           >
             <Play className="w-4 h-4" /> Resume Schedule
           </button>
@@ -426,12 +426,12 @@ export function ResumeRecurringModal({
       <div className="space-y-3">
         <div className="border border-[var(--shell-border)] rounded-lg p-4 flex items-center justify-between" style={{ background: 'var(--shell-bg)' }}>
           <div>
-            <p className="text-[11px] text-[var(--info)] font-bold">Target Schedule</p>
-            <p className="text-[14px] font-bold" style={{ color: 'var(--shell-text)' }}>{target.description}</p>
+            <p className="text-[12px] text-[var(--info)] font-semibold">Target Schedule</p>
+            <p className="text-[14px] font-semibold" style={{ color: 'var(--shell-text)' }}>{target.description}</p>
           </div>
           <div className="text-right">
-            <p className="text-[11px] text-[var(--info)] font-bold">Last Run</p>
-            <p className="text-[14px] font-bold" style={{ color: 'var(--shell-text)' }}>
+            <p className="text-[12px] text-[var(--info)] font-semibold">Last Run</p>
+            <p className="text-[14px] font-semibold" style={{ color: 'var(--shell-text)' }}>
               {target.last_run ? new Date(target.last_run).toLocaleDateString() : 'None'}
             </p>
           </div>
@@ -488,14 +488,14 @@ export function DeleteRecurringModal({ isOpen, onClose, onConfirm, count }: any)
           <Button
             variant="ghost"
             onClick={onClose}
-            className="h-8 px-4 text-[11.5px] font-medium"
+            className="h-8 px-4 text-[12px] font-medium"
             style={{ color: 'var(--shell-text-muted)' }}
           >
             Cancel
           </Button>
           <button
             onClick={onConfirm}
-            className="px-6 py-2.5 bg-[var(--danger)] text-[var(--danger-foreground)] rounded-lg text-[11px] font-bold transition-all flex items-center gap-2"
+            className="px-6 py-2.5 bg-[var(--danger)] text-[var(--danger-foreground)] rounded-lg text-[12px] font-semibold transition-all flex items-center gap-2"
           >
             <Trash2 className="w-4 h-4" /> Delete Permanently
           </button>
@@ -506,7 +506,7 @@ export function DeleteRecurringModal({ isOpen, onClose, onConfirm, count }: any)
         <div className="p-4 bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] rounded-lg border border-[color-mix(in_srgb,var(--danger)_20%,transparent)] flex gap-3">
           <Trash2 className="w-5 h-5 text-[var(--danger)] shrink-0 mt-0.5" />
           <p className="text-[12px] text-[var(--danger)] leading-relaxed">
-            Are you sure you want to delete <span className="font-bold text-[var(--danger)]">{count} recurring schedule(s)</span>? Future transactions will no longer be generated. This action cannot be undone.
+            Are you sure you want to delete <span className="font-semibold text-[var(--danger)]">{count} recurring schedule(s)</span>? Future transactions will no longer be generated. This action cannot be undone.
           </p>
         </div>
       </div>

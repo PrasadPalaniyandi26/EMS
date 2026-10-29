@@ -74,7 +74,7 @@ export function ProcessReimbursementModal({
     >
       <div className="space-y-4 p-1">
         <div className="space-y-1.5">
-          <label htmlFor="reimb-status" className="text-[11px] font-bold text-[var(--shell-text)] block">Status</label>
+          <label htmlFor="reimb-status" className="text-[12px] font-semibold text-[var(--shell-text)] block">Status</label>
           <Select value={status} onValueChange={(v) => setStatus(v as 'PAID' | 'ON_HOLD')}>
             <SelectTrigger id="reimb-status" className="border-input bg-transparent text-[var(--shell-text)] border border-[var(--shell-border)] rounded-lg h-9 text-xs text-[var(--shell-text)]">
               <SelectValue />
@@ -87,10 +87,10 @@ export function ProcessReimbursementModal({
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="reimb-reference" className="text-[11px] font-bold text-[var(--shell-text)] block">
+          <label htmlFor="reimb-reference" className="text-[12px] font-semibold text-[var(--shell-text)] block">
             Payment Reference
             {status === 'PAID' && <span className="text-[var(--danger)] ml-0.5">*</span>}
-            {status === 'ON_HOLD' && <span className="text-[11px] font-normal text-[var(--shell-text-muted)] ml-1">(optional)</span>}
+            {status === 'ON_HOLD' && <span className="text-[12px] font-normal text-[var(--shell-text-muted)] ml-1">(optional)</span>}
           </label>
           <Input id="reimb-reference" aria-required={status === "PAID"} aria-invalid={referenceError ? true : undefined}
             className="border-input bg-transparent text-[var(--shell-text)] border border-[var(--shell-border)] rounded-lg h-9 text-xs text-[var(--shell-text)]"
@@ -99,13 +99,13 @@ export function ProcessReimbursementModal({
             onChange={(e) => { setReference(e.target.value); setReferenceError(''); }}
           />
           {referenceError && (
-            <p role="alert" className="text-[11px] text-[var(--danger)] mt-0.5">{referenceError}</p>
+            <p role="alert" className="text-[12px] text-[var(--danger)] mt-0.5">{referenceError}</p>
           )}
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="reimb-note" className="text-[11px] font-bold text-[var(--shell-text)] block">
-            Note <span className="text-[11px] font-normal text-[var(--shell-text-muted)]">(optional)</span>
+          <label htmlFor="reimb-note" className="text-[12px] font-semibold text-[var(--shell-text)] block">
+            Note <span className="text-[12px] font-normal text-[var(--shell-text-muted)]">(optional)</span>
           </label>
           <Textarea id="reimb-note"
             className="border-input bg-transparent text-[var(--shell-text)] border border-[var(--shell-border)] rounded-lg text-xs text-[var(--shell-text)] resize-none"
@@ -117,7 +117,7 @@ export function ProcessReimbursementModal({
         </div>
 
         {mode === 'bulk' && (
-          <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg border text-[11px]"
+          <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg border text-[12px]"
             style={{ background: 'var(--shell-hover)', borderColor: 'var(--shell-border)', color: 'var(--shell-text-muted)' }}>
             <CreditCard className="w-3.5 h-3.5 mt-0.5 shrink-0" />
             <span>This status and reference will be applied to all <strong>{selectedCount}</strong> selected transactions.</span>

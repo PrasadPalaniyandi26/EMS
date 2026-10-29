@@ -235,7 +235,7 @@ export function DataTable<TData, TValue>({
           </Table>
         </div>
         <div className="px-4 py-2 flex items-center justify-between shrink-0" style={{ borderTop: '1px solid var(--shell-border)', background: 'var(--shell-surface)' }}>
-          <div className="flex-1 text-[11.5px]" style={{ color: 'var(--shell-text-muted)' }}>
+          <div className="flex-1 text-[12px]" style={{ color: 'var(--shell-text-muted)' }}>
             {isLoading ? 'Loading…' : `${table.getFilteredRowModel().rows.length} results`}
           </div>
           <div className="flex items-center gap-1.5">

@@ -34,7 +34,7 @@ const sel = 'w-full h-10 text-sm border-input bg-transparent text-[var(--shell-t
 function SectionHeader({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-2 mb-3">
-      <span className="text-[11px] font-black text-[var(--shell-text-muted)]">{label}</span>
+      <span className="text-[12px] font-semibold text-[var(--shell-text-muted)]">{label}</span>
       <div className="h-[1px] flex-1" style={{ background: 'var(--shell-border)' }} />
     </div>
   );
@@ -185,7 +185,7 @@ export function ClientModal({ isOpen, onClose, onSave, editing, businessTypes: i
             <button
               type="button"
               onClick={() => setShowNewIndustry(!showNewIndustry)}
-              className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--shell-accent)] hover:underline mt-1"
+              className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--shell-accent)] hover:underline mt-1"
             >
               <PlusCircle className="w-3 h-3" /> Create new sector
             </button>
@@ -198,7 +198,7 @@ export function ClientModal({ isOpen, onClose, onSave, editing, businessTypes: i
                   onChange={(e) => setNewIndustryName(e.target.value)}
                 />
                 <Button type="button" size="sm" onClick={handleAddIndustry}
-                  className="h-10 btn-action-primary font-semibold text-[12.5px] px-3 border border-[var(--shell-border)]">
+                  className="h-10 btn-action-primary font-semibold text-[13px] px-3 border border-[var(--shell-border)]">
                   Add
                 </Button>
               </div>
@@ -274,7 +274,7 @@ export function ClientModal({ isOpen, onClose, onSave, editing, businessTypes: i
                   role="radio"
                   aria-checked={form.is_active === val}
                   onClick={() => set('is_active', val)}
-                  className={`flex-1 py-1.5 text-center text-[11px] font-bold rounded-md transition-all ${
+                  className={`flex-1 py-1.5 text-center text-[12px] font-semibold rounded-md transition-all ${
                     form.is_active === val ? active : 'text-[var(--shell-text-muted)] border border-transparent hover:text-[var(--shell-text)]'
                   }`}
                 >

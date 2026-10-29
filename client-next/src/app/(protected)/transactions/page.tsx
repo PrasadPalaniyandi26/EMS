@@ -204,7 +204,7 @@ export default function TransactionsPage() {
         <div className="flex items-center justify-between">
           <div className="flex gap-2 flex-wrap">
             <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger aria-label="Filter by type" className="h-8 w-[130px] bg-[var(--shell-hover)] border-[var(--shell-border)] text-[11px] font-medium"><SelectValue placeholder="Type: All" /></SelectTrigger>
+              <SelectTrigger aria-label="Filter by type" className="h-8 w-[130px] bg-[var(--shell-hover)] border-[var(--shell-border)] text-[12px] font-medium"><SelectValue placeholder="Type: All" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Type: All</SelectItem>
                 <SelectItem value="income">Income</SelectItem>
@@ -212,7 +212,7 @@ export default function TransactionsPage() {
               </SelectContent>
             </Select>
             <Select value={filterPayment} onValueChange={setFilterPayment}>
-              <SelectTrigger aria-label="Filter by payment method" className="h-8 w-[150px] bg-[var(--shell-hover)] border-[var(--shell-border)] text-[11px] font-medium"><SelectValue placeholder="Payment: All" /></SelectTrigger>
+              <SelectTrigger aria-label="Filter by payment method" className="h-8 w-[150px] bg-[var(--shell-hover)] border-[var(--shell-border)] text-[12px] font-medium"><SelectValue placeholder="Payment: All" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Payment: All</SelectItem>
                 <SelectItem value="cash">Cash</SelectItem>
@@ -223,7 +223,7 @@ export default function TransactionsPage() {
               </SelectContent>
             </Select>
             <Select value={filterClient} onValueChange={setFilterClient}>
-              <SelectTrigger aria-label="Filter by client" className="h-8 w-[150px] bg-[var(--shell-hover)] border-[var(--shell-border)] text-[11px] font-medium"><SelectValue placeholder="Client: All" /></SelectTrigger>
+              <SelectTrigger aria-label="Filter by client" className="h-8 w-[150px] bg-[var(--shell-hover)] border-[var(--shell-border)] text-[12px] font-medium"><SelectValue placeholder="Client: All" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Client: All</SelectItem>
                 {(clients || []).map((c: any) => (
@@ -235,7 +235,7 @@ export default function TransactionsPage() {
           <button
             onClick={handleExportCsv}
             disabled={exporting}
-            className="flex items-center gap-1.5 h-8 px-3 rounded-md border border-[var(--shell-border)] bg-[var(--shell-hover)] text-[11px] font-bold text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] hover:bg-[var(--shell-surface)] transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 h-8 px-3 rounded-md border border-[var(--shell-border)] bg-[var(--shell-hover)] text-[12px] font-semibold text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] hover:bg-[var(--shell-surface)] transition-colors disabled:opacity-50"
           >
             <Download className="h-3.5 w-3.5" />
             {exporting ? 'Exporting...' : 'Export CSV'}
@@ -263,14 +263,14 @@ export default function TransactionsPage() {
           <tbody>
             {isLoading && [...Array(8)].map((_, i) => (
               <tr key={i} className="animate-pulse">
-                <td className="px-4 py-3"><div className="h-4 w-4 rounded bg-[var(--shell-hover)]" /></td>
-                <td className="px-3 py-3"><div className="h-3 w-20 rounded bg-[var(--shell-hover)]" /></td>
-                <td className="px-3 py-3"><div className="h-3 w-48 rounded bg-[var(--shell-hover)]" /></td>
-                <td className="px-3 py-3"><div className="h-3 w-24 rounded bg-[var(--shell-hover)]" /></td>
-                <td className="px-3 py-3"><div className="h-3 w-20 rounded bg-[var(--shell-hover)]" /></td>
+                <td className="px-4 py-3"><div className="h-4 w-4 rounded-md bg-[var(--shell-hover)]" /></td>
+                <td className="px-3 py-3"><div className="h-3 w-20 rounded-md bg-[var(--shell-hover)]" /></td>
+                <td className="px-3 py-3"><div className="h-3 w-48 rounded-md bg-[var(--shell-hover)]" /></td>
+                <td className="px-3 py-3"><div className="h-3 w-24 rounded-md bg-[var(--shell-hover)]" /></td>
+                <td className="px-3 py-3"><div className="h-3 w-20 rounded-md bg-[var(--shell-hover)]" /></td>
                 <td className="px-3 py-3"><div className="h-5 w-16 rounded-sm bg-[var(--shell-hover)]" /></td>
-                <td className="px-3 py-3"><div className="h-3 w-16 rounded bg-[var(--shell-hover)]" /></td>
-                <td className="px-4 py-3"><div className="h-3 w-20 rounded bg-[var(--shell-hover)] ml-auto" /></td>
+                <td className="px-3 py-3"><div className="h-3 w-16 rounded-md bg-[var(--shell-hover)]" /></td>
+                <td className="px-4 py-3"><div className="h-3 w-20 rounded-md bg-[var(--shell-hover)] ml-auto" /></td>
               </tr>
             ))}
             {!isLoading && displayedTxns.map((t: any) => {
@@ -309,9 +309,9 @@ export default function TransactionsPage() {
       </div>
 
       {/* Pagination */}
-      <div className="px-4 py-2.5 shrink-0 border-t border-[var(--shell-border)] flex items-center justify-between text-[11px] text-[var(--shell-text-muted)] font-medium">
+      <div className="px-4 py-2.5 shrink-0 border-t border-[var(--shell-border)] flex items-center justify-between text-[12px] text-[var(--shell-text-muted)] font-medium">
         <p>
-          Showing <span className="text-[var(--shell-text)] font-bold">{total === 0 ? 0 : page * PAGE_SIZE + 1}–{page * PAGE_SIZE + displayedTxns.length}</span> of <span className="text-[var(--shell-text)] font-bold">{total}</span>
+          Showing <span className="text-[var(--shell-text)] font-semibold">{total === 0 ? 0 : page * PAGE_SIZE + 1}–{page * PAGE_SIZE + displayedTxns.length}</span> of <span className="text-[var(--shell-text)] font-semibold">{total}</span>
         </p>
         <div className="flex gap-1.5">
           <button
@@ -322,7 +322,7 @@ export default function TransactionsPage() {
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <button aria-current="page" aria-label={`Page ${page + 1}`} className="w-7 h-7 flex items-center justify-center rounded-md bg-[var(--shell-accent)] text-[var(--shell-accent-fg)] font-bold">{page + 1}</button>
+          <button aria-current="page" aria-label={`Page ${page + 1}`} className="w-7 h-7 flex items-center justify-center rounded-md bg-[var(--shell-accent)] text-[var(--shell-accent-fg)] font-semibold">{page + 1}</button>
           <button
             onClick={() => setPage((p) => p + 1)}
             disabled={page + 1 >= totalPages}

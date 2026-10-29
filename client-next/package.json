@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "check:design": "node scripts/check-design.mjs",
     "lint": "eslint",
     "clean": "rimraf .next",
     "build:mobile": "cross-env BUILD_TARGET=capacitor next build && npx cap sync",

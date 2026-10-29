@@ -142,18 +142,6 @@ export function useBudgets() {
   });
 }
 
-export function useBudgetSummary(month?: number, year?: number) {
-  const qs = new URLSearchParams();
-  if (month) qs.set('month', String(month));
-  if (year) qs.set('year', String(year));
-  const q = qs.toString() ? `?${qs.toString()}` : '';
-  return useQuery({
-    queryKey: [QUERY_KEYS.BUDGETS, 'summary', month, year],
-    queryFn: () => api.get<unknown>(`/budgets/summary${q}`).then((r) => r.data),
-    staleTime: LIVE_STALE,
-  });
-}
-
 // ─── Recurring ───────────────────────────────────
 export function useRecurring(params?: Record<string, string>) {
   const qs = params ? '?' + new URLSearchParams(params).toString() : '';
@@ -391,26 +379,6 @@ export function useProductBurn(dateFrom?: string, dateTo?: string) {
   return useQuery({
     queryKey: [QUERY_KEYS.ANALYTICS, 'product-burn', dateFrom, dateTo],
     queryFn: () => api.get<any[]>(`/dashboard/analytics/product-burn${q}`).then((r) => r.data),
-    staleTime: LIVE_STALE,
-  });
-}
-
-export function useReportData(type: string, params: Record<string, string>) {
-  const qs = new URLSearchParams({ type, ...params }).toString();
-  return useQuery({
-    queryKey: [QUERY_KEYS.REPORT, type, params],
-    queryFn: () => api.get<any>(`/reporting/generate?${qs}`).then((r) => r.data),
-    enabled: false,
-    staleTime: 0,
-  });
-}
-
-// ─── Transaction Notes ───────────────────────────
-export function useTransactionNotes(transactionId?: number) {
-  return useQuery({
-    queryKey: [QUERY_KEYS.TRANSACTIONS, 'notes', transactionId],
-    queryFn: () => api.get<any[]>(`/transactions/${transactionId}/notes`).then((r) => r.data),
-    enabled: !!transactionId,
     staleTime: LIVE_STALE,
   });
 }

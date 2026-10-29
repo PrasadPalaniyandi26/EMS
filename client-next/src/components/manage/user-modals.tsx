@@ -44,7 +44,7 @@ function roleColor(name?: string) {
 function SectionHeader({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-2 mb-3">
-      <span className="text-[11px] font-black text-[var(--shell-text-muted)]">{label}</span>
+      <span className="text-[12px] font-semibold text-[var(--shell-text-muted)]">{label}</span>
       <div className="h-[1px] flex-1" style={{ background: 'var(--shell-border)' }} />
     </div>
   );
@@ -182,9 +182,9 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
         {/* Employee ID badge for edit mode */}
         {editing && (
           <div className="flex items-center gap-3 rounded-lg border bg-[var(--shell-hover)] rounded-lg px-4 py-2">
-            <span className="text-[11px] font-black text-[var(--shell-text-muted)]">Employee ID</span>
-            <span className="text-[13px] font-black text-[var(--info)]">{getEmployeeId(editing.id)}</span>
-            <span className="ml-auto px-2 py-0.5 rounded text-[11px] font-black border border-[var(--shell-border)] text-[var(--shell-text)]">
+            <span className="text-[12px] font-semibold text-[var(--shell-text-muted)]">Employee ID</span>
+            <span className="text-[13px] font-semibold text-[var(--info)]">{getEmployeeId(editing.id)}</span>
+            <span className="ml-auto px-2 py-0.5 rounded-md text-[12px] font-semibold border border-[var(--shell-border)] text-[var(--shell-text)]">
               {editing.role_name || 'Staff'}
             </span>
           </div>
@@ -263,7 +263,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
                   ))}
                 </SelectContent>
               </Select>
-              <button type="button" onClick={() => setShowNewDeptForm(!showNewDeptForm)} className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] mt-1">
+              <button type="button" onClick={() => setShowNewDeptForm(!showNewDeptForm)} className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] mt-1">
                 <PlusCircle className="w-3 h-3" /> Create new department
               </button>
               {showNewDeptForm && (
@@ -281,11 +281,11 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
                   const rc = roleColor(r.role_name);
                   return (
                     <div key={r.role_id} className={cn('flex items-center px-3 py-2 transition-colors', isChecked ? 'rounded-lg border' : 'hover:rounded-lg border')} style={{ borderColor: 'var(--shell-border)' }}>
-                      <div onClick={() => toggleRole(r.role_id)} className={cn('w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-all cursor-pointer shrink-0 mr-2.5', isChecked ? 'bg-[var(--shell-accent)] border-[var(--shell-accent)]' : 'border-[var(--shell-border)]')}>
+                      <div onClick={() => toggleRole(r.role_id)} className={cn('w-3.5 h-3.5 rounded-md border-2 flex items-center justify-center transition-all cursor-pointer shrink-0 mr-2.5', isChecked ? 'bg-[var(--shell-accent)] border-[var(--shell-accent)]' : 'border-[var(--shell-border)]')}>
                         {isChecked && <Check className="w-2 h-2 text-white" />}
                       </div>
                       <div className={cn('w-2 h-2 rounded-full shrink-0 mr-2', rc.dot)} />
-                      <span onClick={() => toggleRole(r.role_id)} className={cn('text-[11px] font-bold select-none flex-1 cursor-pointer', isChecked ? 'text-[var(--shell-text)]' : 'text-[var(--shell-text-muted)]')}>
+                      <span onClick={() => toggleRole(r.role_id)} className={cn('text-[12px] font-semibold select-none flex-1 cursor-pointer', isChecked ? 'text-[var(--shell-text)]' : 'text-[var(--shell-text-muted)]')}>
                         {r.role_name}
                       </span>
                       {isChecked && (
@@ -298,8 +298,8 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
                 })}
               </div>
               {defaultRoleName && (
-                <p className="text-[11px] text-[var(--shell-text-muted)] pt-0.5">
-                  <span className="text-[var(--shell-accent)] font-bold">{defaultRoleName}</span> is the default active role <span className="text-[var(--warning)]">★</span>
+                <p className="text-[12px] text-[var(--shell-text-muted)] pt-0.5">
+                  <span className="text-[var(--shell-accent)] font-semibold">{defaultRoleName}</span> is the default active role <span className="text-[var(--warning)]">★</span>
                 </p>
               )}
             </div>
@@ -357,7 +357,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
                   { s: 'Inactive', active: 'text-[var(--danger)] border border-[var(--danger)]' },
                 ] as const).map(({ s, active: activeClass }) => (
                   <button key={s} type="button" role="radio" aria-checked={form.status === s} onClick={() => set("status", s)}
-                    className={cn('flex-1 py-1.5 text-center text-[11px] font-bold rounded-md transition-all',
+                    className={cn('flex-1 py-1.5 text-center text-[12px] font-semibold rounded-md transition-all',
                       form.status === s ? activeClass : 'text-[var(--shell-text-muted)] border border-transparent hover:text-[var(--shell-text)]')}
                   >
                     {s}
@@ -470,7 +470,7 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
       icon={<Pencil className="w-4 h-4" />}
       size="lg"
       footer={
-        <Button variant="ghost" onClick={onClose} className="h-8 px-4 text-[11.5px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>Close</Button>
+        <Button variant="ghost" onClick={onClose} className="h-8 px-4 text-[12px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>Close</Button>
       }
     >
       <div className="space-y-2.5">
@@ -526,23 +526,23 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
         {/* Action row */}
         <div className="flex items-center justify-between">
           <div className="flex gap-2">
-            <Button className="btn-action-primary border border-[var(--shell-border)] text-[var(--shell-text)] font-bold text-[11px] h-8 px-4 rounded-lg flex items-center gap-1.5" onClick={handleAddAllocation} disabled={saving}>
+            <Button className="btn-action-primary border border-[var(--shell-border)] text-[var(--shell-text)] font-semibold text-[12px] h-8 px-4 rounded-lg flex items-center gap-1.5" onClick={handleAddAllocation} disabled={saving}>
               <Plus className="w-3.5 h-3.5" /> Add Allocation
             </Button>
-            <Button variant="outline" className="border-[color-mix(in_srgb,var(--danger)_40%,transparent)] text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] font-bold text-[11px] h-8 px-4 rounded-lg flex items-center gap-1.5" onClick={handleRemove} disabled={saving || selected.size === 0}>
+            <Button variant="outline" className="border-[color-mix(in_srgb,var(--danger)_40%,transparent)] text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] font-semibold text-[12px] h-8 px-4 rounded-lg flex items-center gap-1.5" onClick={handleRemove} disabled={saving || selected.size === 0}>
               <Trash2 className="w-3.5 h-3.5" /> Remove
             </Button>
           </div>
-          <span className="text-[11px] font-bold text-[var(--shell-text-muted)]">{allocations.length} Allocation{allocations.length !== 1 ? 's' : ''}</span>
+          <span className="text-[12px] font-semibold text-[var(--shell-text-muted)]">{allocations.length} Allocation{allocations.length !== 1 ? 's' : ''}</span>
         </div>
 
         {/* Table */}
         <div className="border border-[var(--shell-border)] rounded-lg overflow-hidden" style={{ background: 'var(--shell-surface)' }}>
           <table className="w-full text-left">
             <thead className="dialog-header">
-              <tr className="text-[11px] font-black">
+              <tr className="text-[12px] font-semibold">
                 <th className="w-10 px-4 py-3 text-center">
-                  <input type="checkbox" className="size-3.5 rounded border-[var(--shell-border)]" onChange={(e) => setSelected(e.target.checked ? new Set(allocations.map((a) => a.id)) : new Set())} checked={selected.size === allocations.length && allocations.length > 0} />
+                  <input type="checkbox" className="size-3.5 rounded-md border-[var(--shell-border)]" onChange={(e) => setSelected(e.target.checked ? new Set(allocations.map((a) => a.id)) : new Set())} checked={selected.size === allocations.length && allocations.length > 0} />
                 </th>
                 <th className="px-4 py-3">Client</th>
                 <th className="px-4 py-3">Category</th>
@@ -558,12 +558,12 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
               ) : allocations.map((a) => (
                 <tr key={a.id} className={cn('transition-colors', selected.has(a.id) ? 'bg-[var(--shell-accent)]/10' : 'hover:rounded-lg border')}>
                   <td className="px-4 py-3 text-center">
-                    <input type="checkbox" className="size-3.5 rounded border-[var(--shell-border)]" checked={selected.has(a.id)} onChange={() => toggleSelect(a.id)} />
+                    <input type="checkbox" className="size-3.5 rounded-md border-[var(--shell-border)]" checked={selected.has(a.id)} onChange={() => toggleSelect(a.id)} />
                   </td>
-                  <td className="px-4 py-3 font-bold text-[var(--shell-text)]">{a.client_name}</td>
+                  <td className="px-4 py-3 font-semibold text-[var(--shell-text)]">{a.client_name}</td>
                   <td className="px-4 py-3 text-[var(--shell-text)]">{a.category}</td>
                   <td className="px-4 py-3 text-[var(--shell-text)]">{a.type}</td>
-                  <td className="px-4 py-3 text-[var(--info)] font-bold">{a.code}</td>
+                  <td className="px-4 py-3 text-[var(--info)] font-semibold">{a.code}</td>
                 </tr>
               ))}
             </tbody>
@@ -723,7 +723,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
       saveLabel={saving ? 'Saving...' : 'Save Permissions'}
       size="xl"
       footerLeft={
-        <div className="flex items-center gap-2 text-[var(--shell-text-muted)] text-[11px] font-bold italic">
+        <div className="flex items-center gap-2 text-[var(--shell-text-muted)] text-[12px] font-semibold italic">
           <ShieldCheck className="w-3.5 h-3.5" />
           Audit log entry will be created on save.
         </div>
@@ -734,13 +734,13 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
         <div className="flex-1 min-w-0">
           {/* Role template selector */}
           <div className="flex items-center gap-3 mb-4 pb-4 border-b border-[var(--shell-border)]">
-            <span className="text-[11px] font-black text-[var(--shell-text-muted)] shrink-0">Apply Template:</span>
+            <span className="text-[12px] font-semibold text-[var(--shell-text-muted)] shrink-0">Apply Template:</span>
             <div className="flex gap-2 flex-wrap">
               {Object.keys(ROLE_TEMPLATES).map((t) => {
                 const c = roleColor(t);
                 return (
                   <button key={t} onClick={() => applyTemplate(t)}
-                    className={cn('px-3 py-1 rounded-lg text-[11px] font-black border transition-all', template === t ? 'border-input bg-transparent text-[var(--shell-text)] border-[var(--shell-border)] text-[var(--shell-text)]' : 'text-[var(--shell-text-muted)] border-[var(--shell-border)] hover:text-[var(--shell-text)]')}
+                    className={cn('px-3 py-1 rounded-lg text-[12px] font-semibold border transition-all', template === t ? 'border-input bg-transparent text-[var(--shell-text)] border-[var(--shell-border)] text-[var(--shell-text)]' : 'text-[var(--shell-text-muted)] border-[var(--shell-border)] hover:text-[var(--shell-text)]')}
                     style={template !== t ? { background: 'var(--shell-bg)' } : {}}
                   >
                     <span className={cn('inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle', c.dot)} />
@@ -755,7 +755,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
           <div className="overflow-x-auto rounded-lg">
           <div className="border border-[var(--shell-border)] rounded-lg overflow-hidden min-w-[480px]" style={{ background: 'var(--shell-surface)' }}>
             {/* Column header */}
-            <div className="dialog-header flex items-center text-[11px] font-black">
+            <div className="dialog-header flex items-center text-[12px] font-semibold">
               <div className="flex-1 px-4 py-3">Module</div>
               {PERMISSIONS.map((p) => (
                 <div key={p} className="w-[70px] py-3 text-center shrink-0">{p}</div>
@@ -767,7 +767,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
               <div key={group.label} className={gi > 0 ? 'border-t border-[var(--shell-border)]' : ''}>
                 {/* Group label */}
                 <div className="px-4 py-1.5 flex items-center gap-2" style={{ background: 'var(--shell-hover)' }}>
-                  <span className="text-[11px] font-black" style={{ color: 'var(--shell-text)' }}>
+                  <span className="text-[12px] font-semibold" style={{ color: 'var(--shell-text)' }}>
                     {group.label}
                   </span>
                   <div className="h-px flex-1" style={{ background: 'var(--shell-border)' }} />
@@ -782,7 +782,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
                       <div className="flex-1 flex items-center gap-2 pl-7 pr-4 py-2.5 min-w-0">
                         <div className="w-px h-3 shrink-0" style={{ background: 'var(--shell-border)' }} />
                         <div className="w-3 h-px shrink-0" style={{ background: 'var(--shell-border)' }} />
-                        <span className="text-[11px] font-semibold text-[var(--shell-text)] truncate">
+                        <span className="text-[12px] font-semibold text-[var(--shell-text)] truncate">
                           {modName}
                         </span>
                       </div>
@@ -790,7 +790,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
                         <div key={i} className="w-[70px] py-2.5 flex items-center justify-center shrink-0">
                           <div
                             onClick={() => togglePerm(modName, i)}
-                            className={cn('w-4 h-4 rounded border-2 flex items-center justify-center cursor-pointer transition-all',
+                            className={cn('w-4 h-4 rounded-md border-2 flex items-center justify-center cursor-pointer transition-all',
                               on ? 'bg-[var(--shell-accent)] border-[var(--shell-accent)]' : 'border-[var(--shell-border)] hover:border-[var(--shell-accent)]/50')}
                             style={!on ? { background: 'var(--shell-bg)' } : {}}
                           >
@@ -801,7 +801,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
                       <div className="w-[56px] py-2.5 flex items-center justify-center shrink-0">
                         <div
                           onClick={() => toggleAllModule(modName)}
-                          className={cn('w-4 h-4 rounded border-2 flex items-center justify-center cursor-pointer transition-all',
+                          className={cn('w-4 h-4 rounded-md border-2 flex items-center justify-center cursor-pointer transition-all',
                             allOn ? 'bg-[var(--warning)] border-[var(--warning)]' : 'border-[var(--shell-border)] hover:border-[color-mix(in_srgb,var(--warning)_50%,transparent)]')}
                           style={!allOn ? { background: 'var(--shell-bg)' } : {}}
                         >
@@ -822,7 +822,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
           {/* Approval Thresholds */}
           <div className="border border-[var(--shell-border)] rounded-lg overflow-hidden" style={{ background: 'var(--shell-surface)' }}>
             <div className="dialog-header px-4 py-2.5">
-              <span className="text-[11px] font-black">Approval Limits</span>
+              <span className="text-[12px] font-semibold">Approval Limits</span>
             </div>
             <div className="p-4 space-y-2.5">
               <div className="space-y-1">
@@ -839,12 +839,12 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
           {/* Data Scope */}
           <div className="border border-[var(--shell-border)] rounded-lg overflow-hidden" style={{ background: 'var(--shell-surface)' }}>
             <div className="dialog-header px-4 py-2.5">
-              <span className="text-[11px] font-black">Data Visibility</span>
+              <span className="text-[12px] font-semibold">Data Visibility</span>
             </div>
             <div className="p-3 space-y-2">
               {['Own Records', 'Department', 'Global'].map((s) => (
                 <button key={s} onClick={() => setScope(s)}
-                  className={cn('w-full text-left px-3 py-2 rounded-lg text-[11px] font-bold transition-all flex items-center gap-2',
+                  className={cn('w-full text-left px-3 py-2 rounded-lg text-[12px] font-semibold transition-all flex items-center gap-2',
                     scope === s ? 'bg-[var(--shell-accent)] text-[var(--shell-accent-fg)]' : 'text-[var(--shell-text-muted)] hover:text-[var(--shell-text)]')}
                   style={scope !== s ? { background: 'var(--shell-bg)' } : {}}
                 >
@@ -852,7 +852,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
                   {s}
                 </button>
               ))}
-              <p className="text-[11px] text-[var(--shell-text-muted)] font-bold leading-relaxed pt-1 italic">
+              <p className="text-[12px] text-[var(--shell-text-muted)] font-semibold leading-relaxed pt-1 italic">
                 {scope === 'Own Records' && 'User sees only their own transactions and records.'}
                 {scope === 'Department' && 'Access limited to their department branch.'}
                 {scope === 'Global' && 'Full access across all departments and records.'}
@@ -863,7 +863,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
           {/* Summary */}
           <div className="border border-[var(--shell-border)] rounded-lg overflow-hidden" style={{ background: 'var(--shell-surface)' }}>
             <div className="dialog-header px-4 py-2.5">
-              <span className="text-[11px] font-black">Summary</span>
+              <span className="text-[12px] font-semibold">Summary</span>
             </div>
             <div className="p-4 space-y-2">
               {PERMISSIONS.map((p, i) => {
@@ -873,7 +873,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
                   <div key={p}>
                     <div className="flex items-center justify-between mb-0.5">
                       <span className="text-xs font-medium text-[var(--shell-text-muted)]">{p}</span>
-                      <span className="text-[11px] font-black text-[var(--shell-accent)]">{count}/{MODULES.length}</span>
+                      <span className="text-[12px] font-semibold text-[var(--shell-accent)]">{count}/{MODULES.length}</span>
                     </div>
                     <div className="w-full h-1 rounded-lg border bg-[var(--shell-hover)] rounded-full overflow-hidden">
                       <div className="h-full bg-[var(--shell-accent)] rounded-full transition-all duration-300" style={{ width: `${pct}%` }} />

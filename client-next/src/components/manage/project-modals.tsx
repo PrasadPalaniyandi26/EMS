@@ -116,7 +116,7 @@ export function ProjectModal({
           </Field>
 
           <div className="space-y-1">
-            <AutoLabel className="text-xs font-bold text-[var(--shell-text)] normal-case tracking-normal">Project Type *</AutoLabel>
+            <AutoLabel className="text-xs font-semibold text-[var(--shell-text)] normal-case tracking-normal">Project Type *</AutoLabel>
             <Select value={form.type_id} onValueChange={(v) => set('type_id', v)}>
               <SelectTrigger className={sel}><SelectValue placeholder="Select type" /></SelectTrigger>
               <SelectContent>
@@ -126,7 +126,7 @@ export function ProjectModal({
             <button
               type="button"
               onClick={() => { setShowNewType(!showNewType); setNewTypeName(''); }}
-              className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--shell-accent)] hover:underline mt-1"
+              className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--shell-accent)] hover:underline mt-1"
             >
               <PlusCircle className="w-3 h-3" /> {showNewType ? 'Cancel' : 'Create new type'}
             </button>
@@ -140,7 +140,7 @@ export function ProjectModal({
                   onKeyDown={(e) => e.key === 'Enter' && handleAddType()}
                 />
                 <Button type="button" onClick={handleAddType}
-                  className="h-10 px-3 btn-action-primary rounded-lg text-[11px] font-bold border border-[var(--shell-border)]">
+                  className="h-10 px-3 btn-action-primary rounded-lg text-[12px] font-semibold border border-[var(--shell-border)]">
                   Add
                 </Button>
               </div>
@@ -206,7 +206,7 @@ export function ProjectModal({
                 key={val}
                 type="button" role="radio" aria-checked={form.status === val}
                 onClick={() => set('status', val)}
-                className={`flex-1 py-1.5 text-center text-[11px] font-bold rounded-md transition-all ${
+                className={`flex-1 py-1.5 text-center text-[12px] font-semibold rounded-md transition-all ${
                   form.status === val ? active : 'text-[var(--shell-text-muted)] border border-transparent hover:text-[var(--shell-text)]'
                 }`}
               >

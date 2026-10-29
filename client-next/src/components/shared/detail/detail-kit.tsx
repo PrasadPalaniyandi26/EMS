@@ -45,7 +45,7 @@ export function DetailSummary({
       </div>
       {figure !== undefined && (
         <div className="shrink-0 text-right">
-          <p className="text-[17px] font-semibold leading-tight tabular-nums text-[var(--shell-text)]">{figure}</p>
+          <p className="text-[18px] font-semibold leading-tight tabular-nums text-[var(--shell-text)]">{figure}</p>
           {figureLabel && <p className="mt-1 text-[12px] text-[var(--shell-text-muted)]">{figureLabel}</p>}
         </div>
       )}

@@ -45,11 +45,6 @@ export const inputStyle = {
   color: 'var(--shell-text)',
 };
 
-export const focusStyle = {
-  '--tw-ring-color': 'var(--shell-accent)',
-  borderColor: 'var(--shell-accent)',
-} as React.CSSProperties;
-
 // Field wrapper: label + control + optional hint and error.
 // The label is linked to the control (so clicking it focuses the field and screen readers announce it),
 // and an error is announced and tied to the control through aria-invalid / aria-describedby.
@@ -64,7 +59,7 @@ interface FieldProps {
   children: React.ReactNode;
 }
 
-const CONTROL_SELECTOR = 'input:not([type="hidden"]):not([type="file"]), select, textarea, [role="combobox"], [role="switch"], [role="checkbox"]';
+const CONTROL_SELECTOR ='input:not([type="hidden"]):not([type="file"]), select, textarea, [role="combobox"], [role="switch"], [role="checkbox"]';
 
 export function Field({ label, required, hint, error, htmlFor, children }: FieldProps) {
   const autoId = useId();
@@ -127,40 +122,6 @@ export function SectionHeader({ label }: { label: string }) {
   );
 }
 
-// Themed section card (replaces bg-white/8)
-export function SectionCard({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={`rounded-lg p-4 ${className || ''}`} style={{ border: '1px solid var(--shell-border)' }}>
-      {children}
-    </div>
-  );
-}
-
-// Toggle pill group (replaces bg-black/20 pill)
-export function ToggleGroup({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex p-1 gap-1 rounded-md" style={{ background: 'var(--shell-hover)', border: '1px solid var(--shell-border)' }}>
-      {children}
-    </div>
-  );
-}
-
-export function ToggleOption({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex-1 px-3 py-1 text-[12px] font-medium rounded-md transition-all"
-      style={active
-        ? { background: 'var(--shell-surface)', color: 'var(--shell-text)', border: '1px solid var(--shell-border)' }
-        : { color: 'var(--shell-text-muted)', border: '1px solid transparent' }
-      }
-    >
-      {children}
-    </button>
-  );
-}
-
 // ─── PhoneInput ───────────────────────────────────────────────────────────────
 // Blocks alphabet keys; validates E.164-style format on blur.
 // Accepts optional, validates only when a value is present.
@@ -202,7 +163,7 @@ export function PhoneInput({
         onKeyDown={(e) => { if (/^[a-zA-Z]$/.test(e.key)) e.preventDefault(); }}
         aria-invalid={error ? true : undefined}
       />
-      {error && <p role="alert" className="text-[11px] text-[var(--danger)] font-medium mt-0.5">{error}</p>}
+      {error && <p role="alert" className="text-[12px] text-[var(--danger)] font-medium mt-0.5">{error}</p>}
     </div>
   );
 }
@@ -257,7 +218,7 @@ export function EmailInput({
         style={readOnly ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
         aria-invalid={error ? true : undefined}
       />
-      {error && <p role="alert" className="text-[11px] text-[var(--danger)] font-medium mt-0.5">{error}</p>}
+      {error && <p role="alert" className="text-[12px] text-[var(--danger)] font-medium mt-0.5">{error}</p>}
     </div>
   );
 }
@@ -295,13 +256,13 @@ export function ConfirmDialog({ open, title, message, confirmLabel = 'Confirm', 
       icon={<AlertTriangle className="w-4 h-4" />}
       footer={
         <>
-          <Button variant="ghost" onClick={onCancel} autoFocus className="h-8 px-4 text-[11.5px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>
+          <Button variant="ghost" onClick={onCancel} autoFocus className="h-8 px-4 text-[12px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>
             Cancel
           </Button>
           <Button
             variant={destructive ? 'destructive' : 'default'}
             onClick={onConfirm}
-            className="h-8 px-5 text-[11.5px] font-semibold"
+            className="h-8 px-5 text-[12px] font-semibold"
             style={!destructive ? { background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' } : undefined}
           >
             {confirmLabel}
@@ -367,12 +328,12 @@ export function CurrencyInput({
 }: CurrencyInputProps) {
   return (
     <div className="relative">
-      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--shell-text-muted)] font-bold text-sm select-none pointer-events-none">
+      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--shell-text-muted)] font-semibold text-sm select-none pointer-events-none">
         {symbol}
       </span>
       <Input
         type="number"
-        className={`${inp} border-input bg-transparent text-[var(--shell-text)] pl-7 font-bold ${className}`}
+        className={`${inp} border-input bg-transparent text-[var(--shell-text)] pl-7 font-semibold ${className}`}
         placeholder={placeholder}
         min={min}
         step="0.01"

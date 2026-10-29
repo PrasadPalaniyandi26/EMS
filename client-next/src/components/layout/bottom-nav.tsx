@@ -25,7 +25,6 @@ export function BottomNav() {
         height: '56px',
         background: 'var(--shell-surface)',
         borderTop: '1px solid var(--shell-border)',
-        boxShadow: '0 -2px 12px rgba(0,0,0,0.08)',
       }}
     >
       {BOTTOM_NAV_ITEMS.filter((item) => canAccessRoute(item.href, user?.role_name)).map((item) => {
@@ -38,7 +37,7 @@ export function BottomNav() {
             style={{ color: isActive ? 'var(--shell-accent)' : 'var(--shell-text-muted)' }}
           >
             <item.icon className="w-5 h-5" strokeWidth={isActive ? 2.2 : 1.8} />
-            <span className="text-[11px] font-semibold">{item.name}</span>
+            <span className="text-[12px] font-semibold">{item.name}</span>
             {isActive && (
               <span className="absolute bottom-1 w-1 h-1 rounded-full" style={{ background: 'var(--shell-accent)' }} />
             )}
@@ -54,7 +53,7 @@ export function BottomNav() {
         aria-label="More navigation"
       >
         <Menu className="w-5 h-5" strokeWidth={1.8} />
-        <span className="text-[11px] font-semibold">More</span>
+        <span className="text-[12px] font-semibold">More</span>
       </button>
     </nav>
   );

@@ -412,7 +412,7 @@ export default function ApprovalsPage() {
           <div className="w-16 h-16 rounded-full bg-[var(--shell-accent)]/10 flex items-center justify-center text-[var(--shell-accent)]">
             <CheckCircle2 size={32} />
           </div>
-          <h2 className="text-xl font-bold text-black dark:text-white">
+          <h2 className="text-xl font-semibold text-black dark:text-white">
             {view === 'history' ? 'No History Yet' : 'All Caught Up!'}
           </h2>
           <p className="text-muted-foreground max-w-sm text-center text-sm">

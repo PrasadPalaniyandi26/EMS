@@ -5,8 +5,8 @@ import { useHeaderStore } from '@/stores/header-store';
 import { useClients, useProjects, useProjectTypes, useUsers, useInvalidate } from '@/hooks/use-queries';
 import api from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/shared/modal-primitives';
 import { toast } from 'sonner';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
 import {
   Plus, Pencil, Trash2,
   Target, ArrowUpRight
@@ -194,25 +194,15 @@ export default function ProjectsPage() {
       />
 
       {/* Simplified Delete Confirm */}
-      {deleteId && (
-        <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-          <DialogContent 
-            className="sm:max-w-[450px] p-0 overflow-hidden border-[var(--shell-border)] flex flex-col"
-            showCloseButton={false}
-          >
-            <div className="flex items-center justify-between p-4 border-b border-[var(--shell-border)] bg-[var(--shell-surface)]">
-              <h3 className="text-sm font-black text-[var(--danger)]">Delete Project</h3>
-            </div>
-            <p className="text-xs text-[var(--shell-text-muted)] p-4">
-              Are you sure you want to delete this project? This action cannot be undone.
-            </p>
-            <div className="flex items-center gap-3 mt-6 p-4 pt-0">
-              <Button variant="outline" className="flex-1 text-[11px] font-bold border-[var(--shell-border)] text-[var(--shell-text-muted)]" onClick={() => setDeleteId(null)}>Cancel</Button>
-              <Button variant="destructive" className="flex-1 text-[11px] font-bold" onClick={handleDelete}>Delete</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+      <ConfirmDialog
+        open={!!deleteId}
+        title="Delete Project"
+        message="Are you sure you want to delete this project? This action cannot be undone."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteId(null)}
+      />
     </ModuleShell>
   );
 }

@@ -551,13 +551,13 @@ export default function ExpensePage() {
             <Button
               variant="ghost"
               onClick={() => setSplitOpen(false)}
-              className="h-8 px-4 text-[11.5px] font-medium"
+              className="h-8 px-4 text-[12px] font-medium"
               style={{ color: 'var(--shell-text-muted)' }}
             >
               Cancel
             </Button>
             <Button
-              className="font-semibold text-[11.5px] h-8 px-5 rounded-lg transition-all active:scale-95"
+              className="font-semibold text-[12px] h-8 px-5 rounded-lg transition-all active:scale-95"
               style={{ background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' }}
               onClick={handleSplitExpense}
             >
@@ -569,18 +569,18 @@ export default function ExpensePage() {
         {/* Summary cards */}
         <div className="flex gap-3 mb-4">
           <div className="flex-1 flex flex-col gap-0.5 rounded-lg p-2.5 bg-[var(--shell-hover)] border border-[var(--shell-border)]">
-            <p className="text-[var(--shell-accent)] text-[11px] font-bold">Original</p>
-            <p className="text-[var(--shell-text)] text-[13px] font-black">{formatCurrency(Number(editing?.amount || 0), currency)}</p>
+            <p className="text-[var(--shell-accent)] text-[12px] font-semibold">Original</p>
+            <p className="text-[var(--shell-text)] text-[13px] font-semibold">{formatCurrency(Number(editing?.amount || 0), currency)}</p>
           </div>
           <div className="flex-1 flex flex-col gap-0.5 rounded-lg p-2.5 bg-[color-mix(in_srgb,var(--info)_10%,transparent)] border border-[color-mix(in_srgb,var(--info)_20%,transparent)]">
-            <p className="text-[var(--info)] text-[11px] font-bold">Split Total</p>
-            <p className="text-[var(--info)] text-[13px] font-black">
+            <p className="text-[var(--info)] text-[12px] font-semibold">Split Total</p>
+            <p className="text-[var(--info)] text-[13px] font-semibold">
               {formatCurrency(splitEntries.reduce((sum, e) => sum + (Number(e.amount) || 0), 0), currency)}
             </p>
           </div>
           <div className="flex-1 flex flex-col gap-0.5 rounded-lg p-2.5 bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border border-[color-mix(in_srgb,var(--warning)_20%,transparent)]">
-            <p className="text-[var(--warning)] text-[11px] font-bold">Remaining</p>
-            <p className="text-[var(--warning)] text-[13px] font-black">
+            <p className="text-[var(--warning)] text-[12px] font-semibold">Remaining</p>
+            <p className="text-[var(--warning)] text-[13px] font-semibold">
               {formatCurrency(Number(editing?.amount || 0) - splitEntries.reduce((sum, e) => sum + (Number(e.amount) || 0), 0), currency)}
             </p>
           </div>
@@ -588,9 +588,9 @@ export default function ExpensePage() {
 
         {/* Column headers */}
         <div className="grid gap-2 mb-1" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
-          <p className="text-[11px] font-bold text-[var(--shell-text-muted)] px-1">Category</p>
-          <p className="text-[11px] font-bold text-[var(--shell-text-muted)] px-1">Description</p>
-          <p className="text-[11px] font-bold text-[var(--shell-text-muted)] px-1 text-right">Amount</p>
+          <p className="text-[12px] font-semibold text-[var(--shell-text-muted)] px-1">Category</p>
+          <p className="text-[12px] font-semibold text-[var(--shell-text-muted)] px-1">Description</p>
+          <p className="text-[12px] font-semibold text-[var(--shell-text-muted)] px-1 text-right">Amount</p>
         </div>
 
         {/* Split rows */}
@@ -632,7 +632,7 @@ export default function ExpensePage() {
         </div>
 
         <button
-          className="mt-3 flex items-center gap-1.5 text-[var(--shell-accent)] font-bold text-[11px]"
+          className="mt-3 flex items-center gap-1.5 text-[var(--shell-accent)] font-semibold text-[12px]"
           onClick={() => {
             const used = splitEntries.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
             const remaining = Math.max(0, (editing?.amount || 0) - used);
@@ -653,13 +653,13 @@ export default function ExpensePage() {
         size="sm"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setVoidOpen(false)} disabled={voidSaving} className="h-8 px-4 text-[11.5px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>
+            <Button variant="ghost" onClick={() => setVoidOpen(false)} disabled={voidSaving} className="h-8 px-4 text-[12px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>
               Cancel
             </Button>
             <button
               onClick={handleVoid}
               disabled={voidSaving}
-              className="px-8 py-2.5 bg-[var(--danger)] text-[var(--danger-foreground)] text-[12px] font-bold rounded-lg active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-8 py-2.5 bg-[var(--danger)] text-[var(--danger-foreground)] text-[12px] font-semibold rounded-lg active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {voidSaving && <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />}
               Confirm Void
@@ -668,11 +668,11 @@ export default function ExpensePage() {
         }
       >
         <div className="space-y-4">
-          <div className="p-3 bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] border border-[color-mix(in_srgb,var(--danger)_20%,transparent)] rounded-lg text-[11px] text-[var(--danger)] font-medium">
+          <div className="p-3 bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] border border-[color-mix(in_srgb,var(--danger)_20%,transparent)] rounded-lg text-[12px] text-[var(--danger)] font-medium">
             This will permanently mark <strong>{selectedTxn?.reference_id || `#${selectedTxn?.id}`}</strong> as VOIDED. The record is kept for audit purposes but will no longer count in reports.
           </div>
           <div className="space-y-2">
-            <label className="text-[11px] font-bold text-[var(--shell-text)] block">Void Reason (optional)</label>
+            <label className="text-[12px] font-semibold text-[var(--shell-text)] block">Void Reason (optional)</label>
             <textarea
               className="w-full h-20 p-3 border-input bg-transparent text-[var(--shell-text)] border border-[var(--shell-border)] rounded-lg text-[13px] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[color-mix(in_srgb,var(--danger)_50%,transparent)] focus:border-[color-mix(in_srgb,var(--danger)_50%,transparent)] resize-none outline-none"
               placeholder="Describe why this transaction is being voided..."

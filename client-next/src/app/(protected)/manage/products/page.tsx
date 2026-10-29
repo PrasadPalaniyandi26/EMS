@@ -246,7 +246,7 @@ export default function ProductsPage() {
                   <button
                     type="button"
                     onClick={() => { setShowNewType(!showNewType); setNewTypeName(''); }}
-                    className="mt-1 flex items-center gap-1.5 text-[11px] font-bold text-[var(--info)] hover:underline"
+                    className="mt-1 flex items-center gap-1.5 text-[12px] font-semibold text-[var(--info)] hover:underline"
                   >
                     <PlusCircle aria-hidden className="h-3 w-3" /> {showNewType ? 'Cancel' : 'Create new type'}
                   </button>
@@ -260,7 +260,7 @@ export default function ProductsPage() {
                         onChange={e => setNewTypeName(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && handleAddType()}
                       />
-                      <Button type="button" onClick={handleAddType} className="h-10 px-4 text-[11px] font-bold">
+                      <Button type="button" onClick={handleAddType} className="h-10 px-4 text-[12px] font-semibold">
                         Add
                       </Button>
                     </div>
@@ -301,7 +301,7 @@ export default function ProductsPage() {
                     role="radio"
                     aria-checked={form.status === opt}
                     onClick={() => setForm({ ...form, status: opt })}
-                    className={`min-w-[5.5rem] flex-1 rounded-md border py-1.5 text-center text-[11px] font-bold transition-all focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)] ${
+                    className={`min-w-[5.5rem] flex-1 rounded-md border py-1.5 text-center text-[12px] font-semibold transition-all focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)] ${
                       form.status === opt ? 'border-[var(--shell-accent)] text-[var(--shell-accent)]' : 'border-transparent text-[var(--shell-text-muted)] hover:text-[var(--shell-text)]'
                     }`}
                   >

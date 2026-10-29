@@ -49,7 +49,7 @@ function NotifRow({ n, onMarkRead, onDelete, selected, onSelect }: {
     >
       {/* Checkbox */}
       <div
-        className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 mt-1 transition-all cursor-pointer ${selected ? 'border-[var(--shell-accent)] bg-[var(--shell-accent)]' : 'border-[var(--shell-border)] group-hover:border-[var(--shell-accent)]/50'}`}
+        className={`w-4 h-4 rounded-md border-2 flex items-center justify-center shrink-0 mt-1 transition-all cursor-pointer ${selected ? 'border-[var(--shell-accent)] bg-[var(--shell-accent)]' : 'border-[var(--shell-border)] group-hover:border-[var(--shell-accent)]/50'}`}
         onClick={(e) => { e.stopPropagation(); onSelect(n.id); }}
       >
         {selected && <div className="w-1.5 h-1.5 bg-white rounded-sm" />}
@@ -71,7 +71,7 @@ function NotifRow({ n, onMarkRead, onDelete, selected, onSelect }: {
               </p>
               {!n.is_read && <span className="w-1.5 h-1.5 rounded-full bg-[var(--danger)] shrink-0" />}
               {n.reference_id && (
-                <span className="text-[11px] font-bold text-[var(--info)] bg-[color-mix(in_srgb,var(--info)_10%,transparent)] px-1.5 py-0.5 rounded">
+                <span className="text-[12px] font-semibold text-[var(--info)] bg-[color-mix(in_srgb,var(--info)_10%,transparent)] px-1.5 py-0.5 rounded-md">
                   {n.reference_id}
                 </span>
               )}
@@ -82,13 +82,13 @@ function NotifRow({ n, onMarkRead, onDelete, selected, onSelect }: {
               </p>
             )}
             <div className="flex items-center gap-3 mt-1.5">
-              <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${cfg.bg} ${cfg.color}`}>
+              <span className={`text-[12px] font-semibold px-1.5 py-0.5 rounded-md ${cfg.bg} ${cfg.color}`}>
                 {cfg.label}
               </span>
-              <span className="text-[11px]" style={{ color: 'var(--shell-text-muted)' }}>
+              <span className="text-[12px]" style={{ color: 'var(--shell-text-muted)' }}>
                 {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
               </span>
-              <span className="text-[11px]" style={{ color: 'var(--shell-text-muted)', opacity: 0.6 }}>
+              <span className="text-[12px]" style={{ color: 'var(--shell-text-muted)', opacity: 0.6 }}>
                 {format(new Date(n.created_at), 'MMM d, h:mm a')}
               </span>
             </div>
@@ -226,7 +226,7 @@ export default function NotificationsPage() {
           <Filter className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--shell-text-muted)' }} />
           {TYPE_FILTERS.map((f) => (
             <button key={f.value} onClick={() => setTypeFilter(f.value)}
-              className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-all ${
+              className={`px-2.5 py-1 text-[12px] font-semibold rounded-lg border transition-all ${
                 typeFilter === f.value
                   ? 'bg-[var(--shell-accent)]/15 text-[var(--info)] border-[var(--shell-accent)]/40'
                   : 'text-[var(--shell-text-muted)] border-transparent hover:border-[var(--shell-border)] hover:text-[var(--shell-text)]'
@@ -239,7 +239,7 @@ export default function NotificationsPage() {
 
         {/* Unread toggle */}
         <button onClick={() => setUnreadOnly(!unreadOnly)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded-lg border transition-all ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-lg border transition-all ${
             unreadOnly ? 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] text-[var(--danger)] border-[color-mix(in_srgb,var(--danger)_40%,transparent)]' : 'text-[var(--shell-text-muted)] border-[var(--shell-border)] hover:text-[var(--shell-text)]'
           }`}
         >
@@ -251,25 +251,25 @@ export default function NotificationsPage() {
         {/* Bulk / global actions */}
         {selected.size > 0 && (
           <div className="flex items-center gap-1.5">
-            <span className="text-[11px] font-bold" style={{ color: 'var(--shell-text-muted)' }}>{selected.size} selected</span>
-            <button onClick={handleMarkSelectedRead} className="btn-action flex items-center gap-1 text-[11px]">
+            <span className="text-[12px] font-semibold" style={{ color: 'var(--shell-text-muted)' }}>{selected.size} selected</span>
+            <button onClick={handleMarkSelectedRead} className="btn-action flex items-center gap-1 text-[12px]">
               <CheckCheck className="w-3.5 h-3.5 text-[var(--success)]" /> Mark read
             </button>
-            <button onClick={handleDeleteSelected} className="btn-action flex items-center gap-1 text-[11px] text-[var(--danger)]">
+            <button onClick={handleDeleteSelected} className="btn-action flex items-center gap-1 text-[12px] text-[var(--danger)]">
               <Trash2 className="w-3.5 h-3.5" /> Delete
             </button>
           </div>
         )}
         {unreadCount > 0 && selected.size === 0 && (
-          <button onClick={handleMarkAllRead} className="btn-action flex items-center gap-1 text-[11px]">
+          <button onClick={handleMarkAllRead} className="btn-action flex items-center gap-1 text-[12px]">
             <CheckCheck className="w-3.5 h-3.5 text-[var(--success)]" /> Mark all read
           </button>
         )}
-        <button onClick={() => refetch()} className="btn-action flex items-center gap-1 text-[11px]" title="Refresh">
+        <button onClick={() => refetch()} className="btn-action flex items-center gap-1 text-[12px]" title="Refresh">
           <RefreshCw className="w-3.5 h-3.5" />
         </button>
         {notifications.length > 0 && (
-          <button onClick={handleClearAll} className="btn-action flex items-center gap-1 text-[11px] text-[var(--danger)]">
+          <button onClick={handleClearAll} className="btn-action flex items-center gap-1 text-[12px] text-[var(--danger)]">
             <Trash2 className="w-3.5 h-3.5" /> Clear all
           </button>
         )}
@@ -277,12 +277,12 @@ export default function NotificationsPage() {
 
       {/* ── Stats / select bar ── */}
       <div className="shrink-0 flex items-center gap-4 px-5 py-2 border-b" style={{ borderColor: 'var(--shell-border)', background: 'var(--shell-surface)' }}>
-        <span className="text-[11px] font-semibold" style={{ color: 'var(--shell-text-muted)' }}>
+        <span className="text-[12px] font-semibold" style={{ color: 'var(--shell-text-muted)' }}>
           {total} total · {unreadCount} unread
         </span>
         <div className="flex-1" />
-        <button onClick={toggleSelectAll} className="flex items-center gap-1.5 text-[11px] font-semibold transition-colors hover:text-[var(--shell-text)]" style={{ color: 'var(--shell-text-muted)' }}>
-          <div className={`w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-all ${allSelected ? 'border-[var(--shell-accent)] bg-[var(--shell-accent)]' : 'border-[var(--shell-border)]'}`}>
+        <button onClick={toggleSelectAll} className="flex items-center gap-1.5 text-[12px] font-semibold transition-colors hover:text-[var(--shell-text)]" style={{ color: 'var(--shell-text-muted)' }}>
+          <div className={`w-3.5 h-3.5 rounded-md border-2 flex items-center justify-center transition-all ${allSelected ? 'border-[var(--shell-accent)] bg-[var(--shell-accent)]' : 'border-[var(--shell-border)]'}`}>
             {allSelected && <div className="w-1.5 h-1.5 bg-white rounded-sm" />}
           </div>
           {allSelected ? 'Deselect all' : 'Select all'}
@@ -294,12 +294,12 @@ export default function NotificationsPage() {
         {isLoading ? (
           [...Array(8)].map((_, i) => (
             <div key={i} className="flex items-start gap-4 px-5 py-4 border-b" style={{ borderColor: 'var(--shell-border)' }}>
-              <div className="w-4 h-4 rounded bg-[var(--shell-hover)] animate-pulse shrink-0 mt-1" />
+              <div className="w-4 h-4 rounded-md bg-[var(--shell-hover)] animate-pulse shrink-0 mt-1" />
               <div className="w-9 h-9 rounded-lg bg-[var(--shell-hover)] animate-pulse shrink-0" />
               <div className="flex-1 space-y-2">
-                <div className="h-3 w-48 rounded bg-[var(--shell-hover)] animate-pulse" />
-                <div className="h-2.5 w-72 rounded bg-[var(--shell-hover)] animate-pulse" />
-                <div className="h-2 w-24 rounded bg-[var(--shell-hover)] animate-pulse" />
+                <div className="h-3 w-48 rounded-md bg-[var(--shell-hover)] animate-pulse" />
+                <div className="h-2.5 w-72 rounded-md bg-[var(--shell-hover)] animate-pulse" />
+                <div className="h-2 w-24 rounded-md bg-[var(--shell-hover)] animate-pulse" />
               </div>
             </div>
           ))

@@ -14,7 +14,7 @@ import api from '@/lib/api-client';
 import { toast } from 'sonner';
 
 const INP = 'h-10 text-sm';
-const LBL = 'text-[11.5px] font-medium';
+const LBL = 'text-[12px] font-medium';
 
 export default function SettingsPage() {
   const setHeader = useHeaderStore((s) => s.setHeader);
@@ -128,7 +128,7 @@ export default function SettingsPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`relative flex items-center gap-2 px-4 py-2.5 text-[11px] font-semibold transition-all ${
+              className={`relative flex items-center gap-2 px-4 py-2.5 text-[12px] font-semibold transition-all ${
                 active
                   ? 'text-black dark:text-white'
                   : 'text-[var(--shell-text-muted)] hover:text-[var(--shell-text)]'
@@ -164,14 +164,14 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label className={LBL}>Username <span className="text-[11px] text-muted-foreground font-normal">(used to login)</span></Label>
+                <Label className={LBL}>Username <span className="text-[12px] text-muted-foreground font-normal">(used to login)</span></Label>
                 <Input
                   className={INP}
                   placeholder="e.g. johnp"
                   value={loginName}
                   onChange={(e) => { setLoginName(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '')); setLoginNameError(''); }}
                 />
-                {loginNameError && <p className="text-[11px] text-[var(--danger)]">{loginNameError}</p>}
+                {loginNameError && <p className="text-[12px] text-[var(--danger)]">{loginNameError}</p>}
               </div>
 
               <div className="space-y-1.5">
@@ -184,7 +184,7 @@ export default function SettingsPage() {
                   onChange={(e) => { setEmail(e.target.value); setEmailError(''); }}
                   onBlur={(e) => { if (e.target.value && !validateEmail(e.target.value)) setEmailError('Invalid email address.'); }}
                 />
-                {emailError && <p className="text-[11px] text-[var(--danger)]">{emailError}</p>}
+                {emailError && <p className="text-[12px] text-[var(--danger)]">{emailError}</p>}
               </div>
 
               <div className="space-y-1.5">
@@ -197,7 +197,7 @@ export default function SettingsPage() {
                   onChange={(e) => { setPhone(e.target.value); setPhoneError(''); }}
                   onBlur={(e) => { if (e.target.value && !validatePhone(e.target.value)) setPhoneError('Invalid phone number.'); }}
                 />
-                {phoneError && <p className="text-[11px] text-[var(--danger)]">{phoneError}</p>}
+                {phoneError && <p className="text-[12px] text-[var(--danger)]">{phoneError}</p>}
               </div>
 
               <div className="space-y-1.5">
@@ -248,7 +248,7 @@ export default function SettingsPage() {
                 <Label className={LBL}>Currency</Label>
                 <Input className={INP} value={user?.currency || 'INR'} disabled />
               </div>
-              <p className="text-[11.5px] text-muted-foreground">Contact your administrator to change preferences.</p>
+              <p className="text-[12px] text-muted-foreground">Contact your administrator to change preferences.</p>
             </CardContent>
           </Card>
         )}
@@ -258,13 +258,13 @@ export default function SettingsPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-[14px]">Audit Log</CardTitle>
-              <span className="text-[11px] text-muted-foreground">{auditTotal} entries</span>
+              <span className="text-[12px] text-muted-foreground">{auditTotal} entries</span>
             </CardHeader>
             <CardContent>
               {auditLoading ? (
                 <div className="space-y-2">
                   {[...Array(6)].map((_, i) => (
-                    <div key={i} className="h-9 rounded animate-pulse bg-[var(--shell-hover)]" />
+                    <div key={i} className="h-9 rounded-md animate-pulse bg-[var(--shell-hover)]" />
                   ))}
                 </div>
               ) : (
@@ -294,12 +294,12 @@ export default function SettingsPage() {
                   )}
                   {auditTotal > AUDIT_PAGE_SIZE && (
                     <div className="flex items-center justify-between pt-3 border-t border-[var(--shell-border)] mt-2">
-                      <span className="text-[11px] text-muted-foreground">
+                      <span className="text-[12px] text-muted-foreground">
                         Showing {auditPage * AUDIT_PAGE_SIZE + 1}–{Math.min((auditPage + 1) * AUDIT_PAGE_SIZE, auditTotal)} of {auditTotal}
                       </span>
                       <div className="flex gap-1.5">
-                        <Button variant="outline" size="sm" className="h-7 text-[11px]" disabled={auditPage === 0} onClick={() => setAuditPage(p => p - 1)}>Previous</Button>
-                        <Button variant="outline" size="sm" className="h-7 text-[11px]" disabled={(auditPage + 1) * AUDIT_PAGE_SIZE >= auditTotal} onClick={() => setAuditPage(p => p + 1)}>Next</Button>
+                        <Button variant="outline" size="sm" className="h-7 text-[12px]" disabled={auditPage === 0} onClick={() => setAuditPage(p => p - 1)}>Previous</Button>
+                        <Button variant="outline" size="sm" className="h-7 text-[12px]" disabled={(auditPage + 1) * AUDIT_PAGE_SIZE >= auditTotal} onClick={() => setAuditPage(p => p + 1)}>Next</Button>
                       </div>
                     </div>
                   )}

@@ -260,7 +260,7 @@ export default function ReportingPage() {
                 <input type="date" aria-label="From date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setDatePreset('Custom'); }}
                   className="rounded-lg px-3 py-1.5 text-[12px] border outline-none"
                   style={inputStyle} />
-                <span className="text-[11px]" style={{ color: 'var(--shell-text-muted)' }}>—</span>
+                <span className="text-[12px]" style={{ color: 'var(--shell-text-muted)' }}>—</span>
                 <input type="date" aria-label="To date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setDatePreset('Custom'); }}
                   className="rounded-lg px-3 py-1.5 text-[12px] border outline-none"
                   style={inputStyle} />
@@ -306,7 +306,7 @@ export default function ReportingPage() {
             <div className="flex items-center gap-2 min-w-0">
               <FileText className="h-4 w-4 shrink-0" style={{ color: 'var(--shell-accent)' }} />
               <span className="truncate">{result.title}</span>
-              <span className="text-[11px] px-2 py-0.5 rounded-md font-semibold shrink-0"
+              <span className="text-[12px] px-2 py-0.5 rounded-md font-semibold shrink-0"
                 style={{ background: 'var(--shell-hover)', color: 'var(--shell-text-muted)' }}>
                 {filteredRows.length} records
               </span>
@@ -345,7 +345,7 @@ export default function ReportingPage() {
 
           {/* Truncation notice */}
           {result.truncated && (
-            <div role="status" className="px-4 py-2 text-[11.5px] font-medium flex items-center gap-2"
+            <div role="status" className="px-4 py-2 text-[12px] font-medium flex items-center gap-2"
               style={{ background: 'color-mix(in srgb, var(--warning) 12%, transparent)', color: 'var(--warning)', borderBottom: '1px solid var(--shell-border)' }}>
               <AlertTriangle aria-hidden className="h-3.5 w-3.5 shrink-0" />
               <span>{result.note || 'Some records were omitted because the result set is large. Narrow the filters to see the rest.'}</span>
@@ -354,12 +354,12 @@ export default function ReportingPage() {
 
           {/* Table */}
           <div className="overflow-x-auto" ref={tableRef}>
-            <table className="w-full text-[12.5px]">
+            <table className="w-full text-[13px]">
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--shell-border)', background: 'var(--shell-hover)' }}>
                   {result.columns.map((col) => (
                     <th key={col} scope="col"
-                      className={`px-4 py-2.5 font-semibold text-[11px] whitespace-nowrap ${isNumericCol(col, result.rows) ? 'text-right' : 'text-left'}`}
+                      className={`px-4 py-2.5 font-semibold text-[12px] whitespace-nowrap ${isNumericCol(col, result.rows) ? 'text-right' : 'text-left'}`}
                       style={{ color: 'var(--shell-text-muted)' }}>
                       {col}
                     </th>
@@ -396,7 +396,7 @@ export default function ReportingPage() {
                       const val = result.totals[col];
                       const isCurrency = val != null && CURRENCY_COLS.has(col);
                       return (
-                        <td key={col} className={`px-4 py-2.5 font-black text-[12px] ${val != null ? 'text-right tabular-nums' : ''}`}
+                        <td key={col} className={`px-4 py-2.5 font-semibold text-[12px] ${val != null ? 'text-right tabular-nums' : ''}`}
                           style={{ color: 'var(--shell-text)' }}>
                           {ci === 0 ? 'TOTAL' : val != null ? (isCurrency ? fmt(val) : val) : ''}
                         </td>

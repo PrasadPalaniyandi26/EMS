@@ -161,7 +161,7 @@ export default function DashboardPage() {
             onChange={(e) => { setDateFrom(e.target.value); setActivePreset('Custom'); }}
             className="rounded-lg px-3 py-1.5 text-[12px] border outline-none"
             style={inputStyle} />
-          <span className="text-[11px]" style={{ color: 'var(--shell-text-muted)' }}>—</span>
+          <span className="text-[12px]" style={{ color: 'var(--shell-text-muted)' }}>—</span>
           <input type="date" aria-label="To date" value={dateTo}
             onChange={(e) => { setDateTo(e.target.value); setActivePreset('Custom'); }}
             className="rounded-lg px-3 py-1.5 text-[12px] border outline-none"
@@ -239,7 +239,7 @@ export default function DashboardPage() {
         <div className="rounded-lg overflow-hidden" style={surface}>
           <div className="dialog-header px-4 py-2.5 flex items-center justify-between">
             <span>Budget Utilization — This Month</span>
-            <button onClick={() => router.push('/manage/budgets')} className="text-[11px] font-semibold hover:underline" style={{ color: 'var(--shell-accent)' }}>Manage</button>
+            <button onClick={() => router.push('/manage/budgets')} className="text-[12px] font-semibold hover:underline" style={{ color: 'var(--shell-accent)' }}>Manage</button>
           </div>
           <div className="p-4 space-y-3">
             {budgetLoading ? (
@@ -253,8 +253,8 @@ export default function DashboardPage() {
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-[12px] font-semibold truncate" style={{ color: 'var(--shell-text)' }}>{b.category_name}</span>
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-[11px]" style={{ color: 'var(--shell-text-muted)' }}>{fmt(b.spent)} / {fmt(b.budget)}</span>
-                        <span className="text-[11px] font-bold w-10 text-right" style={{ color }}>{b.pct}%</span>
+                        <span className="text-[12px]" style={{ color: 'var(--shell-text-muted)' }}>{fmt(b.spent)} / {fmt(b.budget)}</span>
+                        <span className="text-[12px] font-semibold w-10 text-right" style={{ color }}>{b.pct}%</span>
                       </div>
                     </div>
                     <div className="h-1.5 rounded-md overflow-hidden" style={{ background: 'var(--shell-hover)' }}>
@@ -299,7 +299,7 @@ export default function DashboardPage() {
         <div className="rounded-lg overflow-hidden" style={surface}>
           <div className="dialog-header px-4 py-2.5 flex items-center justify-between">
             <span>Approval Pipeline</span>
-            <button onClick={() => router.push('/approvals')} className="text-[11px] font-semibold hover:underline" style={{ color: 'var(--shell-accent)' }}>View All</button>
+            <button onClick={() => router.push('/approvals')} className="text-[12px] font-semibold hover:underline" style={{ color: 'var(--shell-accent)' }}>View All</button>
           </div>
           <div className="p-4 space-y-2">
             {approvalStages.map((s) => (
@@ -308,7 +308,7 @@ export default function DashboardPage() {
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
                   <span className="text-[12px] font-medium" style={{ color: 'var(--shell-text)' }}>{s.label}</span>
                 </div>
-                <span className="text-[13px] font-black" style={{ color: s.color }}>{s.count}</span>
+                <span className="text-[13px] font-semibold" style={{ color: s.color }}>{s.count}</span>
               </div>
             ))}
           </div>
@@ -318,7 +318,7 @@ export default function DashboardPage() {
         <div className="lg:col-span-2 rounded-lg overflow-hidden" style={surface}>
           <div className="dialog-header px-4 py-2.5 flex items-center justify-between">
             <span>Recent Transactions</span>
-            <button onClick={() => router.push('/transactions')} className="text-[11px] font-semibold hover:underline" style={{ color: 'var(--shell-accent)' }}>View All</button>
+            <button onClick={() => router.push('/transactions')} className="text-[12px] font-semibold hover:underline" style={{ color: 'var(--shell-accent)' }}>View All</button>
           </div>
           <div className="p-4">
             {txnsLoading ? (
@@ -337,13 +337,13 @@ export default function DashboardPage() {
                         }
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[12.5px] font-semibold truncate" style={{ color: 'var(--shell-text)' }}>{txn.description || txn.category_name}</p>
-                        <p className="text-[11px]" style={{ color: 'var(--shell-text-muted)' }}>
+                        <p className="text-[13px] font-semibold truncate" style={{ color: 'var(--shell-text)' }}>{txn.description || txn.category_name}</p>
+                        <p className="text-[12px]" style={{ color: 'var(--shell-text-muted)' }}>
                           {parseApiDate(txn.date_recorded)?.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                         </p>
                       </div>
                     </div>
-                    <span className={`text-[13px] font-black shrink-0 ml-3 ${txn.type === 'income' ? 'text-[var(--success)]' : 'text-[var(--danger)]'}`}>
+                    <span className={`text-[13px] font-semibold shrink-0 ml-3 ${txn.type === 'income' ? 'text-[var(--success)]' : 'text-[var(--danger)]'}`}>
                       {txn.type === 'income' ? '+' : '-'}{formatCurrency(txn.amount, currency)}
                     </span>
                   </div>
@@ -358,7 +358,7 @@ export default function DashboardPage() {
 
       {/* Row 5 — Quick Actions */}
       <div className="rounded-lg px-4 py-3 flex flex-wrap gap-2 items-center" style={surface}>
-        <span className="text-[11px] font-semibold mr-2" style={{ color: 'var(--shell-text-muted)' }}>Quick Actions</span>
+        <span className="text-[12px] font-semibold mr-2" style={{ color: 'var(--shell-text-muted)' }}>Quick Actions</span>
         {quickActions.map((a) => (
           <button
             key={a.href}

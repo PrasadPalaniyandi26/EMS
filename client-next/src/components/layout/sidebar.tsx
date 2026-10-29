@@ -92,9 +92,9 @@ export function Sidebar() {
           {/* Logo */}
           <div className="h-[44px] flex items-center shrink-0 overflow-hidden" style={{ borderBottom: '1px solid var(--shell-border)', justifyContent: slim ? 'center' : 'center' }}>
             {slim ? (
-              <span className="text-[16px] font-bold" style={{ color: 'var(--shell-brand)' }}>N</span>
+              <span className="text-[16px] font-semibold" style={{ color: 'var(--shell-brand)' }}>N</span>
             ) : (
-              <span className="text-[16px] font-bold tracking-[0.22em]" style={{ color: 'var(--shell-brand)' }}>NTEMS</span>
+              <span className="text-[16px] font-semibold tracking-[0.22em]" style={{ color: 'var(--shell-brand)' }}>NTEMS</span>
             )}
           </div>
 
@@ -127,7 +127,7 @@ export function Sidebar() {
                           className={`flex items-center transition-all rounded-md ${
                             slim
                               ? 'justify-center w-9 h-9 mx-auto'
-                              : 'w-full gap-2.5 px-3 py-[7px] text-[12.5px] font-medium'
+                              : 'w-full gap-2.5 px-3 py-[7px] text-[13px] font-medium'
                           } ${isActive ? 'nav-active' : 'hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]'}`}
                           style={!isActive ? { color: 'color-mix(in srgb, var(--shell-text) 55%, var(--shell-text-muted))' } : {}}
                         >

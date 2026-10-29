@@ -166,61 +166,19 @@ export function AddBudgetModal({ isOpen, onClose, onSave, editingData }: BudgetM
         <FormGrid className="gap-4 border-t border-[var(--shell-border)] pt-3">
           <label className="rounded-lg border flex cursor-pointer items-center justify-between rounded-lg border border-[var(--shell-border)] p-4">
             <span>
-              <span className="block text-[12px] font-bold" style={{ color: 'var(--shell-text)' }}>Strict Enforcement</span>
-              <span className="block text-[11px] font-medium text-[var(--shell-text-muted)]">Prevent overspending strictly</span>
+              <span className="block text-[12px] font-semibold" style={{ color: 'var(--shell-text)' }}>Strict Enforcement</span>
+              <span className="block text-[12px] font-medium text-[var(--shell-text-muted)]">Prevent overspending strictly</span>
             </span>
             <Switch checked={form.strict} onCheckedChange={v => set('strict', v)} aria-label="Strict enforcement" />
           </label>
           <label className="rounded-lg border flex cursor-pointer items-center justify-between rounded-lg border border-[var(--shell-border)] p-4">
             <span>
-              <span className="block text-[12px] font-bold" style={{ color: 'var(--shell-text)' }}>Auto-Rollover</span>
-              <span className="block text-[11px] font-medium text-[var(--shell-text-muted)]">Carry over unused balance</span>
+              <span className="block text-[12px] font-semibold" style={{ color: 'var(--shell-text)' }}>Auto-Rollover</span>
+              <span className="block text-[12px] font-medium text-[var(--shell-text-muted)]">Carry over unused balance</span>
             </span>
             <Switch checked={form.rollover} onCheckedChange={v => set('rollover', v)} aria-label="Auto-rollover" />
           </label>
         </FormGrid>
-      </div>
-    </ModuleModal>
-  );
-}
-
-export function ExportBudgetModal({ isOpen, onClose }: BudgetModalProps) {
-  return (
-    <ModuleModal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Export Reports"
-      icon={<Download className="w-4 h-4" />}
-      saveLabel="Generate Report"
-      size="md"
-    >
-      <div className="space-y-3">
-        <div className="space-y-2.5">
-          <p className="text-xs font-semibold" style={{ color: 'var(--shell-text-muted)' }}>Select Format</p>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <button className="flex flex-col items-center justify-center p-6 rounded-lg border border border-[var(--shell-border)] rounded-lg hover:border-[var(--shell-accent)]/30 hover:rounded-lg border transition-all group scale-100 active:scale-95">
-              <div className="w-12 h-12 rounded-full bg-[var(--shell-accent)]/20 text-[var(--success)] flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                <Download className="w-6 h-6" />
-              </div>
-              <span className="text-xs font-bold" style={{ color: 'var(--shell-text)' }}>Excel Spreadsheet</span>
-              <span className="text-[11px] text-[var(--shell-text-muted)] mt-1 font-bold">.XLSX Format</span>
-            </button>
-            <button className="flex flex-col items-center justify-center p-6 rounded-lg border border border-[var(--shell-border)] rounded-lg hover:border-[var(--shell-accent)]/30 hover:rounded-lg border transition-all group scale-100 active:scale-95">
-              <div className="w-12 h-12 rounded-full bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] text-[var(--danger)] flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                <Download className="w-6 h-6" />
-              </div>
-              <span className="text-xs font-bold" style={{ color: 'var(--shell-text)' }}>PDF Document</span>
-              <span className="text-[11px] text-[var(--shell-text-muted)] mt-1 font-bold">Portable Format</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="p-4 bg-[var(--shell-accent)]/8 rounded-lg border border-[var(--shell-accent)]/15 flex gap-3">
-          <Info className="w-4 h-4 text-[var(--shell-accent)] shrink-0 mt-0.5" />
-          <p className="text-[11px] text-[var(--shell-accent)]/80 font-medium leading-relaxed">
-            Export will include all filtered budget lines and current utilization metrics. Generated reports are secured and logged.
-          </p>
-        </div>
       </div>
     </ModuleModal>
   );
@@ -238,11 +196,11 @@ export function SubmitBudgetModal({ isOpen, onClose, onSubmit }: BudgetModalProp
       size="md"
       footer={
         <>
-          <Button variant="ghost" onClick={onClose} className="h-8 px-4 text-[11.5px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>
+          <Button variant="ghost" onClick={onClose} className="h-8 px-4 text-[12px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>
             Review
           </Button>
           <Button
-            className="font-semibold text-[11.5px] h-8 px-5 rounded-lg transition-all active:scale-95"
+            className="font-semibold text-[12px] h-8 px-5 rounded-lg transition-all active:scale-95"
             style={{ background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' }}
             onClick={onSubmit}
           >
@@ -256,8 +214,8 @@ export function SubmitBudgetModal({ isOpen, onClose, onSubmit }: BudgetModalProp
           <Send className="w-8 h-8 text-[var(--shell-accent)]" />
         </div>
         <div className="space-y-2">
-          <h3 className="text-lg font-bold tracking-tight" style={{ color: 'var(--shell-text)' }}>Finalize Allocation?</h3>
-          <p className="text-[11px] text-[var(--shell-text)] leading-relaxed font-medium">
+          <h3 className="text-lg font-semibold tracking-tight" style={{ color: 'var(--shell-text)' }}>Finalize Allocation?</h3>
+          <p className="text-[12px] text-[var(--shell-text)] leading-relaxed font-medium">
             You are about to submit the current budget allocation for approval. Once submitted, changes may requires administrative override.
           </p>
         </div>
@@ -292,8 +250,8 @@ export function DeleteBudgetModal({ isOpen, onClose, onConfirm, count }: { isOpe
            <Trash2 className="w-8 h-8 text-[var(--danger)]" />
         </div>
         <div className="space-y-2">
-          <h3 className="text-lg font-bold tracking-tight" style={{ color: 'var(--shell-text)' }}>Delete {count} budget record(s)?</h3>
-          <p className="text-[11px] text-[var(--shell-text)] leading-relaxed font-medium">
+          <h3 className="text-lg font-semibold tracking-tight" style={{ color: 'var(--shell-text)' }}>Delete {count} budget record(s)?</h3>
+          <p className="text-[12px] text-[var(--shell-text)] leading-relaxed font-medium">
             This action is irreversible. All data associated with these budget allocations will be permanently removed from the system.
           </p>
         </div>

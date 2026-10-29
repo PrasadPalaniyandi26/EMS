@@ -174,7 +174,7 @@ export default function AuditLogPage() {
               const cfg = a ? getActionCfg(a) : null;
               return (
                 <button key={a} type="button" aria-pressed={actionFilter === a} onClick={() => setActionFilter(a)}
-                  className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-all ${
+                  className={`px-2.5 py-1 text-[12px] font-semibold rounded-lg border transition-all ${
                     actionFilter === a
                       ? (cfg ? `${cfg.bg} ${cfg.color} border-current/40` : 'bg-[var(--shell-accent)]/15 text-[var(--info)] border-[var(--shell-accent)]/40')
                       : 'text-[var(--shell-text-muted)] border-transparent hover:border-[var(--shell-border)] hover:text-[var(--shell-text)]'
@@ -189,7 +189,7 @@ export default function AuditLogPage() {
           {/* Table filter */}
           <select
             aria-label="Filter by table"
-            className="h-8 px-3 text-[11px] rounded-lg border outline-none"
+            className="h-8 px-3 text-[12px] rounded-lg border outline-none"
             style={inputStyle}
             value={tableFilter}
             onChange={(e) => setTableFilter(e.target.value)}
@@ -200,17 +200,17 @@ export default function AuditLogPage() {
 
           {/* Date range */}
           <input type="date" aria-label="From date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
-            className="h-8 px-3 text-[11px] rounded-lg border outline-none"
+            className="h-8 px-3 text-[12px] rounded-lg border outline-none"
             style={inputStyle}
           />
-          <span className="text-[11px]" style={{ color: 'var(--shell-text-muted)' }}>to</span>
+          <span className="text-[12px]" style={{ color: 'var(--shell-text-muted)' }}>to</span>
           <input type="date" aria-label="To date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
-            className="h-8 px-3 text-[11px] rounded-lg border outline-none"
+            className="h-8 px-3 text-[12px] rounded-lg border outline-none"
             style={inputStyle}
           />
 
           <div className="flex-1" />
-          <button type="button" aria-label="Refresh audit log" onClick={() => refetch()} className="btn-action flex items-center gap-1 text-[11px]">
+          <button type="button" aria-label="Refresh audit log" onClick={() => refetch()} className="btn-action flex items-center gap-1 text-[12px]">
             <RefreshCw className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -230,21 +230,21 @@ export default function AuditLogPage() {
         <div className="shrink-0 flex items-center gap-4 px-4 py-2.5 border-b" style={{ borderColor: 'var(--shell-border)', background: 'var(--shell-surface)' }}>
           <div className="flex items-center gap-1.5">
             <Activity className="w-3.5 h-3.5" style={{ color: 'var(--shell-accent)' }} />
-            <span className="text-[11px] font-bold" style={{ color: 'var(--shell-text)' }}>{stats.total?.toLocaleString()}</span>
-            <span className="text-[11px]" style={{ color: 'var(--shell-text-muted)' }}>total events</span>
+            <span className="text-[12px] font-semibold" style={{ color: 'var(--shell-text)' }}>{stats.total?.toLocaleString()}</span>
+            <span className="text-[12px]" style={{ color: 'var(--shell-text-muted)' }}>total events</span>
           </div>
           <div className="w-px h-3" style={{ background: 'var(--shell-border)' }} />
           {stats.by_action?.map((a: any) => {
             const cfg = getActionCfg(a.action);
             return (
               <div key={a.action} className="flex items-center gap-1.5">
-                <span className={`text-[11px] font-black px-1.5 py-0.5 rounded ${cfg.bg} ${cfg.color}`}>{cfg.label}</span>
-                <span className="text-[11px] font-bold text-black dark:text-white">{a.count?.toLocaleString()}</span>
+                <span className={`text-[12px] font-semibold px-1.5 py-0.5 rounded-md ${cfg.bg} ${cfg.color}`}>{cfg.label}</span>
+                <span className="text-[12px] font-semibold text-black dark:text-white">{a.count?.toLocaleString()}</span>
               </div>
             );
           })}
           <div className="flex-1" />
-          <span className="text-[11px]" style={{ color: 'var(--shell-text-muted)' }}>
+          <span className="text-[12px]" style={{ color: 'var(--shell-text-muted)' }}>
             Showing {rows.length} of {total.toLocaleString()} records
           </span>
         </div>
@@ -256,11 +256,11 @@ export default function AuditLogPage() {
           <div className="space-y-0 pt-1">
             {[...Array(12)].map((_, i) => (
               <div key={i} className="flex items-center gap-4 px-4 py-3 border-b" style={{ borderColor: 'var(--shell-border)' }}>
-                <div className="h-5 w-14 rounded bg-[var(--shell-hover)] animate-pulse" />
-                <div className="h-3 w-24 rounded bg-[var(--shell-hover)] animate-pulse" />
-                <div className="h-3 w-20 rounded bg-[var(--shell-hover)] animate-pulse" />
-                <div className="h-3 w-32 rounded bg-[var(--shell-hover)] animate-pulse flex-1" />
-                <div className="h-3 w-24 rounded bg-[var(--shell-hover)] animate-pulse" />
+                <div className="h-5 w-14 rounded-md bg-[var(--shell-hover)] animate-pulse" />
+                <div className="h-3 w-24 rounded-md bg-[var(--shell-hover)] animate-pulse" />
+                <div className="h-3 w-20 rounded-md bg-[var(--shell-hover)] animate-pulse" />
+                <div className="h-3 w-32 rounded-md bg-[var(--shell-hover)] animate-pulse flex-1" />
+                <div className="h-3 w-24 rounded-md bg-[var(--shell-hover)] animate-pulse" />
               </div>
             ))}
           </div>
@@ -270,7 +270,7 @@ export default function AuditLogPage() {
             <p className="text-[13px] font-semibold" style={{ color: 'var(--shell-text)' }}>
               {(error as any)?.status === 403 ? 'Access restricted' : 'Could not load the audit log'}
             </p>
-            <p className="text-[11px]" style={{ color: 'var(--shell-text-muted)' }}>
+            <p className="text-[12px]" style={{ color: 'var(--shell-text-muted)' }}>
               {(error as any)?.status === 403
                 ? 'The audit log is available to Admin and Finance users only.'
                 : ((error as any)?.message || 'Please try again.')}
@@ -283,7 +283,7 @@ export default function AuditLogPage() {
           <div className="flex flex-col items-center justify-center h-full gap-3 py-24">
             <Shield className="w-12 h-12" style={{ color: 'var(--shell-text-muted)', opacity: 0.3 }} />
             <p className="text-[13px] font-semibold" style={{ color: 'var(--shell-text)' }}>No audit records found</p>
-            <p className="text-[11px]" style={{ color: 'var(--shell-text-muted)' }}>Try adjusting your filters</p>
+            <p className="text-[12px]" style={{ color: 'var(--shell-text-muted)' }}>Try adjusting your filters</p>
           </div>
         ) : (
           <table className="w-full text-[12px]">
@@ -339,7 +339,7 @@ export default function AuditLogPage() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="shrink-0 flex items-center justify-between px-4 py-2.5 border-t" style={{ borderColor: 'var(--shell-border)', background: 'var(--shell-surface)' }}>
-          <span className="text-[11px]" style={{ color: 'var(--shell-text-muted)' }}>
+          <span className="text-[12px]" style={{ color: 'var(--shell-text-muted)' }}>
             Page {page} of {totalPages}
           </span>
           <div className="flex items-center gap-1">
@@ -352,7 +352,7 @@ export default function AuditLogPage() {
               if (p < 1 || p > totalPages) return null;
               return (
                 <button key={p} aria-label={`Page ${p}`} aria-current={p === page ? "page" : undefined} onClick={() => setPage(p)}
-                  className={`w-7 h-7 text-[11px] font-semibold rounded-lg transition-all ${p === page ? 'bg-[var(--shell-accent)] text-[var(--shell-accent-fg)]' : 'btn-action'}`}>
+                  className={`w-7 h-7 text-[12px] font-semibold rounded-lg transition-all ${p === page ? 'bg-[var(--shell-accent)] text-[var(--shell-accent-fg)]' : 'btn-action'}`}>
                   {p}
                 </button>
               );
