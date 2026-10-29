@@ -553,7 +553,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
 
           {/* File card: visible when a file exists */}
           {hasFile && (
-            <div className="modal-section mt-2 flex items-center justify-between gap-2 rounded-lg border border-[var(--shell-border)] px-3 py-2 shadow-sm">
+            <div className="modal-section mt-2 flex items-center justify-between gap-2 rounded-lg border border-[var(--shell-border)] px-3 py-2">
               <div className="flex min-w-0 items-center gap-3">
                 <div className="modal-divider rounded border border-[var(--shell-border)] p-1.5">
                   <FileText aria-hidden className="h-5 w-5 text-[var(--shell-accent)]" />

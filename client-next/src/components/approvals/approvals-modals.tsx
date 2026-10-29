@@ -205,7 +205,7 @@ export function RejectModal({ isOpen, onClose, onConfirm, selectedRequest }: Mod
           <button
             onClick={handleConfirm}
             disabled={saving}
-            className="px-8 py-2.5 bg-[var(--danger)] text-[var(--danger-foreground)] text-[12px] font-bold rounded-lg hover:brightness-110 active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-8 py-2.5 bg-[var(--danger)] text-[var(--danger-foreground)] text-[12px] font-bold rounded-lg active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {saving && <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />}
             Confirm Rejection
@@ -297,7 +297,7 @@ export function VoidModal({ isOpen, onClose, onConfirm, selectedRequest }: Modal
           <button
             onClick={handleConfirm}
             disabled={saving}
-            className="px-8 py-2.5 bg-[var(--danger)] text-[var(--danger-foreground)] text-[12px] font-bold rounded-lg shadow-lg shadow-red-600/20 hover:brightness-110 active:scale-95 transition-all disabled:opacity-50"
+            className="px-8 py-2.5 bg-[var(--danger)] text-[var(--danger-foreground)] text-[12px] font-bold rounded-lg active:scale-95 transition-all disabled:opacity-50"
           >
             {saving ? 'Voiding...' : 'Confirm Void'}
           </button>
@@ -382,7 +382,7 @@ export function SendBackModal({ isOpen, onClose, onConfirm, selectedRequest }: M
           </Button>
           <button
             onClick={() => onConfirm({ comment })}
-            className="px-8 py-2.5 bg-[var(--info)] text-[var(--info-foreground)] text-[12px] font-bold rounded-lg shadow-lg shadow-blue-600/20 hover:brightness-110 active:scale-95 transition-all"
+            className="px-8 py-2.5 bg-[var(--info)] text-[var(--info-foreground)] text-[12px] font-bold rounded-lg active:scale-95 transition-all"
           >
             Send Back
           </button>

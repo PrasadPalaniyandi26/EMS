@@ -352,9 +352,9 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
               <p id="user-status-label" className="text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Status</p>
               <div role="radiogroup" aria-labelledby="user-status-label" className="flex p-1 modal-toggle-track rounded-xl gap-1">
                 {([
-                  { s: 'ACTIVE',   active: 'text-[var(--success)] border border-[var(--success)] shadow-sm' },
-                  { s: 'On Hold',  active: 'text-[var(--warning)] border border-[var(--warning)] shadow-sm' },
-                  { s: 'Inactive', active: 'text-[var(--danger)] border border-[var(--danger)] shadow-sm' },
+                  { s: 'ACTIVE',   active: 'text-[var(--success)] border border-[var(--success)]' },
+                  { s: 'On Hold',  active: 'text-[var(--warning)] border border-[var(--warning)]' },
+                  { s: 'Inactive', active: 'text-[var(--danger)] border border-[var(--danger)]' },
                 ] as const).map(({ s, active: activeClass }) => (
                   <button key={s} type="button" role="radio" aria-checked={form.status === s} onClick={() => set("status", s)}
                     className={cn('flex-1 py-1.5 text-center text-[11px] font-bold rounded-md transition-all',
@@ -537,7 +537,7 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
         </div>
 
         {/* Table */}
-        <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden shadow-sm" style={{ background: 'var(--shell-surface)' }}>
+        <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden" style={{ background: 'var(--shell-surface)' }}>
           <table className="w-full text-left">
             <thead className="dialog-header">
               <tr className="text-[11px] font-black">
@@ -740,7 +740,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
                 const c = roleColor(t);
                 return (
                   <button key={t} onClick={() => applyTemplate(t)}
-                    className={cn('px-3 py-1 rounded-lg text-[11px] font-black border transition-all', template === t ? 'modal-input border-[var(--shell-border)] text-[var(--shell-text)] shadow-sm' : 'text-[var(--shell-text-muted)] border-[var(--shell-border)] hover:text-[var(--shell-text)]')}
+                    className={cn('px-3 py-1 rounded-lg text-[11px] font-black border transition-all', template === t ? 'modal-input border-[var(--shell-border)] text-[var(--shell-text)]' : 'text-[var(--shell-text-muted)] border-[var(--shell-border)] hover:text-[var(--shell-text)]')}
                     style={template !== t ? { background: 'var(--shell-bg)' } : {}}
                   >
                     <span className={cn('inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle', c.dot)} />
@@ -753,7 +753,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
 
           {/* Permission matrix — sidebar-mirrored tree view */}
           <div className="overflow-x-auto rounded-xl">
-          <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden shadow-sm min-w-[480px]" style={{ background: 'var(--shell-surface)' }}>
+          <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden min-w-[480px]" style={{ background: 'var(--shell-surface)' }}>
             {/* Column header */}
             <div className="dialog-header flex items-center text-[11px] font-black">
               <div className="flex-1 px-4 py-3">Module</div>
@@ -820,7 +820,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
         {/* Right: Config panel */}
         <div className="w-[220px] shrink-0 space-y-2.5">
           {/* Approval Thresholds */}
-          <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden shadow-sm" style={{ background: 'var(--shell-surface)' }}>
+          <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden" style={{ background: 'var(--shell-surface)' }}>
             <div className="dialog-header px-4 py-2.5">
               <span className="text-[11px] font-black">Approval Limits</span>
             </div>
@@ -837,7 +837,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
           </div>
 
           {/* Data Scope */}
-          <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden shadow-sm" style={{ background: 'var(--shell-surface)' }}>
+          <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden" style={{ background: 'var(--shell-surface)' }}>
             <div className="dialog-header px-4 py-2.5">
               <span className="text-[11px] font-black">Data Visibility</span>
             </div>
@@ -861,7 +861,7 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
           </div>
 
           {/* Summary */}
-          <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden shadow-sm" style={{ background: 'var(--shell-surface)' }}>
+          <div className="border border-[var(--shell-border)] rounded-xl overflow-hidden" style={{ background: 'var(--shell-surface)' }}>
             <div className="dialog-header px-4 py-2.5">
               <span className="text-[11px] font-black">Summary</span>
             </div>

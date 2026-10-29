@@ -149,7 +149,7 @@ export default function ProjectsPage() {
                <div className="flex items-center justify-between">
                  <div>
                    <h4 className="font-extrabold text-[15px] text-black dark:text-white leading-tight">{selectedProject.name}</h4>
-                   <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest mt-0.5">{selectedProject.code || 'Code Pending'}</p>
+                   <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mt-0.5">{selectedProject.code || 'Code Pending'}</p>
                  </div>
                  <span className="p-2 bg-[var(--shell-accent)]/20 rounded text-[var(--success)]">
                    <Target className="h-5 w-5" />
@@ -158,7 +158,7 @@ export default function ProjectsPage() {
             </div>
 
             <div className="bg-[var(--shell-hover)] border border-[var(--shell-border)] rounded-xl p-4 space-y-3">
-               <h4 className="text-[11px] font-bold text-black dark:text-white uppercase tracking-wider">Project Team</h4>
+               <h4 className="text-[11px] font-bold text-black dark:text-white">Project Team</h4>
                <div className="space-y-2">
                  {((selectedProject as any).lead ? [{ name: (selectedProject as any).lead as string, role: 'Project Lead' }] : []).map((member, i) => {
                    const p = member.name.trim().split(/\s+/);
@@ -171,7 +171,7 @@ export default function ProjectsPage() {
                        </div>
                        <div>
                          <p className="text-[11px] font-extrabold text-black dark:text-white">{member.name}</p>
-                         <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-tighter">{member.role}</p>
+                         <p className="text-[11px] font-bold text-[var(--shell-text-muted)]">{member.role}</p>
                        </div>
                      </div>
                      <ArrowUpRight className="h-3.5 w-3.5 text-[var(--shell-text-muted)] opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -181,7 +181,7 @@ export default function ProjectsPage() {
                    <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">No lead assigned.</p>
                  )}
                </div>
-               <Button variant="outline" className="w-full h-8 border-dashed border-[var(--shell-border)] text-[11px] font-bold text-[var(--shell-text-muted)] hover:text-[var(--shell-text-muted)] hover:border-[var(--shell-border)] transition-colors uppercase tracking-widest mt-1">
+               <Button variant="outline" className="w-full h-8 border-dashed border-[var(--shell-border)] text-[11px] font-bold text-[var(--shell-text-muted)] hover:text-[var(--shell-text-muted)] hover:border-[var(--shell-border)] transition-colors mt-1">
                  + Manage Resources
                </Button>
             </div>
@@ -211,11 +211,11 @@ export default function ProjectsPage() {
       {deleteId && (
         <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
           <DialogContent 
-            className="sm:max-w-[450px] p-0 overflow-hidden border-[var(--shell-border)] shadow-2xl flex flex-col"
+            className="sm:max-w-[450px] p-0 overflow-hidden border-[var(--shell-border)] flex flex-col"
             showCloseButton={false}
           >
             <div className="flex items-center justify-between p-4 border-b border-[var(--shell-border)] bg-[var(--shell-surface)]">
-              <h3 className="text-sm font-black text-[var(--danger)] uppercase tracking-widest">Delete Project</h3>
+              <h3 className="text-sm font-black text-[var(--danger)]">Delete Project</h3>
             </div>
             <p className="text-xs text-[var(--shell-text-muted)] p-4">
               Are you sure you want to delete this project? This action cannot be undone.

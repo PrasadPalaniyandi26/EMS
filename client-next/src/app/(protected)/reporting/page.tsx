@@ -166,7 +166,7 @@ export default function ReportingPage() {
         body { font-family: Arial, sans-serif; font-size: 12px; margin: 24px; color: #111; }
         h2 { margin-bottom: 16px; }
         table { border-collapse: collapse; width: 100%; }
-        th { background: #f1f5f9; text-align: left; padding: 6px 10px; border: 1px solid #e2e8f0; font-size: 11px; text-transform: uppercase; }
+        th { background: #f1f5f9; text-align: left; padding: 6px 10px; border: 1px solid #e2e8f0; font-size: 11px; text-transform:; }
         td { padding: 6px 10px; border: 1px solid #e2e8f0; }
         tr:nth-child(even) td { background: #f8fafc; }
         .totals td { font-weight: bold; background: #eff6ff; }
@@ -250,7 +250,7 @@ export default function ReportingPage() {
               <div className="flex flex-wrap items-center gap-1.5">
                 {DATE_PRESETS.map((p) => (
                   <button key={p.label} type="button" aria-pressed={datePreset === p.label} onClick={() => handlePreset(p.label, p.key)}
-                    className="px-2.5 py-1.5 rounded-full text-[11px] font-semibold transition-all"
+                    className="px-2.5 py-1.5 rounded-md text-[12px] font-semibold transition-all"
                     style={datePreset === p.label
                       ? { background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' }
                       : { background: 'var(--shell-hover)', color: 'var(--shell-text-muted)' }
@@ -305,7 +305,7 @@ export default function ReportingPage() {
             <div className="flex items-center gap-2 min-w-0">
               <FileText className="h-4 w-4 shrink-0" style={{ color: 'var(--shell-accent)' }} />
               <span className="truncate">{result.title}</span>
-              <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold shrink-0"
+              <span className="text-[11px] px-2 py-0.5 rounded-md font-semibold shrink-0"
                 style={{ background: 'var(--shell-hover)', color: 'var(--shell-text-muted)' }}>
                 {filteredRows.length} records
               </span>
@@ -358,7 +358,7 @@ export default function ReportingPage() {
                 <tr style={{ borderBottom: '1px solid var(--shell-border)', background: 'var(--shell-hover)' }}>
                   {result.columns.map((col) => (
                     <th key={col} scope="col"
-                      className={`px-4 py-2.5 font-semibold text-[11px] uppercase tracking-wider whitespace-nowrap ${isNumericCol(col, result.rows) ? 'text-right' : 'text-left'}`}
+                      className={`px-4 py-2.5 font-semibold text-[11px] whitespace-nowrap ${isNumericCol(col, result.rows) ? 'text-right' : 'text-left'}`}
                       style={{ color: 'var(--shell-text-muted)' }}>
                       {col}
                     </th>

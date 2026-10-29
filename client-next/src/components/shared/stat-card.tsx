@@ -30,7 +30,7 @@ export function StatCard({ label, value, icon, tone = 'default', hint, onClick, 
     <>
       {icon && <div className="mt-0.5 shrink-0" aria-hidden>{icon}</div>}
       <div className="min-w-0 text-left">
-        <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--shell-text-muted)]">{label}</p>
+        <p className="text-[11px] font-bold text-[var(--shell-text-muted)]">{label}</p>
         <p className={cn('text-[16px] font-black mt-0.5 truncate', TONE_TEXT[tone])}>{value}</p>
         {hint && <p className="text-[11px] mt-0.5 text-[var(--shell-text-muted)]">{hint}</p>}
       </div>

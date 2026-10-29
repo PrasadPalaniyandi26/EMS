@@ -461,7 +461,7 @@ export default function IncomePage() {
             <div className="flex-1 space-y-4">
               {/* Primary Document */}
               <div className="space-y-2">
-                <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
+                <label className="text-[11px] font-bold text-[var(--shell-text-muted)] flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
                   <FileText className="w-3.5 h-3.5" /> Primary Document
                 </label>
                 <input
@@ -472,21 +472,21 @@ export default function IncomePage() {
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePanelFileUpload(f); e.target.value = ''; }}
                 />
                 <div
-                  className={`h-32 rounded-xl flex flex-col items-center justify-center group cursor-pointer transition-all shadow-md ${selectedTxn?.receipt_path ? 'border-2 border-[var(--shell-accent)]/40 hover:border-[var(--shell-accent)]' : 'hover:brightness-105'}`}
+                  className={`h-32 rounded-xl flex flex-col items-center justify-center group cursor-pointer transition-all ${selectedTxn?.receipt_path ? 'border-2 border-[var(--shell-accent)]/40 hover:border-[var(--shell-accent)]' : 'hover:brightness-105'}`}
                   style={selectedTxn?.receipt_path ? { background: 'linear-gradient(135deg, rgba(74,111,83,0.12) 0%, rgba(74,111,83,0.05) 100%)' } : { background: 'var(--shell-bg)', border: '1px solid var(--shell-border)' }}
                   onClick={handlePanelDocClick}
                 >
                   {panelUploading ? (
                     <>
                       <UploadCloud className="w-8 h-8 mb-2 text-[var(--shell-text-muted)] animate-pulse" />
-                      <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--shell-text-muted)]">Uploading...</p>
+                      <p className="text-[11px] font-bold text-[var(--shell-text-muted)]">Uploading...</p>
                     </>
                   ) : selectedTxn?.receipt_path ? (
                     <>
                       <div className="w-10 h-10 rounded-xl bg-[var(--shell-accent)]/20 border border-[var(--shell-accent)]/30 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
                         <FileText className="w-5 h-5 text-[var(--shell-accent)]" />
                       </div>
-                      <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--shell-accent)] truncate max-w-[160px] px-2">{selectedTxn.receipt_path.split('/').pop()}</p>
+                      <p className="text-[11px] font-bold text-[var(--shell-accent)] truncate max-w-[160px] px-2">{selectedTxn.receipt_path.split('/').pop()}</p>
                       <p className="text-[11px] text-[var(--shell-accent)]/60 mt-0.5 font-medium">Click to view full screen</p>
                     </>
                   ) : (
@@ -494,7 +494,7 @@ export default function IncomePage() {
                       <div className="w-10 h-10 rounded-xl bg-[var(--shell-hover)] border border-[var(--shell-border)] flex items-center justify-center mb-2">
                         <FileText className="w-5 h-5 text-[var(--shell-text-muted)]" />
                       </div>
-                      <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--shell-text-muted)]">No Receipt or Invoice</p>
+                      <p className="text-[11px] font-bold text-[var(--shell-text-muted)]">No Receipt or Invoice</p>
                       <p className="text-[11px] text-[var(--shell-text-muted)] opacity-60 mt-0.5 font-medium">Click to upload PDF, JPG, PNG</p>
                     </>
                   )}
@@ -504,7 +504,7 @@ export default function IncomePage() {
               {/* Info fields */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-4">
                 <div className="col-span-2">
-                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">Description</label>
+                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)]">Description</label>
                   <p className="text-[11px] text-[var(--shell-text-muted)] bg-[var(--shell-hover)] px-2 py-1.5 rounded-lg mt-0.5 border border-[var(--shell-border)] leading-relaxed">{selectedTxn.description || 'No description provided'}</p>
                 </div>
 
@@ -513,11 +513,11 @@ export default function IncomePage() {
                   {selectedTxn.gst_rate != null && (
                     <>
                       <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--shell-border)]">
-                        <span className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">Net Amount</span>
+                        <span className="text-[11px] font-bold text-[var(--shell-text-muted)]">Net Amount</span>
                         <span className="text-[12px] font-bold text-black dark:text-white">{formatCurrency(selectedTxn.net_amount ?? selectedTxn.amount, currency)}</span>
                       </div>
                       <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--shell-border)]">
-                        <span className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">GST ({selectedTxn.gst_rate}%)</span>
+                        <span className="text-[11px] font-bold text-[var(--shell-text-muted)]">GST ({selectedTxn.gst_rate}%)</span>
                         <span className="text-[12px] font-bold text-black dark:text-white">
                           {formatCurrency((selectedTxn.total_amount ?? selectedTxn.amount) - (selectedTxn.net_amount ?? selectedTxn.amount), currency)}
                         </span>
@@ -525,37 +525,37 @@ export default function IncomePage() {
                     </>
                   )}
                   <div className="flex items-center justify-between px-3 py-2.5 bg-[var(--shell-accent)]/5">
-                    <span className="text-[11px] font-bold text-[var(--shell-accent)] uppercase tracking-wider">Total Amount</span>
+                    <span className="text-[11px] font-bold text-[var(--shell-accent)]">Total Amount</span>
                     <span className="text-[14px] font-black text-black dark:text-white">{formatCurrency(selectedTxn.total_amount ?? selectedTxn.amount, currency)}</span>
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">Date Recorded</label>
+                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)]">Date Recorded</label>
                   <p className="text-[12px] font-bold mt-0.5 text-black dark:text-white">{formatDate(selectedTxn.date_recorded)}</p>
                 </div>
                 <div>
-                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">Payment Method</label>
+                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)]">Payment Method</label>
                   <p className="text-[12px] font-bold mt-0.5 text-black dark:text-white capitalize">{selectedTxn.payment_method || '—'}</p>
                 </div>
                 <div>
-                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">Category</label>
+                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)]">Category</label>
                   <p className="text-[12px] font-bold mt-0.5 text-black dark:text-white">{selectedTxn.category_name || '—'}</p>
                 </div>
               </div>
 
               {/* Fund Allocation */}
               <div className="space-y-2">
-                <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
+                <label className="text-[11px] font-bold text-[var(--shell-text-muted)] flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
                   <LayoutGrid className="w-3.5 h-3.5" /> Fund Allocation
                 </label>
                 {selectedTxn.is_split === 1 ? (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5 px-2 py-0.5 bg-[color-mix(in_srgb,var(--success)_12%,transparent)] border border-[color-mix(in_srgb,var(--success)_35%,transparent)] rounded-full text-[11px] font-bold text-[var(--success)] uppercase tracking-wider">
+                      <span className="flex items-center gap-1.5 px-2 py-0.5 bg-[color-mix(in_srgb,var(--success)_12%,transparent)] border border-[color-mix(in_srgb,var(--success)_35%,transparent)] rounded-full text-[11px] font-bold text-[var(--success)]">
                         <Layers className="w-3 h-3" /> Split Income
                       </span>
-                      <button onClick={openSplit} className="text-[11px] font-bold text-[var(--shell-accent)] hover:underline uppercase tracking-wider">Re-split →</button>
+                      <button onClick={openSplit} className="text-[11px] font-bold text-[var(--shell-accent)] hover:underline">Re-split →</button>
                     </div>
                     {splitDetailsLoading ? (
                       <p className="text-[11px] text-[var(--shell-text-muted)] font-medium">Loading split details...</p>
@@ -575,7 +575,7 @@ export default function IncomePage() {
                                   <span className="text-[11px] font-black text-black dark:text-white">{formatCurrency(s.amount, currency)}</span>
                                 </div>
                               </div>
-                              <div className="w-full bg-[var(--shell-hover)] rounded-full h-1 overflow-hidden shadow-inner">
+                              <div className="w-full bg-[var(--shell-hover)] rounded-full h-1 overflow-hidden">
                                 <div className="bg-[var(--shell-accent)] h-full rounded-full transition-all" style={{ width: `${pct}%` }} />
                               </div>
                               {(s.description || s.project_name) && (
@@ -587,7 +587,7 @@ export default function IncomePage() {
                           );
                         })}
                         <div className="flex items-center justify-between pt-1.5 border-t border-[var(--shell-border)]">
-                          <span className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">{splitDetails.length} splits · Total</span>
+                          <span className="text-[11px] font-bold text-[var(--shell-text-muted)]">{splitDetails.length} splits · Total</span>
                           <span className="text-[12px] font-black text-[var(--shell-accent)]">{formatCurrency(selectedTxn.amount, currency)}</span>
                         </div>
                       </div>
@@ -601,7 +601,7 @@ export default function IncomePage() {
                       <span className="text-[11px] font-bold text-black dark:text-white">{selectedTxn.project_name || selectedTxn.product_name}</span>
                       <span className="text-[11px] font-bold text-[var(--shell-accent)]">100.00%</span>
                     </div>
-                    <div className="w-full bg-[var(--shell-hover)] rounded-full h-1 overflow-hidden shadow-inner">
+                    <div className="w-full bg-[var(--shell-hover)] rounded-full h-1 overflow-hidden">
                       <div className="bg-[var(--shell-accent)] h-full rounded-full" style={{ width: '100%' }} />
                     </div>
                   </div>
@@ -612,7 +612,7 @@ export default function IncomePage() {
 
               {/* Approval Trail */}
               <div className="space-y-2">
-                <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
+                <label className="text-[11px] font-bold text-[var(--shell-text-muted)] flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
                   <Clock className="w-3.5 h-3.5" /> Approval Trail
                 </label>
                 {(() => {
@@ -693,7 +693,7 @@ export default function IncomePage() {
 
               {/* Notes Thread */}
               <div className="space-y-2">
-                <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
+                <label className="text-[11px] font-bold text-[var(--shell-text-muted)] flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
                   <FileText className="w-3.5 h-3.5" /> Internal Notes
                 </label>
                 {notesLoading ? (
@@ -728,7 +728,7 @@ export default function IncomePage() {
                   <button
                     onClick={handleAddNote}
                     disabled={!newNote.trim() || noteSaving}
-                    className="h-8 px-3 rounded-lg bg-[var(--shell-accent)] text-[var(--shell-accent-fg)] text-[11px] font-bold uppercase tracking-wider disabled:opacity-40 transition-opacity"
+                    className="h-8 px-3 rounded-lg bg-[var(--shell-accent)] text-[var(--shell-accent-fg)] text-[11px] font-bold disabled:opacity-40 transition-opacity"
                   >
                     {noteSaving ? '...' : 'Add'}
                   </button>
@@ -737,7 +737,7 @@ export default function IncomePage() {
 
               {/* Reference ID */}
               <div>
-                <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5 mb-1.5">
+                <label className="text-[11px] font-bold text-[var(--shell-text-muted)] flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5 mb-1.5">
                   <ShieldCheck className="w-3.5 h-3.5" /> Reference ID
                 </label>
                 <div className="px-3 py-2 rounded-lg font-mono text-[12px] font-bold leading-relaxed" style={{ background: 'var(--shell-hover)', border: '1px solid var(--shell-border)', color: 'var(--shell-accent)' }}>
@@ -749,14 +749,14 @@ export default function IncomePage() {
               <div className="flex gap-2 pt-1">
                 <button
                   onClick={handleDuplicate}
-                  className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg border border-[var(--shell-border)] bg-[var(--shell-hover)] text-[11px] font-bold text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] hover:bg-[var(--shell-surface)] transition-colors uppercase tracking-wider"
+                  className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg border border-[var(--shell-border)] bg-[var(--shell-hover)] text-[11px] font-bold text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] hover:bg-[var(--shell-surface)] transition-colors"
                 >
                   <Copy className="w-3 h-3" /> Duplicate
                 </button>
                 {(selectedTxn.status || '').toUpperCase() === 'APPROVED' && (user?.roles || []).some((r: any) => ['FINANCE', 'ADMIN'].includes((r.role_name || '').toUpperCase())) && (
                   <button
                     onClick={() => { setVoidReason(''); setVoidOpen(true); }}
-                    className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg border border-[color-mix(in_srgb,var(--danger)_40%,transparent)] bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] text-[11px] font-bold text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_20%,transparent)] transition-colors uppercase tracking-wider"
+                    className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg border border-[color-mix(in_srgb,var(--danger)_40%,transparent)] bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] text-[11px] font-bold text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_20%,transparent)] transition-colors"
                   >
                     <Ban className="w-3 h-3" /> Void
                   </button>
@@ -816,17 +816,17 @@ export default function IncomePage() {
         {/* Summary cards */}
         <div className="flex gap-3 mb-4">
           <div className="flex-1 flex flex-col gap-0.5 rounded-lg p-2.5 bg-[var(--shell-hover)] border border-[var(--shell-border)]">
-            <p className="text-[var(--shell-accent)] text-[11px] font-bold uppercase tracking-wider">Original</p>
+            <p className="text-[var(--shell-accent)] text-[11px] font-bold">Original</p>
             <p className="text-[var(--shell-text)] text-[13px] font-black">{formatCurrency(Number(editing?.amount || 0), currency)}</p>
           </div>
           <div className="flex-1 flex flex-col gap-0.5 rounded-lg p-2.5 bg-[color-mix(in_srgb,var(--info)_10%,transparent)] border border-[color-mix(in_srgb,var(--info)_20%,transparent)]">
-            <p className="text-[var(--info)] text-[11px] font-bold uppercase tracking-wider">Split Total</p>
+            <p className="text-[var(--info)] text-[11px] font-bold">Split Total</p>
             <p className="text-[var(--info)] text-[13px] font-black">
               {formatCurrency(splitEntries.reduce((sum, e) => sum + (Number(e.amount) || 0), 0), currency)}
             </p>
           </div>
           <div className="flex-1 flex flex-col gap-0.5 rounded-lg p-2.5 bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border border-[color-mix(in_srgb,var(--warning)_20%,transparent)]">
-            <p className="text-[var(--warning)] text-[11px] font-bold uppercase tracking-wider">Remaining</p>
+            <p className="text-[var(--warning)] text-[11px] font-bold">Remaining</p>
             <p className="text-[var(--warning)] text-[13px] font-black">
               {formatCurrency(Number(editing?.amount || 0) - splitEntries.reduce((sum, e) => sum + (Number(e.amount) || 0), 0), currency)}
             </p>
@@ -835,9 +835,9 @@ export default function IncomePage() {
 
         {/* Column headers */}
         <div className="grid gap-2 mb-1" style={{ gridTemplateColumns: '2fr 3fr 1.5fr' }}>
-          <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--shell-text-muted)] px-1">Category</p>
-          <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--shell-text-muted)] px-1">Description</p>
-          <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--shell-text-muted)] px-1 text-right">Amount</p>
+          <p className="text-[11px] font-bold text-[var(--shell-text-muted)] px-1">Category</p>
+          <p className="text-[11px] font-bold text-[var(--shell-text-muted)] px-1">Description</p>
+          <p className="text-[11px] font-bold text-[var(--shell-text-muted)] px-1 text-right">Amount</p>
         </div>
 
         {/* Split rows */}
@@ -871,7 +871,7 @@ export default function IncomePage() {
         </div>
 
         <button
-          className="mt-3 flex items-center gap-1.5 text-[var(--shell-accent)] font-bold text-[11px] uppercase tracking-widest"
+          className="mt-3 flex items-center gap-1.5 text-[var(--shell-accent)] font-bold text-[11px]"
           onClick={() => {
             const used = splitEntries.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
             const remaining = Math.max(0, (editing?.amount || 0) - used);
@@ -898,7 +898,7 @@ export default function IncomePage() {
             <button
               onClick={handleVoid}
               disabled={voidSaving}
-              className="px-8 py-2.5 bg-[var(--danger)] text-[var(--danger-foreground)] text-[12px] font-bold uppercase tracking-widest rounded-lg hover:brightness-110 active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-8 py-2.5 bg-[var(--danger)] text-[var(--danger-foreground)] text-[12px] font-bold rounded-lg active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {voidSaving && <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />}
               Confirm Void
@@ -911,7 +911,7 @@ export default function IncomePage() {
             This will permanently mark <strong>{selectedTxn?.reference_id || `#${selectedTxn?.id}`}</strong> as VOIDED. The record is kept for audit purposes but will no longer count in reports.
           </div>
           <div className="space-y-2">
-            <label className="text-[11px] font-bold modal-label uppercase tracking-widest block">Void Reason (optional)</label>
+            <label className="text-[11px] font-bold modal-label block">Void Reason (optional)</label>
             <textarea
               className="w-full h-20 p-3 modal-input border border-[var(--shell-border)] rounded-lg text-[13px] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[color-mix(in_srgb,var(--danger)_50%,transparent)] focus:border-[color-mix(in_srgb,var(--danger)_50%,transparent)] resize-none outline-none"
               placeholder="Describe why this transaction is being voided..."

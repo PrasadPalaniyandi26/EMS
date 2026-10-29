@@ -192,7 +192,7 @@ export default function OrganizationPage() {
               {/* Avatar + Identity */}
               <div className="flex items-center gap-4 pb-4" style={{ borderBottom: '1px solid var(--shell-border)' }}>
                 <div className="relative shrink-0">
-                  <div className="h-14 w-14 rounded-2xl flex items-center justify-center font-black text-lg uppercase shadow-md"
+                  <div className="h-14 w-14 rounded-2xl flex items-center justify-center font-black text-lg"
                     style={{ background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' }}>
                     {(() => { const p = selectedUser.username.trim().split(/\s+/); return p.length >= 2 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : p[0].slice(0, 2).toUpperCase(); })()}
                   </div>
@@ -201,7 +201,7 @@ export default function OrganizationPage() {
                 </div>
                 <div className="min-w-0">
                   <h3 className="text-[14px] font-bold leading-tight truncate" style={{ color: 'var(--shell-text)' }}>{selectedUser.username}</h3>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.15em] mt-0.5" style={{ color: 'var(--shell-accent)' }}>
+                  <p className="text-[11px] font-semibold mt-0.5" style={{ color: 'var(--shell-accent)' }}>
                     NT{10000 + selectedUser.id}
                   </p>
                   <div className="flex flex-wrap gap-1 mt-1.5">
@@ -210,7 +210,7 @@ export default function OrganizationPage() {
                       const key = (r.role_name || '').toLowerCase();
                       const cls = colors[key] || 'bg-[var(--shell-hover)] text-[var(--shell-text-muted)]';
                       return (
-                        <span key={i} className={`px-1.5 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider ${cls}`}>
+                        <span key={i} className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${cls}`}>
                           {r.role_name}{r.is_default && ' ★'}
                         </span>
                       );
@@ -222,7 +222,7 @@ export default function OrganizationPage() {
               {/* Contact & Location — 2 column */}
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-lg p-3 space-y-2" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
-                  <p className="text-[11px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--shell-text-muted)' }}>Contact</p>
+                  <p className="text-[11px] font-bold mb-2" style={{ color: 'var(--shell-text-muted)' }}>Contact</p>
                   <div className="flex items-start gap-2">
                     <Mail className="w-3 h-3 shrink-0 mt-0.5" style={{ color: 'var(--shell-text-muted)' }} />
                     <span className="text-[11px] break-all leading-tight" style={{ color: 'var(--shell-text)' }}>{selectedUser.email}</span>
@@ -243,7 +243,7 @@ export default function OrganizationPage() {
                   </div>
                 </div>
                 <div className="rounded-lg p-3 space-y-2" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
-                  <p className="text-[11px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--shell-text-muted)' }}>Location</p>
+                  <p className="text-[11px] font-bold mb-2" style={{ color: 'var(--shell-text-muted)' }}>Location</p>
                   {selectedUser.house_apt && <p className="text-[11px]" style={{ color: 'var(--shell-text)' }}>{selectedUser.house_apt}</p>}
                   {selectedUser.address && <p className="text-[11px]" style={{ color: 'var(--shell-text)' }}>{selectedUser.address}</p>}
                   {selectedUser.city && <p className="text-[11px] font-semibold" style={{ color: 'var(--shell-text)' }}>{selectedUser.city}{selectedUser.postal_code ? ` — ${selectedUser.postal_code}` : ''}</p>}
@@ -265,7 +265,7 @@ export default function OrganizationPage() {
               {/* Active Allocations */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-[11px] font-bold uppercase tracking-widest flex items-center gap-1.5" style={{ color: 'var(--shell-text-muted)' }}>
+                  <h4 className="text-[11px] font-bold flex items-center gap-1.5" style={{ color: 'var(--shell-text-muted)' }}>
                     <FolderOpen className="w-3 h-3" /> Active Allocations
                   </h4>
                   <span className="text-[11px] font-bold" style={{ color: 'var(--shell-accent)' }}>{panelAllocations.length}</span>
@@ -277,7 +277,7 @@ export default function OrganizationPage() {
                     <div key={a.id} className="rounded-lg p-2.5" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
                       <div className="flex items-center justify-between mb-0.5">
                         <span className="text-[11px] font-semibold leading-none truncate flex-1 mr-2" style={{ color: 'var(--shell-text)' }}>{a.code}</span>
-                        <span className="text-[11px] font-bold uppercase shrink-0" style={{ color: 'var(--shell-text-muted)' }}>{a.type}</span>
+                        <span className="text-[11px] font-bold shrink-0" style={{ color: 'var(--shell-text-muted)' }}>{a.type}</span>
                       </div>
                       <span className="text-[11px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>{a.client_name} · {a.category}</span>
                     </div>
@@ -290,7 +290,7 @@ export default function OrganizationPage() {
               <div className="grid grid-cols-2 gap-2 pt-2" style={{ borderTop: '1px solid var(--shell-border)' }}>
                 <button
                   onClick={() => setAllocationModalOpen(true)}
-                  className="flex items-center justify-center gap-2 py-2 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition-colors"
+                  className="flex items-center justify-center gap-2 py-2 rounded-lg text-[11px] font-semibold transition-colors"
                   style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)', color: 'var(--shell-text)' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--shell-accent)'; (e.currentTarget as HTMLElement).style.color = 'var(--shell-accent)'; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--shell-border)'; (e.currentTarget as HTMLElement).style.color = 'var(--shell-text)'; }}
@@ -299,7 +299,7 @@ export default function OrganizationPage() {
                 </button>
                 <button
                   onClick={() => setPermissionsModalOpen(true)}
-                  className="flex items-center justify-center gap-2 py-2 rounded-lg text-[11px] font-semibold uppercase tracking-wider text-white transition-all"
+                  className="flex items-center justify-center gap-2 py-2 rounded-lg text-[11px] font-semibold text-white transition-all"
                   style={{ background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.88'; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}

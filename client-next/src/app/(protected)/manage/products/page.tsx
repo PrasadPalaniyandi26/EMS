@@ -303,7 +303,7 @@ export default function ProductsPage() {
                     aria-checked={form.status === opt}
                     onClick={() => setForm({ ...form, status: opt })}
                     className={`min-w-[5.5rem] flex-1 rounded-md border py-1.5 text-center text-[11px] font-bold transition-all focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)] ${
-                      form.status === opt ? 'border-[var(--shell-accent)] text-[var(--shell-accent)] shadow-sm' : 'border-transparent text-[var(--shell-text-muted)] hover:text-[var(--shell-text)]'
+                      form.status === opt ? 'border-[var(--shell-accent)] text-[var(--shell-accent)]' : 'border-transparent text-[var(--shell-text-muted)] hover:text-[var(--shell-text)]'
                     }`}
                   >
                     {opt}

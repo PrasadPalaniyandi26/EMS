@@ -40,7 +40,7 @@ function SkeletonRect({ h = '120px' }: { h?: string }) {
 function CurrencyTooltip({ active, payload, label, fmt }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg px-3 py-2 text-[12px] shadow-lg border"
+    <div className="rounded-lg px-3 py-2 text-[12px] border"
       style={{ background: 'var(--shell-surface)', borderColor: 'var(--shell-border)', color: 'var(--shell-text)' }}>
       <p className="font-semibold mb-1">{label}</p>
       {payload.map((p: any) => (

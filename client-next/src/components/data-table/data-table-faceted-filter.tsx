@@ -77,7 +77,7 @@ export function DataTableFacetedFilter<TData, TValue>({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-[200px]">
-        <DropdownMenuLabel className="text-[11px] uppercase font-bold text-muted-foreground">{title}</DropdownMenuLabel>
+        <DropdownMenuLabel className="text-[11px] font-bold text-muted-foreground">{title}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {options.map((option) => {
           const isSelected = selectedValues.has(option.value)

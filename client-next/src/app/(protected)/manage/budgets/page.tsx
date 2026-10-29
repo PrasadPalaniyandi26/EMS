@@ -152,7 +152,7 @@ export default function BudgetsPage() {
             {activeRow && (
             <div className="flex-1 space-y-3">
               <div className="bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)] p-4">
-                <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase">Utilization</label>
+                <label className="text-[11px] font-bold text-[var(--shell-text-muted)]">Utilization</label>
                 {(() => {
                   const pct = activeRow.amount > 0 ? Math.min(((activeRow.spent || 0) / Number(activeRow.amount)) * 100, 100) : 0;
                   return (
@@ -167,17 +167,17 @@ export default function BudgetsPage() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="p-4 bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)]">
-                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase block tracking-wider">Allocated</label>
+                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] block">Allocated</label>
                   <p className="text-[14px] font-bold text-black dark:text-white mt-1">{formatCurrency(Number(activeRow.amount), currency)}</p>
                 </div>
                 <div className="p-4 bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)]">
-                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase block tracking-wider">Department</label>
+                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] block">Department</label>
                   <p className="text-[12px] font-bold text-black dark:text-white mt-1">{activeRow.department || '—'}</p>
                 </div>
               </div>
               {activeRow.details && (
                 <div className="p-4 bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)]">
-                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase block tracking-wider mb-2">Details</label>
+                  <label className="text-[11px] font-bold text-[var(--shell-text-muted)] block mb-2">Details</label>
                   <p className="text-[11px] text-[var(--shell-text-muted)] leading-relaxed">{activeRow.details}</p>
                 </div>
               )}

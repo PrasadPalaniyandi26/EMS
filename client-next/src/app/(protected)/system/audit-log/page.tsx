@@ -52,7 +52,7 @@ function AuditDetailPanel({ log }: { log: AuditLog }) {
       {/* Header card */}
       <div className="rounded-xl p-4 border" style={{ background: 'var(--shell-hover)', borderColor: 'var(--shell-border)' }}>
         <div className="flex items-center gap-2 mb-3">
-          <div className={`px-2 py-0.5 rounded text-[11px] font-black uppercase tracking-widest ${action.bg} ${action.color}`}>
+          <div className={`px-2 py-0.5 rounded text-[11px] font-black ${action.bg} ${action.color}`}>
             {action.label}
           </div>
           <span className="text-[11px] font-bold text-black dark:text-white">
@@ -72,7 +72,7 @@ function AuditDetailPanel({ log }: { log: AuditLog }) {
             { label: 'Time',       val: format(new Date(log.changed_at), 'h:mm:ss a') },
           ].map(({ label, val }) => (
             <div key={label} className="rounded-lg px-2.5 py-2 border" style={{ background: 'var(--shell-surface)', borderColor: 'var(--shell-border)' }}>
-              <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--shell-text-muted)' }}>{label}</p>
+              <p className="text-[11px] font-bold" style={{ color: 'var(--shell-text-muted)' }}>{label}</p>
               <p className="text-[11px] font-bold text-black dark:text-white mt-0.5 truncate">{val}</p>
             </div>
           ))}
@@ -82,26 +82,26 @@ function AuditDetailPanel({ log }: { log: AuditLog }) {
       {/* Changed fields diff */}
       {changedFields && changedFields.length > 0 && (
         <div className="space-y-2">
-          <p className="text-[11px] font-bold uppercase tracking-widest flex items-center gap-2 border-b pb-1.5"
+          <p className="text-[11px] font-bold flex items-center gap-2 border-b pb-1.5"
             style={{ color: 'var(--shell-text-muted)', borderColor: 'var(--shell-border)' }}>
             <GitCommit className="w-3.5 h-3.5" /> Changes ({changedFields.length} fields)
           </p>
           <div className="space-y-2">
             {changedFields.map(({ key, old: oldVal, new: newVal }) => (
               <div key={key} className="rounded-lg overflow-hidden border text-[11px]" style={{ borderColor: 'var(--shell-border)' }}>
-                <div className="px-3 py-1.5 border-b font-bold uppercase tracking-wider text-[11px]"
+                <div className="px-3 py-1.5 border-b font-bold text-[11px]"
                   style={{ background: 'var(--shell-hover)', borderColor: 'var(--shell-border)', color: 'var(--shell-text-muted)' }}>
                   {key.replace(/_/g, ' ')}
                 </div>
                 {oldVal !== undefined && (
                   <div className="px-3 py-2 flex items-start gap-2 bg-[color-mix(in_srgb,var(--danger)_5%,transparent)] border-b" style={{ borderColor: 'var(--shell-border)' }}>
-                    <span className="text-[11px] font-black text-[var(--danger)] uppercase mt-0.5 shrink-0 w-7">Old</span>
+                    <span className="text-[11px] font-black text-[var(--danger)] mt-0.5 shrink-0 w-7">Old</span>
                     <span className="text-[var(--danger)] font-mono break-all">{String(oldVal ?? '—')}</span>
                   </div>
                 )}
                 {newVal !== undefined && (
                   <div className="px-3 py-2 flex items-start gap-2 bg-[color-mix(in_srgb,var(--success)_5%,transparent)]">
-                    <span className="text-[11px] font-black text-[var(--success)] uppercase mt-0.5 shrink-0 w-7">New</span>
+                    <span className="text-[11px] font-black text-[var(--success)] mt-0.5 shrink-0 w-7">New</span>
                     <span className="text-[var(--success)] font-mono break-all">{String(newVal ?? '—')}</span>
                   </div>
                 )}
@@ -114,14 +114,14 @@ function AuditDetailPanel({ log }: { log: AuditLog }) {
       {/* Raw values (INSERT only — show new_values) */}
       {log.action === 'INSERT' && newVals && (
         <div className="space-y-2">
-          <p className="text-[11px] font-bold uppercase tracking-widest flex items-center gap-2 border-b pb-1.5"
+          <p className="text-[11px] font-bold flex items-center gap-2 border-b pb-1.5"
             style={{ color: 'var(--shell-text-muted)', borderColor: 'var(--shell-border)' }}>
             <FileText className="w-3.5 h-3.5" /> Record Data
           </p>
           <div className="rounded-lg overflow-hidden border text-[11px]" style={{ borderColor: 'var(--shell-border)' }}>
             {Object.entries(newVals).map(([k, v]) => (
               <div key={k} className="flex items-start gap-3 px-3 py-1.5 border-b" style={{ borderColor: 'var(--shell-border)' }}>
-                <span className="text-[11px] font-bold uppercase tracking-wider min-w-[100px] shrink-0 mt-0.5" style={{ color: 'var(--shell-text-muted)' }}>
+                <span className="text-[11px] font-bold min-w-[100px] shrink-0 mt-0.5" style={{ color: 'var(--shell-text-muted)' }}>
                   {k.replace(/_/g, ' ')}
                 </span>
                 <span className="font-mono text-black dark:text-white break-all">{String(v ?? '—')}</span>
@@ -201,7 +201,7 @@ export default function AuditLogPage() {
               const cfg = a ? getActionCfg(a) : null;
               return (
                 <button key={a} type="button" aria-pressed={actionFilter === a} onClick={() => setActionFilter(a)}
-                  className={`px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-lg border transition-all ${
+                  className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-all ${
                     actionFilter === a
                       ? (cfg ? `${cfg.bg} ${cfg.color} border-current/40` : 'bg-[var(--shell-accent)]/15 text-[var(--info)] border-[var(--shell-accent)]/40')
                       : 'text-[var(--shell-text-muted)] border-transparent hover:border-[var(--shell-border)] hover:text-[var(--shell-text)]'
@@ -265,7 +265,7 @@ export default function AuditLogPage() {
             const cfg = getActionCfg(a.action);
             return (
               <div key={a.action} className="flex items-center gap-1.5">
-                <span className={`text-[11px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${cfg.bg} ${cfg.color}`}>{cfg.label}</span>
+                <span className={`text-[11px] font-black px-1.5 py-0.5 rounded ${cfg.bg} ${cfg.color}`}>{cfg.label}</span>
                 <span className="text-[11px] font-bold text-black dark:text-white">{a.count?.toLocaleString()}</span>
               </div>
             );

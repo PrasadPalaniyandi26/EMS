@@ -265,8 +265,8 @@ export function ClientModal({ isOpen, onClose, onSave, editing, businessTypes: i
             <p id="client-status-label" className="mb-2 block text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Status</p>
             <div role="radiogroup" aria-labelledby="client-status-label" className="flex p-1 modal-toggle-track rounded-lg gap-1 h-9 w-56">
               {([
-                { label: 'Active',   val: true,  active: 'text-[var(--success)] border border-[var(--success)] shadow-sm' },
-                { label: 'Inactive', val: false, active: 'text-[var(--danger)] border border-[var(--danger)] shadow-sm' },
+                { label: 'Active',   val: true,  active: 'text-[var(--success)] border border-[var(--success)]' },
+                { label: 'Inactive', val: false, active: 'text-[var(--danger)] border border-[var(--danger)]' },
               ]).map(({ label, val, active }) => (
                 <button
                   key={label}

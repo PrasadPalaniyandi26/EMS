@@ -19,6 +19,7 @@ import {
 } from '@tanstack/react-table';
 import { useDataTable } from '@/hooks/use-data-table';
 import { DataTable } from '@/components/data-table/data-table';
+import { IdCell, TextCell, DateCell, MoneyCell, ToneText, headerRight } from '@/components/data-table/cells';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
 import { ProcessReimbursementModal } from './process-reimbursement-modal';
 
@@ -68,105 +69,55 @@ export function ReimbursementsTab() {
     {
       accessorKey: 'reference_id',
       header: 'Reference',
-      cell: ({ row }) => (
-        <span className="text-[11px] font-bold font-mono text-[var(--info)]">
-          {row.getValue('reference_id') || `#${row.original.id}`}
-        </span>
-      ),
+      cell: ({ row }) => <IdCell value={row.getValue('reference_id') || `#${row.original.id}`} />,
       size: 110,
     },
     {
       accessorKey: 'employee_name',
       header: 'Employee',
-      cell: ({ row }) => {
-        const name: string = row.getValue('employee_name') || 'Unknown';
-        const parts = name.trim().split(/\s+/);
-        const initials = parts.length >= 2
-          ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-          : name.slice(0, 2).toUpperCase();
-        return (
-          <div className="flex items-center gap-2">
-            <div
-              className="w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[11px] font-black text-white border border-[var(--shell-border)]"
-              style={{ background: 'var(--shell-accent)' }}
-            >
-              {initials}
-            </div>
-            <div>
-              <p className="text-[12px] font-semibold text-black dark:text-white">{name}</p>
-              <p className="text-[11px] text-[var(--shell-text-muted)] font-mono">{row.original.employee_id}</p>
-            </div>
-          </div>
-        );
-      },
+      cell: ({ row }) => <TextCell value={row.getValue('employee_name') || 'Unknown'} strong />,
     },
     {
       accessorKey: 'category_name',
-      header: () => <div className="text-center">Category</div>,
-      cell: ({ row }) => (
-        <div className="flex justify-center">
-          <span className="text-[12px] font-medium text-[var(--info)]">
-            {row.getValue('category_name') || 'General'}
-          </span>
-        </div>
-      ),
+      header: 'Category',
+      cell: ({ row }) => <TextCell value={(row.getValue('category_name') as string) || 'General'} />,
     },
     {
       id: 'project',
-      header: 'Project / Product',
-      cell: ({ row }) => (
-        <span className="text-[12px] text-[var(--shell-text-muted)] font-mono font-semibold">
-          {row.original.project_name
-            ? (row.original.context_code || row.original.project_name)
-            : row.original.product_name
-            ? (row.original.context_code || row.original.product_name)
-            : '—'}
-        </span>
-      ),
+      header: 'Project / product',
+      cell: ({ row }) => {
+        const o = row.original;
+        const code = o.project_name
+          ? (o.context_code || o.project_name)
+          : o.product_name
+          ? (o.context_code || o.product_name)
+          : '';
+        return <IdCell value={code} />;
+      },
     },
     {
       accessorKey: 'date_recorded',
-      header: () => <div className="text-center">Date</div>,
-      cell: ({ row }) => (
-        <div className="text-[12px] text-[var(--shell-text-muted)] text-center">
-          {formatDate(row.getValue('date_recorded'))}
-        </div>
-      ),
+      header: 'Date',
+      cell: ({ row }) => <DateCell value={row.getValue('date_recorded') as string} />,
       size: 110,
     },
     {
       id: 'reimb_status',
-      header: () => <div className="text-center">Status</div>,
+      header: 'Status',
       cell: ({ row }) => {
         const status = row.original.reimbursement_status;
-        return (
-          <div className="flex justify-center">
-            {status === 'PAID' ? (
-              <span className="flex items-center gap-1 text-[11px] font-semibold text-[var(--success)]">
-                <CheckCircle2 className="w-3.5 h-3.5" /> Paid
-              </span>
-            ) : status === 'ON_HOLD' ? (
-              <span className="flex items-center gap-1 text-[11px] font-semibold text-[var(--warning)]">
-                <PauseCircle className="w-3.5 h-3.5" /> On Hold
-              </span>
-            ) : (
-              <span className="flex items-center gap-1 text-[11px] font-semibold text-[var(--warning)]">
-                <Clock className="w-3.5 h-3.5" /> Pending
-              </span>
-            )}
-          </div>
-        );
+        return status === 'PAID'
+          ? <ToneText label="Paid" tone="success" />
+          : status === 'ON_HOLD'
+          ? <ToneText label="On hold" tone="warning" />
+          : <ToneText label="Pending" tone="warning" />;
       },
       size: 110,
     },
     {
       accessorKey: 'total_amount',
-      header: () => <div className="text-right">Amount</div>,
-      cell: ({ row }) => (
-        <div className="text-[12px] font-bold text-right text-black dark:text-white">
-          {formatCurrency(row.original.total_amount ?? row.original.amount, currency)}
-        </div>
-      ),
+      header: headerRight('Amount'),
+      cell: ({ row }) => <MoneyCell value={row.original.total_amount ?? row.original.amount} currency={currency} />,
       size: 120,
     },
   ], [currency]);
@@ -216,7 +167,7 @@ export function ReimbursementsTab() {
     <div className="flex items-start gap-2">
       <span className="mt-0.5 text-[var(--shell-text-muted)] shrink-0">{icon}</span>
       <div>
-        <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase mb-0.5">{label}</p>
+        <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-0.5">{label}</p>
         <p className="text-[12px] font-bold text-black dark:text-white">{value}</p>
       </div>
     </div>
@@ -273,7 +224,7 @@ export function ReimbursementsTab() {
               <div className="flex-1 space-y-6">
                 {/* Employee */}
                 <div className="bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)] p-4 space-y-3">
-                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase">Employee</p>
+                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)]">Employee</p>
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-[13px] font-bold"
                       style={{ background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' }}>
@@ -288,7 +239,7 @@ export function ReimbursementsTab() {
 
                 {/* Transaction detail */}
                 <div className="space-y-3">
-                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase border-b border-[var(--shell-border)] pb-1.5">Transaction</p>
+                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] border-b border-[var(--shell-border)] pb-1.5">Transaction</p>
                   <div className="space-y-2.5">
                     {infoRow(<Tag className="w-3.5 h-3.5" />, 'Reference', <span className="font-mono text-[var(--info)]">{selected.reference_id || `#${selected.id}`}</span>)}
                     {infoRow(<CalendarDays className="w-3.5 h-3.5" />, 'Date', formatDate(selected.date_recorded))}
@@ -304,7 +255,7 @@ export function ReimbursementsTab() {
 
                 {/* Amount breakdown */}
                 <div className="bg-[var(--shell-hover)] rounded-xl border border-[var(--shell-border)] p-4 space-y-2">
-                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase">Amount</p>
+                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)]">Amount</p>
                   {selected.gst_rate ? (
                     <>
                       <div className="flex justify-between text-[11px]">
@@ -327,7 +278,7 @@ export function ReimbursementsTab() {
 
                 {/* Reimbursement status */}
                 <div className="space-y-2">
-                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase border-b border-[var(--shell-border)] pb-1.5 flex items-center gap-2">
+                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] border-b border-[var(--shell-border)] pb-1.5 flex items-center gap-2">
                     <Wallet className="w-3.5 h-3.5" /> Reimbursement
                   </p>
                   {selected.reimbursement_status === 'PAID' ? (
@@ -341,13 +292,13 @@ export function ReimbursementsTab() {
                       </div>
                       {selected.reimbursement_reference && (
                         <div className="px-3 py-2 rounded-lg border text-[11px]" style={{ background: 'var(--shell-hover)', borderColor: 'var(--shell-border)' }}>
-                          <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase mb-0.5">Payment Reference</p>
+                          <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-0.5">Payment Reference</p>
                           <p className="font-mono font-bold text-black dark:text-white">{selected.reimbursement_reference}</p>
                         </div>
                       )}
                       {selected.reimbursement_note && (
                         <div className="px-3 py-2 rounded-lg border text-[11px]" style={{ background: 'var(--shell-hover)', borderColor: 'var(--shell-border)' }}>
-                          <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase mb-0.5">Note</p>
+                          <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-0.5">Note</p>
                           <p className="text-black dark:text-white">{selected.reimbursement_note}</p>
                         </div>
                       )}
@@ -363,20 +314,20 @@ export function ReimbursementsTab() {
                       </div>
                       {selected.reimbursement_reference && (
                         <div className="px-3 py-2 rounded-lg border text-[11px]" style={{ background: 'var(--shell-hover)', borderColor: 'var(--shell-border)' }}>
-                          <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase mb-0.5">Reference</p>
+                          <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-0.5">Reference</p>
                           <p className="font-mono font-bold text-black dark:text-white">{selected.reimbursement_reference}</p>
                         </div>
                       )}
                       {selected.reimbursement_note && (
                         <div className="px-3 py-2 rounded-lg border text-[11px]" style={{ background: 'var(--shell-hover)', borderColor: 'var(--shell-border)' }}>
-                          <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase mb-0.5">Note</p>
+                          <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-0.5">Note</p>
                           <p className="text-black dark:text-white">{selected.reimbursement_note}</p>
                         </div>
                       )}
                       {isFinanceOrAdmin && (
                         <button
                           onClick={() => openModal([selected.id])}
-                          className="w-full text-[11px] font-bold text-[var(--shell-accent)] hover:underline uppercase tracking-wider text-center py-1"
+                          className="w-full text-[11px] font-bold text-[var(--shell-accent)] hover:underline text-center py-1"
                         >
                           Process Payment →
                         </button>
@@ -391,7 +342,7 @@ export function ReimbursementsTab() {
                       {isFinanceOrAdmin && (
                         <button
                           onClick={() => openModal([selected.id])}
-                          className="text-[11px] font-bold text-[var(--shell-accent)] hover:underline uppercase tracking-wider"
+                          className="text-[11px] font-bold text-[var(--shell-accent)] hover:underline"
                         >
                           Process →
                         </button>
@@ -403,7 +354,7 @@ export function ReimbursementsTab() {
                 {/* Approved by */}
                 {selected.approved_by_name && (
                   <div className="space-y-2">
-                    <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase border-b border-[var(--shell-border)] pb-1.5 flex items-center gap-2">
+                    <p className="text-[11px] font-bold text-[var(--shell-text-muted)] border-b border-[var(--shell-border)] pb-1.5 flex items-center gap-2">
                       <BadgeCheck className="w-3.5 h-3.5" /> Approved By
                     </p>
                     <div className="px-3 py-2 rounded-lg bg-[var(--shell-hover)] border border-[var(--shell-border)]">

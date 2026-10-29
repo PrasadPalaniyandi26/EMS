@@ -108,8 +108,8 @@ export function RecurringModal({
             <p id="recurring-type-label" className="text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Transaction Type</p>
             <div role="radiogroup" aria-labelledby="recurring-type-label" className="flex p-1 modal-toggle-track rounded-xl gap-1 h-10">
               {([
-                { val: 'expense', active: 'text-[var(--danger)] border border-[var(--danger)] shadow-sm' },
-                { val: 'income',  active: 'text-[var(--success)] border border-[var(--success)] shadow-sm' },
+                { val: 'expense', active: 'text-[var(--danger)] border border-[var(--danger)]' },
+                { val: 'income',  active: 'text-[var(--success)] border border-[var(--success)]' },
               ]).map(({ val, active }) => (
                 <button
                   key={val}
@@ -282,7 +282,7 @@ export function RecurringModal({
             </span>
           </button>
           {(file || (isEdit && editing?.receipt_path)) && (
-            <div className="mt-1 modal-section border border-[var(--shell-border)] rounded-lg px-3 py-2 flex items-center justify-between shadow-sm">
+            <div className="mt-1 modal-section border border-[var(--shell-border)] rounded-lg px-3 py-2 flex items-center justify-between">
               <div className="flex items-center gap-2.5 min-w-0">
                 <FileText aria-hidden className="w-5 h-5 text-[var(--shell-accent)] shrink-0" />
                 <div className="leading-tight min-w-0">
@@ -424,7 +424,7 @@ export function ResumeRecurringModal({
       }
     >
       <div className="space-y-3">
-        <div className="border border-[var(--shell-border)] rounded-xl p-4 flex items-center justify-between shadow-sm" style={{ background: 'var(--shell-bg)' }}>
+        <div className="border border-[var(--shell-border)] rounded-xl p-4 flex items-center justify-between" style={{ background: 'var(--shell-bg)' }}>
           <div>
             <p className="text-[11px] text-[var(--info)] font-bold">Target Schedule</p>
             <p className="text-[14px] font-bold" style={{ color: 'var(--shell-text)' }}>{target.description}</p>
@@ -495,7 +495,7 @@ export function DeleteRecurringModal({ isOpen, onClose, onConfirm, count }: any)
           </Button>
           <button
             onClick={onConfirm}
-            className="px-6 py-2.5 bg-[var(--danger)] text-[var(--danger-foreground)] rounded-lg text-[11px] font-bold hover:brightness-110 shadow-lg shadow-red-200/10 transition-all flex items-center gap-2"
+            className="px-6 py-2.5 bg-[var(--danger)] text-[var(--danger-foreground)] rounded-lg text-[11px] font-bold transition-all flex items-center gap-2"
           >
             <Trash2 className="w-4 h-4" /> Delete Permanently
           </button>

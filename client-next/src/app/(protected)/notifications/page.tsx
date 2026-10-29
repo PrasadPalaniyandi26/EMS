@@ -82,7 +82,7 @@ function NotifRow({ n, onMarkRead, onDelete, selected, onSelect }: {
               </p>
             )}
             <div className="flex items-center gap-3 mt-1.5">
-              <span className={`text-[11px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${cfg.bg} ${cfg.color}`}>
+              <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${cfg.bg} ${cfg.color}`}>
                 {cfg.label}
               </span>
               <span className="text-[11px]" style={{ color: 'var(--shell-text-muted)' }}>
@@ -226,7 +226,7 @@ export default function NotificationsPage() {
           <Filter className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--shell-text-muted)' }} />
           {TYPE_FILTERS.map((f) => (
             <button key={f.value} onClick={() => setTypeFilter(f.value)}
-              className={`px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-lg border transition-all ${
+              className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-all ${
                 typeFilter === f.value
                   ? 'bg-[var(--shell-accent)]/15 text-[var(--info)] border-[var(--shell-accent)]/40'
                   : 'text-[var(--shell-text-muted)] border-transparent hover:border-[var(--shell-border)] hover:text-[var(--shell-text)]'
@@ -239,7 +239,7 @@ export default function NotificationsPage() {
 
         {/* Unread toggle */}
         <button onClick={() => setUnreadOnly(!unreadOnly)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-lg border transition-all ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded-lg border transition-all ${
             unreadOnly ? 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] text-[var(--danger)] border-[color-mix(in_srgb,var(--danger)_40%,transparent)]' : 'text-[var(--shell-text-muted)] border-[var(--shell-border)] hover:text-[var(--shell-text)]'
           }`}
         >
@@ -277,7 +277,7 @@ export default function NotificationsPage() {
 
       {/* ── Stats / select bar ── */}
       <div className="shrink-0 flex items-center gap-4 px-5 py-2 border-b" style={{ borderColor: 'var(--shell-border)', background: 'var(--shell-surface)' }}>
-        <span className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: 'var(--shell-text-muted)' }}>
+        <span className="text-[11px] font-semibold" style={{ color: 'var(--shell-text-muted)' }}>
           {total} total · {unreadCount} unread
         </span>
         <div className="flex-1" />

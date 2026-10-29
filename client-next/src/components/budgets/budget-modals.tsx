@@ -198,14 +198,14 @@ export function ExportBudgetModal({ isOpen, onClose }: BudgetModalProps) {
         <div className="space-y-2.5">
           <p className="text-xs font-semibold" style={{ color: 'var(--shell-text-muted)' }}>Select Format</p>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <button className="flex flex-col items-center justify-center p-6 modal-section border border-[var(--shell-border)] rounded-xl hover:border-[var(--shell-accent)]/30 hover:modal-section transition-all group scale-100 active:scale-95 shadow-sm">
+            <button className="flex flex-col items-center justify-center p-6 modal-section border border-[var(--shell-border)] rounded-xl hover:border-[var(--shell-accent)]/30 hover:modal-section transition-all group scale-100 active:scale-95">
               <div className="w-12 h-12 rounded-full bg-[var(--shell-accent)]/20 text-[var(--success)] flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <Download className="w-6 h-6" />
               </div>
               <span className="text-xs font-bold" style={{ color: 'var(--shell-text)' }}>Excel Spreadsheet</span>
               <span className="text-[11px] text-[var(--shell-text-muted)] mt-1 font-bold">.XLSX Format</span>
             </button>
-            <button className="flex flex-col items-center justify-center p-6 modal-section border border-[var(--shell-border)] rounded-xl hover:border-[var(--shell-accent)]/30 hover:modal-section transition-all group scale-100 active:scale-95 shadow-sm">
+            <button className="flex flex-col items-center justify-center p-6 modal-section border border-[var(--shell-border)] rounded-xl hover:border-[var(--shell-accent)]/30 hover:modal-section transition-all group scale-100 active:scale-95">
               <div className="w-12 h-12 rounded-full bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] text-[var(--danger)] flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <Download className="w-6 h-6" />
               </div>

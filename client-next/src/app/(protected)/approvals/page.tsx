@@ -343,7 +343,7 @@ export default function ApprovalsPage() {
             <div className="flex-1 space-y-4">
               {/* Receipt Viewer */}
               <div className="space-y-2">
-                <h3 className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
+                <h3 className="text-[11px] font-bold text-[var(--shell-text-muted)] flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
                   <Receipt className="w-3.5 h-3.5" /> Receipt
                 </h3>
                 <div
@@ -351,7 +351,7 @@ export default function ApprovalsPage() {
                   tabIndex={selectedApproval?.receipt_path ? 0 : undefined}
                   aria-label={selectedApproval?.receipt_path ? "Open receipt in a new tab" : undefined}
                   onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } }}
-                  className="focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)] h-20 rounded-xl flex items-center justify-center group cursor-pointer hover:brightness-105 transition-all shadow-md px-4"
+                  className="focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)] h-20 rounded-xl flex items-center justify-center group cursor-pointer transition-all px-4"
                   style={{ background: 'var(--shell-bg)', border: '1px solid var(--shell-border)' }}
                   onClick={async () => {
                     if (selectedApproval?.receipt_path) {
@@ -385,7 +385,7 @@ export default function ApprovalsPage() {
                         <Receipt className="w-4 h-4 text-[var(--shell-text-muted)]" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--shell-text-muted)] truncate">{selectedApproval.receipt_path.split('/').pop()}</p>
+                        <p className="text-[11px] font-bold text-[var(--shell-text-muted)] truncate">{selectedApproval.receipt_path.split('/').pop()}</p>
                         <p className="text-[11px] text-[var(--shell-text-muted)]/60 font-medium">Click to expand preview</p>
                       </div>
                     </div>
@@ -394,7 +394,7 @@ export default function ApprovalsPage() {
                       <div className="w-8 h-8 rounded-lg bg-[var(--shell-hover)] border border-[var(--shell-border)] flex items-center justify-center shrink-0">
                         <FileText className="w-4 h-4 text-[var(--shell-text-muted)]" />
                       </div>
-                      <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--shell-text-muted)]">No receipt attached</p>
+                      <p className="text-[11px] font-bold text-[var(--shell-text-muted)]">No receipt attached</p>
                     </div>
                   )}
                 </div>
@@ -402,7 +402,7 @@ export default function ApprovalsPage() {
 
               {/* Submission Details */}
               <div className="space-y-2">
-                <h3 className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
+                <h3 className="text-[11px] font-bold text-[var(--shell-text-muted)] flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
                   <Cpu className="w-3.5 h-3.5" /> Submission Details
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -432,7 +432,7 @@ export default function ApprovalsPage() {
                     },
                   ] as Array<{ label: string; val: string; amber?: boolean }>).map((item, idx) => (
                     <div key={idx} className={`px-2.5 py-2 rounded-lg border ${item.amber ? 'bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border-[color-mix(in_srgb,var(--warning)_30%,transparent)]' : 'bg-[var(--shell-hover)] border-[var(--shell-border)]'}`}>
-                      <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">{item.label}</p>
+                      <p className="text-[11px] font-bold text-[var(--shell-text-muted)]">{item.label}</p>
                       <p className={`text-[11px] font-bold truncate mt-0.5 ${item.amber ? 'text-[var(--warning)]' : 'text-black dark:text-white'}`}>{item.val}</p>
                     </div>
                   ))}
@@ -441,12 +441,12 @@ export default function ApprovalsPage() {
 
               {/* Fund Allocation / Split Detail */}
               <div className="space-y-2">
-                <h3 className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
+                <h3 className="text-[11px] font-bold text-[var(--shell-text-muted)] flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
                   <LayoutGrid className="w-3.5 h-3.5" /> Fund Allocation
                 </h3>
                 {selectedApproval.is_split === 1 ? (
                   <div className="space-y-2">
-                    <span className="flex items-center gap-1.5 px-2 py-0.5 bg-[color-mix(in_srgb,var(--success)_15%,transparent)] border border-[color-mix(in_srgb,var(--success)_20%,transparent)] rounded-full text-[11px] font-bold text-[var(--success)] uppercase tracking-wider w-fit">
+                    <span className="flex items-center gap-1.5 px-2 py-0.5 bg-[color-mix(in_srgb,var(--success)_15%,transparent)] border border-[color-mix(in_srgb,var(--success)_20%,transparent)] rounded-full text-[11px] font-bold text-[var(--success)] w-fit">
                       <Layers className="w-3 h-3" /> Split Transaction
                     </span>
                     {splitDetailsLoading ? (
@@ -467,7 +467,7 @@ export default function ApprovalsPage() {
                                   <span className="text-[11px] font-black text-black dark:text-white">{formatCurrency(Number(s.amount), currency)}</span>
                                 </div>
                               </div>
-                              <div className="w-full bg-[var(--shell-hover)] rounded-full h-1 overflow-hidden shadow-inner">
+                              <div className="w-full bg-[var(--shell-hover)] rounded-full h-1 overflow-hidden">
                                 <div className="bg-[var(--shell-accent)] h-full rounded-full transition-all" style={{ width: `${pct}%` }} />
                               </div>
                               {s.description && <p className="text-[11px] text-[var(--shell-text-muted)] mt-0.5 truncate">{s.description}</p>}
@@ -475,7 +475,7 @@ export default function ApprovalsPage() {
                           );
                         })}
                         <div className="flex items-center justify-between pt-1.5 border-t border-[var(--shell-border)]">
-                          <span className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-wider">{splitDetails.length} splits · Total</span>
+                          <span className="text-[11px] font-bold text-[var(--shell-text-muted)]">{splitDetails.length} splits · Total</span>
                           <span className="text-[12px] font-black text-[var(--shell-accent)]">{formatCurrency(amount, currency)}</span>
                         </div>
                       </div>
@@ -489,7 +489,7 @@ export default function ApprovalsPage() {
                       <span className="text-[11px] font-bold text-black dark:text-white">{selectedApproval.project_name || selectedApproval.product_name}</span>
                       <span className="text-[11px] font-bold text-[var(--shell-accent)]">100.00%</span>
                     </div>
-                    <div className="w-full bg-[var(--shell-hover)] rounded-full h-1 overflow-hidden shadow-inner">
+                    <div className="w-full bg-[var(--shell-hover)] rounded-full h-1 overflow-hidden">
                       <div className="bg-[var(--shell-accent)] h-full rounded-full" style={{ width: '100%' }} />
                     </div>
                   </div>
@@ -500,7 +500,7 @@ export default function ApprovalsPage() {
 
               {/* Timeline */}
               <div className="space-y-2">
-                <h3 className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
+                <h3 className="text-[11px] font-bold text-[var(--shell-text-muted)] flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
                   <HistoryIcon className="w-3.5 h-3.5" /> Approval Timeline
                 </h3>
                 <div className="space-y-3 relative before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-[var(--shell-hover)] ml-1">
@@ -508,10 +508,10 @@ export default function ApprovalsPage() {
                     <div className="absolute left-0 top-0.5 w-5 h-5 rounded-full bg-[color-mix(in_srgb,var(--success)_20%,transparent)] border-2 border-[var(--success)] flex items-center justify-center z-10">
                       <ShieldCheck className="w-3 h-3 text-[var(--success)]" />
                     </div>
-                    <p className="text-[11px] font-black text-black dark:text-white tracking-tight">
+                    <p className="text-[11px] font-black text-black dark:text-white">
                       Submitted by {selectedApproval.submitted_by_name || 'User'}
                     </p>
-                    <p className="text-[11px] text-[var(--shell-text-muted)] font-bold uppercase mt-0.5">
+                    <p className="text-[11px] text-[var(--shell-text-muted)] font-bold mt-0.5">
                       {formatDate(selectedApproval.created_at)}
                     </p>
                   </div>
@@ -521,7 +521,7 @@ export default function ApprovalsPage() {
               {/* Reimbursement status — shown when employee requested reimbursement */}
               {selectedApproval.needs_reimbursement && (
                 <div className="space-y-1.5">
-                  <h3 className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
+                  <h3 className="text-[11px] font-bold text-[var(--shell-text-muted)] flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
                     <Wallet className="w-3.5 h-3.5" /> Reimbursement
                   </h3>
                   {selectedApproval.reimbursement_status === 'PAID' ? (
@@ -563,19 +563,19 @@ export default function ApprovalsPage() {
                 <div className="grid grid-cols-3 gap-2 pt-1">
                   <button
                     onClick={() => setIsApproveOpen(true)}
-                    className="bg-[var(--shell-accent)] text-[var(--shell-accent-fg)] py-2.5 rounded-xl text-[11px] font-black uppercase tracking-[0.1em] hover:brightness-110 shadow-lg transition-all active:scale-95"
+                    className="bg-[var(--shell-accent)] text-[var(--shell-accent-fg)] py-2.5 rounded-xl text-[11px] font-black transition-all active:scale-95"
                   >
                     Approve
                   </button>
                   <button
                     onClick={() => setIsSendBackOpen(true)}
-                    className="bg-[var(--info)] text-[var(--info-foreground)] py-2.5 rounded-xl text-[11px] font-black uppercase tracking-[0.1em] hover:brightness-110 shadow-lg shadow-blue-600/20 transition-all active:scale-95"
+                    className="bg-[var(--info)] text-[var(--info-foreground)] py-2.5 rounded-xl text-[11px] font-black transition-all active:scale-95"
                   >
                     Send Back
                   </button>
                   <button
                     onClick={() => setIsRejectOpen(true)}
-                    className="bg-[var(--shell-hover)] border border-[color-mix(in_srgb,var(--danger)_30%,transparent)] text-[var(--danger)] py-2.5 rounded-xl text-[11px] font-black uppercase tracking-[0.1em] hover:bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] transition-all active:scale-95"
+                    className="bg-[var(--shell-hover)] border border-[color-mix(in_srgb,var(--danger)_30%,transparent)] text-[var(--danger)] py-2.5 rounded-xl text-[11px] font-black hover:bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] transition-all active:scale-95"
                   >
                     Reject
                   </button>

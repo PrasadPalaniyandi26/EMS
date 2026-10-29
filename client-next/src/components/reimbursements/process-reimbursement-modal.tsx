@@ -76,7 +76,7 @@ export function ProcessReimbursementModal({
         <div className="space-y-1.5">
           <label htmlFor="reimb-status" className="text-[11px] font-bold modal-label block">Status</label>
           <Select value={status} onValueChange={(v) => setStatus(v as 'PAID' | 'ON_HOLD')}>
-            <SelectTrigger id="reimb-status" className="modal-input border border-[var(--shell-border)] rounded-lg h-9 text-xs text-[var(--shell-text)] shadow-sm">
+            <SelectTrigger id="reimb-status" className="modal-input border border-[var(--shell-border)] rounded-lg h-9 text-xs text-[var(--shell-text)]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -93,7 +93,7 @@ export function ProcessReimbursementModal({
             {status === 'ON_HOLD' && <span className="text-[11px] font-normal text-[var(--shell-text-muted)] ml-1">(optional)</span>}
           </label>
           <Input id="reimb-reference" aria-required={status === "PAID"} aria-invalid={referenceError ? true : undefined}
-            className="modal-input border border-[var(--shell-border)] rounded-lg h-9 text-xs text-[var(--shell-text)] shadow-sm"
+            className="modal-input border border-[var(--shell-border)] rounded-lg h-9 text-xs text-[var(--shell-text)]"
             placeholder="UTR / Cheque No / Bank Ref"
             value={reference}
             onChange={(e) => { setReference(e.target.value); setReferenceError(''); }}
@@ -108,7 +108,7 @@ export function ProcessReimbursementModal({
             Note <span className="text-[11px] font-normal text-[var(--shell-text-muted)]">(optional)</span>
           </label>
           <Textarea id="reimb-note"
-            className="modal-input border border-[var(--shell-border)] rounded-lg text-xs text-[var(--shell-text)] shadow-sm resize-none"
+            className="modal-input border border-[var(--shell-border)] rounded-lg text-xs text-[var(--shell-text)] resize-none"
             rows={2}
             placeholder="Additional notes about this payment..."
             value={note}

@@ -319,7 +319,7 @@ export default function UserFormPage() {
                   ].map(({ val, label, color }) => (
                     <button key={val} onClick={() => set('status', val)}
                       className={cn('flex-1 py-2 text-sm font-medium rounded-lg transition-all',
-                        form.status === val ? `bg-[var(--shell-surface)] shadow-sm ${color}` : 'text-[var(--shell-text-muted)] hover:text-[var(--shell-text-muted)]'
+                        form.status === val ? `bg-[var(--shell-surface)] ${color}` : 'text-[var(--shell-text-muted)] hover:text-[var(--shell-text-muted)]'
                       )}>
                       {label}
                     </button>

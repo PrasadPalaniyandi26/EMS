@@ -118,7 +118,7 @@ export default function TransactionsPage() {
               <div className={`rounded-xl p-4 border ${selectedTxn.type === 'income' ? 'bg-[color-mix(in_srgb,var(--info)_15%,transparent)] border-[color-mix(in_srgb,var(--info)_20%,transparent)]' : 'bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] border-[color-mix(in_srgb,var(--danger)_20%,transparent)]'}`}>
                 <div className="flex justify-between items-start mb-3">
                   <div>
-                    <p className={`text-[11px] font-bold uppercase tracking-widest mb-1 ${selectedTxn.type === 'income' ? 'text-[var(--info)]' : 'text-[var(--danger)]'}`}>Total Amount</p>
+                    <p className={`text-[11px] font-bold mb-1 ${selectedTxn.type === 'income' ? 'text-[var(--info)]' : 'text-[var(--danger)]'}`}>Total Amount</p>
                     <p className={`text-2xl font-black ${selectedTxn.type === 'income' ? 'text-[var(--info)]' : 'text-[var(--danger)]'}`}>{formatCurrency(selectedTxn.amount, currency)}</p>
                   </div>
                   {selectedTxn.status && (() => {
@@ -128,11 +128,11 @@ export default function TransactionsPage() {
                 </div>
                 <div className={`grid grid-cols-2 gap-4 pt-3 border-t ${selectedTxn.type === 'income' ? 'border-[color-mix(in_srgb,var(--info)_20%,transparent)]' : 'border-[color-mix(in_srgb,var(--danger)_20%,transparent)]'}`}>
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider mb-0.5 text-[var(--shell-text-muted)]">Record ID</p>
+                    <p className="text-[11px] font-bold mb-0.5 text-[var(--shell-text-muted)]">Record ID</p>
                     <p className="text-[13px] font-bold font-mono text-black dark:text-white">#{selectedTxn.id}</p>
                   </div>
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider mb-0.5 text-[var(--shell-text-muted)]">Reference #</p>
+                    <p className="text-[11px] font-bold mb-0.5 text-[var(--shell-text-muted)]">Reference #</p>
                     <p className="text-[13px] font-bold text-black dark:text-white">{selectedTxn.reference_id || '—'}</p>
                   </div>
                 </div>
@@ -140,38 +140,38 @@ export default function TransactionsPage() {
 
               <div className="grid grid-cols-2 gap-y-4 gap-x-4">
                 <div className="col-span-2">
-                  <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--shell-text-muted)] mb-1 block">Description</p>
+                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-1 block">Description</p>
                   <p className="text-[12px] font-medium text-[var(--shell-text-muted)] bg-[var(--shell-hover)] px-2.5 py-2 rounded-lg border border-[var(--shell-border)] leading-relaxed">
                     {selectedTxn.description || 'No description provided.'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--shell-text-muted)] mb-1 block">Category</p>
-                  <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold border uppercase tracking-tighter bg-[var(--shell-hover)] text-[var(--shell-text-muted)] border-[var(--shell-border)]">
+                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-1 block">Category</p>
+                  <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold border bg-[var(--shell-hover)] text-[var(--shell-text-muted)] border-[var(--shell-border)]">
                     {selectedTxn.category_name || 'Uncategorized'}
                   </span>
                 </div>
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--shell-text-muted)] mb-1 block">Transaction Date</p>
+                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-1 block">Transaction Date</p>
                   <p className="text-[12px] font-bold text-black dark:text-white">{formatDate(selectedTxn.date_recorded)}</p>
                 </div>
                 <div className="col-span-2 h-[1px] bg-[var(--shell-hover)]" />
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--shell-text-muted)] mb-1 block">Payment Method</p>
+                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-1 block">Payment Method</p>
                   <div className="flex items-center gap-2">
                     <CreditCard className="h-4 w-4 text-[var(--shell-text-muted)]" />
                     <p className="text-[12px] font-bold text-[var(--shell-text-muted)] capitalize">{selectedTxn.payment_method || '—'}</p>
                   </div>
                 </div>
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--shell-text-muted)] mb-1 block">Type</p>
+                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-1 block">Type</p>
                   <p className="text-[12px] font-bold text-[var(--shell-text-muted)] capitalize">{selectedTxn.type}</p>
                 </div>
               </div>
 
               {selectedTxn.needs_reimbursement && (
                 <div className="space-y-1.5">
-                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
+                  <p className="text-[11px] font-bold text-[var(--shell-text-muted)] flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5">
                     <Wallet className="w-3.5 h-3.5" /> Reimbursement
                   </p>
                   {selectedTxn.reimbursement_status === 'PAID' ? (
@@ -209,7 +209,7 @@ export default function TransactionsPage() {
               )}
 
               <div className="space-y-2">
-                <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--shell-text-muted)]">Attached Document</p>
+                <p className="text-[11px] font-bold text-[var(--shell-text-muted)]">Attached Document</p>
                 {selectedTxn.receipt_path ? (
                   <button
                     type="button"
@@ -247,7 +247,7 @@ export default function TransactionsPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--shell-text-muted)]" />
             <Input
               aria-label="Search transactions"
-              className="pl-9 h-9 bg-[var(--shell-bg)] border-[var(--shell-border)] text-xs shadow-sm focus-visible:ring-1 focus-visible:ring-[color-mix(in_srgb,var(--info)_50%,transparent)]"
+              className="pl-9 h-9 bg-[var(--shell-bg)] border-[var(--shell-border)] text-xs focus-visible:ring-1 focus-visible:ring-[color-mix(in_srgb,var(--info)_50%,transparent)]"
               placeholder="Search description, category..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -255,7 +255,7 @@ export default function TransactionsPage() {
           </div>
           <div className="flex items-center gap-2">
             <Select value={datePreset} onValueChange={setDatePreset}>
-              <SelectTrigger aria-label="Date range" className="h-9 w-[140px] bg-[var(--shell-bg)] border-[var(--shell-border)] text-xs shadow-sm">
+              <SelectTrigger aria-label="Date range" className="h-9 w-[140px] bg-[var(--shell-bg)] border-[var(--shell-border)] text-xs">
                 <SelectValue placeholder="Date Range" />
               </SelectTrigger>
               <SelectContent>
@@ -269,7 +269,7 @@ export default function TransactionsPage() {
                 <SelectItem value="custom">Custom</SelectItem>
               </SelectContent>
             </Select>
-            <div className="flex items-center gap-2 bg-[var(--shell-bg)] border border-[var(--shell-border)] rounded-md px-3 h-9 text-xs font-medium text-[var(--shell-text-muted)] shadow-sm">
+            <div className="flex items-center gap-2 bg-[var(--shell-bg)] border border-[var(--shell-border)] rounded-md px-3 h-9 text-xs font-medium text-[var(--shell-text-muted)]">
               <Calendar className="h-3.5 w-3.5 text-[var(--shell-text-muted)]" />
               <input aria-label="From date" className="bg-transparent border-none p-0 w-[78px] text-center focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
               <span className="text-[var(--shell-text-muted)]">to</span>
@@ -398,7 +398,7 @@ export default function TransactionsPage() {
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <button aria-current="page" aria-label={`Page ${page + 1}`} className="w-7 h-7 flex items-center justify-center rounded-md bg-[var(--shell-accent)] text-[var(--shell-accent-fg)] font-bold shadow-sm">{page + 1}</button>
+          <button aria-current="page" aria-label={`Page ${page + 1}`} className="w-7 h-7 flex items-center justify-center rounded-md bg-[var(--shell-accent)] text-[var(--shell-accent-fg)] font-bold">{page + 1}</button>
           <button
             onClick={() => setPage((p) => p + 1)}
             disabled={page + 1 >= totalPages}

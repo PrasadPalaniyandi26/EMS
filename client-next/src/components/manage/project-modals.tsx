@@ -196,11 +196,11 @@ export function ProjectModal({
           <p id="project-status-label" className="mb-2 block text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Project Status</p>
           <div role="radiogroup" aria-labelledby="project-status-label" className="flex p-1 modal-toggle-track rounded-xl gap-1">
             {([
-              { val: 'Active',    active: 'text-[var(--success)] border border-[var(--success)] shadow-sm' },
-              { val: 'Proposed',  active: 'text-[var(--shell-text)] border border-[var(--shell-border)] shadow-sm' },
-              { val: 'On-Hold',   active: 'text-[var(--warning)] border border-[var(--warning)] shadow-sm' },
-              { val: 'Completed', active: 'text-[var(--info)] border border-[var(--info)] shadow-sm' },
-              { val: 'Canceled',  active: 'text-[var(--danger)] border border-[var(--danger)] shadow-sm' },
+              { val: 'Active',    active: 'text-[var(--success)] border border-[var(--success)]' },
+              { val: 'Proposed',  active: 'text-[var(--shell-text)] border border-[var(--shell-border)]' },
+              { val: 'On-Hold',   active: 'text-[var(--warning)] border border-[var(--warning)]' },
+              { val: 'Completed', active: 'text-[var(--info)] border border-[var(--info)]' },
+              { val: 'Canceled',  active: 'text-[var(--danger)] border border-[var(--danger)]' },
             ]).map(({ val, active }) => (
               <button
                 key={val}

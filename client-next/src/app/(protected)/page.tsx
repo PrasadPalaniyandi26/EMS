@@ -144,7 +144,7 @@ export default function DashboardPage() {
               type="button"
               aria-pressed={activePreset === p.label}
               onClick={() => handlePreset(p.key, p.label)}
-              className="px-2.5 py-1.5 rounded-full text-[11px] font-semibold transition-all"
+              className="px-2.5 py-1.5 rounded-md text-[12px] font-semibold transition-all"
               style={activePreset === p.label
                 ? { background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' }
                 : { background: 'var(--shell-hover)', color: 'var(--shell-text-muted)' }
@@ -266,8 +266,8 @@ export default function DashboardPage() {
                         <span className="text-[11px] font-bold w-10 text-right" style={{ color }}>{b.pct}%</span>
                       </div>
                     </div>
-                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--shell-hover)' }}>
-                      <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
+                    <div className="h-1.5 rounded-md overflow-hidden" style={{ background: 'var(--shell-hover)' }}>
+                      <div className="h-full rounded-md transition-all" style={{ width: `${pct}%`, background: color }} />
                     </div>
                   </div>
                 );
@@ -339,7 +339,7 @@ export default function DashboardPage() {
                 {(recentTxns || []).map((txn: any) => (
                   <div key={txn.id} className="flex items-center justify-between rounded-lg px-3 py-2.5 transition-colors" style={{ background: 'var(--shell-hover)', border: '1px solid var(--shell-border)' }}>
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${txn.type === 'income' ? 'bg-[color-mix(in_srgb,var(--success)_10%,transparent)]' : 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)]'}`}>
+                      <div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${txn.type === 'income' ? 'bg-[color-mix(in_srgb,var(--success)_10%,transparent)]' : 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)]'}`}>
                         {txn.type === 'income'
                           ? <TrendingUp className="h-3.5 w-3.5 text-[var(--success)]" />
                           : <TrendingDown className="h-3.5 w-3.5 text-[var(--danger)]" />
@@ -367,12 +367,12 @@ export default function DashboardPage() {
 
       {/* Row 5 — Quick Actions */}
       <div className="rounded-lg px-4 py-3 flex flex-wrap gap-2 items-center" style={surface}>
-        <span className="text-[11px] font-semibold uppercase tracking-wider mr-2" style={{ color: 'var(--shell-text-muted)' }}>Quick Actions</span>
+        <span className="text-[11px] font-semibold mr-2" style={{ color: 'var(--shell-text-muted)' }}>Quick Actions</span>
         {quickActions.map((a) => (
           <button
             key={a.href}
             onClick={() => router.push(a.href)}
-            className={`px-3 py-1.5 rounded-full text-[12px] font-semibold transition-all ${a.color}`}
+            className={`px-3 py-1.5 rounded-md text-[12px] font-semibold transition-all ${a.color}`}
           >
             {a.label}
           </button>

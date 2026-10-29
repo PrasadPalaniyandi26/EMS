@@ -39,7 +39,7 @@ export default function HubPage() {
 
       {/* Quick Actions */}
       <div>
-        <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--shell-text-muted)] mb-2.5">Quick Actions</p>
+        <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-2.5">Quick Actions</p>
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => router.push('/expense')}
@@ -102,7 +102,7 @@ export default function HubPage() {
         {/* Recent Transactions */}
         <div className="rounded-xl overflow-hidden" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
           <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--shell-border)' }}>
-            <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--shell-text-muted)]">Recent Transactions</p>
+            <p className="text-[11px] font-bold text-[var(--shell-text-muted)]">Recent Transactions</p>
             <button onClick={() => router.push('/transactions')} className="flex items-center gap-1 text-[11px] font-semibold text-[var(--shell-accent)] hover:opacity-80 transition-opacity">
               View all <ArrowRight className="w-3 h-3" />
             </button>
@@ -141,7 +141,7 @@ export default function HubPage() {
         {/* Budget Overview */}
         <div className="rounded-xl overflow-hidden" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
           <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--shell-border)' }}>
-            <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--shell-text-muted)]">Budget Overview</p>
+            <p className="text-[11px] font-bold text-[var(--shell-text-muted)]">Budget Overview</p>
             <button onClick={() => router.push('/manage/budgets')} className="flex items-center gap-1 text-[11px] font-semibold text-[var(--shell-accent)] hover:opacity-80 transition-opacity">
               Manage <ArrowRight className="w-3 h-3" />
             </button>
