@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import api, { getAccessToken } from '@/lib/api-client';
+import api from '@/lib/api-client';
+import { useAuthStore } from '@/stores/auth-store';
 import type {
   Category, Client, Project, Product, ProjectType, ProductType,
   Transaction, Budget, RecurringTransaction, ApprovalRequest, AuditLog,
@@ -106,6 +107,30 @@ export function useTransactions(params?: Record<string, string>) {
   });
 }
 
+// Every page of a filtered list, for workspaces that filter, sort and search client-side. The API caps a page at
+// 500 rows, so this keeps requesting pages until `total` is reached (up to MAX_PAGES) instead of silently
+// stopping at the first 500. `truncated` is true only if the safety cap was hit.
+const ALL_PAGE_SIZE = 500;
+const ALL_MAX_PAGES = 20;
+export function useAllTransactions(params: Record<string, string>) {
+  return useQuery({
+    queryKey: [QUERY_KEYS.TRANSACTIONS, 'all', params],
+    queryFn: async (): Promise<PaginatedResponse<Transaction> & { truncated: boolean }> => {
+      const rows: Transaction[] = [];
+      let total = 0;
+      for (let page = 1; page <= ALL_MAX_PAGES; page++) {
+        const qs = new URLSearchParams({ ...params, page: String(page), limit: String(ALL_PAGE_SIZE) }).toString();
+        const r = await api.get<Transaction[]>(`/transactions?${qs}`);
+        total = r.meta.total ?? r.data.length;
+        rows.push(...r.data);
+        if (rows.length >= total || r.data.length === 0) break;
+      }
+      return { rows, total, page: 1, limit: rows.length, truncated: rows.length < total };
+    },
+    staleTime: LIVE_STALE,
+  });
+}
+
 // ─── Budgets ─────────────────────────────────────
 export function useBudgets() {
   return useQuery({
@@ -198,6 +223,7 @@ export function useAuditStats() {
 
 // ─── Notifications ────────────────────────────────
 export function useNotifications(params?: Record<string, string>) {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const qs = params ? '?' + new URLSearchParams(params).toString() : '';
   return useQuery({
     queryKey: [QUERY_KEYS.NOTIFICATIONS, params],
@@ -206,7 +232,7 @@ export function useNotifications(params?: Record<string, string>) {
       // ResponseInterceptor puts rows into data and total/unread_count into meta
       return { rows: (r.data as any) ?? [], total: (r as any).meta?.total ?? 0, unread_count: (r as any).meta?.unread_count ?? 0 };
     },
-    enabled: !!getAccessToken(),
+    enabled: isAuthenticated,
     staleTime: LIVE_STALE,
     refetchInterval: 60 * 1000,
     refetchIntervalInBackground: false,
@@ -215,10 +241,11 @@ export function useNotifications(params?: Record<string, string>) {
 }
 
 export function useUnreadCount() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   return useQuery({
     queryKey: [QUERY_KEYS.NOTIFICATIONS, 'unread-count'],
     queryFn: () => api.get<{ unread_count: number }>('/notifications/unread-count').then((r) => r.data),
-    enabled: !!getAccessToken(),
+    enabled: isAuthenticated,
     staleTime: 60 * 1000,
     refetchInterval: 60 * 1000,
     refetchIntervalInBackground: false,
@@ -306,7 +333,13 @@ export function useApprovalCounts() {
 export function useProjectSpend(dateFrom?: string, dateTo?: string) {
   return useQuery({
     queryKey: [QUERY_KEYS.DASHBOARD, 'project-spend', dateFrom, dateTo],
-    queryFn: () => api.get<any[]>(`/dashboard/project-spend${dateFrom ? `?dateFrom=${dateFrom}&dateTo=${dateTo}` : ''}`).then((r) => r.data),
+    queryFn: () => {
+      const qs = new URLSearchParams();
+      if (dateFrom) qs.set('dateFrom', dateFrom);
+      if (dateTo) qs.set('dateTo', dateTo);
+      const q = qs.toString();
+      return api.get<any[]>(`/dashboard/project-spend${q ? `?${q}` : ''}`).then((r) => r.data);
+    },
     staleTime: LIVE_STALE,
   });
 }

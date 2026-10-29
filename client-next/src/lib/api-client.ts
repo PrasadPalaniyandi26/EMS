@@ -21,10 +21,14 @@ export async function refreshAccessToken(): Promise<string> {
   // If already refreshing, return the existing promise
   if (refreshPromise) return refreshPromise;
 
-  refreshPromise = fetch(`${API_BASE}/auth/refresh`, {
+  // Refresh tokens rotate, so two tabs refreshing at once would invalidate each other. A Web Lock makes the
+  // tabs refresh one at a time (the second one then simply uses the cookie the first one rotated).
+  const doFetch = () => fetch(`${API_BASE}/auth/refresh`, {
     method: 'POST',
     credentials: 'include',
-  })
+  });
+  const locks = typeof navigator !== 'undefined' ? (navigator as Navigator & { locks?: LockManager }).locks : undefined;
+  refreshPromise = ((locks ? locks.request('ems-token-refresh', doFetch) : doFetch()) as Promise<Response>)
     .then(async (res) => {
       if (!res.ok) throw new Error('Refresh failed');
       const data = await res.json();

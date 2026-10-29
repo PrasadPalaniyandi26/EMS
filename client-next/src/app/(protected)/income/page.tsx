@@ -3,7 +3,7 @@
 import { useRef, useState, useMemo, useEffect } from 'react';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
-import { useTransactions, useCategories, useClients, useProjects, useInvalidate, useApprovalTrail } from '@/hooks/use-queries';
+import { useAllTransactions, useCategories, useClients, useProjects, useInvalidate, useApprovalTrail } from '@/hooks/use-queries';
 import api, { getAccessToken, API_BASE } from '@/lib/api-client';
 import { formatCurrency, formatDate, CURRENCY_SYMBOL } from '@/lib/currency';
 import { STATUS_CONFIG } from '@/lib/status';
@@ -58,7 +58,7 @@ export default function IncomePage() {
   // Income is auto-approved on submit, so hiding APPROVED/REJECTED would make a record vanish from
   // the page it was entered on. Show every status and let the toolbar filter narrow it down.
   // Request a high limit instead of the default 20 so the client-side table has the full set.
-  const { data: txnData, isLoading } = useTransactions({ type: 'income', limit: '500' });
+  const { data: txnData, isLoading } = useAllTransactions({ type: 'income' });
 
   const LOCKED_STATUSES = ['APPROVED', 'REJECTED'];
   const [statusFilter, setStatusFilter] = useState('all');

@@ -3,7 +3,7 @@
 import { useRef, useState, useMemo, useEffect } from 'react';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
-import { useTransactions, useCategories, useProjects, useInvalidate, useApprovalTrail } from '@/hooks/use-queries';
+import { useAllTransactions, useCategories, useProjects, useInvalidate, useApprovalTrail } from '@/hooks/use-queries';
 import api, { getAccessToken, API_BASE } from '@/lib/api-client';
 import { formatCurrency, formatDate, parseApiDate, CURRENCY_SYMBOL } from '@/lib/currency';
 import { toast } from 'sonner';
@@ -52,7 +52,7 @@ export default function ExpensePage() {
   // live in Approvals history), so the row count is naturally bounded. Request a high
   // limit instead of the default 20 so the full active set is available to the
   // client-side table + faceted filters rather than just the latest 20 records.
-  const { data: txnData, isLoading } = useTransactions({ type: 'expense', limit: '500' });
+  const { data: txnData, isLoading } = useAllTransactions({ type: 'expense', excludeStatus: 'APPROVED,REJECTED' });
   // Data — exclude APPROVED/REJECTED (those belong to Approvals history)
   const EXCLUDED_STATUSES = ['APPROVED', 'REJECTED'];
   const rawTransactions = useMemo(() => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useHeaderStore } from '@/stores/header-store';
 import { useRoles, useInvalidate } from '@/hooks/use-queries';
@@ -44,7 +44,16 @@ const TABS = [
 ];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
+// useSearchParams needs a Suspense boundary or the page cannot be prerendered / statically exported
 export default function UserFormPage() {
+  return (
+    <Suspense fallback={null}>
+      <UserForm />
+    </Suspense>
+  );
+}
+
+function UserForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const userId = searchParams.get('id');

@@ -48,6 +48,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
   const { data: allCategories } = useCategories();
   const { data: clients } = useClients();
   const invalidate = useInvalidate();
+  const isExpense = type === 'expense';
 
   const [clientId, setClientId] = useState('');
   const [contextType, setContextType] = useState('project');
@@ -59,7 +60,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
   const [receiptNumber, setReceiptNumber] = useState('');
   const [amount, setAmount] = useState('');
   const [gstRate, setGstRate] = useState('0%');
-  const [gstAdded, setGstAdded] = useState(false);
+  const [gstAdded, setGstAdded] = useState(true);
   const [needsReimbursement, setNeedsReimbursement] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [fileRemoved, setFileRemoved] = useState(false);
@@ -67,6 +68,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
   const [saving, setSaving] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [budgetWarning, setBudgetWarning] = useState<{ remaining: number; after_this_expense: number; allocated: number; will_exceed: boolean } | null>(null);
+  const [dupCheckFailed, setDupCheckFailed] = useState(false);
   const [dupWarning, setDupWarning] = useState<{ hardBlock: boolean; softWarn: boolean; matches: any[] } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -110,6 +112,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
       setOcrLoading(false);
       setSaving(false);
       setDupWarning(null);
+      setDupCheckFailed(false);
       return;
     }
     if (editing) {
@@ -219,7 +222,9 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
 
   const handleViewFile = async () => {
     if (file) {
-      window.open(URL.createObjectURL(file), '_blank');
+      const url = URL.createObjectURL(file);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } else if (editing?.receipt_path) {
       try {
         const token = getAccessToken();
@@ -227,8 +232,11 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
           credentials: 'include',
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
+        if (!res.ok) { toast.error('Failed to open receipt'); return; }
         const blob = await res.blob();
-        window.open(URL.createObjectURL(blob), '_blank');
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
       } catch {
         toast.error('Failed to open receipt');
       }
@@ -273,6 +281,12 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
         }
       } catch (e) {
         console.error('Duplicate check failed:', e);
+        // Do not silently skip the check: warn once, and let a second Save go through
+        if (!dupCheckFailed) {
+          setDupCheckFailed(true);
+          toast.warning("Couldn't check for duplicates. Click Save again to save anyway.");
+          return;
+        }
       }
     }
 
@@ -300,7 +314,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
         clientId: clientId ? Number(clientId) : null,
         projectId: contextType === 'project' && codeId ? Number(codeId) : null,
         productId: contextType === 'product' && codeId ? Number(codeId) : null,
-        contextType: contextType || 'project',
+        contextType: contextType || null,
         receiptPath,
         needsReimbursement: isExpense ? needsReimbursement : false,
       };
@@ -325,7 +339,6 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
   const hasFile = file || (!fileRemoved && editing?.receipt_path);
   const fileName = file?.name || (editing?.receipt_path ? editing.receipt_path.split('/').pop() : '');
   const fileSize = file ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : '';
-  const isExpense = type === 'expense';
   const isAdd = !editing;
 
   return (

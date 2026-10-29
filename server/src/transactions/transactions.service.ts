@@ -70,6 +70,12 @@ export class TransactionsService {
     if (filters.paymentMethod) where.paymentMethod = filters.paymentMethod;
     if (filters.clientId) where.clientId = Number(filters.clientId);
     if (filters.status) where.status = filters.status;
+    // Comma-separated statuses to leave out (e.g. the expense workspace hides APPROVED and REJECTED), so they
+    // never crowd active rows out of a page
+    const excluded = typeof filters.excludeStatus === 'string'
+      ? filters.excludeStatus.split(',').map((s: string) => s.trim().toUpperCase()).filter(Boolean)
+      : [];
+    if (excluded.length) where.AND = [{ status: { notIn: excluded } }];
     if (filters.type) where.type = filters.type;
     if (filters.contextType) where.contextType = filters.contextType;
     if (filters.search) {
