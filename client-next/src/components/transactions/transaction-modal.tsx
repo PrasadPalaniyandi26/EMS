@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
-import { useCategories, useClients, useProjects, useProducts, useInvalidate } from '@/hooks/use-queries';
+import { useCategories, useCategoryTypes, useProjects, useProducts, useInvalidate } from '@/hooks/use-queries';
 import api, { getAccessToken, API_BASE } from '@/lib/api-client';
 import { CURRENCY_SYMBOL, toLocalYMD, parseApiDate, parseOcrDate } from '@/lib/currency';
 import { toast } from 'sonner';
@@ -10,7 +10,7 @@ import { Plus, Pencil, Eye, Trash2, FileText, Sparkles } from 'lucide-react';
 import type { Transaction } from '@/lib/types';
 import { ModuleModal } from '@/components/shared/module/module-modal';
 import { Field, NativeSelect, CurrencyInput, inp } from '@/components/shared/modal-primitives';
-import { FormGrid } from '@/components/shared/form-grid';
+import { PickSelect } from '@/components/manage/pick-select';
 import { InlineAlert } from '@/components/shared/inline-alert';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { Input } from '@/components/ui/input';
@@ -48,7 +48,6 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
   const currency = useAuthStore((s) => s.user?.currency || 'INR');
   const currencySymbol = CURRENCY_SYMBOL[currency] || '₹';
   const { data: allCategories } = useCategories();
-  const { data: clients } = useClients();
   const invalidate = useInvalidate();
   const isExpense = type === 'expense';
 
@@ -56,6 +55,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
   const [contextType, setContextType] = useState('project');
   const [codeId, setCodeId] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [typeId, setTypeId] = useState('');
   const [description, setDescription] = useState('');
   const [dateRecorded, setDateRecorded] = useState(toLocalYMD());
   const [paymentMethod, setPaymentMethod] = useState('cash');
@@ -91,19 +91,31 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
     return () => clearTimeout(timer);
   }, [type, categoryId, amount, dateRecorded]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const clientIdNum = clientId ? Number(clientId) : undefined;
-  const { data: projects } = useProjects(clientIdNum);
-  const { data: products } = useProducts(clientIdNum);
+  const { data: projects } = useProjects();
+  const { data: products } = useProducts();
+  const { data: categoryTypes } = useCategoryTypes(type);
 
   const filteredCategories = (allCategories || []).filter((c) => c.type === type);
 
-  // Codes belong to a client, so offer none until a client is chosen
-  const codeOptions = !clientId ? [] :
-    contextType === 'project'
-      ? (projects || []).map((p) => ({ id: String(p.id), label: p.code || p.name }))
-      : contextType === 'product'
-        ? (products || []).map((p) => ({ id: String(p.id), label: p.code || p.name }))
-        : [];
+  // The entry is charged to a project or product by name; the client is whichever client that belongs to
+  const named = contextType === 'project' ? (projects || []) : contextType === 'product' ? (products || []) : [];
+  const nameCount = new Map<string, number>();
+  for (const p of named) nameCount.set(p.name, (nameCount.get(p.name) ?? 0) + 1);
+  const codeOptions = named.map((p) => ({
+    id: String(p.id),
+    // Names are unique per client, so add the client only where two share a name
+    label: (nameCount.get(p.name) ?? 0) > 1 && p.client_name ? `${p.name} (${p.client_name})` : p.name,
+  }));
+  const chosen = named.find((p) => String(p.id) === codeId);
+  const effectiveClientId = chosen?.client_id ?? (clientId ? Number(clientId) : null);
+
+  // Categories follow the chosen type. Keep a saved one even if its type was archived.
+  const typeOptions = (categoryTypes || []).map((t) => ({ id: t.id, name: t.name }));
+  const categoryOptions = filteredCategories.filter((c) => String(c.type_id ?? '') === typeId).map((c) => ({ id: c.id, name: c.name }));
+  if (categoryId && !categoryOptions.some((o) => String(o.id) === categoryId)) {
+    const saved = filteredCategories.find((c) => String(c.id) === categoryId);
+    if (saved) categoryOptions.push({ id: saved.id, name: saved.name });
+  }
 
   useEffect(() => {
     if (!open) {
@@ -125,6 +137,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
             : '',
       );
       setCategoryId(editing.category_id ? String(editing.category_id) : '');
+      setTypeId(String((allCategories || []).find((c) => c.id === editing.category_id)?.type_id ?? ''));
       setDescription(editing.description || '');
       setDateRecorded(editing.date_recorded?.split('T')[0] || toLocalYMD());
       setPaymentMethod(editing.payment_method || 'cash');
@@ -141,6 +154,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
       setContextType('project');
       setCodeId('');
       setCategoryId('');
+      setTypeId('');
       setDescription('');
       setDateRecorded(toLocalYMD());
       setPaymentMethod('cash');
@@ -178,7 +192,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
           c.name.toLowerCase().includes(ocr.category.toLowerCase()) ||
           ocr.category.toLowerCase().includes(c.name.toLowerCase())
         );
-        if (match) setCategoryId(String(match.id));
+        if (match) { setCategoryId(String(match.id)); setTypeId(String(match.type_id ?? '')); }
       }
 
       const filled = [ocr.amount, ocr.date, ocr.paymentMethod, ocr.referenceNo, ocr.description, ocr.category].filter(Boolean).length;
@@ -283,7 +297,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
         description,
         paymentMethod,
         receiptNumber: receiptNumber || null,
-        clientId: clientId ? Number(clientId) : null,
+        clientId: effectiveClientId,
         projectId: contextType === 'project' && codeId ? Number(codeId) : null,
         productId: contextType === 'product' && codeId ? Number(codeId) : null,
         contextType: contextType || null,
@@ -322,105 +336,31 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
       onSave={() => handleSave()}
       canSave={!!amount && !isNaN(Number(amount)) && Number(amount) > 0 && !!dateRecorded}
       saveLabel={editing ? `Update ${isExpense ? 'Expense' : 'Income'}` : `Add ${isExpense ? 'Expense' : 'Income'}`}
-      size="lg"
+      size="xl"
     >
-      <FormGrid className="gap-x-4 gap-y-3">
-        <Field label="Client">
-          <NativeSelect
-            value={clientId}
-            onChange={(e) => { setClientId(e.target.value); setCodeId(''); }}
-          >
-            <option value="">Select client...</option>
-            {(clients || [])
-              .filter((c) => c.is_active || String(c.id) === clientId) // keep an inactive client that an existing entry already uses
-              .map((c) => (
-                <option key={c.id} value={String(c.id)}>{c.name}</option>
-              ))}
-          </NativeSelect>
-        </Field>
+      <div className="grid grid-cols-1 items-start gap-x-6 gap-y-3 md:grid-cols-3">
 
-        <Field label="Charge To">
-          <NativeSelect
-            value={contextType}
-            onChange={(e) => { setContextType(e.target.value); setCodeId(''); }}
-          >
-            <option value="">Select...</option>
-            <option value="project">Project</option>
-            <option value="product">Product</option>
-          </NativeSelect>
-        </Field>
-
-        <Field label="Code" hint={!clientId ? 'Choose a client first' : undefined}>
-          <NativeSelect
-            value={codeId}
-            onChange={(e) => setCodeId(e.target.value)}
-            disabled={!contextType || !clientId}
-          >
-            <option value="">Select code...</option>
-            {codeOptions.map((o) => (
-              <option key={o.id} value={o.id}>{o.label}</option>
-            ))}
-          </NativeSelect>
-        </Field>
-
-        <Field label={isExpense ? 'Expense Category' : 'Income Category'}>
-          <NativeSelect value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-            <option value="">Select category...</option>
-            {filteredCategories.map((c) => (
-              <option key={c.id} value={String(c.id)}>{c.name}</option>
-            ))}
-          </NativeSelect>
-        </Field>
-
-        <Field label="Detail">
-          <Input
-            className={`${inp} border-input bg-transparent text-[var(--shell-text)]`}
-            type="text"
-            placeholder="Enter full description and justification..."
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </Field>
-
-        <Field label="Payment Method">
-          <NativeSelect value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
-            <option value="cash">Cash</option>
-            <option value="card">Card</option>
-            <option value="bank_transfer">Bank Transfer</option>
-            <option value="upi">UPI</option>
-            <option value="cheque">Cheque</option>
-          </NativeSelect>
-        </Field>
-
-        <Field label={`Reference No${isExpense ? ' & Reimburse' : ''}`}>
-          <div className="flex items-center gap-2">
+        {/* Column 1: the entry itself */}
+        <div className="space-y-3">
+          <Field label={`Date of ${isExpense ? 'Expense' : 'Income'}`} required>
             <Input
-              className={`${inp} border-input bg-transparent text-[var(--shell-text)] min-w-0 flex-1`}
-              type="text"
-              placeholder="INV-0000 / REC-0000"
-              value={receiptNumber}
-              onChange={(e) => setReceiptNumber(e.target.value)}
+              className={`${inp} border-input bg-transparent text-[var(--shell-text)]`}
+              type="date"
+              value={dateRecorded}
+              onChange={(e) => setDateRecorded(e.target.value)}
             />
-            {isExpense && (
-              <label className="flex h-10 shrink-0 cursor-pointer items-center gap-2 text-[12px] font-semibold text-[var(--shell-text-muted)]">
-                <Switch checked={needsReimbursement} onCheckedChange={setNeedsReimbursement} aria-label="Needs reimbursement" />
-                <span className="whitespace-nowrap">{needsReimbursement ? 'Reimburse' : 'No reimburse'}</span>
-              </label>
-            )}
-          </div>
-        </Field>
+          </Field>
 
-        <Field label={`Date of ${isExpense ? 'Expense' : 'Income'}`} required>
-          <Input
-            className={`${inp} border-input bg-transparent text-[var(--shell-text)]`}
-            type="date"
-            value={dateRecorded}
-            onChange={(e) => setDateRecorded(e.target.value)}
-          />
-        </Field>
+          <Field label="Detail">
+            <Input
+              className={`${inp} border-input bg-transparent text-[var(--shell-text)]`}
+              type="text"
+              placeholder="Enter full description and justification..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </Field>
 
-        {/* GST rate + inclusion switch | Amount: final row */}
-        <div className="grid grid-cols-1 items-end gap-x-4 gap-y-3 sm:col-span-2 sm:grid-cols-2">
           <Field label="GST & Inclusion">
             <div className="flex items-center gap-2">
               <div className="min-w-0 flex-1">
@@ -435,57 +375,83 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
           </Field>
         </div>
 
-        {/* Budget warning: expense only */}
-        {isExpense && budgetWarning && (
-          <InlineAlert className="sm:col-span-2" tone={budgetWarning.will_exceed ? 'danger' : 'tip'}>
-            {budgetWarning.will_exceed
-              ? <>This expense <strong>exceeds</strong> the budget by <strong>{Math.abs(budgetWarning.after_this_expense).toLocaleString()}</strong>. Budget allocated: {budgetWarning.allocated.toLocaleString()} · Remaining: {budgetWarning.remaining.toLocaleString()}.</>
-              : <>Budget remaining after this expense: <strong>{budgetWarning.after_this_expense.toLocaleString()}</strong> (of {budgetWarning.allocated.toLocaleString()} allocated).</>
-            }
-          </InlineAlert>
-        )}
+        {/* Column 2: what it is charged to and how it is classified */}
+        <div className="space-y-3">
+          <Field label="Charge To">
+            <NativeSelect
+              value={contextType}
+              onChange={(e) => { setContextType(e.target.value); setCodeId(''); }}
+            >
+              <option value="">Select...</option>
+              <option value="project">Project</option>
+              <option value="product">Product</option>
+            </NativeSelect>
+          </Field>
 
-        {/* Duplicate warning */}
-        {dupWarning && (
-          <InlineAlert
-            className="sm:col-span-2"
-            tone={dupWarning.hardBlock ? 'danger' : 'warning'}
-            title={dupWarning.hardBlock
-              ? 'Exact duplicate detected — change amount, category, or date to proceed.'
-              : 'Similar transaction found nearby — please review before saving.'}
-            actions={!dupWarning.hardBlock && (
-              <>
-                <Button
-                  type="button"
-                  onClick={() => handleSave(true)}
-                  disabled={saving}
-                  className="h-9 px-3 text-[12px] font-semibold"
-                  style={{ background: 'var(--warning)', color: 'var(--warning-foreground)' }}
-                >
-                  Save anyway
-                </Button>
-                <Button type="button" variant="ghost" onClick={() => setDupWarning(null)} className="h-9 px-3 text-[12px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>
-                  Cancel
-                </Button>
-              </>
-            )}
-          >
-            <ul className="space-y-1.5">
-              {dupWarning.matches.slice(0, 3).map((m: any) => (
-                <li key={m.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--shell-text-muted)]">
-                  <span className="font-semibold text-[var(--info)]">{m.reference_id || `#${m.id}`}</span>
-                  <span>{m.category_name || '—'}</span>
-                  <span className="font-semibold">{Number(m.net_amount ?? m.amount).toLocaleString()}</span>
-                  <span>{m.date_recorded?.slice(0, 10)}</span>
-                  <StatusBadge status={m.status} />
-                </li>
+          <Field label={contextType === 'product' ? 'Product' : contextType === 'project' ? 'Project' : 'Project / Product'} hint={chosen?.client_name ? `Client: ${chosen.client_name}` : undefined}>
+            <NativeSelect
+              value={codeId}
+              onChange={(e) => setCodeId(e.target.value)}
+              disabled={!contextType}
+            >
+              <option value="">{contextType === 'product' ? 'Select product...' : contextType === 'project' ? 'Select project...' : 'Select...'}</option>
+              {codeOptions.map((o) => (
+                <option key={o.id} value={o.id}>{o.label}</option>
               ))}
-            </ul>
-          </InlineAlert>
-        )}
+            </NativeSelect>
+          </Field>
+
+          <PickSelect
+            label={isExpense ? 'Expense Type' : 'Income Type'}
+            placeholder="Select type..."
+            value={typeId}
+            onChange={(id) => { setTypeId(id); setCategoryId(''); }}
+            options={typeOptions}
+            emptyHint="No types yet. An admin can add them with Category."
+          />
+
+          <PickSelect
+            label={isExpense ? 'Expense Category' : 'Income Category'}
+            placeholder="Select category..."
+            value={categoryId}
+            onChange={setCategoryId}
+            options={categoryOptions}
+            disabled={!typeId}
+            emptyHint="No categories for this type yet. An admin can add them with Category."
+          />
+        </div>
+
+        {/* Column 3: payment and proof */}
+        <div className="space-y-3">
+          <Field label="Payment Method">
+            <NativeSelect value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+              <option value="cash">Cash</option>
+              <option value="card">Card</option>
+              <option value="bank_transfer">Bank Transfer</option>
+              <option value="upi">UPI</option>
+              <option value="cheque">Cheque</option>
+            </NativeSelect>
+          </Field>
+
+          <Field label="Reference No">
+            <Input
+              className={`${inp} border-input bg-transparent text-[var(--shell-text)]`}
+              type="text"
+              placeholder="INV-0000 / REC-0000"
+              value={receiptNumber}
+              onChange={(e) => setReceiptNumber(e.target.value)}
+            />
+          </Field>
+
+          {isExpense && (
+            <label className="flex h-10 cursor-pointer items-center justify-between gap-3 rounded-md border border-input px-3 text-[13px] font-medium text-[var(--shell-text)]">
+              <span>Needs reimbursement</span>
+              <Switch checked={needsReimbursement} onCheckedChange={setNeedsReimbursement} aria-label="Needs reimbursement" />
+            </label>
+          )}
 
         {/* Receipt upload */}
-        <div className="space-y-1.5 sm:col-span-2">
+        <div className="space-y-1.5">
           <FileDropzone
             label="Receipt upload"
             onFile={handleFile}
@@ -525,7 +491,58 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
             </div>
           )}
         </div>
-      </FormGrid>
+        </div>
+
+        {/* Budget warning: expense only */}
+        {isExpense && budgetWarning && (
+          <InlineAlert className="md:col-span-3" tone={budgetWarning.will_exceed ? 'danger' : 'tip'}>
+            {budgetWarning.will_exceed
+              ? <>This expense <strong>exceeds</strong> the budget by <strong>{Math.abs(budgetWarning.after_this_expense).toLocaleString()}</strong>. Budget allocated: {budgetWarning.allocated.toLocaleString()} · Remaining: {budgetWarning.remaining.toLocaleString()}.</>
+              : <>Budget remaining after this expense: <strong>{budgetWarning.after_this_expense.toLocaleString()}</strong> (of {budgetWarning.allocated.toLocaleString()} allocated).</>
+            }
+          </InlineAlert>
+        )}
+
+        {/* Duplicate warning */}
+        {dupWarning && (
+          <InlineAlert
+            className="md:col-span-3"
+            tone={dupWarning.hardBlock ? 'danger' : 'warning'}
+            title={dupWarning.hardBlock
+              ? 'Exact duplicate detected — change amount, category, or date to proceed.'
+              : 'Similar transaction found nearby — please review before saving.'}
+            actions={!dupWarning.hardBlock && (
+              <>
+                <Button
+                  type="button"
+                  onClick={() => handleSave(true)}
+                  disabled={saving}
+                  className="h-9 px-3 text-[12px] font-semibold"
+                  style={{ background: 'var(--warning)', color: 'var(--warning-foreground)' }}
+                >
+                  Save anyway
+                </Button>
+                <Button type="button" variant="ghost" onClick={() => setDupWarning(null)} className="h-9 px-3 text-[12px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>
+                  Cancel
+                </Button>
+              </>
+            )}
+          >
+            <ul className="space-y-1.5">
+              {dupWarning.matches.slice(0, 3).map((m: any) => (
+                <li key={m.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--shell-text-muted)]">
+                  <span className="font-semibold text-[var(--info)]">{m.reference_id || `#${m.id}`}</span>
+                  <span>{m.category_name || '—'}</span>
+                  <span className="font-semibold">{Number(m.net_amount ?? m.amount).toLocaleString()}</span>
+                  <span>{m.date_recorded?.slice(0, 10)}</span>
+                  <StatusBadge status={m.status} />
+                </li>
+              ))}
+            </ul>
+          </InlineAlert>
+        )}
+
+      </div>
     </ModuleModal>
   );
 }

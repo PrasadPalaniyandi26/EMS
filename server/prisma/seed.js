@@ -73,11 +73,10 @@ async function main() {
 
   // ── 4. Internal Project Type ──
   await prisma.projectType.upsert({
-    where: { clientId_name: { clientId: 1, name: 'Internal' } },
+    where: { name: 'Internal' },
     update: {},
     create: {
       id: 1,
-      clientId: 1,
       name: 'Internal',
       isActive: true,
     },
@@ -102,11 +101,10 @@ async function main() {
 
   // ── 6. Internal Product Type ──
   await prisma.productType.upsert({
-    where: { clientId_name: { clientId: 1, name: 'Internal' } },
+    where: { name: 'Internal' },
     update: {},
     create: {
       id: 1,
-      clientId: 1,
       name: 'Internal',
       isActive: true,
     },

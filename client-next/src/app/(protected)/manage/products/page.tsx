@@ -95,8 +95,6 @@ export default function ProductsPage() {
   const selectedRows = table.getSelectedRowModel().rows;
   const selectedProduct = selectedRows.length > 0 ? selectedRows[0].original : null;
 
-  // Types belong to a client, as for projects, so the list follows the chosen client
-  const clientTypes = allTypes.filter((t: any) => String(t.client_id) === form.clientId);
 
   // Categories follow the chosen type; the category is stored by name, so keep a saved one that is no longer listed
   const categoryOptions = (categories || []).filter((c) => String(c.type_id) === form.typeId).map((c) => ({ id: c.name, name: c.name }));
@@ -249,7 +247,7 @@ export default function ProductsPage() {
             {/* Column 2: classification, top to bottom: client, type, then the type's categories */}
             <div className="space-y-3">
               <Field label="Client" required>
-                <NativeSelect value={form.clientId} onChange={e => setForm({ ...form, clientId: e.target.value, typeId: '', category: '' })}>
+                <NativeSelect value={form.clientId} onChange={e => setForm({ ...form, clientId: e.target.value })}>
                   <option value="">Select client</option>
                   {(clients || []).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </NativeSelect>
@@ -260,9 +258,8 @@ export default function ProductsPage() {
                 placeholder="Select type"
                 value={form.typeId}
                 onChange={(id) => setForm(prev => ({ ...prev, typeId: id, category: '' }))}
-                options={clientTypes}
-                disabled={!form.clientId}
-                emptyHint="No types for this client yet. An admin can add them with Types."
+                options={allTypes}
+                emptyHint="No types yet. An admin can add them with Types."
               />
               <PickSelect
                 label="Product Category"
@@ -314,7 +311,6 @@ export default function ProductsPage() {
         kind="product"
         isOpen={manageOpen}
         onClose={() => setManageOpen(false)}
-        clients={clients || []}
         types={allTypes}
         categories={categories || []}
       />

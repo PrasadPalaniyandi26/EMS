@@ -8,7 +8,7 @@ export class ProductsService {
 
   private mapType(pt: any) {
     return ({
-      id: pt.id, client_id: pt.clientId, client_name: pt.client?.name, name: pt.name,
+      id: pt.id, name: pt.name,
       is_active: pt.isActive ? 1 : 0, created_by: pt.createdBy, created_at: pt.createdAt,
     });
   }
@@ -106,37 +106,32 @@ export class ProductsService {
     return result.count > 0;
   }
 
-  // --- Product Types ---
-  async findAllTypes(filters: { clientId?: number } = {}) {
-    const where: any = { isActive: true };
-    if (filters.clientId) where.clientId = filters.clientId;
+  // --- Product Types (global: a product is "client X, product Y, of type Z") ---
+  async findAllTypes(filters: { includeInactive?: boolean } = {}) {
     const types = await this.prisma.productType.findMany({
-      where, include: { client: true }, orderBy: [{ client: { name: 'asc' } }, { name: 'asc' }],
-      take: 1000,
+      where: filters.includeInactive ? {} : { isActive: true }, orderBy: { name: 'asc' }, take: 1000,
     });
     return types.map((pt) => this.mapType(pt));
   }
 
   async findTypeById(id: number) {
-    const pt = await this.prisma.productType.findUnique({ where: { id }, include: { client: true } });
+    const pt = await this.prisma.productType.findUnique({ where: { id } });
     if (!pt) throw new HttpException('Product type not found.', HttpStatus.NOT_FOUND);
     return this.mapType(pt);
   }
 
-  // Type names are unique per client, ignoring case. Returns the clashing type, if any.
-  private findTypeClash(name: string, clientId: number | null, exceptId?: number) {
+  // Type names are unique, ignoring case. Returns the clashing type, if any.
+  private findTypeClash(name: string, exceptId?: number) {
     return this.prisma.productType.findFirst({
-      where: { clientId, name: { equals: String(name).trim(), mode: 'insensitive' }, ...(exceptId && { NOT: { id: exceptId } }) },
+      where: { name: { equals: String(name).trim(), mode: 'insensitive' }, ...(exceptId && { NOT: { id: exceptId } }) },
     });
   }
 
   async createType(data: any) {
     try {
-      const clientId = data.clientId ? Number(data.clientId) : (data.client_id ? Number(data.client_id) : null);
       const name = String(data.name ?? '').trim();
       if (!name) throw new HttpException('Name is required.', HttpStatus.BAD_REQUEST);
-      if (!clientId) throw new HttpException('Client is required.', HttpStatus.BAD_REQUEST);
-      const clash = await this.findTypeClash(name, clientId);
+      const clash = await this.findTypeClash(name);
       if (clash?.isActive) throw new HttpException('A type with this name already exists.', HttpStatus.CONFLICT);
       if (clash) {
         await this.prisma.productType.update({ where: { id: clash.id }, data: { isActive: true } });
@@ -144,7 +139,6 @@ export class ProductsService {
       }
       const pt = await this.prisma.productType.create({
         data: {
-          clientId: clientId || null,
           name,
           createdBy: data.createdBy ? Number(data.createdBy) : (data.created_by ? Number(data.created_by) : null),
         },
@@ -161,14 +155,11 @@ export class ProductsService {
       const name = data.name !== undefined ? String(data.name).trim() : undefined;
       if (name !== undefined) {
         if (!name) throw new HttpException('Name is required.', HttpStatus.BAD_REQUEST);
-        const current = await this.prisma.productType.findUnique({ where: { id } });
-        const clientId = data.clientId ? Number(data.clientId) : (data.client_id ? Number(data.client_id) : (current?.clientId ?? null));
-        if (await this.findTypeClash(name, clientId, id)) throw new HttpException('A type with this name already exists.', HttpStatus.CONFLICT);
+        if (await this.findTypeClash(name, id)) throw new HttpException('A type with this name already exists.', HttpStatus.CONFLICT);
       }
       await this.prisma.productType.update({
         where: { id },
         data: {
-          clientId: data.clientId ? Number(data.clientId) : (data.client_id ? Number(data.client_id) : undefined),
           name,
           isActive: data.isActive !== undefined ? Boolean(data.isActive) : (data.is_active !== undefined ? Boolean(data.is_active) : undefined),
         },

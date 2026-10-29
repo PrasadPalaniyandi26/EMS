@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import api from '@/lib/api-client';
 import { ModuleModal } from '@/components/shared/module/module-modal';
-import { Field, NativeSelect } from '@/components/shared/modal-primitives';
 import { useInvalidate, useTypeUsage, type TypeCategory } from '@/hooks/use-queries';
 import { ManageList } from './manage-list';
 
@@ -14,28 +13,25 @@ interface Props {
   kind: 'project' | 'product';
   isOpen: boolean;
   onClose: () => void;
-  /** Types belong to a client, for projects and products alike */
-  clients: { id: number; name: string }[];
-  types: (Item & { client_id?: number | null })[];
+  types: Item[];
   categories: TypeCategory[];
 }
 
 const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
-// Add, rename and remove types (per client) and the categories under them.
+// Add, rename and remove types and the categories under them. Types are shared by every client:
+// a project or product is "client X, name Y, of type Z", chosen when it is created.
 // Unused entries are deleted; ones that records use are archived so those records keep their value.
-export function ManageTypesDialog({ kind, isOpen, onClose, clients, types, categories }: Props) {
+export function ManageTypesDialog({ kind, isOpen, onClose, types, categories }: Props) {
   const invalidate = useInvalidate();
   const { data: usage } = useTypeUsage(kind, isOpen);
   const typeBase = `/${kind}-types`;
   const catBase = `/${kind}-categories`;
 
-  const [clientId, setClientId] = useState('');
   const [typeId, setTypeId] = useState<number | null>(null);
 
-  useEffect(() => { if (isOpen) { setClientId(''); setTypeId(null); } }, [isOpen]);
+  useEffect(() => { if (isOpen) setTypeId(null); }, [isOpen]);
 
-  const shownTypes = types.filter((t) => String(t.client_id) === clientId);
   const selected = types.find((t) => t.id === typeId) ?? null;
   const shownCategories = categories.filter((c) => c.type_id === typeId);
 
@@ -54,28 +50,17 @@ export function ManageTypesDialog({ kind, isOpen, onClose, clients, types, categ
       footer={<Button onClick={onClose} className="h-8 px-5 text-[12px] font-semibold">Done</Button>}
     >
       <div className="grid grid-cols-1 items-start gap-x-6 gap-y-6 md:grid-cols-2">
-        <Field label="Client">
-          <NativeSelect value={clientId} onChange={(e) => { setClientId(e.target.value); setTypeId(null); }}>
-            <option value="">Select client</option>
-            {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </NativeSelect>
-        </Field>
-        {/* Kept free above Categories for a future filter, so both lists start on the same line */}
-        <div aria-hidden className="hidden md:block" />
-
         <ManageList
           heading="Types"
           sectionLabel="Types"
           noun="type"
-          items={shownTypes.map((t) => ({ id: t.id, name: t.name, used: usage?.types[t.id] ?? 0 }))}
+          items={types.map((t) => ({ id: t.id, name: t.name, used: usage?.types[t.id] ?? 0 }))}
           selectedId={typeId}
           onPick={setTypeId}
-          emptyText={clientId ? 'No types yet.' : 'Choose a client to see its types.'}
-          disabled={!clientId}
+          emptyText="No types yet."
           taken={(name, exceptId) =>
-            types.some((t) => t.id !== exceptId && String(t.client_id) === clientId && same(t.name, name))
-              ? `A type named "${name}" already exists for this client` : null}
-          onAdd={(name) => done(api.post(typeBase, { name, client_id: Number(clientId) }))}
+            types.some((t) => t.id !== exceptId && same(t.name, name)) ? `A type named "${name}" already exists` : null}
+          onAdd={(name) => done(api.post(typeBase, { name }))}
           onRename={(id, name) => done(api.put(`${typeBase}/${id}`, { name }))}
           onRemove={async (id) => {
             const res = await done(api.delete(`${typeBase}/${id}`));

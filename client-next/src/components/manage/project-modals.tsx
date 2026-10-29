@@ -52,9 +52,7 @@ export function ProjectModal({
     }
   }, [editing, isOpen]);
 
-  // Types belong to a client, so the list follows the chosen client
-  const clientTypes = projectTypes.filter((t) => String(t.client_id) === form.client_id);
-  // ...and categories follow the chosen type. The category is stored by name; keep a saved one that is no longer listed
+  // Categories follow the chosen type. The category is stored by name; keep a saved one that is no longer listed
   const categoryOptions = categories.filter((c) => String(c.type_id) === form.type_id).map((c) => ({ id: c.name, name: c.name }));
   if (form.category && form.type_id && !categoryOptions.some((o) => o.id === form.category)) categoryOptions.push({ id: form.category, name: form.category });
 
@@ -101,7 +99,7 @@ export function ProjectModal({
           <Field label="Client" required>
             <NativeSelect
               value={form.client_id}
-              onChange={(e) => setForm((p) => ({ ...p, client_id: e.target.value, type_id: '', category: '' }))}
+              onChange={(e) => set("client_id", e.target.value)}
             >
               <option value="">Select client</option>
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -113,9 +111,8 @@ export function ProjectModal({
             placeholder="Select type"
             value={form.type_id}
             onChange={(id) => setForm((p) => ({ ...p, type_id: id, category: '' }))}
-            options={clientTypes}
-            disabled={!form.client_id}
-            emptyHint="No types for this client yet. An admin can add them with Types."
+            options={projectTypes}
+            emptyHint="No types yet. An admin can add them with Types."
           />
           <PickSelect
             label="Project Category"

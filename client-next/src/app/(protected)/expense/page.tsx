@@ -3,6 +3,8 @@
 import { useRef, useState, useMemo, useEffect } from 'react';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
+import { Tags } from 'lucide-react';
+import { ManageCategoriesDialog } from '@/components/manage/manage-categories-dialog';
 import { useAllTransactions, useCategories, useProjects, useInvalidate, useApprovalTrail } from '@/hooks/use-queries';
 import api, { getAccessToken, API_BASE } from '@/lib/api-client';
 import { formatCurrency, formatDate, parseApiDate, CURRENCY_SYMBOL } from '@/lib/currency';
@@ -42,6 +44,9 @@ import { CurrencyInput, useConfirm } from '@/components/shared/modal-primitives'
 export default function ExpensePage() {
   const setHeader = useHeaderStore((s) => s.setHeader);
   const user = useAuthStore((s) => s.user);
+  // Managing types and categories is admin-only; the API checks the active role the same way
+  const isAdmin = (user?.role_name || '').toUpperCase() === 'ADMIN';
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
   const currency = user?.currency || 'INR';
   
   const currencySymbol = CURRENCY_SYMBOL[currency] || '₹';
@@ -466,6 +471,11 @@ export default function ExpensePage() {
             <button className="btn-action" onClick={openAdd}>
               <Plus className="h-4 w-4 text-[var(--success)]" /> Add
             </button>
+            {isAdmin && (
+              <button className="btn-action" onClick={() => setCategoriesOpen(true)}>
+                <Tags aria-hidden className="h-4 w-4 text-[var(--nav-violet)]" /> Category
+              </button>
+            )}
           <ToolbarActions actions={itemActions} /></>}
         />
       }
@@ -682,6 +692,7 @@ export default function ExpensePage() {
           </div>
         </div>
       </ModuleModal>
+      <ManageCategoriesDialog isOpen={categoriesOpen} onClose={() => setCategoriesOpen(false)} kinds={['expense']} />
     </ModuleShell>
   );
 }

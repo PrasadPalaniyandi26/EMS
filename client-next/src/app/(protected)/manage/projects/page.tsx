@@ -198,7 +198,6 @@ export default function ProjectsPage() {
         kind="project"
         isOpen={manageOpen}
         onClose={() => setManageOpen(false)}
-        clients={clients || []}
         types={types || []}
         categories={categories || []}
       />

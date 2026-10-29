@@ -16,7 +16,6 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   Plus,
   Pencil,
-  Settings,
   Pause,
   Play,
   CalendarDays,
@@ -29,6 +28,8 @@ import { ModuleModal } from '@/components/shared/module/module-modal';
 import { Field, NativeSelect, CurrencyInput, SegmentedControl, inp, sel } from '@/components/shared/modal-primitives';
 import { FileDropzone } from '@/components/shared/file-dropzone';
 import { GstRateSelect, GstIncludedSwitch } from '@/components/shared/gst-fields';
+import { PickSelect } from '@/components/manage/pick-select';
+import { useCategoryTypes } from '@/hooks/use-queries';
 
 // Shared control styles for these dialogs: 40px, keyboard focus ring
 const ctl = inp;
@@ -56,8 +57,25 @@ export function RecurringModal({
   file,
   onFileChange,
 }: RecurringModalProps) {
-  const filteredCategories = categories.filter((c) => c.type === form.type);
   const isEdit = !!editing;
+  const { data: categoryTypes } = useCategoryTypes(form.type);
+
+  // The type is not stored on the schedule: it is the type of the chosen category.
+  const [typeId, setTypeId] = React.useState('');
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const saved = categories.find((c) => String(c.id) === String(form.category_id));
+    setTypeId(saved?.type_id ? String(saved.type_id) : '');
+  }, [isOpen, editing]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const typeOptions = (categoryTypes || []).map((t) => ({ id: t.id, name: t.name }));
+  const categoryOptions = categories
+    .filter((c) => c.type === form.type && String(c.type_id ?? '') === typeId)
+    .map((c) => ({ id: c.id, name: c.name }));
+  if (form.category_id && !categoryOptions.some((o) => String(o.id) === String(form.category_id))) {
+    const saved = categories.find((c) => String(c.id) === String(form.category_id));
+    if (saved) categoryOptions.push({ id: saved.id, name: saved.name });
+  }
 
   return (
     <ModuleModal
@@ -68,91 +86,31 @@ export function RecurringModal({
       onSave={onSave}
       canSave={!!form.description?.trim() && !!form.amount && Number(form.amount) > 0 && !!form.category_id && !!form.frequency && !!form.next_run}
       saveLabel={isEdit ? 'Update Schedule' : 'Schedule Transaction'}
-      size="lg"
+      size="xl"
     >
-      <div className="space-y-3">
+      <div className="grid grid-cols-1 items-start gap-x-6 gap-y-3 md:grid-cols-3">
 
-        {/* Vendor + Type */}
-        <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
-          <div className="sm:col-span-2">
-            <Field label="Service / Vendor" required>
-              <Input
-                className={ctl}
-                placeholder="Enter vendor name..."
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-              />
-            </Field>
-          </div>
-          <div className="space-y-1.5">
-            <p id="recurring-type-label" className="text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Transaction Type</p>
-            <SegmentedControl
-              labelledBy="recurring-type-label"
-              className="h-10"
-              value={form.type}
-              onChange={(v) => setForm({ ...form, type: v, category_id: '' })}
-              options={[
-                { value: 'expense', label: 'Expense', tone: 'danger' },
-                { value: 'income', label: 'Income', tone: 'success' },
-              ]}
+        {/* Column 1: what is billed and when */}
+        <div className="space-y-3">
+          <Field label="Service / Vendor" required>
+            <Input
+              className={ctl}
+              placeholder="Enter vendor name..."
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
             />
-          </div>
-        </div>
-
-        {/* Category | Frequency | Payment Method */}
-        <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
-          <Field label="Category" required>
-            <Select value={form.category_id} onValueChange={(v) => setForm({ ...form, category_id: v })}>
-              <SelectTrigger className={sel}><SelectValue placeholder="Select Category" /></SelectTrigger>
-              <SelectContent>
-                {filteredCategories.map((c) => (
-                  <SelectItem className="text-sm" key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </Field>
           <Field label="Frequency" required>
-            <Select value={form.frequency.toLowerCase()} onValueChange={(v) => setForm({ ...form, frequency: v })}>
-              <SelectTrigger className={sel}><SelectValue placeholder="Select Frequency" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem className="text-sm" value="daily">Daily</SelectItem>
-                <SelectItem className="text-sm" value="weekly">Weekly</SelectItem>
-                <SelectItem className="text-sm" value="biweekly">Bi-Weekly</SelectItem>
-                <SelectItem className="text-sm" value="monthly">Monthly</SelectItem>
-                <SelectItem className="text-sm" value="quarterly">Quarterly</SelectItem>
-                <SelectItem className="text-sm" value="yearly">Yearly</SelectItem>
-              </SelectContent>
-            </Select>
+            <NativeSelect value={form.frequency.toLowerCase()} onChange={(e) => setForm({ ...form, frequency: e.target.value })}>
+              <option value="">Select frequency</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="biweekly">Bi-Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="quarterly">Quarterly</option>
+              <option value="yearly">Yearly</option>
+            </NativeSelect>
           </Field>
-          <Field label="Payment Method">
-            <Select value={form.payment_method || 'cash'} onValueChange={(v) => setForm({ ...form, payment_method: v })}>
-              <SelectTrigger className={sel}><SelectValue placeholder="Select Method" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem className="text-sm" value="cash">Cash</SelectItem>
-                <SelectItem className="text-sm" value="card">Card</SelectItem>
-                <SelectItem className="text-sm" value="bank_transfer">Bank Transfer</SelectItem>
-                <SelectItem className="text-sm" value="upi">UPI</SelectItem>
-                <SelectItem className="text-sm" value="cheque">Cheque</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-        </div>
-
-        {/* GST Rate | GST Included | Amount */}
-        <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
-          <Field label="GST rate">
-            <GstRateSelect value={form.gst_rate} onChange={(v) => setForm({ ...form, gst_rate: v })} emptyLabel="No GST" />
-          </Field>
-          <Field label="GST included">
-            <GstIncludedSwitch checked={form.gst_included} onChange={(v) => setForm({ ...form, gst_included: v })} />
-          </Field>
-          <Field label={`Amount ${amountLabel(form.gst_rate, form.gst_included)}`} required>
-            <CurrencyInput value={form.amount} onChange={(v) => setForm({ ...form, amount: v })} />
-          </Field>
-        </div>
-
-        {/* Start Date | End Date | Open-Ended */}
-        <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
           <Field label="Start Date" required>
             <Input
               type="date"
@@ -165,87 +123,119 @@ export function RecurringModal({
             <Input
               type="date"
               className={`${ctl} disabled:opacity-40`}
+              min={form.next_run || undefined}
               value={form.end_date || ''}
               onChange={(e) => setForm({ ...form, end_date: e.target.value })}
               disabled={form.open_ended}
             />
           </Field>
-          <Field label="Open-Ended">
-            <label className="flex h-10 cursor-pointer items-center gap-2.5 text-[12px] font-semibold text-[var(--shell-text-muted)]">
-              <Switch
-                checked={form.open_ended}
-                onCheckedChange={(v) => setForm({ ...form, open_ended: v, end_date: v ? '' : form.end_date })}
-              />
-              <span className="whitespace-nowrap">{form.open_ended ? 'No end date' : 'Set end date'}</span>
-            </label>
+          <label className="flex h-10 cursor-pointer items-center justify-between gap-3 rounded-md border border-input px-3 text-[13px] font-medium text-[var(--shell-text)]">
+            <span>Open-ended (no end date)</span>
+            <Switch
+              checked={form.open_ended}
+              onCheckedChange={(v) => setForm({ ...form, open_ended: v, end_date: v ? '' : form.end_date })}
+              aria-label="Open-ended"
+            />
+          </label>
+        </div>
+
+        {/* Column 2: what kind of transaction, and its type and category */}
+        <div className="space-y-3">
+          <div>
+            <p id="recurring-type-label" className="mb-2 block text-[13px] font-medium" style={{ color: 'var(--shell-text)' }}>Transaction Type</p>
+            <SegmentedControl
+              labelledBy="recurring-type-label"
+              value={form.type}
+              onChange={(v) => { setForm({ ...form, type: v, category_id: '' }); setTypeId(''); }}
+              options={[
+                { value: 'expense', label: 'Expense', tone: 'danger' },
+                { value: 'income', label: 'Income', tone: 'success' },
+              ]}
+            />
+          </div>
+          <PickSelect
+            label={form.type === 'income' ? 'Income Type' : 'Expense Type'}
+            placeholder="Select type..."
+            value={typeId}
+            onChange={(id) => { setTypeId(id); setForm({ ...form, category_id: '' }); }}
+            options={typeOptions}
+            emptyHint="No types yet. An admin can add them with Category."
+          />
+          <PickSelect
+            label={form.type === 'income' ? 'Income Category' : 'Expense Category'}
+            required
+            placeholder="Select category..."
+            value={form.category_id ? String(form.category_id) : ''}
+            onChange={(id) => setForm({ ...form, category_id: id })}
+            options={categoryOptions}
+            disabled={!typeId}
+            emptyHint="No categories for this type yet. An admin can add them with Category."
+          />
+        </div>
+
+        {/* Column 3: how it is paid and how much */}
+        <div className="space-y-3">
+          <Field label="Payment Method">
+            <NativeSelect value={form.payment_method || 'cash'} onChange={(e) => setForm({ ...form, payment_method: e.target.value })}>
+              <option value="cash">Cash</option>
+              <option value="card">Card</option>
+              <option value="bank_transfer">Bank Transfer</option>
+              <option value="upi">UPI</option>
+              <option value="cheque">Cheque</option>
+            </NativeSelect>
+          </Field>
+          <Field label="GST & Inclusion">
+            <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <GstRateSelect value={form.gst_rate} onChange={(v) => setForm({ ...form, gst_rate: v })} emptyLabel="No GST" />
+              </div>
+              <GstIncludedSwitch checked={form.gst_included} onChange={(v) => setForm({ ...form, gst_included: v })} />
+            </div>
+          </Field>
+          <Field label={`Amount ${amountLabel(form.gst_rate, form.gst_included)}`} required>
+            <CurrencyInput value={form.amount} onChange={(v) => setForm({ ...form, amount: v })} />
+          </Field>
+          <label className="flex h-10 cursor-pointer items-center justify-between gap-3 rounded-md border border-input px-3 text-[13px] font-medium text-[var(--shell-text)]">
+            <span>Auto-submit for approval</span>
+            <Switch checked={!!form.auto_submit} onCheckedChange={(v) => setForm({ ...form, auto_submit: v })} aria-label="Auto-submit for approval" />
+          </label>
+        </div>
+
+        {/* Notes and proof, across the full width */}
+        <div className="md:col-span-2">
+          <Field label="Recurring Purpose / Notes">
+            <Textarea
+              className="min-h-[96px] w-full resize-none rounded-md border border-input bg-transparent text-sm text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus-visible:border-[var(--shell-accent)] focus-visible:ring-2 focus-visible:ring-[var(--shell-accent)]"
+              placeholder="Provide a reason for this recurring transaction..."
+              value={form.notes || ''}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            />
           </Field>
         </div>
 
-        {/* Automation Rules */}
-        <div className="pt-2 border-t border-[var(--shell-border)]">
-          <div className="flex items-center gap-2 mb-2">
-            <Settings aria-hidden className="w-3.5 h-3.5 text-[var(--shell-accent)]" />
-            <span className="text-xs font-semibold text-[var(--shell-accent)]">Automation Rules</span>
-            <div className="h-[1px] flex-1 bg-[var(--shell-border)]" />
-          </div>
-          <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <p className="text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Next Run Date</p>
-              <p className="flex h-10 items-center text-[12px] text-[var(--shell-text-muted)]">
-                {form.next_run
-                  ? (() => {
-                      const d = new Date(form.next_run + 'T00:00:00');
-                      return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-                    })()
-                  : '—'}
-                {form.next_run && form.frequency && (
-                  <span className="ml-1.5 text-[var(--shell-accent)] font-semibold capitalize">· {form.frequency}</span>
-                )}
-              </p>
-            </div>
-            <Field label="Auto-submit for Approval">
-              <label className="flex h-10 cursor-pointer items-center gap-2.5 text-[12px] font-medium text-[var(--shell-text)]">
-                <Switch checked={!!form.auto_submit} onCheckedChange={(v) => setForm({ ...form, auto_submit: v })} />
-                <span>{form.auto_submit ? 'Enabled' : 'Disabled'}</span>
-              </label>
-            </Field>
-          </div>
-        </div>
-
-        {/* Notes */}
-        <Field label="Recurring Purpose / Notes">
-          <Textarea
-            className="w-full text-sm border-input bg-transparent text-[var(--shell-text)] rounded-lg resize-none min-h-[64px]"
-            placeholder="Provide a reason for this recurring transaction..."
-            value={form.notes || ''}
-            onChange={(e) => setForm({ ...form, notes: e.target.value })}
-          />
-        </Field>
-
-        {/* File upload */}
         <div className="space-y-1.5">
           <FileDropzone label="Supporting document" onFile={onFileChange} />
           {(file || (isEdit && editing?.receipt_path)) && (
-            <div className="mt-1 rounded-lg border border border-[var(--shell-border)] rounded-lg px-3 py-2 flex items-center justify-between">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <FileText aria-hidden className="w-5 h-5 text-[var(--shell-accent)] shrink-0" />
-                <div className="leading-tight min-w-0">
-                  <p className="text-[12px] font-semibold text-[var(--shell-text)] truncate max-w-[280px]">
+            <div className="mt-1 flex items-center justify-between rounded-lg border border-[var(--shell-border)] px-3 py-2">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <FileText aria-hidden className="h-5 w-5 shrink-0 text-[var(--shell-accent)]" />
+                <div className="min-w-0 leading-tight">
+                  <p className="max-w-[200px] truncate text-[12px] font-semibold text-[var(--shell-text)]">
                     {file?.name || (editing?.receipt_path ? editing.receipt_path.split('/').pop() : '')}
                   </p>
                   {file && <p className="text-[12px] text-[var(--shell-text-muted)]">{(file.size / 1024 / 1024).toFixed(1)} MB</p>}
                 </div>
               </div>
-              <div className="flex items-center gap-1 shrink-0">
+              <div className="flex shrink-0 items-center gap-1">
                 {file && (
                   <button type="button" aria-label="View file" onClick={() => window.open(URL.createObjectURL(file), '_blank')}
-                    className="flex h-9 w-9 items-center justify-center rounded-md hover:bg-[var(--shell-hover)] text-[var(--shell-text-muted)] hover:text-[var(--shell-accent)] transition-colors">
-                    <Eye aria-hidden className="w-4 h-4" />
+                    className="flex h-9 w-9 items-center justify-center rounded-md text-[var(--shell-text-muted)] transition-colors hover:bg-[var(--shell-hover)] hover:text-[var(--shell-accent)]">
+                    <Eye aria-hidden className="h-4 w-4" />
                   </button>
                 )}
                 <button type="button" aria-label="Remove file" onClick={() => onFileChange(null)}
-                  className="flex h-9 w-9 items-center justify-center rounded-md hover:bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] text-[var(--shell-text-muted)] hover:text-[var(--danger)] transition-colors">
-                  <XIcon aria-hidden className="w-4 h-4" />
+                  className="flex h-9 w-9 items-center justify-center rounded-md text-[var(--shell-text-muted)] transition-colors hover:bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] hover:text-[var(--danger)]">
+                  <XIcon aria-hidden className="h-4 w-4" />
                 </button>
               </div>
             </div>

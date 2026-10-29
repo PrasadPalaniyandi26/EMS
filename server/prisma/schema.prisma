@@ -119,11 +119,14 @@ model Category {
   isCustom     Boolean                @default(false) @map("is_custom")
   createdBy    Int?                   @map("created_by")
   isActive     Boolean                @default(true) @map("is_active")
+  typeId       Int?                   @map("type_id")
+  categoryType CategoryType?          @relation(fields: [typeId], references: [id], onDelete: SetNull)
   budgets      Budget[]
   recurringTxn RecurringTransaction[]
   splits       TransactionSplit[]
   transactions Transaction[]
 
+  @@index([typeId])
   @@map("categories")
 }
 
@@ -256,9 +259,7 @@ model Client {
   state        String?                @db.VarChar(100)
   postalCode   String?                @map("postal_code") @db.VarChar(20)
   creator      User?                  @relation("ClientCreator", fields: [createdBy], references: [id])
-  productTypes ProductType[]
   products     Product[]
-  projectTypes ProjectType[]
   projects     Project[]
   recurringTxn   RecurringTransaction[]
   transactions   Transaction[]
@@ -270,18 +271,15 @@ model Client {
 
 model ProjectType {
   id        Int       @id @default(autoincrement())
-  clientId  Int       @map("client_id")
   name      String    @db.VarChar(100)
   isActive  Boolean   @default(true) @map("is_active")
   createdBy Int?      @map("created_by")
   createdAt DateTime  @default(now()) @map("created_at")
-  client    Client    @relation(fields: [clientId], references: [id])
   creator   User?     @relation("ProjectTypeCreator", fields: [createdBy], references: [id])
   projects  Project[]
   categories ProjectCategory[]
 
-  @@unique([clientId, name])
-  @@index([clientId])
+  @@unique([name])
   @@map("project_types")
 }
 
@@ -341,18 +339,15 @@ model Project {
 
 model ProductType {
   id        Int       @id @default(autoincrement())
-  clientId  Int?      @map("client_id")
   name      String    @db.VarChar(100)
   isActive  Boolean   @default(true) @map("is_active")
   createdBy Int?      @map("created_by")
   createdAt DateTime  @default(now()) @map("created_at")
-  client    Client?   @relation(fields: [clientId], references: [id], onDelete: Restrict)
   creator   User?     @relation("ProductTypeCreator", fields: [createdBy], references: [id])
   products  Product[]
   categories ProductCategory[]
 
-  @@unique([clientId, name])
-  @@index([clientId])
+  @@unique([name])
   @@map("product_types")
 }
 
@@ -590,4 +585,18 @@ model Department {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("departments")
+}
+
+// Groups expense or income categories: Type > Category, e.g. Facilities > Rent
+model CategoryType {
+  id         Int        @id @default(autoincrement())
+  name       String     @db.VarChar(50)
+  kind       String     @db.VarChar(10)
+  isActive   Boolean    @default(true) @map("is_active")
+  createdBy  Int?       @map("created_by")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  categories Category[]
+
+  @@unique([kind, name])
+  @@map("category_types")
 }

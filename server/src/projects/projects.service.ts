@@ -8,7 +8,7 @@ export class ProjectsService {
 
   private mapType(pt: any) {
     return ({
-      id: pt.id, client_id: pt.clientId, client_name: pt.client?.name, name: pt.name,
+      id: pt.id, name: pt.name,
       is_active: pt.isActive ? 1 : 0, created_by: pt.createdBy, created_at: pt.createdAt,
     });
   }
@@ -106,45 +106,39 @@ export class ProjectsService {
     return result.count > 0;
   }
 
-  // --- Project Types ---
-  async findAllTypes(filters: { clientId?: number; includeInactive?: boolean } = {}) {
-    const where: any = {};
-    if (!filters.includeInactive) where.isActive = true;
-    if (filters.clientId) where.clientId = filters.clientId;
+  // --- Project Types (global: a project is "client X, project Y, of type Z") ---
+  async findAllTypes(filters: { includeInactive?: boolean } = {}) {
     const types = await this.prisma.projectType.findMany({
-      where, include: { client: true }, orderBy: [{ client: { name: 'asc' } }, { name: 'asc' }],
-      take: 1000,
+      where: filters.includeInactive ? {} : { isActive: true }, orderBy: { name: 'asc' }, take: 1000,
     });
     return types.map((pt) => this.mapType(pt));
   }
 
   async findTypeById(id: number) {
-    const pt = await this.prisma.projectType.findUnique({ where: { id }, include: { client: true } });
+    const pt = await this.prisma.projectType.findUnique({ where: { id } });
     if (!pt) throw new HttpException('Project type not found.', HttpStatus.NOT_FOUND);
     return this.mapType(pt);
   }
 
-  // Type names are unique per client, ignoring case. Returns the clashing type, if any.
-  private findTypeClash(name: string, clientId: number, exceptId?: number) {
+  // Type names are unique, ignoring case. Returns the clashing type, if any.
+  private findTypeClash(name: string, exceptId?: number) {
     return this.prisma.projectType.findFirst({
-      where: { clientId, name: { equals: String(name).trim(), mode: 'insensitive' }, ...(exceptId && { NOT: { id: exceptId } }) },
+      where: { name: { equals: String(name).trim(), mode: 'insensitive' }, ...(exceptId && { NOT: { id: exceptId } }) },
     });
   }
 
   async createType(data: any) {
     try {
-      const clientId = data.clientId ? Number(data.clientId) : (data.client_id ? Number(data.client_id) : 0);
       const name = String(data.name ?? '').trim();
       if (!name) throw new HttpException('Name is required.', HttpStatus.BAD_REQUEST);
-      const clash = await this.findTypeClash(name, clientId);
-      if (clash?.isActive) throw new HttpException('This client already has a type with that name.', HttpStatus.CONFLICT);
+      const clash = await this.findTypeClash(name);
+      if (clash?.isActive) throw new HttpException('A type with this name already exists.', HttpStatus.CONFLICT);
       if (clash) {
         await this.prisma.projectType.update({ where: { id: clash.id }, data: { isActive: true } });
         return this.findTypeById(clash.id);
       }
       const pt = await this.prisma.projectType.create({
         data: {
-          clientId,
           name,
           createdBy: data.createdBy ? Number(data.createdBy) : (data.created_by ? Number(data.created_by) : null),
         },
@@ -161,14 +155,11 @@ export class ProjectsService {
       const name = data.name !== undefined ? String(data.name).trim() : undefined;
       if (name !== undefined) {
         if (!name) throw new HttpException('Name is required.', HttpStatus.BAD_REQUEST);
-        const current = await this.prisma.projectType.findUnique({ where: { id } });
-        const clientId = data.clientId ? Number(data.clientId) : (data.client_id ? Number(data.client_id) : (current?.clientId ?? 0));
-        if (await this.findTypeClash(name, clientId, id)) throw new HttpException('This client already has a type with that name.', HttpStatus.CONFLICT);
+        if (await this.findTypeClash(name, id)) throw new HttpException('A type with this name already exists.', HttpStatus.CONFLICT);
       }
       await this.prisma.projectType.update({
         where: { id },
         data: {
-          clientId: data.clientId ? Number(data.clientId) : (data.client_id ? Number(data.client_id) : undefined),
           name,
           isActive: data.isActive !== undefined ? Boolean(data.isActive) : (data.is_active !== undefined ? Boolean(data.is_active) : undefined),
         },

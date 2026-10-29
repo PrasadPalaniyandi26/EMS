@@ -3,6 +3,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
+import { Tags } from 'lucide-react';
+import { ManageCategoriesDialog } from '@/components/manage/manage-categories-dialog';
 import { useRecurring, useCategories, useInvalidate, useRecurringRuns } from '@/hooks/use-queries';
 import api, { getAccessToken, API_BASE } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
@@ -49,6 +51,9 @@ import { getStatusConfig } from '@/lib/status';
 export default function RecurringPage() {
   const setHeader = useHeaderStore((s) => s.setHeader);
   const user = useAuthStore((s) => s.user);
+  // Managing types and categories is admin-only; the API checks the active role the same way
+  const isAdmin = (user?.role_name || '').toUpperCase() === 'ADMIN';
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
   const currency = user?.currency || 'INR';
 
   const userRoleNames = [
@@ -446,6 +451,11 @@ export default function RecurringPage() {
                 <Plus className="h-4 w-4 text-[var(--success)]" /> Add
               </button>
             ) : null}
+            {isAdmin && (
+              <button className="btn-action" onClick={() => setCategoriesOpen(true)}>
+                <Tags aria-hidden className="h-4 w-4 text-[var(--nav-violet)]" /> Category
+              </button>
+            )}
           <ToolbarActions actions={itemActions} /></>}
         />
       }
@@ -564,6 +574,7 @@ export default function RecurringPage() {
         onConfirm={confirmDelete}
         count={selectedCount}
       />
+      <ManageCategoriesDialog isOpen={categoriesOpen} onClose={() => setCategoriesOpen(false)} kinds={['expense', 'income']} />
     </ModuleShell>
   );
 }

@@ -30,7 +30,7 @@ export class ProjectsController {
 export class ProjectTypesController {
   constructor(private service: ProjectsService) {}
 
-  @Get() findAll(@Query('clientId') clientId?: number) { return this.service.findAllTypes({ clientId }); }
+  @Get() findAll() { return this.service.findAllTypes(); }
   @Post() @UseGuards(RolesGuard) @Roles('admin')
   create(@Body() body: any, @CurrentUser('id') userId: number) {
     return this.service.createType({ ...body, createdBy: userId });

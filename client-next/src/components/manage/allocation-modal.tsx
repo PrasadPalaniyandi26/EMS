@@ -28,8 +28,8 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
   const clientId = form.client_id ? Number(form.client_id) : undefined;
   const typeId = form.type_id ? Number(form.type_id) : undefined;
 
-  const { data: projectTypes } = useProjectTypes(clientId);
-  const { data: productTypes } = useProductTypes(clientId);
+  const { data: projectTypes } = useProjectTypes();
+  const { data: productTypes } = useProductTypes();
   const { data: projects } = useProjects(clientId);
   const { data: products } = useProducts(clientId);
 

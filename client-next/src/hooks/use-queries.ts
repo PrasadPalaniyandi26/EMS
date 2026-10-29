@@ -15,6 +15,8 @@ const LIVE_STALE = 0;
 
 export const QUERY_KEYS = {
   CATEGORIES: 'categories',
+  CATEGORY_TYPES: 'categoryTypes',
+  CATEGORY_USAGE: 'categoryUsage',
   CLIENTS: 'clients',
   PROJECTS: 'projects',
   PROJECT_TYPES: 'projectTypes',
@@ -48,6 +50,27 @@ export function useCategories() {
     queryKey: [QUERY_KEYS.CATEGORIES],
     queryFn: () => api.get<Category[]>('/categories').then((r) => r.data),
     staleTime: REF_STALE,
+  });
+}
+
+export interface CategoryType { id: number; name: string; kind: 'expense' | 'income' }
+
+// The groups categories sit under (Type > Category), for expenses or income
+export function useCategoryTypes(kind?: 'expense' | 'income') {
+  return useQuery({
+    queryKey: [QUERY_KEYS.CATEGORY_TYPES, kind],
+    queryFn: () => api.get<CategoryType[]>(`/category-types${kind ? `?kind=${kind}` : ''}`).then((r) => r.data),
+    staleTime: REF_STALE,
+  });
+}
+
+// How much each category type and category is used, for the manage dialog
+export function useCategoryUsage(kind: 'expense' | 'income', enabled: boolean) {
+  return useQuery({
+    queryKey: [QUERY_KEYS.CATEGORY_USAGE, kind],
+    queryFn: () => api.get<{ types: Record<number, number>; categories: Record<number, number> }>(`/categories/usage?kind=${kind}`).then((r) => r.data),
+    enabled,
+    staleTime: LIVE_STALE,
   });
 }
 
@@ -110,11 +133,10 @@ export function useProjects(clientId?: number) {
   });
 }
 
-export function useProjectTypes(clientId?: number) {
-  const qs = clientId ? `?clientId=${clientId}` : '';
+export function useProjectTypes() {
   return useQuery({
-    queryKey: [QUERY_KEYS.PROJECT_TYPES, clientId],
-    queryFn: () => api.get<ProjectType[]>(`/project-types${qs}`).then((r) => r.data),
+    queryKey: [QUERY_KEYS.PROJECT_TYPES],
+    queryFn: () => api.get<ProjectType[]>('/project-types').then((r) => r.data),
     staleTime: REF_STALE,
   });
 }
@@ -129,11 +151,10 @@ export function useProducts(clientId?: number) {
   });
 }
 
-export function useProductTypes(clientId?: number) {
-  const qs = clientId ? `?clientId=${clientId}` : '';
+export function useProductTypes() {
   return useQuery({
-    queryKey: [QUERY_KEYS.PRODUCT_TYPES, clientId],
-    queryFn: () => api.get<ProductType[]>(`/product-types${qs}`).then((r) => r.data),
+    queryKey: [QUERY_KEYS.PRODUCT_TYPES],
+    queryFn: () => api.get<ProductType[]>('/product-types').then((r) => r.data),
     staleTime: REF_STALE,
   });
 }

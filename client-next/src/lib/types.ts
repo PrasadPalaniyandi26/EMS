@@ -39,6 +39,7 @@ export interface Category {
   id: number;
   name: string;
   type: 'income' | 'expense';
+  type_id?: number | null;
   icon: string;
   is_custom: number;
   created_by: number | null;
@@ -90,7 +91,6 @@ export interface ProjectType {
   name: string;
   code?: string;
   description?: string;
-  client_id: number;
   is_system?: number;
 }
 
@@ -99,7 +99,6 @@ export interface ProductType {
   name: string;
   code?: string;
   description?: string;
-  client_id: number;
   is_system?: number;
 }
 

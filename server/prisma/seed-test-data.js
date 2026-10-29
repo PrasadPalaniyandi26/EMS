@@ -109,8 +109,9 @@ async function main() {
       },
     });
     clients.push(client);
-    const pt = await prisma.projectType.create({ data: { clientId: client.id, name: 'Implementation', createdBy: admin.id } });
-    const prt = await prisma.productType.create({ data: { clientId: client.id, name: 'Software', createdBy: admin.id } });
+    // Types are shared by every client, so create them once
+    const pt = await prisma.projectType.upsert({ where: { name: 'Implementation' }, update: {}, create: { name: 'Implementation', createdBy: admin.id } });
+    const prt = await prisma.productType.upsert({ where: { name: 'Software' }, update: {}, create: { name: 'Software', createdBy: admin.id } });
     for (let i = 1; i <= 2; i++) {
       projects.push(await prisma.project.create({
         data: {
