@@ -232,7 +232,7 @@ export function ReimbursementsTab() {
                     </div>
                     <div>
                       <p className="text-[13px] font-bold text-black dark:text-white">{selected.employee_name}</p>
-                      <p className="text-[11px] font-mono text-[var(--shell-text-muted)]">{selected.employee_id}</p>
+                      <p className="text-[11px] text-[var(--shell-text-muted)]">{selected.employee_id}</p>
                     </div>
                   </div>
                 </div>
@@ -241,7 +241,7 @@ export function ReimbursementsTab() {
                 <div className="space-y-3">
                   <p className="text-[11px] font-bold text-[var(--shell-text-muted)] border-b border-[var(--shell-border)] pb-1.5">Transaction</p>
                   <div className="space-y-2.5">
-                    {infoRow(<Tag className="w-3.5 h-3.5" />, 'Reference', <span className="font-mono text-[var(--info)]">{selected.reference_id || `#${selected.id}`}</span>)}
+                    {infoRow(<Tag className="w-3.5 h-3.5" />, 'Reference', <span className="text-[var(--info)]">{selected.reference_id || `#${selected.id}`}</span>)}
                     {infoRow(<CalendarDays className="w-3.5 h-3.5" />, 'Date', formatDate(selected.date_recorded))}
                     {infoRow(<Tag className="w-3.5 h-3.5" />, 'Category', selected.category_name || '—')}
                     {(selected.project_name || selected.product_name) && infoRow(
@@ -293,7 +293,7 @@ export function ReimbursementsTab() {
                       {selected.reimbursement_reference && (
                         <div className="px-3 py-2 rounded-lg border text-[11px]" style={{ background: 'var(--shell-hover)', borderColor: 'var(--shell-border)' }}>
                           <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-0.5">Payment Reference</p>
-                          <p className="font-mono font-bold text-black dark:text-white">{selected.reimbursement_reference}</p>
+                          <p className="font-bold text-black dark:text-white">{selected.reimbursement_reference}</p>
                         </div>
                       )}
                       {selected.reimbursement_note && (
@@ -315,7 +315,7 @@ export function ReimbursementsTab() {
                       {selected.reimbursement_reference && (
                         <div className="px-3 py-2 rounded-lg border text-[11px]" style={{ background: 'var(--shell-hover)', borderColor: 'var(--shell-border)' }}>
                           <p className="text-[11px] font-bold text-[var(--shell-text-muted)] mb-0.5">Reference</p>
-                          <p className="font-mono font-bold text-black dark:text-white">{selected.reimbursement_reference}</p>
+                          <p className="font-bold text-black dark:text-white">{selected.reimbursement_reference}</p>
                         </div>
                       )}
                       {selected.reimbursement_note && (

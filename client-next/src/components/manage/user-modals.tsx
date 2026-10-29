@@ -183,7 +183,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
         {editing && (
           <div className="flex items-center gap-3 rounded-lg border bg-[var(--shell-hover)] rounded-lg px-4 py-2">
             <span className="text-[11px] font-black text-[var(--shell-text-muted)]">Employee ID</span>
-            <span className="font-mono text-[13px] font-black text-[var(--info)]">{getEmployeeId(editing.id)}</span>
+            <span className="text-[13px] font-black text-[var(--info)]">{getEmployeeId(editing.id)}</span>
             <span className="ml-auto px-2 py-0.5 rounded text-[11px] font-black border border-[var(--shell-border)] text-[var(--shell-text)]">
               {editing.role_name || 'Staff'}
             </span>
@@ -563,7 +563,7 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
                   <td className="px-4 py-3 font-bold text-[var(--shell-text)]">{a.client_name}</td>
                   <td className="px-4 py-3 text-[var(--shell-text)]">{a.category}</td>
                   <td className="px-4 py-3 text-[var(--shell-text)]">{a.type}</td>
-                  <td className="px-4 py-3 font-mono text-[var(--info)] font-bold">{a.code}</td>
+                  <td className="px-4 py-3 text-[var(--info)] font-bold">{a.code}</td>
                 </tr>
               ))}
             </tbody>

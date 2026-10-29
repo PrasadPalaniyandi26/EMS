@@ -129,7 +129,7 @@ export default function TransactionsPage() {
                 <div className={`grid grid-cols-2 gap-4 pt-3 border-t ${selectedTxn.type === 'income' ? 'border-[color-mix(in_srgb,var(--info)_20%,transparent)]' : 'border-[color-mix(in_srgb,var(--danger)_20%,transparent)]'}`}>
                   <div>
                     <p className="text-[11px] font-bold mb-0.5 text-[var(--shell-text-muted)]">Record ID</p>
-                    <p className="text-[13px] font-bold font-mono text-black dark:text-white">#{selectedTxn.id}</p>
+                    <p className="text-[13px] font-bold text-black dark:text-white">#{selectedTxn.id}</p>
                   </div>
                   <div>
                     <p className="text-[11px] font-bold mb-0.5 text-[var(--shell-text-muted)]">Reference #</p>

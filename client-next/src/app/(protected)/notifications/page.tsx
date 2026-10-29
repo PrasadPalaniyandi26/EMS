@@ -71,7 +71,7 @@ function NotifRow({ n, onMarkRead, onDelete, selected, onSelect }: {
               </p>
               {!n.is_read && <span className="w-1.5 h-1.5 rounded-full bg-[var(--danger)] shrink-0" />}
               {n.reference_id && (
-                <span className="font-mono text-[11px] font-bold text-[var(--info)] bg-[color-mix(in_srgb,var(--info)_10%,transparent)] px-1.5 py-0.5 rounded">
+                <span className="text-[11px] font-bold text-[var(--info)] bg-[color-mix(in_srgb,var(--info)_10%,transparent)] px-1.5 py-0.5 rounded">
                   {n.reference_id}
                 </span>
               )}

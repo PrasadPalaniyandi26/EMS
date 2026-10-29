@@ -508,7 +508,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
             <ul className="space-y-1.5">
               {dupWarning.matches.slice(0, 3).map((m: any) => (
                 <li key={m.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[var(--shell-text-muted)]">
-                  <span className="font-mono font-bold text-[var(--info)]">{m.reference_id || `#${m.id}`}</span>
+                  <span className="font-bold text-[var(--info)]">{m.reference_id || `#${m.id}`}</span>
                   <span>{m.category_name || '—'}</span>
                   <span className="font-semibold">{Number(m.net_amount ?? m.amount).toLocaleString()}</span>
                   <span>{m.date_recorded?.slice(0, 10)}</span>

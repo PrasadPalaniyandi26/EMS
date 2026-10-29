@@ -92,9 +92,9 @@ export function Sidebar() {
           {/* Logo */}
           <div className="h-[44px] flex items-center shrink-0 overflow-hidden" style={{ borderBottom: '1px solid var(--shell-border)', justifyContent: slim ? 'center' : 'center' }}>
             {slim ? (
-              <span className="text-[16px] font-extrabold" style={{ color: 'var(--shell-brand)', fontFamily: 'var(--font-raleway)' }}>N</span>
+              <span className="text-[16px] font-bold" style={{ color: 'var(--shell-brand)' }}>N</span>
             ) : (
-              <span className="text-[16px] font-extrabold tracking-[0.22em]" style={{ color: 'var(--shell-brand)', fontFamily: 'var(--font-raleway)' }}>NTEMS</span>
+              <span className="text-[16px] font-bold tracking-[0.22em]" style={{ color: 'var(--shell-brand)' }}>NTEMS</span>
             )}
           </div>
 

@@ -99,7 +99,7 @@ export function ApproveModal({ isOpen, onClose, onConfirm, selectedRequest }: Mo
             </thead>
             <tbody>
               <tr className={`border-b ${selectedRequest.needs_reimbursement ? 'border-[color-mix(in_srgb,var(--warning)_20%,transparent)]' : 'border-[var(--shell-border)]'}`}>
-                <td className="px-4 py-3 font-bold font-mono text-[var(--info)]">{selectedRequest.code || `#${selectedRequest.id}`}</td>
+                <td className="px-4 py-3 font-bold text-[var(--info)]">{selectedRequest.code || `#${selectedRequest.id}`}</td>
                 <td className="px-4 py-3 font-medium" style={{ color: 'var(--shell-text)' }}>{selectedRequest.submitted_by_name || '—'}</td>
                 <td className="px-4 py-3 text-right font-bold" style={{ color: 'var(--shell-text)' }}>{formatCurrency(selectedRequest.amount, currency)}</td>
               </tr>
@@ -225,7 +225,7 @@ export function RejectModal({ isOpen, onClose, onConfirm, selectedRequest }: Mod
             </thead>
             <tbody>
               <tr className="border-b border-[var(--shell-border)]">
-                <td className="px-4 py-3 font-bold font-mono text-[var(--info)]">{selectedRequest.code || `#${selectedRequest.id}`}</td>
+                <td className="px-4 py-3 font-bold text-[var(--info)]">{selectedRequest.code || `#${selectedRequest.id}`}</td>
                 <td className="px-4 py-3 font-medium" style={{ color: 'var(--shell-text)' }}>{selectedRequest.submitted_by_name || '—'}</td>
                 <td className="px-4 py-3 text-right font-bold" style={{ color: 'var(--shell-text)' }}>{formatCurrency(selectedRequest.amount, currency)}</td>
               </tr>
@@ -316,7 +316,7 @@ export function VoidModal({ isOpen, onClose, onConfirm, selectedRequest }: Modal
             </thead>
             <tbody>
               <tr className="border-b border-[var(--shell-border)]">
-                <td className="px-4 py-3 font-bold font-mono text-[var(--info)]">{selectedRequest.code || `#${selectedRequest.transaction_id}`}</td>
+                <td className="px-4 py-3 font-bold text-[var(--info)]">{selectedRequest.code || `#${selectedRequest.transaction_id}`}</td>
                 <td className="px-4 py-3 font-medium" style={{ color: 'var(--shell-text)' }}>{selectedRequest.submitted_by_name || '—'}</td>
                 <td className="px-4 py-3 text-right font-bold" style={{ color: 'var(--shell-text)' }}>{formatCurrency(selectedRequest.amount, currency)}</td>
               </tr>
@@ -401,7 +401,7 @@ export function SendBackModal({ isOpen, onClose, onConfirm, selectedRequest }: M
             </thead>
             <tbody>
               <tr className="border-b border-[var(--shell-border)]">
-                <td className="px-4 py-3 font-bold font-mono text-[var(--info)]">{selectedRequest.code || `#${selectedRequest.id}`}</td>
+                <td className="px-4 py-3 font-bold text-[var(--info)]">{selectedRequest.code || `#${selectedRequest.id}`}</td>
                 <td className="px-4 py-3 font-medium" style={{ color: 'var(--shell-text)' }}>{selectedRequest.submitted_by_name || '—'}</td>
                 <td className="px-4 py-3 text-right font-bold" style={{ color: 'var(--shell-text)' }}>{formatCurrency(selectedRequest.amount, currency)}</td>
               </tr>

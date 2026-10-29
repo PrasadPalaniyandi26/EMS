@@ -4,10 +4,10 @@
 @custom-variant dark (&:is(.dark *));
 
 /* Fonts: `inline` so the utility resolves next/font's variables on the element that uses it
-   (they are defined on <body>, not :root). IBM Plex Sans and IBM Plex Mono are loaded in layout.tsx. */
+   (they are defined on <body>, not :root). IBM Plex Sans is loaded in layout.tsx. */
 @theme inline {
   --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;  /* not used by the UI */
 }
 
 @theme {
@@ -89,52 +89,52 @@
 
   /* Shell tokens. surface/border/text/muted/accent are ALIASES of the shadcn tokens below (one source of
      truth); bg and hover have no shadcn equivalent and stay here. */
-  --shell-bg:          #f4f4f5;  /* canvas: sidebar, top bar, page edge */
+  --shell-bg:          #f4f4f4;  /* canvas: sidebar, top bar, page edge */
   --shell-surface:     var(--card);
   --shell-border:      var(--border);
   --shell-text:        var(--foreground);
   --shell-text-muted:  var(--muted-foreground);
   --shell-accent:      var(--primary);
   --shell-accent-fg:   var(--primary-foreground);
-  --shell-hover:       #efeff1;  /* hover tint */
+  --shell-hover:       #e8e8e8;  /* hover tint */
   --shell-brand:       var(--foreground);  /* amber-700: wordmark colour, 5:1 on white */
 
   /* shadcn tokens */
-  --background:        #f4f4f5;  /* canvas */
-  --foreground:        #18181b;
+  --background:        #f4f4f4;  /* canvas */
+  --foreground:        #161616;
   --card:              #ffffff;  /* white      */
-  --card-foreground:   #18181b;
+  --card-foreground:   #161616;
   --popover:           #ffffff;
-  --popover-foreground:#18181b;
-  --primary:           #2b50d8;  /* blue-600: white text 5.2:1, and 5.2:1 as text on white */
+  --popover-foreground:#161616;
+  --primary:           #0f62fe;  /* blue-600: white text 5.2:1, and 5.2:1 as text on white */
   --primary-foreground:#ffffff;
-  --secondary:         #f1f1f3;
-  --secondary-foreground:#18181b;
-  --muted:             #f1f1f3;
-  --muted-foreground:  #52525b;  /* 6:1 on white, 5.4:1 on the canvas and hover tints */
-  --accent:            #efeff1;
-  --accent-foreground: #18181b;
+  --secondary:         #f4f4f4;
+  --secondary-foreground:#161616;
+  --muted:             #f4f4f4;
+  --muted-foreground:  #525252;  /* 6:1 on white, 5.4:1 on the canvas and hover tints */
+  --accent:            #e8e8e8;
+  --accent-foreground: #161616;
   --destructive:       #dc2626;  /* red-600: white text 4.8:1 (red-500 was 3.8:1) */
   --destructive-foreground:#ffffff;
-  --border:            #e4e4e7;  /* hairline: separates regions and rows */
-  --input:             #8b8b94;  /* control boundary, 3.3:1 on white (WCAG 1.4.11) */
-  --ring:              #2b50d8;  /* blue-500   */
-  --chart-1:           #2b50d8;  /* blue-500   */
+  --border:            #e0e0e0;  /* hairline: separates regions and rows */
+  --input:             #8d8d8d;  /* control boundary, 3.3:1 on white (WCAG 1.4.11) */
+  --ring:              #0f62fe;  /* blue-500   */
+  --chart-1:           #0f62fe;  /* blue-500   */
   --chart-2:           #0ea5e9;
   --chart-3:           #10b981;
   --chart-4:           #8b5cf6;
   --chart-5:           #ef4444;
-  --sidebar:           #f4f4f5;
-  --sidebar-foreground:#52525b;
-  --sidebar-primary:   #18181b;
+  --sidebar:           #f4f4f4;
+  --sidebar-foreground:#525252;
+  --sidebar-primary:   #161616;
   --sidebar-primary-foreground:#ffffff;
-  --sidebar-accent:    #e9e9ec;
-  --sidebar-accent-foreground:#18181b;
-  --sidebar-border:    #e4e4e7;
-  --sidebar-ring:      #2b50d8;  /* blue-500   */
+  --sidebar-accent:    #e8e8e8;
+  --sidebar-accent-foreground:#161616;
+  --sidebar-border:    #e0e0e0;
+  --sidebar-ring:      #0f62fe;  /* blue-500   */
 
   /* Semantic status colours — text-safe (>= 4.5:1) on white and on the tinted page surfaces */
-  --success:           #047857;  /* emerald-700 */
+  --success:           #066149;  /* emerald-700 */
   --success-foreground:#ffffff;
   --warning:           #a3480a;  /* deeper amber: 5:1 on white and on tinted fills */
   --warning-foreground:#ffffff;
@@ -143,20 +143,20 @@
   --danger:            #b91c1c;  /* red-700     */
   --danger-foreground: #ffffff;
   --surface-raised:    #ffffff;
-  --overlay:           rgba(15, 15, 20, 0.5);
+  --overlay:           rgba(22, 22, 22, 0.5);
 
   /* Approval workflow states (consumed by lib/status.ts as components migrate, Phase 4) */
   --status-draft:           #0369a1;
   --status-pending-manager: #a3480a;
   --status-pending-finance: #c2410c;
-  --status-approved:        #047857;
+  --status-approved:        #066149;
   --status-rejected:        #b91c1c;
   --status-sent-back:       #1d4ed8;
   --status-voided:          #475569;
 
   /* Role colours */
   --role-admin:    #b91c1c;
-  --role-finance:  #047857;
+  --role-finance:  #066149;
   --role-manager:  #c2410c;
   --role-employee: #1d4ed8;
 
@@ -213,49 +213,49 @@
   color-scheme: dark;
   /* Shell: two solid surfaces (canvas and surface) separated by hairlines, no blur or gradient.
      surface/border/text/muted/accent alias the shadcn tokens below (same as light). */
-  --shell-bg:          #141416;  /* canvas */
+  --shell-bg:          #262626;  /* canvas */
   --shell-surface:     var(--card);
   --shell-border:      var(--border);
   --shell-text:        var(--foreground);
   --shell-text-muted:  var(--muted-foreground);
   --shell-accent:      var(--primary);
   --shell-accent-fg:   var(--primary-foreground);
-  --shell-hover:       #26262a;
+  --shell-hover:       #3d3d3d;
   --shell-brand:       var(--foreground);
 
   /* shadcn tokens */
-  --background:        #141416;
-  --foreground:        #ececee;
-  --card:              #18181a;  /* surface */
-  --card-foreground:   #ececee;
-  --popover:           #1f1f22;  /* raised: menus and dialogs */
-  --popover-foreground:#ececee;
-  --primary:           #7c9bff;
-  --primary-foreground:#0d1020;  /* near-black on the light blue: 7.5:1 (white was 2.5:1) */
-  --secondary:         #1f1f22;
-  --secondary-foreground:#ececee;
-  --muted:             #1f1f22;
-  --muted-foreground:  #a1a1a8;
-  --accent:            #26262a;
-  --accent-foreground: #ececee;
-  --destructive:       #f87171;
+  --background:        #262626;
+  --foreground:        #f4f4f4;
+  --card:              #2f2f2f;  /* surface */
+  --card-foreground:   #f4f4f4;
+  --popover:           #393939;  /* raised: menus and dialogs */
+  --popover-foreground:#f4f4f4;
+  --primary:           #78a9ff;
+  --primary-foreground:#161616;  /* near-black on the light blue: 7.5:1 (white was 2.5:1) */
+  --secondary:         #393939;
+  --secondary-foreground:#f4f4f4;
+  --muted:             #393939;
+  --muted-foreground:  #c6c6c6;
+  --accent:            #3d3d3d;
+  --accent-foreground: #f4f4f4;
+  --destructive:       #ff8389;
   --destructive-foreground:#2a0a0a;  /* near-black on the light red */
-  --border:            #2a2a2e;
-  --input:             #68686f;  /* control boundary */
-  --ring:              #7c9bff;
-  --chart-1:           #7c9bff;
+  --border:            #4c4c4c;
+  --input:             #8d8d8d;  /* control boundary */
+  --ring:              #78a9ff;
+  --chart-1:           #78a9ff;
   --chart-2:           #22d3ee;
   --chart-3:           #34d399;
   --chart-4:           #fb923c;
   --chart-5:           #f87171;
-  --sidebar:           #141416;
-  --sidebar-foreground:#a1a1a8;
-  --sidebar-primary:   #7c9bff;
-  --sidebar-primary-foreground:#0d1020;
-  --sidebar-accent:    #26262a;
-  --sidebar-accent-foreground:#ececee;
-  --sidebar-border:    #2a2a2e;
-  --sidebar-ring:      #7c9bff;
+  --sidebar:           #262626;
+  --sidebar-foreground:#c6c6c6;
+  --sidebar-primary:   #78a9ff;
+  --sidebar-primary-foreground:#161616;
+  --sidebar-accent:    #3d3d3d;
+  --sidebar-accent-foreground:#f4f4f4;
+  --sidebar-border:    #4c4c4c;
+  --sidebar-ring:      #78a9ff;
 
   /* Semantic status colours on the dark surfaces */
   --success:           #34d399;
@@ -264,20 +264,20 @@
   --warning-foreground:#2a1a02;
   --info:              #60a5fa;
   --info-foreground:   #0b1220;
-  --danger:            #f87171;
+  --danger:            #ff8389;
   --danger-foreground: #2a0a0a;
-  --surface-raised:    #1f1f22;
+  --surface-raised:    #393939;
   --overlay:           rgba(0, 0, 0, 0.6);
 
   --status-draft:           #38bdf8;
   --status-pending-manager: #fbbf24;
   --status-pending-finance: #fb923c;
   --status-approved:        #34d399;
-  --status-rejected:        #f87171;
+  --status-rejected:        #ff8389;
   --status-sent-back:       #60a5fa;
   --status-voided:          #94a3b8;
 
-  --role-admin:    #f87171;
+  --role-admin:    #ff8389;
   --role-finance:  #34d399;
   --role-manager:  #fb923c;
   --role-employee: #60a5fa;

@@ -59,7 +59,7 @@ function AuditDetailPanel({ log }: { log: AuditLog }) {
             {TABLE_LABELS[log.table_name] || log.table_name}
           </span>
           {log.reference_id && (
-            <span className="font-mono text-[11px] font-bold text-[var(--info)] bg-[color-mix(in_srgb,var(--info)_10%,transparent)] px-1.5 py-0.5 rounded ml-auto">
+            <span className="text-[11px] font-bold text-[var(--info)] bg-[color-mix(in_srgb,var(--info)_10%,transparent)] px-1.5 py-0.5 rounded ml-auto">
               {log.reference_id}
             </span>
           )}
@@ -96,13 +96,13 @@ function AuditDetailPanel({ log }: { log: AuditLog }) {
                 {oldVal !== undefined && (
                   <div className="px-3 py-2 flex items-start gap-2 bg-[color-mix(in_srgb,var(--danger)_5%,transparent)] border-b" style={{ borderColor: 'var(--shell-border)' }}>
                     <span className="text-[11px] font-black text-[var(--danger)] mt-0.5 shrink-0 w-7">Old</span>
-                    <span className="text-[var(--danger)] font-mono break-all">{String(oldVal ?? '—')}</span>
+                    <span className="text-[var(--danger)] break-all">{String(oldVal ?? '—')}</span>
                   </div>
                 )}
                 {newVal !== undefined && (
                   <div className="px-3 py-2 flex items-start gap-2 bg-[color-mix(in_srgb,var(--success)_5%,transparent)]">
                     <span className="text-[11px] font-black text-[var(--success)] mt-0.5 shrink-0 w-7">New</span>
-                    <span className="text-[var(--success)] font-mono break-all">{String(newVal ?? '—')}</span>
+                    <span className="text-[var(--success)] break-all">{String(newVal ?? '—')}</span>
                   </div>
                 )}
               </div>
@@ -124,7 +124,7 @@ function AuditDetailPanel({ log }: { log: AuditLog }) {
                 <span className="text-[11px] font-bold min-w-[100px] shrink-0 mt-0.5" style={{ color: 'var(--shell-text-muted)' }}>
                   {k.replace(/_/g, ' ')}
                 </span>
-                <span className="font-mono text-black dark:text-white break-all">{String(v ?? '—')}</span>
+                <span className="text-black dark:text-white break-all">{String(v ?? '—')}</span>
               </div>
             ))}
           </div>
@@ -343,7 +343,7 @@ export default function AuditLogPage() {
                     <td className="px-4 py-2.5 text-[13px]" style={{ color: 'var(--shell-text)' }}>
                       {TABLE_LABELS[log.table_name] || log.table_name}
                     </td>
-                    <td className="px-4 py-2.5 font-mono text-[12px]" style={{ color: log.reference_id ? 'var(--shell-text)' : 'var(--shell-text-muted)' }}>
+                    <td className="px-4 py-2.5 text-[12px]" style={{ color: log.reference_id ? 'var(--shell-text)' : 'var(--shell-text-muted)' }}>
                       {log.reference_id || `#${log.record_id}`}
                     </td>
                     <td className="px-4 py-2.5 text-[13px]" style={{ color: 'var(--shell-text)' }}>

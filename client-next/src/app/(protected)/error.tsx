@@ -19,7 +19,7 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
           {error?.message || 'An unexpected error occurred. Please try again.'}
         </p>
         {error?.digest && (
-          <p className="text-[11px] font-mono" style={{ color: 'var(--shell-text-muted)' }}>Error ID: {error.digest}</p>
+          <p className="text-[11px]" style={{ color: 'var(--shell-text-muted)' }}>Error ID: {error.digest}</p>
         )}
       </div>
       <button

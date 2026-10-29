@@ -312,7 +312,7 @@ export default function DashboardPage() {
           </div>
           <div className="p-4 space-y-2">
             {approvalStages.map((s) => (
-              <div key={s.label} className="flex items-center justify-between rounded-lg px-3 py-2.5" style={{ background: 'var(--shell-hover)', border: '1px solid var(--shell-border)' }}>
+              <div key={s.label} className="flex items-center justify-between rounded-lg px-3 py-2.5" style={{ border: '1px solid var(--shell-border)' }}>
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
                   <span className="text-[12px] font-medium" style={{ color: 'var(--shell-text)' }}>{s.label}</span>
@@ -337,7 +337,7 @@ export default function DashboardPage() {
             ) : (recentTxns || []).length > 0 ? (
               <div className="space-y-2">
                 {(recentTxns || []).map((txn: any) => (
-                  <div key={txn.id} className="flex items-center justify-between rounded-lg px-3 py-2.5 transition-colors" style={{ background: 'var(--shell-hover)', border: '1px solid var(--shell-border)' }}>
+                  <div key={txn.id} className="flex items-center justify-between rounded-lg px-3 py-2.5 transition-colors" style={{ border: '1px solid var(--shell-border)' }}>
                     <div className="flex items-center gap-3 min-w-0">
                       <div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${txn.type === 'income' ? 'bg-[color-mix(in_srgb,var(--success)_10%,transparent)]' : 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)]'}`}>
                         {txn.type === 'income'

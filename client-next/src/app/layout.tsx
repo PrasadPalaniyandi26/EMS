@@ -1,15 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Sans, IBM_Plex_Mono, Raleway } from "next/font/google";
+import { IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-// IBM Plex: a humanist-grotesque with a technical, ledger-like character; Mono for IDs and codes
+// One typeface for the whole app (IBM Plex Sans: a humanist grotesque with a technical, ledger-like character).
+// Components must not set their own font family; change it here.
 const plexSans = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"], display: "swap", variable: "--font-plex-sans" });
-const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500"], display: "swap", variable: "--font-plex-mono" });
-export const raleway = Raleway({ subsets: ["latin"], weight: ["700", "800"], variable: "--font-raleway" });
 
 export const metadata: Metadata = {
   title: "NTEMS — Expense Management System",
@@ -33,7 +32,7 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: `try{var _t=JSON.parse(localStorage.getItem('ems-theme')||'{}');var _theme=(_t.state&&_t.state.theme)||'dark';document.documentElement.classList.toggle('dark',_theme==='dark');}catch(e){document.documentElement.classList.add('dark');}` }} />
       </head>
-      <body className={`${plexSans.variable} ${plexMono.variable} ${raleway.variable} font-sans antialiased`} suppressHydrationWarning>
+      <body className={`${plexSans.variable} font-sans antialiased`} suppressHydrationWarning>
         <QueryProvider>
           <ThemeProvider>
             <TooltipProvider>

@@ -740,7 +740,7 @@ export default function IncomePage() {
                 <label className="text-[11px] font-bold text-[var(--shell-text-muted)] flex items-center gap-2 border-b border-[var(--shell-border)] pb-1.5 mb-1.5">
                   <ShieldCheck className="w-3.5 h-3.5" /> Reference ID
                 </label>
-                <div className="px-3 py-2 rounded-lg font-mono text-[12px] font-bold leading-relaxed" style={{ background: 'var(--shell-hover)', border: '1px solid var(--shell-border)', color: 'var(--shell-accent)' }}>
+                <div className="px-3 py-2 rounded-lg text-[12px] font-bold leading-relaxed" style={{ background: 'var(--shell-hover)', border: '1px solid var(--shell-border)', color: 'var(--shell-accent)' }}>
                   {selectedTxn.reference_id || `#${selectedTxn.id}`}
                 </div>
               </div>

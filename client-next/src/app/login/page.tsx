@@ -41,7 +41,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen" style={{ background: 'var(--shell-bg)', color: 'var(--shell-text)' }}>
       {/* Brand panel */}
       <div className="hidden w-[44%] shrink-0 flex-col justify-between border-r p-12 lg:flex" style={{ borderColor: 'var(--shell-border)' }}>
-        <span className="text-[22px] font-black tracking-[0.2em]" style={{ fontFamily: 'var(--font-raleway)', color: 'var(--shell-brand)' }}>
+        <span className="text-[22px] font-black tracking-[0.2em]" style={{ color: 'var(--shell-brand)' }}>
           NTEMS
         </span>
         <div className="max-w-sm">
@@ -66,7 +66,7 @@ export default function LoginPage() {
       {/* Sign-in */}
       <div className="flex flex-1 items-center justify-center px-6 py-12">
         <div className="w-full max-w-[400px]">
-          <span className="mb-10 block text-center text-[26px] font-black tracking-[0.2em] lg:hidden" style={{ fontFamily: 'var(--font-raleway)', color: 'var(--shell-brand)' }}>
+          <span className="mb-10 block text-center text-[26px] font-black tracking-[0.2em] lg:hidden" style={{ color: 'var(--shell-brand)' }}>
             NTEMS
           </span>
 

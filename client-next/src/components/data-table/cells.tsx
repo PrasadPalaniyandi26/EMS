@@ -19,11 +19,11 @@ export function TextCell({ value, muted, strong, className }: { value?: ReactNod
   );
 }
 
-// Identifiers (codes, references) in the mono face so digits line up.
+// Identifiers (codes, references): same face and size as every other cell; tabular numerals keep digits aligned.
 export function IdCell({ value }: { value?: string | number | null }) {
   const empty = value === undefined || value === null || value === '';
   return (
-    <span className={cn('font-mono text-[12px]', empty ? 'text-[var(--shell-text-muted)]' : 'text-[var(--shell-text)]')}>
+    <span className={cn('text-[13px]', empty ? 'text-[var(--shell-text-muted)]' : 'text-[var(--shell-text)]')}>
       {empty ? EMPTY : value}
     </span>
   );
