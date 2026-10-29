@@ -46,7 +46,8 @@ cd client-next && npm run build && npm run start
 ## Environment
 - Node (Windows): `C:/Program Files/nodejs` | Node (macOS/Linux): `/usr/local/bin/node` or `/opt/homebrew/bin/node`
 - npm global (Windows): `C:/Users/<user>/AppData/Roaming/npm` | npm global (macOS): `/usr/local/lib/node_modules`
-- DB: `postgresql://<user>:<pass>@localhost:5432/fmhdb?schema=public`
+- DB: PostgreSQL 18 in Docker (`ems-db`, localhost-only port **5437**), defined in the root `docker-compose.yml`. `DATABASE_URL=postgresql://ems:<pass>@localhost:5437/fmhdb?schema=public`
+- Compose password: `EMS_DB_PASSWORD` in the root `.env` (gitignored; copy `.env.example`). Use the same value in `server/.env`.
 - Config: `server/.env` — contains `DATABASE_URL`, JWT secrets, UPLOAD_DIR, CLIENT_URL
 - `UPLOAD_DIR`: Windows example `D:/Apps/Web/EMS-Storage`; macOS example `/var/ems-storage`; leave blank for default `server/uploads/`
 
@@ -64,6 +65,16 @@ cd client-next && npm run build && npm run start
 ---
 
 ## Database
+
+### Docker database (first-time setup)
+```bash
+docker compose up -d                  # starts ems-db on 127.0.0.1:5437
+cd server
+npx prisma migrate deploy             # applies prisma/migrations
+node prisma/seed.js                   # roles, categories, Internal client, admin
+node prisma/seed-test-data.js         # optional: sample users, clients, 117 transactions, budgets, recurring
+```
+Test users (password `Test@1234`): `fin1`, `fin2`, `mgr1`, `mgr2`, `emp1`–`emp4`, `emp5` (ON_HOLD). `admin` / `admin123` is unchanged. `seed-test-data.js` is idempotent; to reseed from scratch run `docker compose down -v` first.
 
 ### Seed
 ```bash
@@ -206,6 +217,9 @@ Columns on `users`: `contact_no`, `house_apt`, `address`, `city`, `country`, `po
 - Submitting creates `ApprovalRequest` records in the manager chain
 - Send Back resets to `DRAFT` and cancels all pending approval requests
 - Income transactions are auto-approved (no workflow)
+- Manager-level steps (approve, reject, send back) belong to the requester's direct manager. If the requester has no manager (or theirs lacks the Manager role), any Manager may act.
+- Finance cannot approve their own expense unless they are the only active Finance user (`FINANCE_SELF_APPROVAL`, default `block`; set `allow` to restore the old behavior).
+- Role-based page access lives in `client-next/src/lib/route-access.ts`; the API's `@Roles()` remains the source of truth for data.
 
 ## File Uploads (Receipts)
 - `POST /api/v1/receipts/upload` — multipart, returns `{ filename }`; stored in `UPLOAD_DIR/Receipts/`

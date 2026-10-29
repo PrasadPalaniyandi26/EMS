@@ -5,6 +5,7 @@ import { CreateUserDto, UpdateUserDto, UpdateCurrencyDto, UpdateEmailDto } from 
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { ROLES } from '../common/constants/roles';
 import { ApiTags } from '@nestjs/swagger';
 
 @ApiTags('users')
@@ -14,19 +15,19 @@ export class UsersController {
   constructor(private usersService: UsersService) {}
 
   @Get()
-  async findAll() {
-    return this.usersService.findAll();
+  async findAll(@CurrentUser() viewer: any) {
+    return this.usersService.findAll(viewer);
   }
 
   // Must be before :id route to avoid ParseIntPipe matching 'managers' as an ID
   @Get('by-role/managers')
-  async findManagers() {
-    return this.usersService.findManagersAndAdmins();
+  async findManagers(@CurrentUser() viewer: any) {
+    return this.usersService.findManagersAndAdmins(viewer);
   }
 
   @Get(':id')
-  async findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.usersService.findById(id);
+  async findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() viewer: any) {
+    return this.usersService.findById(id, viewer);
   }
 
   @Post()
@@ -113,16 +114,28 @@ export class UsersController {
 
   // --- User Allocations ---
   @Get(':id/allocations')
-  async findAllAllocations(@Param('id', ParseIntPipe) id: number) {
+  async findAllAllocations(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser('id') currentUserId: number,
+    @CurrentUser('role_name') roleName: string,
+  ) {
+    const role = (roleName || '').toUpperCase();
+    if (id !== currentUserId && role === ROLES.EMPLOYEE) {
+      throw new ForbiddenException('Cannot view another user\'s allocations.');
+    }
     return this.usersService.findAllAllocations(id);
   }
 
   @Post(':id/allocations')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
   async createAllocation(@Param('id', ParseIntPipe) id: number, @Body() data: any) {
     return this.usersService.createAllocation(id, data);
   }
 
   @Delete('allocations/:id')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
   async deleteAllocation(@Param('id', ParseIntPipe) id: number) {
     return this.usersService.deleteAllocation(id);
   }

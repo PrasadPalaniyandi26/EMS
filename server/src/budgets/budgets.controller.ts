@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, ParseIntPipe, ParseFloatPipe } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { BudgetsService } from './budgets.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -29,12 +29,12 @@ export class BudgetsController {
   @Get('check')
   checkBudget(
     @CurrentUser('id') userId: number,
-    @Query('categoryId') categoryId: string,
-    @Query('amount') amount: string,
-    @Query('month') month: string,
-    @Query('year') year: string,
+    @Query('categoryId', ParseIntPipe) categoryId: number,
+    @Query('amount', ParseFloatPipe) amount: number,
+    @Query('month', ParseIntPipe) month: number,
+    @Query('year', ParseIntPipe) year: number,
   ) {
-    return this.service.checkBudget(userId, Number(categoryId), Number(amount), Number(month), Number(year));
+    return this.service.checkBudget(userId, categoryId, amount, month, year);
   }
 
   @Get('monthly-settings')

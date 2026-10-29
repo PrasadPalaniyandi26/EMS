@@ -6,6 +6,9 @@ import { ROLES } from '../common/constants/roles';
 import { COMMITTED_STATUSES } from '../common/constants/transaction-status';
 import { buildGstFields } from '../common/utils/gst';
 
+// Upper bound for ?limit= on list endpoints; the client's largest request is 500.
+const MAX_PAGE_SIZE = 500;
+
 @Injectable()
 export class TransactionsService {
   private readonly logger = new Logger('TransactionsService');
@@ -77,8 +80,8 @@ export class TransactionsService {
       ];
     }
 
-    const page = Number(filters.page) || 1;
-    const limit = Number(filters.limit) || 20;
+    const page = Math.max(1, Math.floor(Number(filters.page)) || 1);
+    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, Math.floor(Number(filters.limit)) || 20));
     const skip = (page - 1) * limit;
 
     const [total, transactions] = await Promise.all([

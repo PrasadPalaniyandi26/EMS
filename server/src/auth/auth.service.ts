@@ -84,6 +84,8 @@ export class AuthService {
         role_id: user.roleId,
         role_name: user.roleRelation?.name,
         currency: user.currency,
+        login_name: user.loginName ?? null,
+        contact_no: user.contactNo ?? null,
         roles: (user.userRoles || []).map((ur: any) => ({
           role_id: ur.roleId,
           role_name: ur.role?.name,
@@ -158,6 +160,8 @@ export class AuthService {
           role_id: user.roleId,
           role_name: user.roleRelation?.name,
           currency: user.currency,
+          login_name: user.loginName ?? null,
+          contact_no: user.contactNo ?? null,
           roles: (user.userRoles || []).map((ur: any) => ({
             role_id: ur.roleId,
             role_name: ur.role?.name,

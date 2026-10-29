@@ -8,6 +8,11 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 
+// Stable codes for exceptions thrown with a plain message, e.g. new HttpException('...', HttpStatus.FORBIDDEN)
+const STATUS_CODES: Record<number, string> = {
+  400: 'BAD_REQUEST', 401: 'UNAUTHORIZED', 403: 'FORBIDDEN', 404: 'NOT_FOUND', 409: 'CONFLICT', 422: 'UNPROCESSABLE',
+};
+
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger('ExceptionFilter');
@@ -28,6 +33,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
       if (typeof exResponse === 'string') {
         message = exResponse;
+        code = STATUS_CODES[statusCode] || 'HTTP_ERROR';
       } else if (typeof exResponse === 'object') {
         const resp = exResponse as any;
         message = resp.message || exception.message;

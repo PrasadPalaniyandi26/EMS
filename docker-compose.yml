@@ -1,0 +1,33 @@
+# Local development infrastructure for NTEMS (EMS v4).
+#
+# ems-db is the local PostgreSQL 18 (host port 5437, localhost only; 5433-5436
+# are taken by emp-db, byb-db, kimp-db and headway-db). Its password is read
+# from EMS_DB_PASSWORD in the repo-root .env, which is gitignored: copy
+# .env.example to .env and fill it in. That variable is only for Compose; the
+# API reads DATABASE_URL from server/.env. The password is applied once, when
+# the volume is first created: changing it later needs ALTER ROLE.
+#
+#   docker compose up -d
+#   cd server && npx prisma migrate deploy && node prisma/seed.js && node prisma/seed-test-data.js
+services:
+  ems-db:
+    image: postgres:18
+    container_name: ems-db
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5437:5432" # localhost only
+    environment:
+      POSTGRES_DB: fmhdb
+      POSTGRES_USER: ems
+      POSTGRES_PASSWORD: ${EMS_DB_PASSWORD:?set EMS_DB_PASSWORD in .env}
+    volumes:
+      - ems-db-data:/var/lib/postgresql # Postgres 18 layout (not .../data)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ems -d fmhdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  ems-db-data:
+    name: ems-db-data # pinned: no compose-project prefix

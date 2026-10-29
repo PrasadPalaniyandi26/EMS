@@ -4,6 +4,7 @@ import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
+import { ROLES } from '../common/constants/roles';
 
 @Injectable()
 export class UsersService {
@@ -58,21 +59,36 @@ export class UsersService {
     userRoles: { include: { role: true } },
   } as const;
 
-  async findAll() {
+  // Personal details are visible only to the user themself, Admin, and a Manager for their direct reports.
+  // Everyone else gets the directory fields needed for pickers and the team list.
+  private redactFor(mapped: ReturnType<UsersService['mapUser']>, viewer?: { id: number; role_name?: string }) {
+    if (!viewer) return mapped;
+    const role = (viewer.role_name || '').toUpperCase();
+    if (mapped.id === viewer.id || role === ROLES.ADMIN) return mapped;
+    if (role === ROLES.MANAGER && mapped.manager_id === viewer.id) return mapped;
+    const {
+      email, contact_no, house_apt, address, city, country, postal_code,
+      date_of_birth, joining_date, clearance_level, login_name, created_at,
+      ...directory
+    } = mapped;
+    return directory;
+  }
+
+  async findAll(viewer?: { id: number; role_name?: string }) {
     const users = await this.prisma.user.findMany({
       include: this.userInclude,
       orderBy: { createdAt: 'desc' },
     });
-    return users.map((u) => this.mapUser(u));
+    return users.map((u) => this.redactFor(this.mapUser(u), viewer));
   }
 
-  async findById(id: number) {
+  async findById(id: number, viewer?: { id: number; role_name?: string }) {
     const user = await this.prisma.user.findUnique({
       where: { id },
       include: this.userInclude,
     });
     if (!user) throw new HttpException('User not found.', HttpStatus.NOT_FOUND);
-    return this.mapUser(user);
+    return this.redactFor(this.mapUser(user), viewer);
   }
 
   async create(dto: any) {
@@ -110,7 +126,7 @@ export class UsersService {
         });
       }
 
-      const created = await this.findById(user.id);
+      const created: any = await this.findById(user.id); // no viewer: full record, not redacted
       this.audit.log({
         tableName: 'users', recordId: user.id,
         action: 'CREATE', changedBy: user.id,
@@ -245,7 +261,8 @@ export class UsersService {
     return { message: 'User deactivated.' };
   }
 
-  async findManagersAndAdmins() {
+  async findManagersAndAdmins(viewer?: { id: number; role_name?: string }) {
+    const showEmail = (viewer?.role_name || '').toUpperCase() === ROLES.ADMIN;
     const rows = await this.prisma.$queryRaw<any[]>`
       SELECT DISTINCT u.id, u.username, u.email, u.role, def_r.role_name
       FROM users u
@@ -264,7 +281,7 @@ export class UsersService {
     return rows.map((u) => ({
       id: u.id,
       username: u.username,
-      email: u.email,
+      email: showEmail || !viewer ? u.email : undefined,
       role: u.role,
       role_name: u.role_name,
     }));

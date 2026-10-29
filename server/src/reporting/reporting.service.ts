@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { COUNTABLE_STATUSES, COMMITTED_STATUSES, countableStatusSql } from '../common/constants/transaction-status';
 
@@ -38,7 +38,7 @@ export class ReportingService {
       case 'client-summary':     return this.clientSummary(userIds, dateFrom, dateTo, params.categoryType, params.txnType as any);
       case 'claimable-gst':            return this.claimableGst(userIds, dateFrom, dateTo);
       case 'reimbursement-register':   return this.reimbursementRegister(userIds, dateFrom, dateTo);
-      default: throw new Error(`Unknown report type: ${type}`);
+      default: throw new BadRequestException(`Unknown report type: ${type}`);
     }
   }
 
