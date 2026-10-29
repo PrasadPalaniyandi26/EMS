@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useRef, useCallback } from 'react';
-import { amountLabel, restoreEnteredAmount, GST_RATES } from '@/lib/gst';
+import React from 'react';
+import { amountLabel, restoreEnteredAmount } from '@/lib/gst';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -21,16 +21,14 @@ import {
   Play,
   CalendarDays,
   Trash2,
-  UploadCloud,
   FileText,
   X as XIcon,
   Eye,
 } from 'lucide-react';
-import { toast } from 'sonner';
 import { ModuleModal } from '@/components/shared/module/module-modal';
-import { Field, NativeSelect, CurrencyInput, inp, sel } from '@/components/shared/modal-primitives';
-
-const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+import { Field, NativeSelect, CurrencyInput, SegmentedControl, inp, sel } from '@/components/shared/modal-primitives';
+import { FileDropzone } from '@/components/shared/file-dropzone';
+import { GstRateSelect, GstIncludedSwitch } from '@/components/shared/gst-fields';
 
 // Shared control styles for these dialogs: 40px, keyboard focus ring
 const ctl = inp;
@@ -60,24 +58,6 @@ export function RecurringModal({
 }: RecurringModalProps) {
   const filteredCategories = categories.filter((c) => c.type === form.type);
   const isEdit = !!editing;
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [dragging, setDragging] = React.useState(false);
-
-  const validateFile = (f: File) => {
-    if (!ALLOWED_TYPES.includes(f.type)) { toast.error('Only PDF, JPG, PNG, WEBP allowed.'); return false; }
-    if (f.size > 10 * 1024 * 1024) { toast.error('File must be under 10 MB.'); return false; }
-    return true;
-  };
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault(); setDragging(false);
-    const dropped = e.dataTransfer.files[0];
-    if (dropped && validateFile(dropped)) onFileChange(dropped);
-  }, [onFileChange]);
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (f && validateFile(f)) onFileChange(f);
-    e.target.value = '';
-  };
 
   return (
     <ModuleModal
@@ -105,25 +85,16 @@ export function RecurringModal({
           </div>
           <div className="space-y-1.5">
             <p id="recurring-type-label" className="text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Transaction Type</p>
-            <div role="radiogroup" aria-labelledby="recurring-type-label" className="flex p-1 rounded-lg border bg-[var(--secondary)] rounded-lg gap-1 h-10">
-              {([
-                { val: 'expense', active: 'text-[var(--danger)] border border-[var(--danger)]' },
-                { val: 'income',  active: 'text-[var(--success)] border border-[var(--success)]' },
-              ]).map(({ val, active }) => (
-                <button
-                  key={val}
-                  type="button"
-                  role="radio"
-                  aria-checked={form.type === val}
-                  onClick={() => setForm({ ...form, type: val, category_id: '' })}
-                  className={`flex-1 text-xs font-semibold rounded-md transition-all focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)] ${
-                    form.type === val ? active : 'text-[var(--shell-text-muted)] border border-transparent hover:text-[var(--shell-text)]'
-                  }`}
-                >
-                  {val.charAt(0).toUpperCase() + val.slice(1)}
-                </button>
-              ))}
-            </div>
+            <SegmentedControl
+              labelledBy="recurring-type-label"
+              className="h-10"
+              value={form.type}
+              onChange={(v) => setForm({ ...form, type: v, category_id: '' })}
+              options={[
+                { value: 'expense', label: 'Expense', tone: 'danger' },
+                { value: 'income', label: 'Income', tone: 'success' },
+              ]}
+            />
           </div>
         </div>
 
@@ -168,19 +139,11 @@ export function RecurringModal({
 
         {/* GST Rate | GST Included | Amount */}
         <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
-          <Field label="GST Rate">
-            <NativeSelect value={form.gst_rate} onChange={(e) => setForm({ ...form, gst_rate: e.target.value })}>
-              <option value="">No GST</option>
-              {GST_RATES.map((r) => (
-                <option key={r} value={r}>{r}</option>
-              ))}
-            </NativeSelect>
+          <Field label="GST rate">
+            <GstRateSelect value={form.gst_rate} onChange={(v) => setForm({ ...form, gst_rate: v })} emptyLabel="No GST" />
           </Field>
-          <Field label="GST Included">
-            <label className="flex h-10 cursor-pointer items-center gap-2.5 text-[12px] font-semibold text-[var(--shell-text-muted)]">
-              <Switch checked={form.gst_included} onCheckedChange={(v) => setForm({ ...form, gst_included: v })} />
-              <span className="whitespace-nowrap">{form.gst_included ? 'Included' : 'Not included'}</span>
-            </label>
+          <Field label="GST included">
+            <GstIncludedSwitch checked={form.gst_included} onChange={(v) => setForm({ ...form, gst_included: v })} />
           </Field>
           <Field label={`Amount ${amountLabel(form.gst_rate, form.gst_included)}`}>
             <CurrencyInput value={form.amount} onChange={(v) => setForm({ ...form, amount: v })} />
@@ -260,26 +223,7 @@ export function RecurringModal({
 
         {/* File upload */}
         <div className="space-y-1.5">
-          <p id="recurring-doc-label" className="text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Supporting Document</p>
-          <input ref={fileInputRef} type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp" tabIndex={-1} aria-hidden onChange={handleFileInput} />
-          {/* A real button so the drop zone works from the keyboard */}
-          <button
-            type="button"
-            aria-labelledby="recurring-doc-label"
-            className={`group flex w-full cursor-pointer items-center gap-3 rounded-lg border-2 border-dashed px-4 py-3 text-left transition-colors rounded-lg border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--shell-accent)] ${dragging ? 'border-[var(--shell-accent)]' : 'border-[var(--shell-border)] hover:border-[var(--shell-accent)]'}`}
-            onClick={() => fileInputRef.current?.click()}
-            onDrop={handleDrop}
-            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-            onDragLeave={() => setDragging(false)}
-          >
-            <UploadCloud aria-hidden className={`h-7 w-7 shrink-0 transition-colors ${dragging ? 'text-[var(--shell-accent)]' : 'text-[var(--shell-text-muted)] group-hover:text-[var(--shell-accent)]'}`} />
-            <span>
-              <span className="block text-[12px] font-medium text-[var(--shell-text-muted)]">
-                Drag &amp; drop or <span className="font-semibold text-[var(--shell-accent)]">browse files</span>
-              </span>
-              <span className="block text-[12px] text-[var(--shell-text-muted)]">PDF, JPG, PNG, WebP · max 10 MB</span>
-            </span>
-          </button>
+          <FileDropzone label="Supporting document" onFile={onFileChange} />
           {(file || (isEdit && editing?.receipt_path)) && (
             <div className="mt-1 rounded-lg border border border-[var(--shell-border)] rounded-lg px-3 py-2 flex items-center justify-between">
               <div className="flex items-center gap-2.5 min-w-0">

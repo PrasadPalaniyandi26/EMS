@@ -113,6 +113,52 @@ export function AutoLabel({ className, children, style }: { className?: string; 
   return <Label ref={ref} className={className} style={style}>{children}</Label>;
 }
 
+// One-of-N toggle (status, type). A radio group on the secondary track; the chosen option is outlined in its tone.
+// `labelledBy` is the id of the visible label above it.
+const SEGMENT_TONES = {
+  success: 'text-[var(--success)] border-[var(--success)]',
+  danger: 'text-[var(--danger)] border-[var(--danger)]',
+  warning: 'text-[var(--warning)] border-[var(--warning)]',
+  info: 'text-[var(--info)] border-[var(--info)]',
+  accent: 'text-[var(--shell-accent)] border-[var(--shell-accent)]',
+  neutral: 'text-[var(--shell-text)] border-[var(--shell-border)]',
+} as const;
+
+export function SegmentedControl<T extends string | boolean>({
+  labelledBy, value, onChange, options, className, wrap,
+}: {
+  labelledBy: string;
+  value: T;
+  onChange: (v: T) => void;
+  options: Array<{ value: T; label: string; tone?: keyof typeof SEGMENT_TONES }>;
+  className?: string;
+  wrap?: boolean;
+}) {
+  return (
+    <div role="radiogroup" aria-labelledby={labelledBy} className={cn('flex gap-1 rounded-lg border bg-[var(--secondary)] p-1', wrap && 'flex-wrap', className)}>
+      {options.map((o) => {
+        const on = value === o.value;
+        return (
+          <button
+            key={String(o.value)}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            onClick={() => onChange(o.value)}
+            className={cn(
+              'flex-1 rounded-md border py-1.5 text-center text-[12px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]',
+              wrap && 'min-w-[5.5rem]',
+              on ? SEGMENT_TONES[o.tone ?? 'accent'] : 'border-transparent text-[var(--shell-text-muted)] hover:text-[var(--shell-text)]',
+            )}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 // Section divider with label
 export function SectionHeader({ label }: { label: string }) {
   return (

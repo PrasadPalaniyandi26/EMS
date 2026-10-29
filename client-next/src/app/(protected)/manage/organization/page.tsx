@@ -40,7 +40,9 @@ import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailActions, T
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
 import { columns } from './columns';
-import { UserModal, AllocationModal, PermissionsModal } from '@/components/manage/user-modals';
+import { UserModal } from '@/components/manage/user-modal';
+import { AllocationModal } from '@/components/manage/allocation-modal';
+import { PermissionsModal } from '@/components/manage/permissions-modal';
 import { cn } from '@/lib/utils';
 import { parseApiDate } from '@/lib/currency';
 import { useConfirm } from '@/components/shared/modal-primitives';

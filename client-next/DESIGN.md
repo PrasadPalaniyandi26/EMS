@@ -32,7 +32,7 @@ One set of rules for every page and dialog. Tokens live in `src/app/globals.css`
 ## Dialogs and forms
 - Every dialog is `ModuleModal` (or `ConfirmDialog` for confirmations): one surface for header, body and footer, 15px sentence-case title, footer Cancel then the main action. Never a raw `Dialog`.
 - Fields use `Field` (label linked to the control, hint and error) with `inp` / `NativeSelect` / `CurrencyInput` / `PhoneInput` / `EmailInput`: transparent fill, 3:1 border, visible focus ring. Same on pages and in dialogs.
-- Toggles that pick one option are radio groups with `aria-labelledby`.
+- Toggles that pick one option are `SegmentedControl` (a labelled radio group). Approve/reject/void/send-back dialogs are `DecisionModal`; receipt upload is `FileDropzone`; GST rate and inclusion are `GstRateSelect` / `GstIncludedSwitch`. Reuse these; don't copy their markup.
 
 ## Accessibility floor
 Text 4.5:1, control boundaries 3:1, focus ring on every control, every control labelled, no horizontal scroll at 375px, `prefers-reduced-motion` respected, theme stored as `{"state":{"theme":"light|dark"}}` in `localStorage['ems-theme']`.

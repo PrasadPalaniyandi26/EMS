@@ -39,3 +39,8 @@ export function getRoleStyle(roleName?: string | null) {
   const key = (roleName || '').toLowerCase();
   return ROLE_STYLES[key] || { ...FALLBACK, label: roleName || '—' };
 }
+
+export function roleColor(name?: string) {
+  const s = getRoleStyle(name);
+  return { dot: s.dot, label: s.badge };
+}

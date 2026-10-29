@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Plus, Pencil, PlusCircle } from 'lucide-react';
 import { ModuleModal } from '@/components/shared/module/module-modal';
-import { Field, SectionHeader, EmailInput, PhoneInput, isValidEmail, isValidPhone, inp, sel } from '@/components/shared/modal-primitives';
+import { Field, SectionHeader, EmailInput, PhoneInput, SegmentedControl, isValidEmail, isValidPhone, inp, sel } from '@/components/shared/modal-primitives';
 
 // ─── Country List ─────────────────────────────────────────────────────────────
 export const COUNTRY_LIST = [
@@ -253,25 +253,16 @@ export function ClientModal({ isOpen, onClose, onSave, editing, businessTypes: i
           {/* ── STATUS TOGGLE ── */}
           <div className="pt-1">
             <p id="client-status-label" className="mb-2 block text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Status</p>
-            <div role="radiogroup" aria-labelledby="client-status-label" className="flex p-1 rounded-lg border bg-[var(--secondary)] rounded-lg gap-1 h-9 w-56">
-              {([
-                { label: 'Active',   val: true,  active: 'text-[var(--success)] border border-[var(--success)]' },
-                { label: 'Inactive', val: false, active: 'text-[var(--danger)] border border-[var(--danger)]' },
-              ]).map(({ label, val, active }) => (
-                <button
-                  key={label}
-                  type="button"
-                  role="radio"
-                  aria-checked={form.is_active === val}
-                  onClick={() => set('is_active', val)}
-                  className={`flex-1 py-1.5 text-center text-[12px] font-semibold rounded-md transition-all ${
-                    form.is_active === val ? active : 'text-[var(--shell-text-muted)] border border-transparent hover:text-[var(--shell-text)]'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            <SegmentedControl
+              labelledBy="client-status-label"
+              className="w-56"
+              value={form.is_active}
+              onChange={(v) => set('is_active', v)}
+              options={[
+                { value: true, label: 'Active', tone: 'success' },
+                { value: false, label: 'Inactive', tone: 'danger' },
+              ]}
+            />
           </div>
 
         </div>

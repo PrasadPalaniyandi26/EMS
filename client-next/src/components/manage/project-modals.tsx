@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Plus, Pencil, PlusCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { ModuleModal } from '@/components/shared/module/module-modal';
-import { Field, AutoLabel, CurrencyInput, inp, sel } from '@/components/shared/modal-primitives';
+import { Field, AutoLabel, CurrencyInput, SegmentedControl, inp, sel } from '@/components/shared/modal-primitives';
 
 // ─── Shared Styles ─────────────────────────────────────────────────────────────
 
@@ -192,26 +192,18 @@ export function ProjectModal({
         {/* Full-width: status + description */}
         <div className="sm:col-span-2">
           <p id="project-status-label" className="mb-2 block text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Project Status</p>
-          <div role="radiogroup" aria-labelledby="project-status-label" className="flex p-1 rounded-lg border bg-[var(--secondary)] rounded-lg gap-1">
-            {([
-              { val: 'Active',    active: 'text-[var(--success)] border border-[var(--success)]' },
-              { val: 'Proposed',  active: 'text-[var(--shell-text)] border border-[var(--shell-border)]' },
-              { val: 'On-Hold',   active: 'text-[var(--warning)] border border-[var(--warning)]' },
-              { val: 'Completed', active: 'text-[var(--info)] border border-[var(--info)]' },
-              { val: 'Canceled',  active: 'text-[var(--danger)] border border-[var(--danger)]' },
-            ]).map(({ val, active }) => (
-              <button
-                key={val}
-                type="button" role="radio" aria-checked={form.status === val}
-                onClick={() => set('status', val)}
-                className={`flex-1 py-1.5 text-center text-[12px] font-semibold rounded-md transition-all ${
-                  form.status === val ? active : 'text-[var(--shell-text-muted)] border border-transparent hover:text-[var(--shell-text)]'
-                }`}
-              >
-                {val}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            labelledBy="project-status-label"
+            value={form.status}
+            onChange={(v) => set('status', v)}
+            options={[
+              { value: 'Active', label: 'Active', tone: 'success' },
+              { value: 'Proposed', label: 'Proposed', tone: 'neutral' },
+              { value: 'On-Hold', label: 'On-Hold', tone: 'warning' },
+              { value: 'Completed', label: 'Completed', tone: 'info' },
+              { value: 'Canceled', label: 'Canceled', tone: 'danger' },
+            ]}
+          />
         </div>
 
         <div className="sm:col-span-2">

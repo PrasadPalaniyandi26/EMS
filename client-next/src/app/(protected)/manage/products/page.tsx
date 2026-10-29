@@ -29,7 +29,7 @@ import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAllocation, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
-import { CurrencyInput, Field, NativeSelect, ConfirmDialog, inp } from '@/components/shared/modal-primitives';
+import { CurrencyInput, Field, NativeSelect, ConfirmDialog, SegmentedControl, inp } from '@/components/shared/modal-primitives';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 interface ProductForm {
@@ -293,22 +293,13 @@ export default function ProductsPage() {
             </div>
             <div>
               <p id="product-status-label" className="mb-1 text-xs font-semibold" style={{ color: 'var(--shell-text-muted)' }}>Production Status</p>
-              <div role="radiogroup" aria-labelledby="product-status-label" className="rounded-lg border bg-[var(--secondary)] flex flex-wrap gap-1 rounded-lg p-1">
-                {['R&D', 'Prototype', 'Assembly', 'Quality', 'Market Ready'].map(opt => (
-                  <button
-                    key={opt}
-                    type="button"
-                    role="radio"
-                    aria-checked={form.status === opt}
-                    onClick={() => setForm({ ...form, status: opt })}
-                    className={`min-w-[5.5rem] flex-1 rounded-md border py-1.5 text-center text-[12px] font-semibold transition-all focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)] ${
-                      form.status === opt ? 'border-[var(--shell-accent)] text-[var(--shell-accent)]' : 'border-transparent text-[var(--shell-text-muted)] hover:text-[var(--shell-text)]'
-                    }`}
-                  >
-                    {opt}
-                  </button>
-                ))}
-              </div>
+              <SegmentedControl
+                wrap
+                labelledBy="product-status-label"
+                value={form.status}
+                onChange={(v) => setForm({ ...form, status: v })}
+                options={['R&D', 'Prototype', 'Assembly', 'Quality', 'Market Ready'].map((opt) => ({ value: opt, label: opt }))}
+              />
             </div>
             <Field label="Description">
               <textarea className={`${inp} h-auto resize-none py-2`} rows={3} placeholder="Describe the manufacturing process..." value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />

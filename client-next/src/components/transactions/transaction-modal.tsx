@@ -1,12 +1,12 @@
 'use client';
 
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useCategories, useClients, useProjects, useProducts, useInvalidate } from '@/hooks/use-queries';
 import api, { getAccessToken, API_BASE } from '@/lib/api-client';
 import { CURRENCY_SYMBOL, toLocalYMD, parseApiDate, parseOcrDate } from '@/lib/currency';
 import { toast } from 'sonner';
-import { Plus, Pencil, Eye, Trash2, UploadCloud, FileText, Loader2, Sparkles } from 'lucide-react';
+import { Plus, Pencil, Eye, Trash2, FileText, Sparkles } from 'lucide-react';
 import type { Transaction } from '@/lib/types';
 import { ModuleModal } from '@/components/shared/module/module-modal';
 import { Field, NativeSelect, CurrencyInput, inp } from '@/components/shared/modal-primitives';
@@ -16,7 +16,9 @@ import { StatusBadge } from '@/components/shared/status-badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { computeTotalAmount, restoreEnteredAmount, amountLabel, GST_RATES } from '@/lib/gst';
+import { FileDropzone } from '@/components/shared/file-dropzone';
+import { GstRateSelect, GstIncludedSwitch } from '@/components/shared/gst-fields';
+import { computeTotalAmount, restoreEnteredAmount, amountLabel } from '@/lib/gst';
 
 const sanitizeText = (v: unknown): string => {
   if (typeof v !== 'string') return '';
@@ -64,14 +66,11 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
   const [needsReimbursement, setNeedsReimbursement] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [fileRemoved, setFileRemoved] = useState(false);
-  const [dragging, setDragging] = useState(false);
   const [saving, setSaving] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [budgetWarning, setBudgetWarning] = useState<{ remaining: number; after_this_expense: number; allocated: number; will_exceed: boolean } | null>(null);
   const [dupCheckFailed, setDupCheckFailed] = useState(false);
   const [dupWarning, setDupWarning] = useState<{ hardBlock: boolean; softWarn: boolean; matches: any[] } | null>(null);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Budget warning: check remaining budget when expense amount + category + date are filled
   useEffect(() => {
@@ -155,21 +154,6 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
     }
   }, [open, editing]);
 
-  const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
-  const MAX_SIZE_MB = 10;
-
-  const validateFile = (f: File): boolean => {
-    if (!ALLOWED_TYPES.includes(f.type)) {
-      toast.error('Invalid file type. Only PDF, JPG, PNG, and WEBP are allowed.');
-      return false;
-    }
-    if (f.size > MAX_SIZE_MB * 1024 * 1024) {
-      toast.error(`File too large. Maximum size is ${MAX_SIZE_MB}MB.`);
-      return false;
-    }
-    return true;
-  };
-
   const runOcr = useCallback(async (f: File) => {
     setOcrLoading(true);
     try {
@@ -207,18 +191,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
     }
   }, [filteredCategories]);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragging(false);
-    const dropped = e.dataTransfer.files[0];
-    if (dropped && validateFile(dropped)) { setFile(dropped); setFileRemoved(false); runOcr(dropped); }
-  }, [runOcr]);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files?.[0];
-    if (selected && validateFile(selected)) { setFile(selected); setFileRemoved(false); runOcr(selected); }
-    e.target.value = '';
-  };
+  const handleFile = (f: File) => { setFile(f); setFileRemoved(false); runOcr(f); };
 
   const handleViewFile = async () => {
     if (file) {
@@ -246,7 +219,6 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
   const handleRemoveFile = () => {
     setFile(null);
     setFileRemoved(true);
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleSave = async (bypass = false) => {
@@ -451,17 +423,9 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
           <Field label="GST & Inclusion">
             <div className="flex items-center gap-2">
               <div className="min-w-0 flex-1">
-                <NativeSelect value={gstRate} onChange={(e) => setGstRate(e.target.value)}>
-                  <option value="">Select GST...</option>
-                  {GST_RATES.map((r) => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                </NativeSelect>
+                <GstRateSelect value={gstRate} onChange={setGstRate} emptyLabel="Select GST..." />
               </div>
-              <label className="flex h-10 shrink-0 cursor-pointer items-center gap-2 text-[12px] font-semibold text-[var(--shell-text-muted)]">
-                <Switch checked={gstAdded} onCheckedChange={setGstAdded} aria-label="GST included in amount" />
-                <span className="whitespace-nowrap">{gstAdded ? 'Included' : 'Not included'}</span>
-              </label>
+              <GstIncludedSwitch checked={gstAdded} onChange={setGstAdded} />
             </div>
           </Field>
 
@@ -521,48 +485,13 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
 
         {/* Receipt upload */}
         <div className="space-y-1.5 sm:col-span-2">
-          <p id="receipt-upload-label" className="text-[13px] font-medium" style={{ color: "var(--shell-text)" }}>Receipt Upload</p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            accept=".pdf,.jpg,.jpeg,.png,.webp"
-            tabIndex={-1}
-            aria-hidden
-            onChange={handleFileChange}
+          <FileDropzone
+            label="Receipt upload"
+            onFile={handleFile}
+            busy={ocrLoading}
+            busyTitle={<><Sparkles aria-hidden className="h-3 w-3" /> Extracting data from receipt...</>}
+            busyHint="Fields will be auto-filled shortly"
           />
-          {/* A real button, so the drop zone is reachable by keyboard (Enter / Space opens the file picker) */}
-          <button
-            type="button"
-            aria-labelledby="receipt-upload-label"
-            aria-busy={ocrLoading}
-            className={`group flex w-full cursor-pointer items-center gap-3 rounded-lg border-2 border-dashed px-4 py-3 text-left transition-colors rounded-lg border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--shell-accent)] ${dragging ? 'border-[var(--shell-accent)]' : 'border-[var(--shell-border)] hover:border-[var(--shell-accent)]'}`}
-            onClick={() => !ocrLoading && fileInputRef.current?.click()}
-            onDrop={handleDrop}
-            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-            onDragLeave={() => setDragging(false)}
-          >
-            {ocrLoading
-              ? <Loader2 aria-hidden className="h-7 w-7 shrink-0 animate-spin text-[var(--shell-accent)]" />
-              : <UploadCloud aria-hidden className={`h-7 w-7 shrink-0 transition-colors ${dragging ? 'text-[var(--shell-accent)]' : 'text-[var(--shell-text-muted)] group-hover:text-[var(--shell-accent)]'}`} />
-            }
-            <span>
-              {ocrLoading
-                ? <>
-                    <span className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--shell-accent)]">
-                      <Sparkles aria-hidden className="h-3 w-3" /> Extracting data from receipt...
-                    </span>
-                    <span className="block text-[12px] text-[var(--shell-text-muted)]">Fields will be auto-filled shortly</span>
-                  </>
-                : <>
-                    <span className="block text-[12px] font-medium text-[var(--shell-text-muted)]">
-                      Drag &amp; drop or <span className="font-semibold text-[var(--shell-accent)]">browse files</span>
-                    </span>
-                    <span className="block text-[12px] text-[var(--shell-text-muted)]">PDF, JPG, PNG, WebP · max 10 MB</span>
-                  </>
-              }
-            </span>
-          </button>
 
           {/* File card: visible when a file exists */}
           {hasFile && (
