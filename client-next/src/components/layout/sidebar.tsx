@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { canAccessRoute } from '@/lib/route-access';
 import { useSidebarStore } from '@/stores/sidebar-store';
+import { useBudgetAlertCount } from '@/hooks/use-budget-queries';
 import {
   Tooltip,
   TooltipContent,
@@ -15,7 +16,7 @@ import {
 import {
   Home, ClipboardCheck, TrendingDown, TrendingUp,
   Users, Briefcase, Package, Building2, Target, RotateCcw,
-  BarChart2, Settings, Shield, FileBarChart,
+  BarChart2, Settings, Shield, FileBarChart, Gauge, BellRing, SlidersHorizontal,
   ChevronLeft, ChevronRight,
 } from 'lucide-react';
 
@@ -47,7 +48,15 @@ const NAV_GROUPS = [
     label: 'Manage',
     items: [
       { name: 'Organization', href: '/manage/organization', icon: Building2, iconColor: 'text-nav-blue' },
-      { name: 'Budget', href: '/manage/budgets', icon: Target, iconColor: 'text-nav-cyan' },
+    ],
+  },
+  {
+    label: 'Budget',
+    items: [
+      { name: 'Planner', href: '/budget/planner', icon: Target, iconColor: 'text-nav-cyan' },
+      { name: 'Monitor', href: '/budget/monitor', icon: Gauge, iconColor: 'text-nav-emerald' },
+      { name: 'Alerts', href: '/budget/alerts', icon: BellRing, iconColor: 'text-nav-amber' },
+      { name: 'Budget settings', href: '/budget/settings', icon: SlidersHorizontal, iconColor: 'text-nav-slate' },
     ],
   },
   {
@@ -74,6 +83,7 @@ export function Sidebar() {
   const { mobileOpen, closeMobile, slim, toggleSlim } = useSidebarStore();
 
   const isEmployeeActive = (user?.role_name || '').toUpperCase() === 'EMPLOYEE';
+  const { data: alertCount } = useBudgetAlertCount(!!user && !isEmployeeActive);
 
 
   return (
@@ -133,6 +143,9 @@ export function Sidebar() {
                         >
                           <item.icon className={`h-[15px] w-[15px] shrink-0 ${item.iconColor}`} />
                           {!slim && item.name}
+                          {!slim && item.href === '/budget/alerts' && !!alertCount?.open && (
+                            <span className={`ml-auto text-[12px] font-semibold tabular-nums ${alertCount.critical ? 'text-[var(--danger)]' : 'text-[var(--warning)]'}`}>{alertCount.open}</span>
+                          )}
                         </Link>
                       );
 

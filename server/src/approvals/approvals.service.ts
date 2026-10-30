@@ -44,6 +44,8 @@ export class ApprovalsService {
       category_name: tx?.category?.name,
       project_name: tx?.project?.name ?? null,
       product_name: tx?.product?.name ?? null,
+      department_name: tx?.department?.name ?? null,
+      over_budget_reason: tx?.overBudgetReason ?? null,
       description: tx?.description,
       submitted_by: tx?.submittedByName ?? tx?.user?.username,
       submitted_by_name: tx?.submittedByName ?? tx?.user?.username,
@@ -183,7 +185,7 @@ export class ApprovalsService {
             transaction: { status: 'PENDING_MANAGER', userId: { not: approverId } },
             AND: [this.managerAssignedFilter(approverId, 'transaction')],
           },
-          include: { transaction: { include: { category: true, user: true, project: true, product: true } } },
+          include: { transaction: { include: { category: true, user: true, project: true, product: true, department: true } } },
           orderBy: { createdAt: 'desc' },
         }),
         this.prisma.approvalRequest.findMany({
@@ -210,7 +212,7 @@ export class ApprovalsService {
             transactionId: { not: null },
             transaction: { status: 'PENDING_FINANCE' },
           },
-          include: { transaction: { include: { category: true, user: true, project: true, product: true } } },
+          include: { transaction: { include: { category: true, user: true, project: true, product: true, department: true } } },
           orderBy: { createdAt: 'desc' },
         }),
         this.prisma.approvalRequest.findMany({
@@ -232,7 +234,7 @@ export class ApprovalsService {
       // Employee/Admin: show requests directly assigned to them
       const requests = await this.prisma.approvalRequest.findMany({
         where: { approverId, status: 'PENDING' },
-        include: { transaction: { include: { category: true, user: true, project: true, product: true } } },
+        include: { transaction: { include: { category: true, user: true, project: true, product: true, department: true } } },
         orderBy: { createdAt: 'desc' },
       });
       results.push(...requests.map((r) => this.mapRequest(r)));
@@ -252,7 +254,7 @@ export class ApprovalsService {
       const [txRequests, recRequests] = await Promise.all([
         this.prisma.approvalRequest.findMany({
           where: { transactionId: { not: null }, transaction: { userId, status: { in: ['APPROVED', 'REJECTED', 'SENT_BACK'] } } },
-          include: { transaction: { include: { category: true, user: true, project: true, product: true } } },
+          include: { transaction: { include: { category: true, user: true, project: true, product: true, department: true } } },
           orderBy: { createdAt: 'desc' },
           distinct: ['transactionId'],
         }),
@@ -274,7 +276,7 @@ export class ApprovalsService {
           status: { in: ['APPROVED', 'REJECTED', 'SENT_BACK'] },
           transactionId: { not: null },
         },
-        include: { transaction: { include: { category: true, user: true, project: true, product: true } } },
+        include: { transaction: { include: { category: true, user: true, project: true, product: true, department: true } } },
         orderBy: { createdAt: 'desc' },
         distinct: ['transactionId'],
       }),

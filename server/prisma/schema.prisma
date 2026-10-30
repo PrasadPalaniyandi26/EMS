@@ -59,10 +59,7 @@ model User {
   approvalReqs                     ApprovalRequest[]
   auditLogs                        AuditLog[]
   notifications                    Notification[]
-  budgets_budgets_owner_idTousers  Budget[]               @relation("budgets_owner_idTousers")
-  budgets                          Budget[]
   createdClients                   Client[]               @relation("ClientCreator")
-  monthlySettings                  MonthlyBudgetSetting[]
   createdProdTypes                 ProductType[]          @relation("ProductTypeCreator")
   createdProducts                  Product[]              @relation("ProductCreator")
   products_products_lead_idTousers Product[]              @relation("products_lead_idTousers")
@@ -114,6 +111,7 @@ model UserPermission {
 model Category {
   id           Int                    @id @default(autoincrement())
   name         String                 @db.VarChar(50)
+  code         String?                @db.VarChar(10)
   type         String                 @db.VarChar(10)
   icon         String?                @db.VarChar(50)
   isCustom     Boolean                @default(false) @map("is_custom")
@@ -121,7 +119,6 @@ model Category {
   isActive     Boolean                @default(true) @map("is_active")
   typeId       Int?                   @map("type_id")
   categoryType CategoryType?          @relation(fields: [typeId], references: [id], onDelete: SetNull)
-  budgets      Budget[]
   recurringTxn RecurringTransaction[]
   splits       TransactionSplit[]
   transactions Transaction[]
@@ -148,6 +145,9 @@ model Transaction {
   submittedAt    DateTime?          @map("submitted_at")
   status         String?            @default("DRAFT") @db.VarChar(20)
   productId      Int?               @map("product_id")
+  departmentId   Int?               @map("department_id")
+  budgetLineId   Int?               @map("budget_line_id")
+  overBudgetReason String?          @map("over_budget_reason") @db.VarChar(500)
   contextType    String?            @default("project") @map("context_type") @db.VarChar(10)
   currency       String?            @default("INR") @db.VarChar(3)
   gstRate        Decimal?           @map("gst_rate") @db.Decimal(5, 2)
@@ -192,6 +192,7 @@ model Transaction {
   project        Project?           @relation(fields: [projectId], references: [id])
   user           User               @relation(fields: [userId], references: [id])
   recurringTransaction RecurringTransaction? @relation(fields: [recurringTransactionId], references: [id])
+  department     Department?        @relation(fields: [departmentId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([dateRecorded])
@@ -201,6 +202,7 @@ model Transaction {
   @@index([clientId])
   @@index([projectId])
   @@index([productId])
+  @@index([departmentId])
   @@index([contextType])
   @@index([userId, status, type])
   @@map("transactions")
@@ -272,6 +274,7 @@ model Client {
 model ProjectType {
   id        Int       @id @default(autoincrement())
   name      String    @db.VarChar(100)
+  code      String?   @db.VarChar(10)
   isActive  Boolean   @default(true) @map("is_active")
   createdBy Int?      @map("created_by")
   createdAt DateTime  @default(now()) @map("created_at")
@@ -297,6 +300,7 @@ model ProjectCategory {
   id        Int         @id @default(autoincrement())
   typeId    Int         @map("type_id")
   name      String      @db.VarChar(100)
+  code      String?     @db.VarChar(10)
   isActive  Boolean     @default(true) @map("is_active")
   createdBy Int?        @map("created_by")
   createdAt DateTime    @default(now()) @map("created_at")
@@ -340,6 +344,7 @@ model Project {
 model ProductType {
   id        Int       @id @default(autoincrement())
   name      String    @db.VarChar(100)
+  code      String?   @db.VarChar(10)
   isActive  Boolean   @default(true) @map("is_active")
   createdBy Int?      @map("created_by")
   createdAt DateTime  @default(now()) @map("created_at")
@@ -355,6 +360,7 @@ model ProductCategory {
   id        Int         @id @default(autoincrement())
   typeId    Int         @map("type_id")
   name      String      @db.VarChar(100)
+  code      String?     @db.VarChar(10)
   isActive  Boolean     @default(true) @map("is_active")
   createdBy Int?        @map("created_by")
   createdAt DateTime    @default(now()) @map("created_at")
@@ -414,6 +420,9 @@ model RecurringTransaction {
   clientId         Int?      @map("client_id")
   projectId        Int?      @map("project_id")
   productId        Int?      @map("product_id")
+  departmentId     Int?      @map("department_id")
+  renewalDate      DateTime? @map("renewal_date") @db.Date
+  escalationPct    Decimal?  @map("escalation_pct") @db.Decimal(5, 2)
   contextType      String?   @default("project") @map("context_type") @db.VarChar(10)
   currency         String?   @default("INR") @db.VarChar(3)
   gstRate          Decimal?  @map("gst_rate") @db.Decimal(5, 2)
@@ -445,55 +454,6 @@ model RecurringTransaction {
   @@index([nextRunDate])
   @@index([isActive, nextRunDate])
   @@map("recurring_transactions")
-}
-
-model Budget {
-  id                            Int       @id @default(autoincrement())
-  userId                        Int       @map("user_id")
-  categoryId                    Int?      @map("category_id")
-  monthlyLimit                  Decimal?  @map("monthly_limit") @db.Decimal(14, 2)
-  amount                        Decimal   @default(0) @db.Decimal(14, 2)
-  periodMonth                   Int       @map("period_month") @db.SmallInt
-  periodYear                    Int       @map("period_year") @db.SmallInt
-  isActive                      Boolean   @default(true) @map("is_active")
-  createdAt                     DateTime  @default(now()) @map("created_at")
-  updatedAt                     DateTime  @default(now()) @updatedAt @map("updated_at")
-  code                          String?   @db.VarChar(20)
-  name                          String?   @db.VarChar(150)
-  department                    String?   @db.VarChar(100)
-  owner_id                      Int?
-  financial_year                Int?
-  details                       String?
-  start_date                    DateTime? @db.Date
-  end_date                      DateTime? @db.Date
-  strict_enforcement            Boolean?  @default(true)
-  auto_rollover                 Boolean?  @default(false)
-  category                      Category? @relation(fields: [categoryId], references: [id])
-  users_budgets_owner_idTousers User?     @relation("budgets_owner_idTousers", fields: [owner_id], references: [id], onUpdate: NoAction)
-  user                          User      @relation(fields: [userId], references: [id])
-
-  @@unique([userId, categoryId, periodMonth, periodYear])
-  @@index([userId])
-  @@index([periodYear, periodMonth])
-  @@map("budgets")
-}
-
-model MonthlyBudgetSetting {
-  id                   Int      @id @default(autoincrement())
-  userId               Int      @map("user_id")
-  periodMonth          Int      @map("period_month") @db.SmallInt
-  periodYear           Int      @map("period_year") @db.SmallInt
-  additionalExpense    Decimal? @default(0) @map("additional_expense") @db.Decimal(14, 2)
-  lastMonthIncome      Decimal? @default(0) @map("last_month_income") @db.Decimal(14, 2)
-  additionalAllocation Decimal? @default(0) @map("additional_allocation") @db.Decimal(14, 2)
-  rolloverEnabled      Boolean  @default(false) @map("rollover_enabled")
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at")
-  user                 User     @relation(fields: [userId], references: [id])
-
-  @@unique([userId, periodMonth, periodYear])
-  @@index([periodYear, periodMonth])
-  @@map("monthly_budget_settings")
 }
 
 model RefreshToken {
@@ -581,6 +541,8 @@ model Department {
   id        Int      @id @default(autoincrement())
   name      String   @unique @db.VarChar(100)
   isActive  Boolean  @default(true) @map("is_active")
+  ownerId   Int?     @map("owner_id")
+  transactions Transaction[]
   createdBy Int?     @map("created_by")
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -592,6 +554,8 @@ model CategoryType {
   id         Int        @id @default(autoincrement())
   name       String     @db.VarChar(50)
   kind       String     @db.VarChar(10)
+  code       String?    @db.VarChar(10)
+  appliesTo  String?    @map("applies_to") @db.VarChar(40)
   isActive   Boolean    @default(true) @map("is_active")
   createdBy  Int?       @map("created_by")
   createdAt  DateTime   @default(now()) @map("created_at")
@@ -599,4 +563,112 @@ model CategoryType {
 
   @@unique([kind, name])
   @@map("category_types")
+}
+
+// ── Budget control ──────────────────────────────────────────────────────────
+
+// One row (id 1): company-wide budget rules
+model BudgetSetting {
+  id                Int      @id @default(1)
+  fyStartMonth      Int      @default(4) @map("fy_start_month") @db.SmallInt
+  overBudgetMode    String   @default("WARN") @map("over_budget_mode") @db.VarChar(10)
+  controlLevel      String   @default("TYPE") @map("control_level") @db.VarChar(10)
+  netOfClaimableGst Boolean  @default(true) @map("net_of_claimable_gst")
+  approvalThreshold Decimal  @default(100000) @map("approval_threshold") @db.Decimal(14, 2)
+  contingencyPct    Decimal  @default(10) @map("contingency_pct") @db.Decimal(5, 2)
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("budget_settings")
+}
+
+// One plan per financial year; fy is the calendar year in which it starts (2026 = FY 2026-27)
+model BudgetPlan {
+  id             Int          @id @default(autoincrement())
+  fy             Int          @unique
+  name           String       @db.VarChar(100)
+  status         String       @default("DRAFT") @db.VarChar(15)
+  envelope       Decimal?     @db.Decimal(14, 2)
+  version        Int          @default(1)
+  submittedAt    DateTime?    @map("submitted_at")
+  submittedByName String?     @map("submitted_by_name") @db.VarChar(100)
+  approvedAt     DateTime?    @map("approved_at")
+  approvedById   Int?         @map("approved_by_id")
+  approvedByName String?      @map("approved_by_name") @db.VarChar(100)
+  decisionNote   String?      @map("decision_note") @db.VarChar(500)
+  createdBy      Int?         @map("created_by")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at")
+  lines          BudgetLine[]
+
+  @@map("budget_plans")
+}
+
+// One cost object x one expense type, phased by month
+model BudgetLine {
+  id             Int                @id @default(autoincrement())
+  planId         Int                @map("plan_id")
+  costObject     String             @map("cost_object") @db.VarChar(12)
+  projectId      Int?               @map("project_id")
+  productId      Int?               @map("product_id")
+  departmentId   Int?               @map("department_id")
+  typeId         Int?               @map("type_id")
+  categoryId     Int?               @map("category_id")
+  controlLevel   String             @default("TYPE") @map("control_level") @db.VarChar(10)
+  strict         Boolean            @default(false)
+  isContingency  Boolean            @default(false) @map("is_contingency")
+  ownerId        Int?               @map("owner_id")
+  note           String?            @db.VarChar(500)
+  isActive       Boolean            @default(true) @map("is_active")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @default(now()) @updatedAt @map("updated_at")
+  plan           BudgetPlan         @relation(fields: [planId], references: [id], onDelete: Cascade)
+  periods        BudgetLinePeriod[]
+
+  @@index([planId])
+  @@index([projectId])
+  @@index([productId])
+  @@index([departmentId])
+  @@index([typeId])
+  @@map("budget_lines")
+}
+
+model BudgetLinePeriod {
+  id     Int        @id @default(autoincrement())
+  lineId Int        @map("line_id")
+  year   Int        @db.SmallInt
+  month  Int        @db.SmallInt
+  amount Decimal    @default(0) @db.Decimal(14, 2)
+  line   BudgetLine @relation(fields: [lineId], references: [id], onDelete: Cascade)
+
+  @@unique([lineId, year, month])
+  @@map("budget_line_periods")
+}
+
+model BudgetAlertRule {
+  code      String   @id @db.VarChar(30)
+  name      String   @db.VarChar(100)
+  detail    String?  @db.VarChar(300)
+  enabled   Boolean  @default(true)
+  threshold Decimal? @db.Decimal(8, 2)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("budget_alert_rules")
+}
+
+// One open alert per rule and line; it escalates instead of repeating and closes when the condition clears
+model BudgetAlert {
+  id         Int       @id @default(autoincrement())
+  ruleCode   String    @map("rule_code") @db.VarChar(30)
+  lineId     Int?      @map("line_id")
+  level      String    @db.VarChar(10)
+  message    String    @db.VarChar(300)
+  action     String?   @db.VarChar(30)
+  ownerId    Int?      @map("owner_id")
+  status     String    @default("OPEN") @db.VarChar(10)
+  openedAt   DateTime  @default(now()) @map("opened_at")
+  resolvedAt DateTime? @map("resolved_at")
+
+  @@index([status])
+  @@index([lineId])
+  @@map("budget_alerts")
 }

@@ -7,6 +7,7 @@ import { ModuleModal } from '@/components/shared/module/module-modal';
 import { SegmentedControl } from '@/components/shared/modal-primitives';
 import { useInvalidate, useCategories, useCategoryTypes, useCategoryUsage } from '@/hooks/use-queries';
 import { ManageList } from './manage-list';
+import { sortByCode } from '@/lib/codes';
 
 type Kind = 'expense' | 'income';
 
@@ -32,8 +33,8 @@ export function ManageCategoriesDialog({ isOpen, onClose, kinds }: Props) {
 
   useEffect(() => { if (isOpen) { setKind(kinds[0]); setTypeId(null); } }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const types = (allTypes || []).filter((t) => t.kind === kind);
-  const categories = (allCategories || []).filter((c) => c.type === kind && c.type_id === typeId);
+  const types = sortByCode((allTypes || []).filter((t) => t.kind === kind));
+  const categories = sortByCode((allCategories || []).filter((c) => c.type === kind && c.type_id === typeId));
   const selected = types.find((t) => t.id === typeId) ?? null;
 
   const refresh = () => invalidate('categoryTypes', 'categories', 'categoryUsage');
@@ -67,14 +68,15 @@ export function ManageCategoriesDialog({ isOpen, onClose, kinds }: Props) {
           heading="Types"
           sectionLabel="Types"
           noun="type"
-          items={types.map((t) => ({ id: t.id, name: t.name, used: usage?.types[t.id] ?? 0 }))}
+          withCode
+          items={types.map((t) => ({ id: t.id, name: t.name, code: t.code, used: usage?.types[t.id] ?? 0 }))}
           selectedId={typeId}
           onPick={setTypeId}
           emptyText="No types yet."
           taken={(name, exceptId) =>
             types.some((t) => t.id !== exceptId && same(t.name, name)) ? `A type named "${name}" already exists` : null}
-          onAdd={(name) => done(api.post('/category-types', { name, kind }))}
-          onRename={(id, name) => done(api.put(`/category-types/${id}`, { name }))}
+          onAdd={(name, code) => done(api.post('/category-types', { name, kind, code: code || undefined }))}
+          onRename={(id, name, code) => done(api.put(`/category-types/${id}`, { name, code: code ?? null }))}
           onRemove={async (id) => {
             const res = await done(api.delete(`/category-types/${id}`));
             if (id === typeId) setTypeId(null);
@@ -88,13 +90,14 @@ export function ManageCategoriesDialog({ isOpen, onClose, kinds }: Props) {
           heading={selected ? `Categories of ${selected.name}` : 'Categories'}
           sectionLabel="Categories"
           noun="category"
-          items={categories.map((c) => ({ id: c.id, name: c.name, used: usage?.categories[c.id] ?? 0 }))}
+          withCode
+          items={categories.map((c) => ({ id: c.id, name: c.name, code: c.code, used: usage?.categories[c.id] ?? 0 }))}
           emptyText={selected ? 'No categories yet.' : 'Select a type to see its categories.'}
           disabled={!selected}
           taken={(name, exceptId) =>
             categories.some((c) => c.id !== exceptId && same(c.name, name)) ? `This type already has a category named "${name}"` : null}
-          onAdd={(name) => done(api.post('/categories', { name, type: kind, type_id: typeId }))}
-          onRename={(id, name) => done(api.put(`/categories/${id}`, { name }))}
+          onAdd={(name, code) => done(api.post('/categories', { name, type: kind, type_id: typeId, code: code || undefined }))}
+          onRename={(id, name, code) => done(api.put(`/categories/${id}`, { name, code: code ?? null }))}
           onRemove={async (id) => (await done(api.delete(`/categories/${id}`))).data as any}
           usedBy="transactions, budgets and schedules"
         />

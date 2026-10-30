@@ -38,6 +38,7 @@ export interface Role {
 export interface Category {
   id: number;
   name: string;
+  code?: string | null;
   type: 'income' | 'expense';
   type_id?: number | null;
   icon: string;
@@ -128,6 +129,9 @@ export interface Transaction {
   receipt_number?: string;
   receipt_path?: string;
   context_type?: string;
+  department_id?: number | null;
+  budget_line_id?: number | null;
+  over_budget_reason?: string | null;
   status?: string;
   notes?: string;
   currency?: string;
@@ -155,17 +159,6 @@ export interface Transaction {
   reimbursed_by_name?: string | null;
   reimbursement_reference?: string | null;
   reimbursement_note?: string | null;
-}
-
-export interface Budget {
-  id: number;
-  user_id: number;
-  category_id: number;
-  category_name?: string;
-  amount: number;
-  period_month: number;
-  period_year: number;
-  is_active: number;
 }
 
 export interface RecurringTransaction {

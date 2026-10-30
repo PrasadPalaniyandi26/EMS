@@ -17,7 +17,7 @@ export class ProjectCategoriesController {
   @Post() @UseGuards(RolesGuard) @Roles('admin')
   create(@Body() body: any, @CurrentUser('id') userId: number) { return this.service.create('project', { ...body, createdBy: userId }); }
   @Put(':id') @UseGuards(RolesGuard) @Roles('admin')
-  rename(@Param('id', ParseIntPipe) id: number, @Body('name') name: string) { return this.service.rename('project', id, name); }
+  rename(@Param('id', ParseIntPipe) id: number, @Body() body: any) { return this.service.rename('project', id, body.name, body.code); }
   @Delete(':id') @UseGuards(RolesGuard) @Roles('admin')
   remove(@Param('id', ParseIntPipe) id: number) { return this.service.remove('project', id); }
 }
@@ -33,7 +33,7 @@ export class ProductCategoriesController {
   @Post() @UseGuards(RolesGuard) @Roles('admin')
   create(@Body() body: any, @CurrentUser('id') userId: number) { return this.service.create('product', { ...body, createdBy: userId }); }
   @Put(':id') @UseGuards(RolesGuard) @Roles('admin')
-  rename(@Param('id', ParseIntPipe) id: number, @Body('name') name: string) { return this.service.rename('product', id, name); }
+  rename(@Param('id', ParseIntPipe) id: number, @Body() body: any) { return this.service.rename('product', id, body.name, body.code); }
   @Delete(':id') @UseGuards(RolesGuard) @Roles('admin')
   remove(@Param('id', ParseIntPipe) id: number) { return this.service.remove('product', id); }
 }

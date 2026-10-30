@@ -1,249 +1,420 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
-import { CURRENCY_SYMBOL } from '@/lib/currency';
-import { Button } from '@/components/ui/button';
+import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
+import { Plus, Pencil, CheckCircle2, CornerUpLeft } from 'lucide-react';
+import api from '@/lib/api-client';
+import { ModuleModal } from '@/components/shared/module/module-modal';
+import { Field, NativeSelect, CurrencyInput, SegmentedControl, inp } from '@/components/shared/modal-primitives';
+import { PickSelect } from '@/components/shared/pick-select';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Pencil, Download, Send, Info, Trash2 } from 'lucide-react';
-import { useUsers } from '@/hooks/use-queries';
-import { DepartmentSelect } from '@/components/shared/reference-selects';
-import { useAuthStore } from '@/stores/auth-store';
-import { ModuleModal } from '@/components/shared/module/module-modal';
-import { Field, CurrencyInput, inp, sel } from '@/components/shared/modal-primitives';
-import { FormGrid } from '@/components/shared/form-grid';
+import { useCategories, useCategoryTypes, useDepartments, useProducts, useProjects, useUsers, useInvalidate } from '@/hooks/use-queries';
+import { fyLabel, type BudgetLine, type BudgetPlanInfo, type CostObject, type PlanView } from '@/hooks/use-budget-queries';
+import { money } from '@/components/budgets/budget-ui';
+import { sortByCode } from '@/lib/codes';
 
+const KIND_OF: Record<CostObject, string> = { PROJECT: 'PROJECT', PRODUCT: 'PRODUCT', DEPARTMENT: 'OVERHEAD', RESERVE: '' };
+const labelOf = (o: { name: string; code?: string | null }) => (o.code ? `${o.code} ${o.name}` : o.name);
 
+// ─── New plan ────────────────────────────────────────────────────────────────
 
-interface BudgetModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSave?: (data: any) => void;
-  onSubmit?: (data: any) => void;
-  editingData?: any;
-}
-
-export function AddBudgetModal({ isOpen, onClose, onSave, editingData }: BudgetModalProps) {
-  const currentYear = new Date().getFullYear();
-  const currency = useAuthStore((s) => s.user?.currency || 'INR');
-  const currencySymbol = CURRENCY_SYMBOL[currency] || '₹';
-  const { data: usersData } = useUsers();
-  const managers = useMemo(() =>
-    (Array.isArray(usersData) ? usersData : []).filter((u: any) =>
-      u.role_name?.toLowerCase() === 'manager' ||
-      (u.roles || []).some((r: any) => r.role_name?.toLowerCase() === 'manager')
-    ),
-  [usersData]);
-
-  const [form, setForm] = useState({
-    name: '', department: '', owner_id: '', financial_year: String(currentYear),
-    category: '', details: '', start_date: '', end_date: '', allocated: '',
-    strict: true, rollover: false,
-  });
+export function NewPlanModal({ isOpen, onClose, plans, currentFy, startMonth, onCreated }: {
+  isOpen: boolean; onClose: () => void; plans: BudgetPlanInfo[]; currentFy: number; startMonth: number; onCreated: (fy: number) => void;
+}) {
+  const invalidate = useInvalidate();
+  const free = useMemo(() => [currentFy - 1, currentFy, currentFy + 1, currentFy + 2].filter((fy) => !plans.some((p) => p.fy === fy)), [plans, currentFy]);
+  const [fy, setFy] = useState('');
+  const [name, setName] = useState('');
+  const [envelope, setEnvelope] = useState('');
+  const [copyFrom, setCopyFrom] = useState('');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
-    if (editingData) {
-      setForm({
-        name: editingData.name || '',
-        department: editingData.department || '',
-        owner_id: editingData.owner_id ? String(editingData.owner_id) : '',
-        financial_year: String(editingData.financial_year || currentYear),
-        category: editingData.category_name || '',
-        details: editingData.details || '',
-        start_date: editingData.start_date ? String(editingData.start_date).slice(0, 10) : '',
-        end_date: editingData.end_date ? String(editingData.end_date).slice(0, 10) : '',
-        allocated: editingData.amount ? String(editingData.amount) : '',
-        strict: editingData.strict !== false,
-        rollover: editingData.rollover === true,
+    const first = free.find((f) => f >= currentFy) ?? free[0];
+    setFy(first != null ? String(first) : '');
+    setName('');
+    setEnvelope('');
+    setCopyFrom('');
+    setSaving(false);
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const save = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await api.post('/budgets/plans', {
+        fy: Number(fy), name: name.trim() || undefined, envelope: envelope ? Number(envelope) : null, copy_from_fy: copyFrom ? Number(copyFrom) : undefined,
       });
-    } else {
-      setForm({ name: '', department: '', owner_id: '', financial_year: String(currentYear), category: '', details: '', start_date: '', end_date: '', allocated: '', strict: true, rollover: false });
+      toast.success('Budget plan created.');
+      invalidate('budgets');
+      onCreated(Number(fy));
+      onClose();
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not create the plan.');
+    } finally {
+      setSaving(false);
     }
-  }, [isOpen, editingData]);
-
-
-  const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }));
-
-  const yearOptions = [
-    { value: String(currentYear - 1), label: `${currentYear - 1} (Closed)` },
-    { value: String(currentYear),     label: `${currentYear} (Active)` },
-    { value: String(currentYear + 1), label: `${currentYear + 1} (Forecast)` },
-  ];
-
-  const ctl = inp;
+  };
 
   return (
     <ModuleModal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={editingData ? 'Edit Budget' : 'Add Budget'}
-      icon={editingData ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-      onSave={() => onSave?.(form)}
-      canSave={!!form.name.trim() && Number(form.allocated) > 0}
-      saveLabel={editingData ? 'Update Budget' : 'Save Budget'}
-      size="md"
+      isOpen={isOpen} onClose={onClose} title="New budget plan" icon={<Plus className="h-4 w-4" />}
+      onSave={save} canSave={!!fy && !saving} saveLabel="Create plan" size="sm"
     >
       <div className="space-y-3">
-        <FormGrid className="gap-x-4 gap-y-3">
-          <Field label="Budget Name" required>
-            <Input className={ctl} placeholder="e.g. Q1 Marketing Campaign" value={form.name} onChange={e => set('name', e.target.value)} />
-          </Field>
-          <Field label="Category">
-            <Select value={form.category} onValueChange={v => set('category', v)}>
-              <SelectTrigger className={sel}><SelectValue placeholder="Select Expense Type" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="opex">Operational Expenditure (OPEX)</SelectItem>
-                <SelectItem value="capex">Capital Expenditure (CAPEX)</SelectItem>
-                <SelectItem value="rnd">Research & Development (R&D)</SelectItem>
-                <SelectItem value="hr">HR & Benefits</SelectItem>
-                <SelectItem value="admin">Office & Admin</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
+        <Field label="Financial year" required hint={free.length === 0 ? 'Every nearby year already has a plan.' : undefined}>
+          <NativeSelect value={fy} onChange={(e) => setFy(e.target.value)} disabled={free.length === 0}>
+            {free.map((f) => <option key={f} value={f}>{fyLabel(f, startMonth)}</option>)}
+          </NativeSelect>
+        </Field>
+        <Field label="Plan name">
+          <Input className={`${inp} border-input bg-transparent text-[var(--shell-text)]`} placeholder={fy ? `Budget ${fyLabel(Number(fy), startMonth)}` : ''} value={name} onChange={(e) => setName(e.target.value)} maxLength={100} />
+        </Field>
+        <Field label="Company envelope" hint="The most the company will allow for the year. Leave empty if not set yet.">
+          <CurrencyInput value={envelope} onChange={setEnvelope} />
+        </Field>
+        <Field label="Start from" hint="Overhead and reserve lines carry over with their monthly amounts; projects and products start empty.">
+          <NativeSelect value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)}>
+            <option value="">Blank plan</option>
+            {plans.map((p) => <option key={p.fy} value={p.fy}>Copy overheads from {p.label}</option>)}
+          </NativeSelect>
+        </Field>
+      </div>
+    </ModuleModal>
+  );
+}
 
-          <DepartmentSelect value={form.department} onChange={(name) => set('department', name)} />
-          <Field label="Owner (Manager)">
-            <Select value={form.owner_id} onValueChange={v => set('owner_id', v)}>
-              <SelectTrigger className={sel}><SelectValue placeholder="Assign Owner" /></SelectTrigger>
-              <SelectContent>
-                {managers.length > 0
-                  ? managers.map((u: any) => (
-                      <SelectItem key={u.id} value={String(u.id)}>{u.username || u.name}</SelectItem>
-                    ))
-                  : (Array.isArray(usersData) ? usersData : []).map((u: any) => (
-                      <SelectItem key={u.id} value={String(u.id)}>{u.username || u.name}</SelectItem>
-                    ))
-                }
-              </SelectContent>
-            </Select>
-          </Field>
+// ─── Plan name and envelope ──────────────────────────────────────────────────
 
-          <Field label="Financial Year">
-            <Select value={form.financial_year} onValueChange={v => set('financial_year', v)}>
-              <SelectTrigger className={sel}><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {yearOptions.map(y => <SelectItem key={y.value} value={y.value}>{y.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field label={`Total Allocation (${currencySymbol})`} required>
-            <CurrencyInput value={form.allocated} onChange={(v) => set('allocated', v)} symbol={currencySymbol} />
-          </Field>
+export function PlanDetailsModal({ isOpen, onClose, plan }: { isOpen: boolean; onClose: () => void; plan: BudgetPlanInfo | null }) {
+  const invalidate = useInvalidate();
+  const [name, setName] = useState('');
+  const [envelope, setEnvelope] = useState('');
+  const [saving, setSaving] = useState(false);
 
-          <Field label="Start Date">
-            <Input type="date" className={ctl} value={form.start_date} onChange={e => set('start_date', e.target.value)} />
-          </Field>
-          <Field label="End Date">
-            <Input type="date" className={ctl} value={form.end_date} onChange={e => set('end_date', e.target.value)} />
-          </Field>
-        </FormGrid>
+  useEffect(() => {
+    if (!isOpen || !plan) return;
+    setName(plan.name);
+    setEnvelope(plan.envelope != null ? String(plan.envelope) : '');
+    setSaving(false);
+  }, [isOpen, plan]);
 
-        <Field label="Details">
+  const save = async () => {
+    if (!plan || saving) return;
+    setSaving(true);
+    try {
+      await api.put(`/budgets/plans/${plan.fy}`, { name: name.trim(), envelope: envelope ? Number(envelope) : null });
+      toast.success('Plan updated.');
+      invalidate('budgets');
+      onClose();
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not update the plan.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <ModuleModal isOpen={isOpen} onClose={onClose} title="Plan details" icon={<Pencil className="h-4 w-4" />} onSave={save} canSave={!!name.trim() && !saving} size="sm">
+      <div className="space-y-3">
+        <Field label="Plan name" required>
+          <Input className={`${inp} border-input bg-transparent text-[var(--shell-text)]`} value={name} onChange={(e) => setName(e.target.value)} maxLength={100} />
+        </Field>
+        <Field label="Company envelope" hint="Shown against the planned total so you can see what is left to allocate.">
+          <CurrencyInput value={envelope} onChange={setEnvelope} />
+        </Field>
+      </div>
+    </ModuleModal>
+  );
+}
+
+// ─── Approve or send back a submitted plan ───────────────────────────────────
+
+export function PlanDecisionModal({ isOpen, onClose, plan, mode, planned, onDone }: {
+  isOpen: boolean; onClose: () => void; plan: BudgetPlanInfo | null; mode: 'approve' | 'send_back'; planned: number; onDone: () => void;
+}) {
+  const invalidate = useInvalidate();
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+  const approve = mode === 'approve';
+
+  useEffect(() => { if (isOpen) { setNote(''); setSaving(false); } }, [isOpen]);
+
+  const save = async () => {
+    if (!plan || saving) return;
+    setSaving(true);
+    try {
+      await api.post(`/budgets/plans/${plan.fy}/decision`, { decision: mode, note });
+      toast.success(approve ? 'Plan approved. Spending is now checked against it.' : 'Plan sent back to draft.');
+      invalidate('budgets');
+      onDone();
+      onClose();
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not record the decision.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!plan) return null;
+  return (
+    <ModuleModal
+      isOpen={isOpen} onClose={onClose} size="sm"
+      title={approve ? `Approve ${plan.label}` : `Send ${plan.label} back`}
+      icon={approve ? <CheckCircle2 className="h-4 w-4" /> : <CornerUpLeft className="h-4 w-4" />}
+      onSave={save} canSave={!saving && (approve || !!note.trim())} saveLabel={approve ? 'Approve plan' : 'Send back'}
+    >
+      <div className="space-y-3">
+        <p className="text-[13px] text-[var(--shell-text)]">
+          {approve
+            ? <>Planned total <strong className="tabular-nums">{money(planned)}</strong>{plan.envelope != null && <> against an envelope of <strong className="tabular-nums">{money(plan.envelope)}</strong></>}. Once approved, new expenses are checked against the lines and changes need a reason.</>
+            : <>The plan goes back to draft so its owner can change it and submit again.</>}
+        </p>
+        <Field label={approve ? 'Note' : 'What needs to change'} required={!approve}>
           <Textarea
-            className="w-full border-input bg-transparent text-[var(--shell-text)] border-[var(--shell-border)] focus-visible:ring-2 focus-visible:ring-[var(--shell-accent)] rounded-lg text-sm text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] resize-none"
-            style={{ minHeight: '64px', maxHeight: '64px' }}
-            placeholder="Budget scope, objectives, and allocation rationale..."
-            value={form.details}
-            onChange={e => set('details', e.target.value)}
+            className="h-24 w-full resize-none rounded-md border border-input bg-transparent p-3 text-[13px] outline-none focus-visible:border-[var(--shell-accent)] focus-visible:ring-2 focus-visible:ring-[var(--shell-accent)]"
+            style={{ color: 'var(--shell-text)' }}
+            value={note} onChange={(e) => setNote(e.target.value)} maxLength={500}
+            placeholder={approve ? 'Optional' : 'Say what to fix'}
           />
         </Field>
-
-        {/* Switch cards: the whole card is the label, so clicking the text toggles it and it is announced */}
-        <FormGrid className="gap-4 border-t border-[var(--shell-border)] pt-3">
-          <label className="rounded-lg border flex cursor-pointer items-center justify-between rounded-lg border border-[var(--shell-border)] p-4">
-            <span>
-              <span className="block text-[12px] font-semibold" style={{ color: 'var(--shell-text)' }}>Strict Enforcement</span>
-              <span className="block text-[12px] font-medium text-[var(--shell-text-muted)]">Prevent overspending strictly</span>
-            </span>
-            <Switch checked={form.strict} onCheckedChange={v => set('strict', v)} aria-label="Strict enforcement" />
-          </label>
-          <label className="rounded-lg border flex cursor-pointer items-center justify-between rounded-lg border border-[var(--shell-border)] p-4">
-            <span>
-              <span className="block text-[12px] font-semibold" style={{ color: 'var(--shell-text)' }}>Auto-Rollover</span>
-              <span className="block text-[12px] font-medium text-[var(--shell-text-muted)]">Carry over unused balance</span>
-            </span>
-            <Switch checked={form.rollover} onCheckedChange={v => set('rollover', v)} aria-label="Auto-rollover" />
-          </label>
-        </FormGrid>
       </div>
     </ModuleModal>
   );
 }
 
-export function SubmitBudgetModal({ isOpen, onClose, onSubmit }: BudgetModalProps) {
+// ─── Budget line ─────────────────────────────────────────────────────────────
+
+export function BudgetLineModal({ isOpen, onClose, view, editing, canReserve, onSaved }: {
+  isOpen: boolean; onClose: () => void; view: PlanView | undefined; editing: BudgetLine | null; canReserve: boolean; onSaved?: (id?: number) => void;
+}) {
+  const invalidate = useInvalidate();
+  const { data: projects } = useProjects();
+  const { data: products } = useProducts();
+  const { data: departments } = useDepartments();
+  const { data: types } = useCategoryTypes('expense');
+  const { data: categories } = useCategories();
+  const { data: users } = useUsers();
+
+  const [costObject, setCostObject] = useState<CostObject>('DEPARTMENT');
+  const [objectId, setObjectId] = useState('');
+  const [typeId, setTypeId] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [controlLevel, setControlLevel] = useState<'TYPE' | 'CATEGORY'>('TYPE');
+  const [strict, setStrict] = useState(false);
+  const [contingency, setContingency] = useState(false);
+  const [ownerId, setOwnerId] = useState('');
+  const [note, setNote] = useState('');
+  const [mode, setMode] = useState<'even' | 'month'>('even');
+  const [total, setTotal] = useState('');
+  const [fromIdx, setFromIdx] = useState('0');
+  const [toIdx, setToIdx] = useState('11');
+  const [periods, setPeriods] = useState<string[]>(Array(12).fill(''));
+  const [reason, setReason] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const plan = view?.plan;
+  const months = view?.months ?? [];
+  const approved = !!plan && plan.status !== 'DRAFT';
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setSaving(false);
+    setReason('');
+    if (editing) {
+      setCostObject(editing.cost_object);
+      setObjectId(String(editing.project_id ?? editing.product_id ?? editing.department_id ?? ''));
+      setTypeId(editing.type_id ? String(editing.type_id) : '');
+      setCategoryId(editing.category_id ? String(editing.category_id) : '');
+      setControlLevel(editing.control_level);
+      setStrict(editing.strict);
+      setContingency(editing.is_contingency);
+      setOwnerId(editing.owner_id ? String(editing.owner_id) : '');
+      setNote(editing.note || '');
+      setMode('month');
+      setTotal(String(editing.total));
+      setFromIdx('0');
+      setToIdx('11');
+      setPeriods(editing.periods.map((p) => (p ? String(p) : '')));
+    } else {
+      setCostObject('DEPARTMENT');
+      setObjectId(''); setTypeId(''); setCategoryId(''); setControlLevel('TYPE');
+      setStrict(false); setContingency(false); setOwnerId(''); setNote('');
+      setMode('even'); setTotal(''); setFromIdx('0'); setToIdx('11'); setPeriods(Array(12).fill(''));
+    }
+  }, [isOpen, editing]);
+
+  const objectOptions = costObject === 'PROJECT'
+    ? (projects || []).map((p) => ({ id: String(p.id), name: p.code ? `${p.code} ${p.name}` : p.name }))
+    : costObject === 'PRODUCT'
+      ? (products || []).map((p) => ({ id: String(p.id), name: p.code ? `${p.code} ${p.name}` : p.name }))
+      : costObject === 'DEPARTMENT' ? (departments || []).map((d) => ({ id: String(d.id), name: d.name })) : [];
+
+  const typeOptions = sortByCode(types || [])
+    .filter((t) => !t.applies_to?.length || t.applies_to.includes(KIND_OF[costObject]) || String(t.id) === typeId)
+    .map((t) => ({ id: String(t.id), name: labelOf(t) }));
+  const categoryOptions = sortByCode((categories || []).filter((c) => c.type === 'expense' && String(c.type_id ?? '') === typeId))
+    .map((c) => ({ id: String(c.id), name: labelOf(c) }));
+
+  const needsType = costObject !== 'RESERVE' && !contingency;
+  const sum = periods.reduce((a, p) => a + (Number(p) || 0), 0);
+  const amount = mode === 'even' ? Number(total) || 0 : sum;
+  const canSave = !saving
+    && (costObject === 'RESERVE' || !!objectId)
+    && (!needsType || !!typeId)
+    && (controlLevel !== 'CATEGORY' || !needsType || !!categoryId)
+    && amount > 0
+    && Number(toIdx) >= Number(fromIdx)
+    && (!approved || !!reason.trim());
+
+  const save = async () => {
+    if (!plan || saving) return;
+    setSaving(true);
+    try {
+      const body: any = {
+        plan_id: plan.id, cost_object: costObject,
+        project_id: costObject === 'PROJECT' ? Number(objectId) : null,
+        product_id: costObject === 'PRODUCT' ? Number(objectId) : null,
+        department_id: costObject === 'DEPARTMENT' ? Number(objectId) : null,
+        type_id: needsType ? Number(typeId) : null,
+        category_id: needsType && controlLevel === 'CATEGORY' ? Number(categoryId) : null,
+        control_level: needsType ? controlLevel : 'TYPE',
+        strict, is_contingency: costObject === 'PROJECT' && contingency,
+        owner_id: ownerId ? Number(ownerId) : null, note: note.trim() || null, reason: reason.trim() || undefined,
+      };
+      if (mode === 'even') Object.assign(body, { total: Number(total), from_index: Number(fromIdx), to_index: Number(toIdx) });
+      else body.periods = periods.map((p) => Number(p) || 0);
+      const res: any = editing ? await api.put(`/budgets/lines/${editing.id}`, body) : await api.post('/budgets/lines', body);
+      toast.success(editing ? 'Budget line updated.' : 'Budget line added.');
+      invalidate('budgets');
+      onSaved?.(res?.data?.id);
+      onClose();
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not save the budget line.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const objectLabel = costObject === 'PROJECT' ? 'Project' : costObject === 'PRODUCT' ? 'Product' : 'Department';
+  const owners = (users || []).filter((u) => u.is_active !== 0).map((u) => ({ id: String(u.id), name: u.username }));
+
   return (
     <ModuleModal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Budget Allocation"
-      icon={<Send className="w-4 h-4" />}
-      onSave={() => onSubmit?.({})}
-      saveLabel="Submit Now"
-      size="md"
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose} className="h-8 px-4 text-[12px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>
-            Review
-          </Button>
-          <Button
-            className="font-semibold text-[12px] h-8 px-5 rounded-lg transition-all active:scale-95"
-            style={{ background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' }}
-            onClick={onSubmit}
-          >
-            Submit Now
-          </Button>
-        </>
-      }
+      isOpen={isOpen} onClose={onClose} size="xl"
+      title={editing ? 'Edit budget line' : 'Add budget line'}
+      icon={editing ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+      onSave={save} canSave={canSave} saveLabel={editing ? 'Update line' : 'Add line'}
     >
-      <div className="flex flex-col items-center text-center space-y-3">
-        <div className="w-16 h-16 rounded-full bg-[var(--shell-accent)]/10 flex items-center justify-center">
-          <Send className="w-8 h-8 text-[var(--shell-accent)]" />
-        </div>
-        <div className="space-y-2">
-          <h3 className="text-lg font-semibold tracking-tight" style={{ color: 'var(--shell-text)' }}>Finalize Allocation?</h3>
-          <p className="text-[12px] text-[var(--shell-text)] leading-relaxed font-medium">
-            You are about to submit the current budget allocation for approval. Once submitted, changes may requires administrative override.
-          </p>
-        </div>
-
-        <div className="w-full text-left">
-          <Field label="Comments (Optional)">
-            <Textarea
-              className="border-input bg-transparent text-[var(--shell-text)] border-[var(--shell-border)] focus-visible:ring-2 focus-visible:ring-[var(--shell-accent)] min-h-[80px] text-xs text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] resize-none rounded-lg p-3"
-              placeholder="Provide justification for this allocation..."
+      <div className="grid grid-cols-1 items-start gap-x-6 gap-y-3 md:grid-cols-3">
+        {/* Column 1: what the money is for */}
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <p id="bl-for" className="text-[13px] font-medium text-[var(--shell-text)]">Budget for</p>
+            <SegmentedControl
+              labelledBy="bl-for" value={costObject}
+              onChange={(v) => { setCostObject(v); setObjectId(''); setTypeId(''); setCategoryId(''); if (v !== 'PROJECT') setContingency(false); }}
+              options={[
+                { value: 'DEPARTMENT' as CostObject, label: 'Overhead' },
+                { value: 'PROJECT' as CostObject, label: 'Project' },
+                { value: 'PRODUCT' as CostObject, label: 'Product' },
+                ...(canReserve || costObject === 'RESERVE' ? [{ value: 'RESERVE' as CostObject, label: 'Reserve' }] : []),
+              ]}
             />
-          </Field>
+          </div>
+          {costObject !== 'RESERVE' && (
+            <PickSelect label={objectLabel} required placeholder={`Select ${objectLabel.toLowerCase()}`} value={objectId} onChange={setObjectId} options={objectOptions} emptyHint={`No ${objectLabel.toLowerCase()}s yet.`} />
+          )}
+          {needsType && (
+            <>
+              <PickSelect label="Expense type" required placeholder="Select type" value={typeId} onChange={(v) => { setTypeId(v); setCategoryId(''); }} options={typeOptions} emptyHint="No types allowed for this budget." />
+              <div className="space-y-1.5">
+                <p id="bl-control" className="text-[13px] font-medium text-[var(--shell-text)]">Controlled at</p>
+                <SegmentedControl
+                  labelledBy="bl-control" value={controlLevel} onChange={setControlLevel}
+                  options={[{ value: 'TYPE' as const, label: 'Expense type' }, { value: 'CATEGORY' as const, label: 'Category' }]}
+                />
+              </div>
+              {controlLevel === 'CATEGORY' && (
+                <PickSelect label="Category" required placeholder="Select category" value={categoryId} onChange={setCategoryId} options={categoryOptions} disabled={!typeId} emptyHint="No categories for this type." />
+              )}
+            </>
+          )}
+          {costObject === 'PROJECT' && (
+            <label className="flex cursor-pointer items-center gap-2.5 text-[13px] text-[var(--shell-text)]">
+              <Switch checked={contingency} onCheckedChange={setContingency} aria-label="Held contingency" />
+              Held contingency for this project
+            </label>
+          )}
         </div>
-      </div>
-    </ModuleModal>
-  );
-}
 
-export function DeleteBudgetModal({ isOpen, onClose, onConfirm, count }: { isOpen: boolean; onClose: () => void; onConfirm: () => void; count: number }) {
-  return (
-    <ModuleModal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Confirm Deletion"
-      icon={<Trash2 className="w-4 h-4" />}
-      onSave={onConfirm}
-      saveLabel="Yes, Delete"
-      isDestructive={true}
-      size="md"
-    >
-      <div className="flex flex-col items-center text-center space-y-3">
-        <div className="w-16 h-16 rounded-full bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] flex items-center justify-center">
-           <Trash2 className="w-8 h-8 text-[var(--danger)]" />
+        {/* Column 2: how much, and when */}
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <p id="bl-phase" className="text-[13px] font-medium text-[var(--shell-text)]">Phasing</p>
+            <SegmentedControl
+              labelledBy="bl-phase" value={mode} onChange={setMode}
+              options={[{ value: 'even' as const, label: 'Spread evenly' }, { value: 'month' as const, label: 'By month' }]}
+            />
+          </div>
+          {mode === 'even' ? (
+            <>
+              <Field label="Amount for the period" required>
+                <CurrencyInput value={total} onChange={setTotal} />
+              </Field>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="From">
+                  <NativeSelect value={fromIdx} onChange={(e) => setFromIdx(e.target.value)}>
+                    {months.map((m, i) => <option key={i} value={i}>{m.label}</option>)}
+                  </NativeSelect>
+                </Field>
+                <Field label="To">
+                  <NativeSelect value={toIdx} onChange={(e) => setToIdx(e.target.value)}>
+                    {months.map((m, i) => <option key={i} value={i} disabled={i < Number(fromIdx)}>{m.label}</option>)}
+                  </NativeSelect>
+                </Field>
+              </div>
+            </>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-[13px] font-medium text-[var(--shell-text)]">Amount by month</p>
+              <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
+                {months.map((m, i) => (
+                  <label key={i} className="flex items-center gap-2 text-[12px] text-[var(--shell-text-muted)]">
+                    <span className="w-10 shrink-0">{m.label}</span>
+                    <Input
+                      aria-label={`Amount for ${m.label}`} type="number" min="0" step="1"
+                      className={`${inp} border-input bg-transparent text-right tabular-nums text-[var(--shell-text)] !h-8`}
+                      value={periods[i] ?? ''} onChange={(e) => setPeriods((p) => p.map((x, j) => (j === i ? e.target.value : x)))}
+                    />
+                  </label>
+                ))}
+              </div>
+              <p className="text-[12px] text-[var(--shell-text-muted)]">Total <strong className="tabular-nums text-[var(--shell-text)]">{money(sum)}</strong></p>
+            </div>
+          )}
         </div>
-        <div className="space-y-2">
-          <h3 className="text-lg font-semibold tracking-tight" style={{ color: 'var(--shell-text)' }}>Delete {count} budget record(s)?</h3>
-          <p className="text-[12px] text-[var(--shell-text)] leading-relaxed font-medium">
-            This action is irreversible. All data associated with these budget allocations will be permanently removed from the system.
-          </p>
+
+        {/* Column 3: who answers for it, and how hard it is enforced */}
+        <div className="space-y-3">
+          <PickSelect label="Owner" placeholder="Select owner" value={ownerId} onChange={setOwnerId} options={owners} />
+          {costObject !== 'RESERVE' && (
+            <label className="flex cursor-pointer items-start gap-2.5 text-[13px] text-[var(--shell-text)]">
+              <Switch className="mt-0.5" checked={strict} onCheckedChange={setStrict} aria-label="Strict line" />
+              <span>Strict: block new expenses once the budget is used<span className="block text-[12px] text-[var(--shell-text-muted)]">Otherwise they go ahead with a written reason.</span></span>
+            </label>
+          )}
+          <Field label="Note">
+            <Input className={`${inp} border-input bg-transparent text-[var(--shell-text)]`} placeholder="Basis or assumption" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />
+          </Field>
+          {approved && (
+            <Field label="Reason for the change" required hint="The plan is approved. Finance records why it changed.">
+              <Input className={`${inp} border-input bg-transparent text-[var(--shell-text)]`} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} />
+            </Field>
+          )}
         </div>
       </div>
     </ModuleModal>

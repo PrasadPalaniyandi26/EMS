@@ -1,10 +1,11 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { BudgetsService } from '../budgets/budgets.service';
 import { COUNTABLE_STATUSES, COMMITTED_STATUSES, countableStatusSql } from '../common/constants/transaction-status';
 
 @Injectable()
 export class ReportingService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private budgets: BudgetsService) {}
 
   // null = no filter (all users); number[] = restrict to these user IDs
   private async resolveUserIds(userId: number, roleName: string): Promise<number[] | null> {
@@ -217,54 +218,8 @@ export class ReportingService {
     };
   }
 
-  private async budgetVsActual(userId: number, monthStr?: string, yearStr?: string) {
-    const now = new Date();
-    const month = monthStr ? parseInt(monthStr) : now.getMonth() + 1;
-    const year = yearStr ? parseInt(yearStr) : now.getFullYear();
-
-    const budgets = await this.prisma.budget.findMany({
-      where: { userId, periodMonth: month, periodYear: year, isActive: true },
-      include: { category: true },
-    });
-
-    if (!budgets.length) return { title: 'Budget vs Actual', columns: ['Category', 'Budget', 'Spent', 'Remaining', '% Used'], rows: [], totals: {} };
-
-    const start = new Date(year, month - 1, 1);
-    const end = new Date(year, month, 0, 23, 59, 59);
-    const catIds = budgets.map((b) => b.categoryId).filter((id): id is number => id !== null);
-
-    // Committed spend (approved + in-flight) to match budget enforcement and the
-    // dashboard budget card. Recurring schedules are already materialized into real
-    // transactions by the cron, so they are captured by the groupBy below.
-    const spent = await this.prisma.transaction.groupBy({
-      by: ['categoryId'],
-      where: { userId, type: 'expense', status: { in: COMMITTED_STATUSES }, categoryId: { in: catIds }, dateRecorded: { gte: start, lte: end } },
-      _sum: { amount: true },
-    });
-    const spentMap: Record<number, number> = Object.fromEntries(spent.map((s) => [s.categoryId, Number(s._sum?.amount) || 0]));
-
-    const rows = budgets.map((b) => {
-      const budget = parseFloat(Number(b.amount).toFixed(2));
-      const spentAmt = parseFloat(((b.categoryId !== null ? spentMap[b.categoryId] : 0) || 0).toFixed(2));
-      return {
-        Category: b.category?.name || 'Unknown',
-        Budget: budget,
-        Spent: spentAmt,
-        Remaining: parseFloat((budget - spentAmt).toFixed(2)),
-        '% Used': budget > 0 ? parseFloat(((spentAmt / budget) * 100).toFixed(1)) : 0,
-      };
-    }).sort((a, b) => b['% Used'] - a['% Used']);
-
-    return {
-      title: `Budget vs Actual — ${month}/${year}`,
-      columns: ['Category', 'Budget', 'Spent', 'Remaining', '% Used'],
-      rows,
-      totals: {
-        Budget: parseFloat(rows.reduce((s, r) => s + r.Budget, 0).toFixed(2)),
-        Spent: parseFloat(rows.reduce((s, r) => s + r.Spent, 0).toFixed(2)),
-        Remaining: parseFloat(rows.reduce((s, r) => s + r.Remaining, 0).toFixed(2)),
-      },
-    };
+  private async budgetVsActual(_userId: number, _monthStr?: string, yearStr?: string) {
+    return this.budgets.budgetVsActual(yearStr ? parseInt(yearStr) : undefined);
   }
 
   private async transactionLedger(userId: number[] | null, dateFrom?: Date, dateTo?: Date, type?: 'income' | 'expense') {

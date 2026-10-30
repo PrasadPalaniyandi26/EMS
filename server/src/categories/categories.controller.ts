@@ -55,7 +55,7 @@ export class CategoryTypesController {
   @Post() @UseGuards(RolesGuard) @Roles('admin')
   create(@Body() body: any, @CurrentUser('id') userId: number) { return this.service.createType({ ...body, createdBy: userId }); }
   @Put(':id') @UseGuards(RolesGuard) @Roles('admin')
-  rename(@Param('id', ParseIntPipe) id: number, @Body('name') name: string) { return this.service.renameType(id, name); }
+  rename(@Param('id', ParseIntPipe) id: number, @Body() body: any) { return this.service.renameType(id, body.name, { code: body.code, applies_to: body.applies_to }); }
   @Delete(':id') @UseGuards(RolesGuard) @Roles('admin')
   remove(@Param('id', ParseIntPipe) id: number) { return this.service.deleteType(id); }
 }

@@ -113,7 +113,7 @@ export default function DashboardPage() {
     { tone: 'info' as const, label: 'Net Balance', value: fmt(summary?.balance || 0), icon: Wallet, color: 'text-[var(--info)]', bg: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]', loading: summaryLoading },
     { tone: 'warning' as const, label: 'Transactions', value: String(summary?.transactionCount || 0), icon: ArrowLeftRight, color: 'text-[var(--warning)]', bg: 'bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]', loading: summaryLoading },
     { tone: 'info' as const, label: 'Pending Approvals', value: String(pendingApprovals), icon: ClipboardCheck, color: 'text-[var(--info)]', bg: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]', loading: false, link: '/approvals' },
-    { tone: (budgetPct !== null && budgetPct > 90 ? 'danger' : 'info') as 'danger' | 'info', label: 'Budget Used', value: budgetPct !== null ? `${budgetPct}%` : '—', icon: Target, color: budgetPct !== null && budgetPct > 90 ? 'text-[var(--danger)]' : 'text-[var(--info)]', bg: budgetPct !== null && budgetPct > 90 ? 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)]' : 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]', loading: budgetLoading, link: '/manage/budgets' },
+    { tone: (budgetPct !== null && budgetPct > 90 ? 'danger' : 'info') as 'danger' | 'info', label: 'Budget Used', value: budgetPct !== null ? `${budgetPct}%` : '—', icon: Target, color: budgetPct !== null && budgetPct > 90 ? 'text-[var(--danger)]' : 'text-[var(--info)]', bg: budgetPct !== null && budgetPct > 90 ? 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)]' : 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]', loading: budgetLoading, link: '/budget/monitor' },
   ];
 
   const approvalStages = [
@@ -130,7 +130,7 @@ export default function DashboardPage() {
     { label: 'Approvals', href: '/approvals', color: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)] text-[var(--info)] hover:bg-[color-mix(in_srgb,var(--info)_20%,transparent)]' },
     { label: 'Reports', href: '/reporting', color: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)] text-[var(--info)] hover:bg-[color-mix(in_srgb,var(--info)_20%,transparent)]' },
     { label: 'Transactions', href: '/transactions', color: 'bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] text-[var(--warning)] hover:bg-[color-mix(in_srgb,var(--warning)_20%,transparent)]' },
-    { label: 'Budgets', href: '/manage/budgets', color: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)] text-[var(--info)] hover:bg-[color-mix(in_srgb,var(--info)_20%,transparent)]' },
+    { label: 'Budgets', href: '/budget/monitor', color: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)] text-[var(--info)] hover:bg-[color-mix(in_srgb,var(--info)_20%,transparent)]' },
   ];
 
   const surface = { background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' };
@@ -243,8 +243,8 @@ export default function DashboardPage() {
         {/* Budget Utilization */}
         <div className="rounded-lg overflow-hidden" style={surface}>
           <div className="dialog-header px-4 py-2.5 flex items-center justify-between">
-            <span>Budget Utilization — This Month</span>
-            <button onClick={() => router.push('/manage/budgets')} className="text-[12px] font-semibold hover:underline" style={{ color: 'var(--shell-accent)' }}>Manage</button>
+            <span>Budgets nearest their limit</span>
+            <button onClick={() => router.push('/budget/monitor')} className="text-[12px] font-semibold hover:underline" style={{ color: 'var(--shell-accent)' }}>Manage</button>
           </div>
           <div className="p-4 space-y-3">
             {budgetLoading ? (
@@ -269,7 +269,7 @@ export default function DashboardPage() {
                 );
               })
             ) : (
-              <p className="py-8 text-center text-[12px] italic" style={{ color: 'var(--shell-text-muted)' }}>No budgets set for this month.</p>
+              <p className="py-8 text-center text-[12px] italic" style={{ color: 'var(--shell-text-muted)' }}>No active budget plan yet.</p>
             )}
           </div>
         </div>

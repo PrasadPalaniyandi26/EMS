@@ -19,6 +19,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DataTable } from '@/components/data-table/data-table';
 import { TransactionModal } from '@/components/transactions/transaction-modal';
+import { SplitRowHeadroom } from '@/components/budgets/budget-headroom';
+import { sortByCode } from '@/lib/codes';
 import { ProcessReimbursementModal } from '@/components/reimbursements/process-reimbursement-modal';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
 import { columns } from './columns';
@@ -285,36 +287,7 @@ export default function ExpensePage() {
       );
     }
     try {
-      const budgetChecks = await Promise.allSettled(
-        targets.map(async (r) => {
-          const t = r.original;
-          if (!t.category_id || !t.amount || !t.date_recorded) return null;
-          const d = parseApiDate(t.date_recorded);
-          if (!d) return null;
-          const params = new URLSearchParams({
-            categoryId: String(t.category_id),
-            amount: String(t.amount),
-            month: String(d.getMonth() + 1),
-            year: String(d.getFullYear()),
-          });
-          try {
-            const res = await api.get(`/budgets/check?${params}`);
-            return (res as any)?.will_exceed ? t : null;
-          } catch { return null; }
-        })
-      );
-      const exceeding = budgetChecks
-        .filter((r) => r.status === 'fulfilled' && r.value !== null)
-        .map((r) => (r as any).value);
-      if (exceeding.length > 0) {
-        const names = exceeding.map((t: any) => t.category_name || `#${t.id}`).join(', ');
-        const ok = await confirmDialog(
-          'Budget Limit Warning',
-          `The following expense(s) will exceed their category budget: ${names}. Submit anyway?`,
-          { confirmLabel: 'Submit Anyway', destructive: false }
-        );
-        if (!ok) return;
-      }
+      // The server checks each expense against its budget line and refuses with the reason when it cannot go ahead
       await Promise.all(targets.map((r) => api.post(`/transactions/${r.original.id}/submit`)));
       toast.success(`${targets.length} expense(s) submitted for approval`);
       invalidate('transactions', 'dashboard');
@@ -606,13 +579,14 @@ export default function ExpensePage() {
         {/* Split rows */}
         <div className="space-y-2">
           {splitEntries.map((entry, idx) => (
-            <div key={idx} className="grid gap-2 items-center" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+            <div key={idx} className="space-y-1">
+            <div className="grid gap-2 items-center" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
               <Select value={entry.category_id} onValueChange={(v) => { const neu = [...splitEntries]; neu[idx].category_id = v; setSplitEntries(neu); }}>
                 <SelectTrigger className="h-10 bg-[var(--shell-surface)] border-[var(--shell-border)] text-[var(--shell-text)] text-sm">
                   <SelectValue placeholder="Category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {filteredCategories.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                  {sortByCode(filteredCategories).map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.code ? `${c.code} ${c.name}` : c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Input
@@ -637,6 +611,8 @@ export default function ExpensePage() {
                 }}
                 className="h-10 text-sm text-right pr-2"
               />
+            </div>
+            <SplitRowHeadroom txn={editing} categoryId={entry.category_id} amount={entry.amount} currency={currency} />
             </div>
           ))}
         </div>

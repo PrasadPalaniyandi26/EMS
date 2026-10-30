@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
-import { useCategories, useCategoryTypes, useProjects, useProducts, useInvalidate } from '@/hooks/use-queries';
+import { useCategories, useCategoryTypes, useProjects, useProducts, useDepartments, useInvalidate } from '@/hooks/use-queries';
+import { useHeadroom } from '@/hooks/use-budget-queries';
+import { BudgetHeadroom, headroomGate } from '@/components/budgets/budget-headroom';
 import api, { getAccessToken, API_BASE } from '@/lib/api-client';
 import { CURRENCY_SYMBOL, toLocalYMD, parseApiDate, parseOcrDate } from '@/lib/currency';
 import { toast } from 'sonner';
@@ -68,32 +70,14 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
   const [fileRemoved, setFileRemoved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
-  const [budgetWarning, setBudgetWarning] = useState<{ remaining: number; after_this_expense: number; allocated: number; will_exceed: boolean } | null>(null);
+  const [overBudgetReason, setOverBudgetReason] = useState('');
   const [dupCheckFailed, setDupCheckFailed] = useState(false);
   const [dupWarning, setDupWarning] = useState<{ hardBlock: boolean; softWarn: boolean; matches: any[] } | null>(null);
-
-  // Budget warning: check remaining budget when expense amount + category + date are filled
-  useEffect(() => {
-    setBudgetWarning(null);
-    if (type !== 'expense' || !categoryId || !amount || isNaN(Number(amount)) || Number(amount) <= 0 || !dateRecorded) return;
-    const d = parseApiDate(dateRecorded);
-    if (!d) return;
-    const month = d.getMonth() + 1;
-    const year = d.getFullYear();
-    const qs = new URLSearchParams({ categoryId, amount, month: String(month), year: String(year) }).toString();
-    const timer = setTimeout(() => {
-      api.get(`/budgets/check?${qs}`).then((r: any) => {
-        const data = r.data ?? r;
-        if (data?.has_budget) setBudgetWarning(data);
-        else setBudgetWarning(null);
-      }).catch(() => setBudgetWarning(null));
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [type, categoryId, amount, dateRecorded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: projects } = useProjects();
   const { data: products } = useProducts();
   const { data: categoryTypes } = useCategoryTypes(type);
+  const { data: departments } = useDepartments();
 
   const filteredCategories = (allCategories || []).filter((c) => c.type === type);
 
@@ -108,6 +92,18 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
   }));
   const chosen = named.find((p) => String(p.id) === codeId);
   const effectiveClientId = chosen?.client_id ?? (clientId ? Number(clientId) : null);
+
+  // Budget line this expense lands on, and what is left on it
+  const headroomOn = isExpense && !!categoryId && !!codeId && !!contextType && !!dateRecorded && Number(amount) > 0;
+  const { data: headroom } = useHeadroom({
+    date: dateRecorded, contextType, categoryId,
+    projectId: contextType === 'project' ? codeId : undefined,
+    productId: contextType === 'product' ? codeId : undefined,
+    departmentId: contextType === 'overhead' ? codeId : undefined,
+    amount: headroomOn ? computeTotalAmount(Number(amount), gstRate, gstAdded) : undefined,
+    excludeId: editing?.id,
+  }, headroomOn);
+  const gate = headroomGate(headroomOn ? headroom : undefined);
 
 
   useEffect(() => {
@@ -127,8 +123,11 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
           ? editing.project_id ? String(editing.project_id) : ''
           : editing.context_type === 'product'
             ? editing.product_id ? String(editing.product_id) : ''
-            : '',
+            : editing.context_type === 'overhead'
+              ? editing.department_id ? String(editing.department_id) : ''
+              : '',
       );
+      setOverBudgetReason(editing.over_budget_reason || '');
       setCategoryId(editing.category_id ? String(editing.category_id) : '');
       setTypeId(String((allCategories || []).find((c) => c.id === editing.category_id)?.type_id ?? ''));
       setDescription(editing.description || '');
@@ -144,6 +143,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
       setFileRemoved(false);
     } else {
       setClientId('');
+      setOverBudgetReason('');
       setContextType('project');
       setCodeId('');
       setCategoryId('');
@@ -295,6 +295,8 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
         productId: contextType === 'product' && codeId ? Number(codeId) : null,
         contextType: contextType || null,
         receiptPath,
+        departmentId: contextType === 'overhead' && codeId ? Number(codeId) : null,
+        overBudgetReason: isExpense && headroomOn && gate.needsReason ? overBudgetReason.trim() || null : null,
         needsReimbursement: isExpense ? needsReimbursement : false,
       };
       if (editing) {
@@ -327,11 +329,11 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
       title={isAdd ? `Add New ${isExpense ? 'Expense' : 'Income'}` : `Edit ${isExpense ? 'Expense' : 'Income'}`}
       icon={editing ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
       onSave={() => handleSave()}
-      canSave={!!amount && !isNaN(Number(amount)) && Number(amount) > 0 && !!dateRecorded}
+      canSave={!!amount && !isNaN(Number(amount)) && Number(amount) > 0 && !!dateRecorded && !gate.blocked && !(gate.needsReason && !overBudgetReason.trim())}
       saveLabel={editing ? `Update ${isExpense ? 'Expense' : 'Income'}` : `Add ${isExpense ? 'Expense' : 'Income'}`}
       size="xl"
     >
-      <div className="grid grid-cols-1 items-start gap-x-6 gap-y-3 md:grid-cols-3">
+      <div className="grid grid-cols-1 items-stretch gap-x-6 gap-y-3 md:grid-cols-3">
 
         {/* Column 1: what it is charged to, and how it is classified */}
         <div className="space-y-3">
@@ -343,17 +345,18 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
               <option value="">Select...</option>
               <option value="project">Project</option>
               <option value="product">Product</option>
+              {isExpense && <option value="overhead">Overhead</option>}
             </NativeSelect>
           </Field>
 
-          <Field label={contextType === 'product' ? 'Product' : contextType === 'project' ? 'Project' : 'Project / Product'} hint={chosen?.client_name ? `Client: ${chosen.client_name}` : undefined}>
+          <Field label={contextType === 'product' ? 'Product' : contextType === 'project' ? 'Project' : contextType === 'overhead' ? 'Department' : 'Project / Product'} hint={chosen?.client_name ? `Client: ${chosen.client_name}` : undefined}>
             <NativeSelect
               value={codeId}
               onChange={(e) => setCodeId(e.target.value)}
               disabled={!contextType}
             >
-              <option value="">{contextType === 'product' ? 'Select product...' : contextType === 'project' ? 'Select project...' : 'Select...'}</option>
-              {codeOptions.map((o) => (
+              <option value="">{contextType === 'product' ? 'Select product...' : contextType === 'project' ? 'Select project...' : contextType === 'overhead' ? 'Select department...' : 'Select...'}</option>
+              {(contextType === 'overhead' ? (departments || []).map((d) => ({ id: String(d.id), label: d.name })) : codeOptions).map((o) => (
                 <option key={o.id} value={o.id}>{o.label}</option>
               ))}
             </NativeSelect>
@@ -370,11 +373,14 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
             onChange={(v) => { setTypeId(v.typeId); setCategoryId(v.category); }}
             typeEmptyHint="No types yet. An admin can add them with Category."
             categoryEmptyHint="No categories for this type yet. An admin can add them with Category."
+            costObject={isExpense ? (contextType === 'product' ? 'PRODUCT' : contextType === 'overhead' ? 'OVERHEAD' : contextType === 'project' ? 'PROJECT' : undefined) : undefined}
           />
+
+          {headroomOn && <BudgetHeadroom headroom={headroom} currency={currency} />}
         </div>
 
         {/* Column 2: the entry, and the proof */}
-        <div className="space-y-3">
+        <div className="flex flex-col gap-3">
           <Field label="Detail">
             <Input
               className={`${inp} border-input bg-transparent text-[var(--shell-text)]`}
@@ -394,9 +400,23 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
             />
           </Field>
 
+          {isExpense && headroomOn && gate.needsReason && (
+            <Field label="Over-budget reason" required hint="Shown to the budget owner and Finance when they approve.">
+              <Input
+                className={`${inp} border-input bg-transparent text-[var(--shell-text)]`}
+                type="text"
+                placeholder="Why this is needed beyond the budget..."
+                value={overBudgetReason}
+                maxLength={500}
+                onChange={(e) => setOverBudgetReason(e.target.value)}
+              />
+            </Field>
+          )}
+
         {/* Receipt upload */}
-        <div className="space-y-1.5">
+        <div className="flex min-h-0 flex-1 flex-col gap-1.5">
           <FileDropzone
+            fill
             label="Receipt upload"
             onFile={handleFile}
             busy={ocrLoading}
@@ -482,16 +502,6 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
             </div>
           </Field>
         </div>
-
-        {/* Budget warning: expense only */}
-        {isExpense && budgetWarning && (
-          <InlineAlert className="md:col-span-3" tone={budgetWarning.will_exceed ? 'danger' : 'tip'}>
-            {budgetWarning.will_exceed
-              ? <>This expense <strong>exceeds</strong> the budget by <strong>{Math.abs(budgetWarning.after_this_expense).toLocaleString()}</strong>. Budget allocated: {budgetWarning.allocated.toLocaleString()} · Remaining: {budgetWarning.remaining.toLocaleString()}.</>
-              : <>Budget remaining after this expense: <strong>{budgetWarning.after_this_expense.toLocaleString()}</strong> (of {budgetWarning.allocated.toLocaleString()} allocated).</>
-            }
-          </InlineAlert>
-        )}
 
         {/* Duplicate warning */}
         {dupWarning && (

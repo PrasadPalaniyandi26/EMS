@@ -10,6 +10,8 @@ interface ModuleShellProps {
   intelligencePanel?: React.ReactNode;
   className?: string;
   showPanel?: boolean;
+  /** Keep the panel closed until something is selected, for wide pages such as grids */
+  panelOnSelect?: boolean;
 }
 
 export function ModuleShell({
@@ -18,7 +20,8 @@ export function ModuleShell({
   searchRow,
   intelligencePanel,
   className,
-  showPanel
+  showPanel,
+  panelOnSelect
 }: ModuleShellProps) {
   const [panelOpen, setPanelOpen] = useState(true);
   const mounted = useRef(false);
@@ -110,7 +113,7 @@ export function ModuleShell({
               "flex flex-col overflow-hidden shadow-2xl lg:shadow-none",
               /* Below 1280px the empty "nothing selected" panel only wastes space (it covers the page on
                  phones and squeezes tables on laptops), so show it once a row is selected */
-              !showPanel && "max-xl:hidden!",
+              !showPanel && (panelOnSelect ? "hidden!" : "max-xl:hidden!"),
             )}
             style={{ background: 'var(--shell-surface)' }}
           >

@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
-import { UploadCloud, Loader2 } from 'lucide-react';
+import { UploadCloud, Loader2, FolderOpen } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -20,10 +21,12 @@ export function validateReceipt(f: File): boolean {
   return true;
 }
 
-// Receipt / document drop zone shared by the expense, income and recurring dialogs. A real button, so Enter and
-// Space open the file picker; the file is checked here and only a valid one reaches `onFile`.
+
+// Receipt / document drop zone shared by the expense, income and recurring dialogs: a large drop area with a
+// real "Browse files" button (so keyboard and screen-reader users get a proper control). The file is checked
+// here and only a valid one reaches `onFile`.
 export function FileDropzone({
-  label, onFile, busy, busyTitle, busyHint,
+  label, onFile, busy, busyTitle, busyHint, fill,
 }: {
   label: string;
   onFile: (f: File) => void;
@@ -31,15 +34,18 @@ export function FileDropzone({
   busy?: boolean;
   busyTitle?: React.ReactNode;
   busyHint?: React.ReactNode;
+  /** Grow to the bottom of a stretched column (never shorter than two control rows) */
+  fill?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const labelId = React.useId();
 
   const accept = (f?: File) => { if (f && validateReceipt(f)) onFile(f); };
+  const browse = () => { if (!busy) inputRef.current?.click(); };
 
   return (
-    <div className="space-y-1.5">
+    <div className={fill ? "flex min-h-0 flex-1 flex-col gap-1.5" : "space-y-1.5"}>
       <p id={labelId} className="text-[13px] font-medium" style={{ color: 'var(--shell-text)' }}>{label}</p>
       <input
         ref={inputRef}
@@ -50,38 +56,49 @@ export function FileDropzone({
         aria-hidden
         onChange={(e) => { accept(e.target.files?.[0]); e.target.value = ''; }}
       />
-      <button
-        type="button"
+      <div
+        role="group"
         aria-labelledby={labelId}
         aria-busy={busy}
         className={cn(
-          'group flex w-full cursor-pointer items-center gap-3 rounded-lg border-2 border-dashed px-4 py-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--shell-accent)]',
-          dragging ? 'border-[var(--shell-accent)]' : 'border-[var(--shell-border)] hover:border-[var(--shell-accent)]',
+          // Two control-rows tall (a text box is 40px), one column wide
+          'flex w-full items-center gap-3 rounded-lg border-2 border-dashed px-3 transition-colors',
+          fill ? 'min-h-20 flex-1' : 'h-20',
+          dragging ? 'border-[var(--shell-accent)] bg-[var(--shell-accent)]/10' : 'border-[var(--shell-border)]',
+          !busy && 'cursor-pointer',
         )}
-        onClick={() => !busy && inputRef.current?.click()}
-        onDrop={(e) => { e.preventDefault(); setDragging(false); accept(e.dataTransfer.files[0]); }}
+        onClick={browse}
+        onDrop={(e) => { e.preventDefault(); setDragging(false); if (!busy) accept(e.dataTransfer.files[0]); }}
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
       >
-        {busy
-          ? <Loader2 aria-hidden className="h-7 w-7 shrink-0 animate-spin text-[var(--shell-accent)]" />
-          : <UploadCloud aria-hidden className={cn('h-7 w-7 shrink-0 transition-colors', dragging ? 'text-[var(--shell-accent)]' : 'text-[var(--shell-text-muted)] group-hover:text-[var(--shell-accent)]')} />}
-        <span>
-          {busy ? (
-            <>
-              <span className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--shell-accent)]">{busyTitle}</span>
+        {busy ? (
+          <>
+            <Loader2 aria-hidden className="h-7 w-7 shrink-0 animate-spin text-[var(--shell-accent)]" />
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-1.5 text-[13px] font-semibold text-[var(--shell-accent)]">{busyTitle}</span>
               {busyHint && <span className="block text-[12px] text-[var(--shell-text-muted)]">{busyHint}</span>}
-            </>
-          ) : (
-            <>
-              <span className="block text-[12px] font-medium text-[var(--shell-text-muted)]">
-                Drag &amp; drop or <span className="font-semibold text-[var(--shell-accent)]">browse files</span>
-              </span>
+            </span>
+          </>
+        ) : (
+          <>
+            <UploadCloud aria-hidden className={cn('h-7 w-7 shrink-0 transition-colors', dragging ? 'text-[var(--shell-accent)]' : 'text-[var(--shell-text-muted)]')} />
+            <span className="min-w-0 flex-1 leading-snug">
+              <span className="block text-[13px] font-medium text-[var(--shell-text)]">{dragging ? 'Drop the file here' : 'Drag & drop a file'}</span>
               <span className="block text-[12px] text-[var(--shell-text-muted)]">PDF, JPG, PNG, WebP · max {RECEIPT_MAX_MB} MB</span>
-            </>
-          )}
-        </span>
-      </button>
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              aria-label="Browse files"
+              className="h-8 shrink-0 gap-1.5 px-3 text-[12px] font-semibold"
+              onClick={(e) => { e.stopPropagation(); browse(); }}
+            >
+              <FolderOpen aria-hidden className="h-3.5 w-3.5 text-[var(--info)]" /> Browse
+            </Button>
+          </>
+        )}
+      </div>
     </div>
   );
 }

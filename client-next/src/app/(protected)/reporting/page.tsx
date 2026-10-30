@@ -5,6 +5,7 @@ import { inputStyle } from '@/components/shared/modal-primitives';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
 import api from '@/lib/api-client';
+import { useBudgetPlans, fyLabel } from '@/hooks/use-budget-queries';
 import { formatCurrency, getDateRange } from '@/lib/currency';
 import {
   BarChart3, FileText, TrendingDown, TrendingUp, Scale, Target,
@@ -50,7 +51,7 @@ const DATE_PRESETS = [
   { label: 'Custom', key: 'custom' },
 ];
 
-const CURRENCY_COLS = new Set(['Amount', 'Income', 'Expenses', 'Net', 'Budget', 'Spent', 'Remaining', 'Net Amount', 'Total Amount', 'GST Amount']);
+const CURRENCY_COLS = new Set(['Amount', 'Income', 'Expenses', 'Net', 'Budget', 'Actual', 'Committed', 'Spent', 'Remaining', 'Net Amount', 'Total Amount', 'GST Amount']);
 
 // ── Number util ───────────────────────────────────────────────────────────────
 function isNumericCol(col: string, rows: Record<string, any>[]) {
@@ -72,8 +73,10 @@ export default function ReportingPage() {
   const [dateTo, setDateTo] = useState('');
   const [txnType, setTxnType] = useState('');
   const [categoryType, setCategoryType] = useState('all');
-  const [month, setMonth] = useState(String(new Date().getMonth() + 1));
-  const [year, setYear] = useState(String(new Date().getFullYear()));
+  const [fy, setFy] = useState('');
+  const { data: plansData } = useBudgetPlans();
+  const fyOptions = Array.from(new Set([...(plansData?.plans ?? []).map((p) => p.fy), ...(plansData ? [plansData.current_fy] : [])])).sort((a, b) => b - a);
+  const activeFy = fy || (plansData ? String(plansData.current_fy) : '');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ReportResult | null>(null);
@@ -101,8 +104,7 @@ export default function ReportingPage() {
     try {
       const params: Record<string, string> = { type: selectedType };
       if (selectedType === 'budget-vs-actual') {
-        params.month = month;
-        params.year = year;
+        if (activeFy) params.year = activeFy;
       } else {
         if (dateFrom) params.dateFrom = dateFrom;
         if (dateTo) params.dateTo = dateTo;
@@ -120,7 +122,7 @@ export default function ReportingPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedType, dateFrom, dateTo, txnType, categoryType, month, year]);
+  }, [selectedType, dateFrom, dateTo, txnType, categoryType, activeFy]);
 
   const filteredRows = result
     ? result.rows.filter((row) =>
@@ -232,16 +234,10 @@ export default function ReportingPage() {
 
           {isBudgetReport ? (
             <>
-              <select aria-label="Month" value={month} onChange={(e) => setMonth(e.target.value)}
+              <select aria-label="Financial year" value={activeFy} onChange={(e) => setFy(e.target.value)}
                 className={selectClass} style={selectStyle}>
-                {Array.from({ length: 12 }, (_, i) => (
-                  <option key={i + 1} value={i + 1}>{new Date(2000, i).toLocaleString('default', { month: 'long' })}</option>
-                ))}
-              </select>
-              <select aria-label="Year" value={year} onChange={(e) => setYear(e.target.value)}
-                className={selectClass} style={selectStyle}>
-                {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((y) => (
-                  <option key={y} value={y}>{y}</option>
+                {fyOptions.map((y) => (
+                  <option key={y} value={y}>{fyLabel(y)}</option>
                 ))}
               </select>
             </>

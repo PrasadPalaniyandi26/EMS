@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Pencil, Trash2, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog, inp } from '@/components/shared/modal-primitives';
 
-export interface ManageItem { id: number; name: string; used: number }
+export interface ManageItem { id: number; name: string; used: number; code?: string | null }
 
 interface ManageListProps {
   /** Heading above the list, e.g. "Types" or "Categories of Software" */
@@ -26,8 +26,12 @@ interface ManageListProps {
   /** Explains why a name can't be used (duplicate), or null when it is free */
   taken: (name: string, exceptId?: number) => string | null;
   /** The callbacks call the API and refresh; they throw to report a failure */
-  onAdd: (name: string) => Promise<unknown>;
-  onRename: (id: number, name: string) => Promise<unknown>;
+  onAdd: (name: string, code?: string) => Promise<unknown>;
+  onRename: (id: number, name: string, code?: string) => Promise<unknown>;
+  /** Shows a short code (E200, J110) beside each name and asks for it when adding or renaming */
+  withCode?: boolean;
+  /** Extra control per row, such as the owner of a department */
+  renderExtra?: (item: ManageItem) => ReactNode;
   onRemove: (id: number) => Promise<{ archived?: boolean } | void>;
   /** What uses an entry, for the remove message: "projects", "clients" */
   usedBy: string;
@@ -39,11 +43,13 @@ interface ManageListProps {
 // Rows show how many records use them, can be renamed in place, and are deleted when unused or archived when used.
 // Five rows tall whatever the content, so lists placed side by side line up.
 export function ManageList({
-  heading, sectionLabel, noun, items, selectedId, onPick, emptyText, disabled, taken, onAdd, onRename, onRemove, usedBy, deleteNote,
+  heading, sectionLabel, noun, items, selectedId, onPick, emptyText, disabled, taken, onAdd, onRename, onRemove, usedBy, deleteNote, withCode, renderExtra,
 }: ManageListProps) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [draft, setDraft] = useState('');
+  const [draftCode, setDraftCode] = useState('');
   const [newName, setNewName] = useState('');
+  const [newCode, setNewCode] = useState('');
   const [target, setTarget] = useState<ManageItem | null>(null);
 
   const attempt = async (job: () => Promise<unknown>, done: string) => {
@@ -56,7 +62,7 @@ export function ManageList({
     if (!name || disabled) return;
     const clash = taken(name);
     if (clash) { toast.error(clash); return; }
-    if (await attempt(() => onAdd(name), `${cap(noun)} added`)) setNewName('');
+    if (await attempt(() => onAdd(name, withCode ? newCode.trim() : undefined), `${cap(noun)} added`)) { setNewName(''); setNewCode(''); }
   };
 
   const saveRename = async () => {
@@ -65,7 +71,7 @@ export function ManageList({
     if (!name) return;
     const clash = taken(name, editingId);
     if (clash) { toast.error(clash); return; }
-    if (await attempt(() => onRename(editingId, name), 'Renamed')) setEditingId(null);
+    if (await attempt(() => onRename(editingId, name, withCode ? draftCode.trim() : undefined), 'Saved')) setEditingId(null);
   };
 
   const confirmRemove = async () => {
@@ -100,6 +106,20 @@ export function ManageList({
               {(active || isEditing) && <span aria-hidden className="absolute inset-y-0 left-0 w-[3px] bg-[var(--shell-accent)]" />}
               {isEditing ? (
                 <>
+                  {withCode && (
+                    <input
+                      aria-label={`Code for ${item.name}`}
+                      className={cn(inp, 'h-8 w-[76px] shrink-0')}
+                      placeholder="Code"
+                      maxLength={10}
+                      value={draftCode}
+                      onChange={(e) => setDraftCode(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') { e.preventDefault(); saveRename(); }
+                        if (e.key === 'Escape') { e.stopPropagation(); setEditingId(null); }
+                      }}
+                    />
+                  )}
                   <input
                     autoFocus
                     aria-label={`Rename ${item.name}`}
@@ -117,12 +137,13 @@ export function ManageList({
               ) : (
                 <>
                   {onPick ? (
-                    <button type="button" aria-pressed={active} onClick={() => onPick(item.id)} className={cn('min-w-0 flex-1 truncate text-left text-[13px]', active ? 'font-semibold' : 'font-medium')} style={{ color: 'var(--shell-text)' }}>{item.name}</button>
+                    <button type="button" aria-pressed={active} onClick={() => onPick(item.id)} className={cn('min-w-0 flex-1 truncate text-left text-[13px]', active ? 'font-semibold' : 'font-medium')} style={{ color: 'var(--shell-text)' }}>{item.code && <span className="mr-2 text-[12px] font-normal" style={{ color: 'var(--shell-text-muted)' }}>{item.code}</span>}{item.name}</button>
                   ) : (
-                    <span className="min-w-0 flex-1 truncate text-[13px] font-medium" style={{ color: 'var(--shell-text)' }}>{item.name}</span>
+                    <span className="min-w-0 flex-1 truncate text-[13px] font-medium" style={{ color: 'var(--shell-text)' }}>{item.code && <span className="mr-2 text-[12px] font-normal" style={{ color: 'var(--shell-text-muted)' }}>{item.code}</span>}{item.name}</span>
                   )}
+                  {renderExtra?.(item)}
                   <span className="shrink-0 text-[12px]" style={{ color: 'var(--shell-text-muted)' }}>{item.used > 0 ? `${item.used} in use` : 'Unused'}</span>
-                  <Button type="button" variant="ghost" aria-label={`Rename ${item.name}`} className="h-8 w-8 p-0" onClick={() => { setEditingId(item.id); setDraft(item.name); }}><Pencil aria-hidden className="h-4 w-4" /></Button>
+                  <Button type="button" variant="ghost" aria-label={`Rename ${item.name}`} className="h-8 w-8 p-0" onClick={() => { setEditingId(item.id); setDraft(item.name); setDraftCode(item.code ?? ''); }}><Pencil aria-hidden className="h-4 w-4" /></Button>
                   <Button type="button" variant="ghost" aria-label={`Remove ${item.name}`} className="h-8 w-8 p-0 text-[var(--danger)]" onClick={() => setTarget(item)}><Trash2 aria-hidden className="h-4 w-4" /></Button>
                 </>
               )}
@@ -132,6 +153,18 @@ export function ManageList({
       </ul>
 
       <div className="mt-3 flex gap-2">
+        {withCode && (
+          <input
+            aria-label={`New ${noun} code`}
+            className={cn(inp, 'w-[84px] shrink-0')}
+            placeholder="Code"
+            maxLength={10}
+            value={newCode}
+            disabled={disabled}
+            onChange={(e) => setNewCode(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+          />
+        )}
         <input
           aria-label={`New ${noun} name`}
           className={cn(inp, 'min-w-0 flex-1')}

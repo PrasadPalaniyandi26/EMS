@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
-import { useDashboardSummary, useApprovals, useBudgets } from '@/hooks/use-queries';
+import { useDashboardSummary, useApprovals, useBudgetUtilization } from '@/hooks/use-queries';
 import { formatCurrency, formatDate } from '@/lib/currency';
 import { getStatusConfig } from '@/lib/status';
 import { StatCard, StatStrip } from '@/components/shared/stat-card';
@@ -22,12 +22,12 @@ export default function HubPage() {
 
   const { data: summary, isLoading: summaryLoading } = useDashboardSummary();
   const { data: pendingApprovals } = useApprovals();
-  const { data: budgetsData } = useBudgets();
+  const { data: budgetsData } = useBudgetUtilization();
 
   const recentTxns: any[] = summary?.recentTransactions?.slice(0, 5) || [];
   const pendingCount = Array.isArray(pendingApprovals) ? pendingApprovals.length : 0;
-  const budgets: any[] = Array.isArray(budgetsData) ? budgetsData : (budgetsData as any)?.rows || [];
-  const overBudget = budgets.filter((b: any) => b.spent > b.amount);
+  const budgets: any[] = Array.isArray(budgetsData) ? budgetsData : [];
+  const overBudget = budgets.filter((b: any) => b.spent > b.budget);
 
   const isManager = user?.roles?.some((r) => r.role_name === 'MANAGER');
   const isFinance = user?.roles?.some((r) => r.role_name === 'FINANCE');
@@ -141,8 +141,8 @@ export default function HubPage() {
         {/* Budget Overview */}
         <div className="rounded-lg overflow-hidden" style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
           <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--shell-border)' }}>
-            <p className="text-[12px] font-semibold text-[var(--shell-text-muted)]">Budget Overview</p>
-            <button onClick={() => router.push('/manage/budgets')} className="flex items-center gap-1 text-[12px] font-semibold text-[var(--shell-accent)] hover:opacity-80 transition-opacity">
+            <p className="text-[12px] font-semibold text-[var(--shell-text-muted)]">Budgets nearest their limit</p>
+            <button onClick={() => router.push('/budget/monitor')} className="flex items-center gap-1 text-[12px] font-semibold text-[var(--shell-accent)] hover:opacity-80 transition-opacity">
               Manage <ArrowRight className="w-3 h-3" />
             </button>
           </div>
@@ -150,16 +150,16 @@ export default function HubPage() {
             {budgets.length === 0 ? (
               <div className="px-4 py-8 flex flex-col items-center gap-2">
                 <Target className="w-6 h-6 text-[var(--shell-text-muted)] opacity-40" />
-                <p className="text-[12px] text-[var(--shell-text-muted)]">No budgets configured</p>
+                <p className="text-[12px] text-[var(--shell-text-muted)]">No active budget plan</p>
               </div>
             ) : budgets.slice(0, 5).map((b: any) => {
-              const pct = b.amount > 0 ? Math.min(100, Math.round((b.spent / b.amount) * 100)) : 0;
+              const pct = b.budget > 0 ? Math.min(100, Math.round((b.spent / b.budget) * 100)) : 0;
               const isOver = pct >= 100;
               const isWarn = pct >= 80 && !isOver;
               return (
                 <div key={b.id} className="px-4 py-2.5">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[12px] font-semibold text-black dark:text-white truncate max-w-[180px]">{b.name || b.category_name || `Budget #${b.id}`}</span>
+                    <span className="text-[12px] font-semibold text-black dark:text-white truncate max-w-[180px]">{b.category_name}</span>
                     <span className={`text-[12px] font-semibold ${isOver ? 'text-[var(--danger)]' : isWarn ? 'text-[var(--warning)]' : 'text-[var(--shell-text-muted)]'}`}>{pct}%</span>
                   </div>
                   <div className="w-full h-1.5 rounded-full bg-[var(--shell-hover)] overflow-hidden">
@@ -170,7 +170,7 @@ export default function HubPage() {
                   </div>
                   <div className="flex justify-between mt-0.5">
                     <span className="text-[12px] text-[var(--shell-text-muted)]">{formatCurrency(b.spent || 0, currency)} spent</span>
-                    <span className="text-[12px] text-[var(--shell-text-muted)]">of {formatCurrency(b.amount, currency)}</span>
+                    <span className="text-[12px] text-[var(--shell-text-muted)]">of {formatCurrency(b.budget, currency)}</span>
                   </div>
                 </div>
               );
@@ -178,7 +178,7 @@ export default function HubPage() {
             {overBudget.length > 0 && (
               <div className="px-4 py-2.5 flex items-center gap-2 bg-[color-mix(in_srgb,var(--danger)_8%,transparent)]">
                 <Target className="w-3.5 h-3.5 text-[var(--danger)] shrink-0" />
-                <p className="text-[12px] font-semibold text-[var(--danger)]">{overBudget.length} budget{overBudget.length !== 1 ? 's' : ''} over limit</p>
+                <p className="text-[12px] font-semibold text-[var(--danger)]">{overBudget.length} line{overBudget.length !== 1 ? 's' : ''} over budget</p>
               </div>
             )}
           </div>

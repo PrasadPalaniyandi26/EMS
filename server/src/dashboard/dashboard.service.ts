@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { BudgetsService } from '../budgets/budgets.service';
 import { COMMITTED_STATUSES, committedStatusSql } from '../common/constants/transaction-status';
 
 @Injectable()
 export class DashboardService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private budgets: BudgetsService) {}
 
   async getSummary(userId: number, dateFrom?: string, dateTo?: string) {
     const where: any = { userId, status: { in: COMMITTED_STATUSES } };
@@ -116,41 +117,10 @@ export class DashboardService {
     });
   }
 
-  async getBudgetUtilization(userId: number) {
-    const now = new Date();
-    const month = now.getMonth() + 1;
-    const year = now.getFullYear();
-
-    const budgets = await this.prisma.budget.findMany({
-      where: { userId, periodMonth: month, periodYear: year, isActive: true },
-      include: { category: true },
-    });
-
-    if (!budgets.length) return [];
-
-    const categoryIds = budgets.map((b) => b.categoryId).filter((id): id is number => id !== null);
-    const start = new Date(year, month - 1, 1);
-    const end = new Date(year, month, 0, 23, 59, 59);
-
-    const spent = await this.prisma.transaction.groupBy({
-      by: ['categoryId'],
-      where: { userId, type: 'expense', status: { in: COMMITTED_STATUSES }, categoryId: { in: categoryIds }, dateRecorded: { gte: start, lte: end } },
-      _sum: { amount: true },
-    });
-    const spentMap = Object.fromEntries(spent.map((s) => [s.categoryId, Number(s._sum?.amount) || 0]));
-
-    return budgets.map((b) => {
-      const spentAmt = (b.categoryId !== null ? spentMap[b.categoryId] : 0) || 0;
-      const budgetAmt = Number(b.amount);
-      return {
-        category_id: b.categoryId,
-        category_name: b.category?.name || 'Unknown',
-        budget: budgetAmt,
-        spent: parseFloat(spentAmt.toFixed(2)),
-        remaining: parseFloat((budgetAmt - spentAmt).toFixed(2)),
-        pct: budgetAmt > 0 ? parseFloat(((spentAmt / budgetAmt) * 100).toFixed(1)) : 0,
-      };
-    }).sort((a, b) => b.pct - a.pct);
+  // Lines closest to or over their budget, from the active plan
+  async getBudgetUtilization(_userId: number) {
+    const lines = await this.budgets.dashboardLines(6);
+    return lines.map((l) => ({ category_id: l.id, category_name: l.label, budget: l.budget, spent: l.spent, remaining: l.remaining, pct: l.pct, status: l.status }));
   }
 
   async getApprovalCounts(userId: number, roleName: string) {

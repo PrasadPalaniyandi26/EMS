@@ -5,6 +5,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { ROLES } from '../common/constants/roles';
 import { COMMITTED_STATUSES } from '../common/constants/transaction-status';
 import { buildGstFields } from '../common/utils/gst';
+import { BudgetsService } from '../budgets/budgets.service';
 
 // Upper bound for ?limit= on list endpoints; the client's largest request is 500.
 const MAX_PAGE_SIZE = 500;
@@ -17,6 +18,7 @@ export class TransactionsService {
     private prisma: PrismaService,
     private audit: AuditService,
     private notifications: NotificationsService,
+    private budgets: BudgetsService,
   ) {}
 
   private mapTransaction(t: any) {
@@ -34,7 +36,8 @@ export class TransactionsService {
       description: t.description, payment_method: t.paymentMethod, receipt_path: t.receiptPath,
       receipt_number: t.receiptNumber, submitted_at: t.submittedAt, currency: t.currency,
       client_id: t.clientId, client_name: t.client?.name, project_id: t.projectId, project_name: t.project?.name,
-      context_code: t.project?.code || t.product?.code, product_id: t.productId, product_name: t.product?.name,
+      context_code: t.project?.code || t.product?.code || t.department?.name, department_name: t.department?.name ?? null, product_id: t.productId, product_name: t.product?.name,
+      department_id: t.departmentId ?? null, budget_line_id: t.budgetLineId ?? null, over_budget_reason: t.overBudgetReason ?? null,
       context_type: t.contextType, is_split: t.isSplit ? 1 : 0, created_at: t.createdAt, updated_at: t.updatedAt, status: t.status,
       approved_by_id: t.approvedById ?? null,
       approved_by_name: t.approvedByName ?? null,
@@ -93,7 +96,7 @@ export class TransactionsService {
     const [total, transactions] = await Promise.all([
       this.prisma.transaction.count({ where }),
       this.prisma.transaction.findMany({
-        where, include: { category: true, client: true, project: true, product: true },
+        where, include: { category: true, client: true, project: true, product: true, department: true },
         orderBy: [{ dateRecorded: 'desc' }, { id: 'desc' }], skip, take: limit,
       }),
     ]);
@@ -103,7 +106,7 @@ export class TransactionsService {
 
   async findById(id: number, userId: number) {
     const t = await this.prisma.transaction.findFirst({
-      where: { id, userId, NOT: { status: 'DELETED' } }, include: { category: true, client: true, project: true, product: true },
+      where: { id, userId, NOT: { status: 'DELETED' } }, include: { category: true, client: true, project: true, product: true, department: true },
     });
     if (!t) return null;
     return this.mapTransaction(t);
@@ -111,7 +114,7 @@ export class TransactionsService {
 
   private async findByIdAny(id: number) {
     const t = await this.prisma.transaction.findFirst({
-      where: { id, NOT: { status: 'DELETED' } }, include: { category: true, client: true, project: true, product: true },
+      where: { id, NOT: { status: 'DELETED' } }, include: { category: true, client: true, project: true, product: true, department: true },
     });
     if (!t) return null;
     return this.mapTransaction(t);
@@ -135,6 +138,8 @@ export class TransactionsService {
         paymentMethod: data.paymentMethod || 'cash', receiptPath: data.receiptPath || null,
         clientId: data.clientId ? Number(data.clientId) : null, projectId: data.projectId ? Number(data.projectId) : null,
         productId: data.productId ? Number(data.productId) : null, contextType: data.contextType || 'project',
+        departmentId: data.contextType === 'overhead' && data.departmentId ? Number(data.departmentId) : null,
+        overBudgetReason: data.overBudgetReason?.trim() || null,
         receiptNumber: data.receiptNumber || null, currency: data.currency || 'INR',
         isClaimable: data.isClaimable !== undefined ? !!data.isClaimable : false,
         needsReimbursement: data.needsReimbursement !== undefined ? !!data.needsReimbursement : false,
@@ -162,7 +167,7 @@ export class TransactionsService {
     return !!found;
   }
 
-  // Enforce per-user spend limits (single + monthly) and strict category budgets.
+  // Enforce per-user spend limits (single + monthly), then the budget line check.
   // Runs at submit time for expenses only — the moment the spend is committed into
   // the approval pipeline. Limits/budgets are computed against COMMITTED_STATUSES
   // (approved + in-flight), matching how "spent" is shown on the dashboard/budgets.
@@ -204,29 +209,8 @@ export class TransactionsService {
       }
     }
 
-    // ── Strict category budget ──
-    if (txn.categoryId != null) {
-      const budget = await this.prisma.budget.findFirst({
-        where: { userId, categoryId: txn.categoryId, periodMonth: month, periodYear: year, isActive: true },
-      });
-      if (budget && budget.strict_enforcement) {
-        const spentAgg = await this.prisma.transaction.aggregate({
-          where: {
-            userId, type: 'expense', categoryId: txn.categoryId, status: { in: COMMITTED_STATUSES },
-            dateRecorded: { gte: start, lte: end }, NOT: { id: txn.id },
-          },
-          _sum: { amount: true },
-        });
-        const spent = Number(spentAgg._sum.amount) || 0;
-        const allocated = Number(budget.amount) || 0;
-        if (spent + amount > allocated) {
-          throw new HttpException(
-            `This expense would exceed the strict budget for this category (allocated ₹${allocated.toFixed(2)}, already committed ₹${spent.toFixed(2)}).`,
-            HttpStatus.BAD_REQUEST,
-          );
-        }
-      }
-    }
+    // ── Budget line: type allowed for the cost object, headroom, reason when over ──
+    await this.budgets.checkExpense(txn);
   }
 
   // Submit a transaction for approval
@@ -439,6 +423,8 @@ export class TransactionsService {
         paymentMethod: data.paymentMethod || 'cash', receiptPath: data.receiptPath || null,
         clientId: data.clientId ? Number(data.clientId) : null, projectId: data.projectId ? Number(data.projectId) : null,
         productId: data.productId ? Number(data.productId) : null, contextType: data.contextType || 'project',
+        departmentId: data.contextType === 'overhead' && data.departmentId ? Number(data.departmentId) : null,
+        overBudgetReason: data.overBudgetReason?.trim() || null,
         receiptNumber: data.receiptNumber || null, currency: data.currency || 'INR',
         ...(data.isClaimable !== undefined ? { isClaimable: !!data.isClaimable } : {}),
         ...(data.needsReimbursement !== undefined ? { needsReimbursement: !!data.needsReimbursement } : {}),
@@ -682,7 +668,7 @@ export class TransactionsService {
 
     const rows = await this.prisma.transaction.findMany({
       where,
-      include: { category: true, client: true, project: true, product: true, user: true },
+      include: { category: true, client: true, project: true, product: true, department: true, user: true },
       orderBy: [{ dateRecorded: 'desc' }, { id: 'desc' }],
     });
 
@@ -777,7 +763,7 @@ export class TransactionsService {
     if (filters.type) where.type = filters.type;
 
     const transactions = await this.prisma.transaction.findMany({
-      where, include: { category: true, client: true, project: true, product: true },
+      where, include: { category: true, client: true, project: true, product: true, department: true },
       orderBy: [{ dateRecorded: 'desc' }, { id: 'desc' }],
       take: 10000,
     });
@@ -850,7 +836,7 @@ export class TransactionsService {
     if (receiptNumber && receiptNumber.trim()) {
       const receiptMatches = await this.prisma.transaction.findMany({
         where: { ...base, receiptNumber: receiptNumber.trim() },
-        include: { category: true, client: true, project: true, product: true },
+        include: { category: true, client: true, project: true, product: true, department: true },
         take: 5,
       });
       if (receiptMatches.length > 0) {
@@ -861,7 +847,7 @@ export class TransactionsService {
     // Soft warn: same totalAmount + same date
     const exactMatches = await this.prisma.transaction.findMany({
       where: { ...base, totalAmount: Number(totalAmount), dateRecorded: { gte: dayStart, lte: dayEnd } },
-      include: { category: true, client: true, project: true, product: true },
+      include: { category: true, client: true, project: true, product: true, department: true },
       take: 5,
     });
     if (exactMatches.length > 0) {
@@ -878,7 +864,7 @@ export class TransactionsService {
         dateRecorded: { gte: weekAgo, lte: weekLater },
         totalAmount: { gte: Number(totalAmount) * 0.9, lte: Number(totalAmount) * 1.1 },
       },
-      include: { category: true, client: true, project: true, product: true },
+      include: { category: true, client: true, project: true, product: true, department: true },
       take: 5,
     });
 

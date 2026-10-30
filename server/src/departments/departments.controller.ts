@@ -18,6 +18,8 @@ export class DepartmentsController {
   create(@Body('name') name: string, @CurrentUser('id') userId: number) { return this.service.create(name, userId); }
   @Put(':id') @UseGuards(RolesGuard) @Roles('admin')
   rename(@Param('id', ParseIntPipe) id: number, @Body('name') name: string) { return this.service.rename(id, name); }
+  @Put(':id/owner') @UseGuards(RolesGuard) @Roles('admin')
+  setOwner(@Param('id', ParseIntPipe) id: number, @Body('owner_id') ownerId: number | null) { return this.service.setOwner(id, ownerId); }
   @Delete(':id') @UseGuards(RolesGuard) @Roles('admin')
   remove(@Param('id', ParseIntPipe) id: number) { return this.service.remove(id); }
 }

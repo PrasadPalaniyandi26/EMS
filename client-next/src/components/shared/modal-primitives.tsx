@@ -56,12 +56,14 @@ interface FieldProps {
   hint?: string;
   error?: string;
   htmlFor?: string;
+  /** Grow to the bottom of a stretched column; the control (a textarea) fills the height */
+  fill?: boolean;
   children: React.ReactNode;
 }
 
 const CONTROL_SELECTOR ='input:not([type="hidden"]):not([type="file"]), select, textarea, [role="combobox"], [role="switch"], [role="checkbox"]';
 
-export function Field({ label, required, hint, error, htmlFor, children }: FieldProps) {
+export function Field({ label, required, hint, error, htmlFor, fill, children }: FieldProps) {
   const autoId = useId();
   const baseId = htmlFor ?? `field-${autoId.replace(/:/g, '')}`;
   const errorId = `${baseId}-error`;
@@ -85,12 +87,12 @@ export function Field({ label, required, hint, error, htmlFor, children }: Field
   });
 
   return (
-    <div className="space-y-1.5">
+    <div className={fill ? "flex min-h-0 flex-1 flex-col gap-1.5" : "space-y-1.5"}>
       <Label htmlFor={controlId} className="text-[13px] font-medium" style={{ color: 'var(--shell-text)' }}>
         {label}
         {required && <span aria-hidden className="ml-0.5 text-[var(--danger)]">*</span>}
       </Label>
-      <div ref={bodyRef}>{children}</div>
+      <div ref={bodyRef} className={fill ? "min-h-0 flex-1 [&>textarea]:h-full" : undefined}>{children}</div>
       {hint && !error && <p id={hintId} className="text-xs" style={{ color: 'var(--shell-text-muted)' }}>{hint}</p>}
       {error && <p id={errorId} role="alert" className="text-xs font-medium text-[var(--danger)]">{error}</p>}
     </div>

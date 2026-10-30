@@ -8,7 +8,7 @@ export class ProjectsService {
 
   private mapType(pt: any) {
     return ({
-      id: pt.id, name: pt.name,
+      id: pt.id, name: pt.name, code: pt.code ?? null,
       is_active: pt.isActive ? 1 : 0, created_by: pt.createdBy, created_at: pt.createdAt,
     });
   }
@@ -127,19 +127,29 @@ export class ProjectsService {
     });
   }
 
+  // Codes such as J110 or P101: up to 10 letters or digits, stored upper case
+  private cleanCode(raw: any): string | null {
+    const code = String(raw ?? '').trim().toUpperCase();
+    if (!code) return null;
+    if (!/^[A-Z0-9.-]{1,10}$/.test(code)) throw new HttpException('A code is up to 10 letters or digits.', HttpStatus.BAD_REQUEST);
+    return code;
+  }
+
   async createType(data: any) {
     try {
       const name = String(data.name ?? '').trim();
       if (!name) throw new HttpException('Name is required.', HttpStatus.BAD_REQUEST);
+      const code = this.cleanCode(data.code);
+      if (code && (await this.prisma.projectType.findFirst({ where: { code } }))) throw new HttpException('Another type already uses that code.', HttpStatus.CONFLICT);
       const clash = await this.findTypeClash(name);
       if (clash?.isActive) throw new HttpException('A type with this name already exists.', HttpStatus.CONFLICT);
       if (clash) {
-        await this.prisma.projectType.update({ where: { id: clash.id }, data: { isActive: true } });
+        await this.prisma.projectType.update({ where: { id: clash.id }, data: { isActive: true, ...(code ? { code } : {}) } });
         return this.findTypeById(clash.id);
       }
       const pt = await this.prisma.projectType.create({
         data: {
-          name,
+          name, code,
           createdBy: data.createdBy ? Number(data.createdBy) : (data.created_by ? Number(data.created_by) : null),
         },
       });
@@ -157,10 +167,12 @@ export class ProjectsService {
         if (!name) throw new HttpException('Name is required.', HttpStatus.BAD_REQUEST);
         if (await this.findTypeClash(name, id)) throw new HttpException('A type with this name already exists.', HttpStatus.CONFLICT);
       }
+      const code = data.code === undefined ? undefined : this.cleanCode(data.code);
+      if (code && (await this.prisma.projectType.findFirst({ where: { code, NOT: { id } } }))) throw new HttpException('Another type already uses that code.', HttpStatus.CONFLICT);
       await this.prisma.projectType.update({
         where: { id },
         data: {
-          name,
+          name, code,
           isActive: data.isActive !== undefined ? Boolean(data.isActive) : (data.is_active !== undefined ? Boolean(data.is_active) : undefined),
         },
       });

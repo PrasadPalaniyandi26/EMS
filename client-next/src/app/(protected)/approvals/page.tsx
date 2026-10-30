@@ -47,11 +47,13 @@ import {
   RowSelectionState,
 } from '@tanstack/react-table';
 import { useDataTable } from '@/hooks/use-data-table';
-import { IdCell, TextCell, DateCell, MoneyCell, StatusText, headerRight } from '@/components/data-table/cells';
+import { IdCell, TextCell, DateCell, MoneyCell, StatusText, ToneText, headerRight } from '@/components/data-table/cells';
+import { useExpenseImpact, type ExpenseImpact } from '@/hooks/use-budget-queries';
+import { UtilBar, money } from '@/components/budgets/budget-ui';
 
 // ─── Column definitions ─────────────────────────────────────────────────────
 
-function buildColumns(role: string, currency: string): ColumnDef<any>[] {
+function buildColumns(role: string, currency: string, impact: Record<number, ExpenseImpact>): ColumnDef<any>[] {
   const isEmployee = role === 'EMPLOYEE';
   return [
     {
@@ -90,6 +92,23 @@ function buildColumns(role: string, currency: string): ColumnDef<any>[] {
       cell: ({ row }) => <StatusText status={row.getValue('transaction_status') as string} />,
       size: 150,
     },
+    ...(isEmployee
+      ? []
+      : [
+          {
+            id: 'budget',
+            header: 'Budget',
+            enableSorting: false,
+            cell: ({ row }: any) => {
+              const i = impact[row.original.transaction_id];
+              if (!i || i.state === 'NO_PLAN') return <TextCell value="" />;
+              if (i.state === 'OVER') return <ToneText tone="warning" label={`Over by ${money(i.over_by, currency)}`} />;
+              if (i.state === 'NO_LINE') return <ToneText tone="warning" label="No budget line" />;
+              return <ToneText tone="success" label="Within" />;
+            },
+            size: 130,
+          } as ColumnDef<any>,
+        ]),
     {
       accessorKey: 'amount',
       header: headerRight('Amount'),
@@ -163,7 +182,14 @@ export default function ApprovalsPage() {
 
   // Non-toggling roles (Admin, Employee) see only their own history — treat as EMPLOYEE for columns
   const colRole = canToggle ? roleName : 'EMPLOYEE';
-  const cols = useMemo(() => buildColumns(colRole, currency), [colRole, currency]);
+  // Money each pending expense would take from its budget line, for the Budget column and the panel
+  const impactIds = useMemo(
+    () => (view === 'pending' && canToggle ? approvals.filter((a) => a.record_type !== 'recurring' && a.type !== 'income' && a.transaction_id).map((a) => Number(a.transaction_id)) : []),
+    [approvals, view, canToggle],
+  );
+  const { data: impactData } = useExpenseImpact(impactIds);
+  const impact = useMemo(() => impactData ?? {}, [impactData]);
+  const cols = useMemo(() => buildColumns(colRole, currency, impact), [colRole, currency, impact]);
 
   const table = useDataTable({
     data: approvals,
@@ -351,6 +377,30 @@ export default function ApprovalsPage() {
                       <DetailField label="Reimbursement" value={a.needs_reimbursement ? 'Needed' : 'Not needed'} tone={a.needs_reimbursement ? 'warning' : 'muted'} />
                     </DetailGrid>
                   </DetailSection>
+
+                  {impact[a.transaction_id] && impact[a.transaction_id].state !== 'NO_PLAN' && (() => {
+                    const i = impact[a.transaction_id];
+                    return (
+                      <DetailSection title={i.line_label ? `Budget impact · ${i.line_label}` : 'Budget impact'}>
+                        {i.state === 'NO_LINE' ? (
+                          <p className="text-[13px] text-[var(--warning)]">This expense matches no budget line.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            <p className="text-[12px] text-[var(--shell-text-muted)]">Before this expense: {i.before_pct}% ({money(i.before, currency)} of {money(i.budget, currency)})</p>
+                            <UtilBar pct={i.before_pct ?? 0} />
+                            <p className={`text-[12px] ${i.state === 'OVER' ? 'text-[var(--warning)]' : 'text-[var(--shell-text-muted)]'}`}>After: {i.after_pct}% ({money(i.after, currency)} of {money(i.budget, currency)}){i.state === 'OVER' ? `, ${money(i.over_by, currency)} over` : ''}</p>
+                            <UtilBar pct={i.after_pct ?? 0} />
+                          </div>
+                        )}
+                        {i.reason && (
+                          <div className="mt-2">
+                            <p className="text-[12px] text-[var(--shell-text-muted)]">Reason given</p>
+                            <p className="text-[13px] text-[var(--shell-text)]">{i.reason}</p>
+                          </div>
+                        )}
+                      </DetailSection>
+                    );
+                  })()}
 
                   <DetailSection title="Receipt">
                     <DetailAttachment path={a.receipt_path} emptyLabel="No receipt attached" />

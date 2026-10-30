@@ -66,6 +66,16 @@ export class CreateTransactionDto {
   productId?: number;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  departmentId?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  overBudgetReason?: string;
+
+  @IsOptional()
   @IsString()
   @MaxLength(50)
   contextType?: string;
@@ -152,6 +162,16 @@ export class UpdateTransactionDto {
   @Type(() => Number)
   @IsInt()
   productId?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  departmentId?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  overBudgetReason?: string;
 
   @IsOptional()
   @IsString()

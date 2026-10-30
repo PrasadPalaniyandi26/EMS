@@ -6,6 +6,7 @@ const EMPLOYEE_ROUTES = ['/expense', '/approvals', '/settings', '/notifications'
 // Routes limited to specific roles for every user; mirrors @Roles() on the API
 const ROLE_ONLY_ROUTES: Record<string, string[]> = {
   '/system/audit-log': ['ADMIN', 'FINANCE'],
+  '/budget/settings': ['ADMIN', 'FINANCE'],
 };
 
 function matches(pathname: string, route: string) {

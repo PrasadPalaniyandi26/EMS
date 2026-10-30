@@ -29,7 +29,10 @@ import { Field, NativeSelect, CurrencyInput, SegmentedControl, inp, sel } from '
 import { FileDropzone } from '@/components/shared/file-dropzone';
 import { GstRateSelect, GstIncludedSwitch } from '@/components/shared/gst-fields';
 import { TypeCategoryFields } from '@/components/shared/type-category-fields';
-import { useCategoryTypes } from '@/hooks/use-queries';
+import { useCategoryTypes, useDepartments, useProducts, useProjects } from '@/hooks/use-queries';
+import { useHeadroom } from '@/hooks/use-budget-queries';
+import { BudgetHeadroom } from '@/components/budgets/budget-headroom';
+import { computeTotalAmount } from '@/lib/gst';
 
 // Shared control styles for these dialogs: 40px, keyboard focus ring
 const ctl = inp;
@@ -59,6 +62,25 @@ export function RecurringModal({
 }: RecurringModalProps) {
   const isEdit = !!editing;
   const { data: categoryTypes } = useCategoryTypes(form.type);
+  const { data: projects } = useProjects();
+  const { data: products } = useProducts();
+  const { data: departments } = useDepartments();
+  const contextType: string = form.context_type || 'project';
+  const objectOptions = contextType === 'overhead'
+    ? (departments || []).map((d) => ({ id: String(d.id), label: d.name }))
+    : (contextType === 'product' ? products : projects || [])?.map((p: any) => ({ id: String(p.id), label: p.client_name ? `${p.name} (${p.client_name})` : p.name })) ?? [];
+
+  // Budget line this schedule's runs will land on
+  const headroomOn = isOpen && form.type === 'expense' && !!form.category_id && !!form.object_id && !!form.next_run && Number(form.amount) > 0;
+  const { data: headroom } = useHeadroom({
+    date: form.next_run, contextType, categoryId: form.category_id,
+    projectId: contextType === 'project' ? form.object_id : undefined,
+    productId: contextType === 'product' ? form.object_id : undefined,
+    departmentId: contextType === 'overhead' ? form.object_id : undefined,
+    amount: headroomOn ? computeTotalAmount(Number(form.amount), form.gst_rate, form.gst_included) : undefined,
+    excludeId: undefined,
+  }, headroomOn);
+  const blocked = headroomOn && (headroom?.state === 'BLOCKED' || headroom?.state === 'NOT_ALLOWED');
 
   // The type is not stored on the schedule: it is the type of the chosen category.
   const [typeId, setTypeId] = React.useState('');
@@ -75,26 +97,39 @@ export function RecurringModal({
       title={isEdit ? 'Edit Recurring Transaction' : 'Add Recurring Transaction'}
       icon={isEdit ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
       onSave={onSave}
-      canSave={!!form.description?.trim() && !!form.amount && Number(form.amount) > 0 && !!form.category_id && !!form.frequency && !!form.next_run}
+      canSave={!!form.description?.trim() && !!form.amount && Number(form.amount) > 0 && !!form.category_id && !!form.frequency && !!form.next_run && !blocked}
       saveLabel={isEdit ? 'Update Schedule' : 'Schedule Transaction'}
       size="xl"
     >
-      <div className="grid grid-cols-1 items-start gap-x-6 gap-y-3 md:grid-cols-3">
+      <div className="grid grid-cols-1 items-stretch gap-x-6 gap-y-3 md:grid-cols-3">
 
         {/* Column 1: what kind of transaction, and its type and category */}
-        <div className="space-y-3">
+        <div className="flex flex-col gap-3">
           <div>
             <p id="recurring-type-label" className="mb-2 block text-[13px] font-medium" style={{ color: 'var(--shell-text)' }}>Transaction Type</p>
             <SegmentedControl
               labelledBy="recurring-type-label"
               value={form.type}
-              onChange={(v) => { setForm({ ...form, type: v, category_id: '' }); setTypeId(''); }}
+              onChange={(v) => { setForm({ ...form, type: v, category_id: '', context_type: v === 'income' && form.context_type === 'overhead' ? 'project' : form.context_type, object_id: v === 'income' && form.context_type === 'overhead' ? '' : form.object_id }); setTypeId(''); }}
               options={[
                 { value: 'expense', label: 'Expense', tone: 'danger' },
                 { value: 'income', label: 'Income', tone: 'success' },
               ]}
             />
           </div>
+          <Field label="Charge To">
+            <NativeSelect value={contextType} onChange={(e) => setForm({ ...form, context_type: e.target.value, object_id: '' })}>
+              <option value="project">Project</option>
+              <option value="product">Product</option>
+              {form.type === 'expense' && <option value="overhead">Overhead</option>}
+            </NativeSelect>
+          </Field>
+          <Field label={contextType === 'product' ? 'Product' : contextType === 'overhead' ? 'Department' : 'Project'}>
+            <NativeSelect value={form.object_id || ''} onChange={(e) => setForm({ ...form, object_id: e.target.value })}>
+              <option value="">{contextType === 'product' ? 'Select product...' : contextType === 'overhead' ? 'Select department...' : 'Select project...'}</option>
+              {objectOptions.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+            </NativeSelect>
+          </Field>
           <TypeCategoryFields
             typeLabel={form.type === 'income' ? 'Income Type' : 'Expense Type'}
             categoryLabel={form.type === 'income' ? 'Income Category' : 'Expense Category'}
@@ -107,10 +142,12 @@ export function RecurringModal({
             onChange={(v) => { setTypeId(v.typeId); setForm({ ...form, category_id: v.category }); }}
             typeEmptyHint="No types yet. An admin can add them with Category."
             categoryEmptyHint="No categories for this type yet. An admin can add them with Category."
+            costObject={form.type === 'expense' ? (contextType === 'product' ? 'PRODUCT' : contextType === 'overhead' ? 'OVERHEAD' : 'PROJECT') : undefined}
           />
-          <Field label="Recurring Purpose / Notes">
+          {headroomOn && <BudgetHeadroom headroom={headroom} />}
+          <Field label="Recurring Purpose / Notes" fill>
             <Textarea
-              className="min-h-[112px] w-full resize-none rounded-md border border-input bg-transparent text-sm text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus-visible:border-[var(--shell-accent)] focus-visible:ring-2 focus-visible:ring-[var(--shell-accent)]"
+              className="min-h-20 w-full resize-none rounded-md border border-input bg-transparent text-sm text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus-visible:border-[var(--shell-accent)] focus-visible:ring-2 focus-visible:ring-[var(--shell-accent)]"
               placeholder="Provide a reason for this recurring transaction..."
               value={form.notes || ''}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
@@ -165,10 +202,24 @@ export function RecurringModal({
               aria-label="Open-ended"
             />
           </label>
+          <label className="flex h-10 cursor-pointer items-center justify-between gap-3 rounded-md border border-input px-3 text-[13px] font-medium text-[var(--shell-text)]">
+            <span>Auto-submit for approval</span>
+            <Switch checked={!!form.auto_submit} onCheckedChange={(v) => setForm({ ...form, auto_submit: v })} aria-label="Auto-submit for approval" />
+          </label>
+          {form.type === 'expense' && (
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Renewal date" hint="When the contract or licence renews.">
+                <Input type="date" className={ctl} min={form.next_run || undefined} value={form.renewal_date || ''} onChange={(e) => setForm({ ...form, renewal_date: e.target.value })} />
+              </Field>
+              <Field label="Yearly increase %" hint="Expected price rise.">
+                <Input type="number" min="0" max="100" step="0.5" className={ctl} placeholder="0" value={form.escalation_pct ?? ''} onChange={(e) => setForm({ ...form, escalation_pct: e.target.value })} />
+              </Field>
+            </div>
+          )}
         </div>
 
         {/* Column 3: how it is paid and how much */}
-        <div className="space-y-3">
+        <div className="flex flex-col gap-3">
           <Field label="Payment Method">
             <NativeSelect value={form.payment_method || 'cash'} onChange={(e) => setForm({ ...form, payment_method: e.target.value })}>
               <option value="cash">Cash</option>
@@ -189,12 +240,8 @@ export function RecurringModal({
           <Field label={`Amount ${amountLabel(form.gst_rate, form.gst_included)}`} required>
             <CurrencyInput value={form.amount} onChange={(v) => setForm({ ...form, amount: v })} />
           </Field>
-          <label className="flex h-10 cursor-pointer items-center justify-between gap-3 rounded-md border border-input px-3 text-[13px] font-medium text-[var(--shell-text)]">
-            <span>Auto-submit for approval</span>
-            <Switch checked={!!form.auto_submit} onCheckedChange={(v) => setForm({ ...form, auto_submit: v })} aria-label="Auto-submit for approval" />
-          </label>
-        <div className="space-y-1.5">
-          <FileDropzone label="Supporting document" onFile={onFileChange} />
+        <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+          <FileDropzone fill label="Supporting document" onFile={onFileChange} />
           {(file || (isEdit && editing?.receipt_path)) && (
             <div className="mt-1 flex items-center justify-between rounded-lg border border-[var(--shell-border)] px-3 py-2">
               <div className="flex min-w-0 items-center gap-2.5">

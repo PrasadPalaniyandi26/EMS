@@ -3,7 +3,7 @@ import api from '@/lib/api-client';
 import { useAuthStore } from '@/stores/auth-store';
 import type {
   Category, Client, Project, Product, ProjectType, ProductType,
-  Transaction, Budget, RecurringTransaction, ApprovalRequest, AuditLog,
+  Transaction, RecurringTransaction, ApprovalRequest, AuditLog,
   Notification, Role, DashboardSummary, CategoryBreakdown, MonthlyTrend,
   PaginatedResponse,
 } from '@/lib/types';
@@ -53,7 +53,7 @@ export function useCategories() {
   });
 }
 
-export interface CategoryType { id: number; name: string; kind: 'expense' | 'income' }
+export interface CategoryType { id: number; name: string; code?: string | null; applies_to?: string[] | null; kind: 'expense' | 'income' }
 
 // The groups categories sit under (Type > Category), for expenses or income
 export function useCategoryTypes(kind?: 'expense' | 'income') {
@@ -85,7 +85,7 @@ export function useClients() {
 
 export interface ClientSector { id: number; name: string }
 
-export interface Department { id: number; name: string }
+export interface Department { id: number; name: string; owner_id?: number | null; owner_name?: string | null }
 
 export function useDepartments() {
   return useQuery({
@@ -95,7 +95,7 @@ export function useDepartments() {
   });
 }
 
-// How many users and budgets use each department, for the manage dialog
+// How many users, budget lines and expenses use each department, for the manage dialog
 export function useDepartmentUsage(enabled: boolean) {
   return useQuery({
     queryKey: [QUERY_KEYS.DEPARTMENT_USAGE],
@@ -160,7 +160,7 @@ export function useProductTypes() {
 }
 
 // Categories of one project type or product type (all of them when no type is given)
-export interface TypeCategory { id: number; type_id: number; name: string }
+export interface TypeCategory { id: number; type_id: number; name: string; code?: string | null }
 
 export function useProjectCategories() {
   return useQuery({
@@ -226,15 +226,6 @@ export function useAllTransactions(params: Record<string, string>) {
       }
       return { rows, total, page: 1, limit: rows.length, truncated: rows.length < total };
     },
-    staleTime: LIVE_STALE,
-  });
-}
-
-// ─── Budgets ─────────────────────────────────────
-export function useBudgets() {
-  return useQuery({
-    queryKey: [QUERY_KEYS.BUDGETS],
-    queryFn: () => api.get<Budget[]>('/budgets').then((r) => r.data),
     staleTime: LIVE_STALE,
   });
 }

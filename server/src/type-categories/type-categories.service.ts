@@ -18,7 +18,7 @@ export class TypeCategoriesService {
   }
 
   private map(c: any) {
-    return { id: c.id, type_id: c.typeId, name: c.name, is_active: c.isActive };
+    return { id: c.id, type_id: c.typeId, name: c.name, code: c.code ?? null, is_active: c.isActive };
   }
 
   async findAll(kind: CategoryKind, typeId?: number) {
@@ -47,29 +47,41 @@ export class TypeCategoriesService {
     return { types, categories };
   }
 
+  // Codes such as J110 or P101: up to 10 letters or digits, stored upper case
+  private cleanCode(raw: any): string | null {
+    const code = String(raw ?? '').trim().toUpperCase();
+    if (!code) return null;
+    if (!/^[A-Z0-9.-]{1,10}$/.test(code)) throw new HttpException('A code is up to 10 letters or digits.', HttpStatus.BAD_REQUEST);
+    return code;
+  }
+
   async create(kind: CategoryKind, data: any) {
     const typeId = Number(data.typeId ?? data.type_id);
     const name = String(data.name ?? '').trim();
     if (!typeId || !name) throw new HttpException('Type and name are required.', HttpStatus.BAD_REQUEST);
     const createdBy = data.createdBy ? Number(data.createdBy) : null;
+    const code = this.cleanCode(data.code);
+    if (code && (await this.model(kind).findFirst({ where: { code } }))) throw new HttpException('Another category already uses that code.', HttpStatus.CONFLICT);
     // One name per type, ignoring case; the same name under another type is fine.
     // Re-adding a name that was archived brings it back.
     const clash = await this.model(kind).findFirst({ where: { typeId, name: { equals: name, mode: 'insensitive' } } });
     if (clash?.isActive) throw new HttpException('This type already has a category with that name.', HttpStatus.CONFLICT);
-    if (clash) return this.map(await this.model(kind).update({ where: { id: clash.id }, data: { isActive: true } }));
-    return this.map(await this.model(kind).create({ data: { typeId, name, createdBy } }));
+    if (clash) return this.map(await this.model(kind).update({ where: { id: clash.id }, data: { isActive: true, ...(code ? { code } : {}) } }));
+    return this.map(await this.model(kind).create({ data: { typeId, name, code, createdBy } }));
   }
 
-  async rename(kind: CategoryKind, id: number, rawName: string) {
+  async rename(kind: CategoryKind, id: number, rawName: string, rawCode?: any) {
     const name = String(rawName ?? '').trim();
+    const code = rawCode === undefined ? undefined : this.cleanCode(rawCode);
     if (!name) throw new HttpException('Name is required.', HttpStatus.BAD_REQUEST);
     const current = await this.model(kind).findUnique({ where: { id } });
     if (!current) throw new HttpException('Category not found.', HttpStatus.NOT_FOUND);
-    if (current.name === name) return this.map(current);
+    if (code && (await this.model(kind).findFirst({ where: { code, NOT: { id } } }))) throw new HttpException('Another category already uses that code.', HttpStatus.CONFLICT);
+    if (current.name === name) return this.map(code !== undefined ? await this.model(kind).update({ where: { id }, data: { code } }) : current);
     const clash = await this.model(kind).findFirst({ where: { typeId: current.typeId, name: { equals: name, mode: 'insensitive' }, NOT: { id } } });
     if (clash) throw new HttpException('This type already has a category with that name.', HttpStatus.CONFLICT);
     const [row] = await this.prisma.$transaction([
-      this.model(kind).update({ where: { id }, data: { name } }),
+      this.model(kind).update({ where: { id }, data: { name, ...(code !== undefined ? { code } : {}) } }),
       this.records(kind).updateMany({ where: { typeId: current.typeId, category: current.name }, data: { category: name } }),
     ]);
     return this.map(row);
