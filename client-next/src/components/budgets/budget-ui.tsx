@@ -9,6 +9,10 @@ import type { AlertLevel, BudgetPlanInfo, LineStatus, PlanStatus } from '@/hooks
 const whole = (currency: string, symbol: boolean) => new Intl.NumberFormat(currency === 'INR' ? 'en-IN' : 'en-US', { style: symbol ? 'currency' : 'decimal', currency, maximumFractionDigits: 0, minimumFractionDigits: 0 });
 export const money = (v: number | null | undefined, currency = 'INR') => whole(currency, true).format(Math.round(Number(v || 0)));
 export const plain = (v: number | null | undefined, currency = 'INR') => whole(currency, false).format(Math.round(Number(v || 0)));
+// Unit prices keep their paise (0.35 stays 0.35); totals above stay whole rupees
+const unitFmt = (currency: string, symbol: boolean) => new Intl.NumberFormat(currency === 'INR' ? 'en-IN' : 'en-US', { style: symbol ? 'currency' : 'decimal', currency, maximumFractionDigits: 2, minimumFractionDigits: 0 });
+export const unitPrice = (v: number | null | undefined, currency = 'INR') => unitFmt(currency, true).format(Number(v || 0));
+export const unitPlain = (v: number | null | undefined, currency = 'INR') => unitFmt(currency, false).format(Number(v || 0));
 
 const LEVEL_TEXT: Record<AlertLevel, { label: string; cls: string }> = {
   CRITICAL: { label: 'Critical', cls: 'text-[var(--danger)]' },
@@ -86,3 +90,35 @@ export function Kpi({ label, value, sub, tone }: { label: string; value: ReactNo
 export function KpiStrip({ children }: { children: ReactNode }) {
   return <div className="flex shrink-0 divide-x divide-[var(--shell-border)] overflow-x-auto border-b border-[var(--shell-border)] bg-[var(--shell-surface)]">{children}</div>;
 }
+
+// Tabs for the detail pages: one row, the active tab underlined with the accent
+export function TabBar<T extends string>({ tabs, value, onChange }: { tabs: { value: T; label: string }[]; value: T; onChange: (v: T) => void }) {
+  return (
+    <div role="tablist" className="flex shrink-0 gap-1 border-b border-[var(--shell-border)] px-4">
+      {tabs.map((t) => (
+        <button
+          key={t.value} type="button" role="tab" aria-selected={value === t.value} onClick={() => onChange(t.value)}
+          className={cn('-mb-px border-b-2 px-3 py-2.5 text-[13px] font-medium focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]',
+            value === t.value ? 'border-[var(--shell-accent)] text-[var(--shell-text)]' : 'border-transparent text-[var(--shell-text-muted)] hover:text-[var(--shell-text)]')}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Plain table used inside tabs; amounts right-aligned
+export function Grid({ head, children, className }: { head: { label: string; right?: boolean; w?: string }[]; children: ReactNode; className?: string }) {
+  return (
+    <table className={cn('w-full border-separate border-spacing-0 text-[13px]', className)}>
+      <thead>
+        <tr className="text-left text-[12px] font-semibold text-[var(--shell-text-muted)]">
+          {head.map((h, i) => <th key={i} className={cn('sticky top-0 border-b border-[var(--shell-border)] bg-[var(--table-header)] px-4 py-2', h.right && 'text-right', h.w)}>{h.label}</th>)}
+        </tr>
+      </thead>
+      <tbody>{children}</tbody>
+    </table>
+  );
+}
+export const td = 'border-b border-[var(--shell-border)] px-4 py-2 text-[var(--shell-text)]';

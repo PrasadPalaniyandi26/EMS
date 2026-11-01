@@ -355,14 +355,30 @@ export class DashboardService {
     const productIds = spent.map((r) => r.productId).filter(Boolean) as number[];
     const products = await this.prisma.product.findMany({
       where: { id: { in: productIds } },
-      select: { id: true, name: true, budget: true },
+      select: { id: true, name: true },
     });
     const prodMap = Object.fromEntries(products.map((p) => [p.id, p]));
+
+    // A product's budget is what the budget plan allows for it, for the months in the chosen range
+    const lines = await this.prisma.budgetLine.findMany({
+      where: { costObject: 'PRODUCT', productId: { in: productIds }, isActive: true, isContingency: false },
+      include: { periods: true },
+    });
+    const from = dateFrom ? new Date(dateFrom).getTime() : null;
+    const to = dateTo ? new Date(dateTo).getTime() : null;
+    const planned = new Map<number, number>();
+    for (const l of lines) {
+      for (const p of l.periods) {
+        const start = Date.UTC(p.year, p.month - 1, 1);
+        const end = Date.UTC(p.year, p.month, 0);
+        if ((from === null || end >= from) && (to === null || start <= to)) planned.set(l.productId!, (planned.get(l.productId!) ?? 0) + Number(p.amount));
+      }
+    }
 
     return spent.map((r) => {
       const prod = prodMap[r.productId!];
       const spentAmt = parseFloat((Number(r._sum.amount) || 0).toFixed(2));
-      const budget   = prod?.budget ? parseFloat(Number(prod.budget).toFixed(2)) : 0;
+      const budget   = parseFloat((planned.get(r.productId!) ?? 0).toFixed(2));
       return {
         product_id:   r.productId,
         product_name: prod?.name || 'Unknown',

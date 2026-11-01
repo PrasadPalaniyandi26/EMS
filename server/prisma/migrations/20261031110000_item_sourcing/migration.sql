@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "items" ADD COLUMN "sourcing" VARCHAR(4) NOT NULL DEFAULT 'BUY';

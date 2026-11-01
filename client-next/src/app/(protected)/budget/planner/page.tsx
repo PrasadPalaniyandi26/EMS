@@ -24,41 +24,6 @@ const GROUPS: { key: string; title: string; match: (l: BudgetLine) => boolean }[
   { key: 'RESERVE', title: 'Company reserve', match: (l) => l.cost_object === 'RESERVE' },
 ];
 
-// One month of one line. Click to type a new amount while the plan is a draft; Enter or leaving the cell saves.
-function MonthCell({ value, editable, onSave }: { value: number; editable: boolean; onSave: (v: number) => Promise<void> }) {
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState('');
-  const ref = useRef<HTMLInputElement>(null);
-  useEffect(() => { if (editing) ref.current?.select(); }, [editing]);
-
-  const commit = async () => {
-    setEditing(false);
-    const next = Math.max(0, Number(text) || 0);
-    if (next !== value) await onSave(next);
-  };
-
-  if (editing) {
-    return (
-      <input
-        ref={ref} type="number" min="0" step="1" value={text} aria-label="Amount for the month"
-        onChange={(e) => setText(e.target.value)} onBlur={commit}
-        onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false); }}
-        className="h-7 w-full rounded-md border border-[var(--shell-accent)] bg-transparent px-1.5 text-right text-[13px] tabular-nums text-[var(--shell-text)] outline-none"
-      />
-    );
-  }
-  const shown = value ? plain(value) : '–';
-  if (!editable) return <span className={cn('block px-1.5 text-right tabular-nums', !value && 'text-[var(--shell-text-muted)]')}>{shown}</span>;
-  return (
-    <button
-      type="button" onClick={(e) => { e.stopPropagation(); setText(value ? String(value) : ''); setEditing(true); }}
-      className={cn('block w-full rounded-md border border-transparent px-1.5 py-0.5 text-right tabular-nums hover:border-[var(--input)] focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]', !value && 'text-[var(--shell-text-muted)]')}
-    >
-      {shown}
-    </button>
-  );
-}
-
 export default function BudgetPlannerPage() {
   const setHeader = useHeaderStore((s) => s.setHeader);
   const user = useAuthStore((s) => s.user);
@@ -95,7 +60,6 @@ export default function BudgetPlannerPage() {
   const lines = view?.lines ?? [];
   const selected = lines.find((l) => l.id === selectedId) ?? null;
   const draft = plan?.status === 'DRAFT';
-  const editableCells = draft;
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -106,16 +70,6 @@ export default function BudgetPlannerPage() {
     : [{ key: 'ALL', title: '', rows: visible }];
   const monthTotals = (view?.months ?? []).map((_, i) => visible.reduce((a, l) => a + (l.periods[i] || 0), 0));
   const shownTotal = visible.reduce((a, l) => a + l.total, 0);
-
-  const saveCell = async (line: BudgetLine, index: number, amount: number, reason?: string) => {
-    const m = view!.months[index];
-    try {
-      await api.put(`/budgets/lines/${line.id}/period`, { year: m.year, month: m.month, amount, reason });
-      invalidate('budgets');
-    } catch (err: any) {
-      toast.error(err?.message || 'Could not save the amount.');
-    }
-  };
 
   const submitPlan = async () => {
     if (!plan) return;
@@ -169,8 +123,6 @@ export default function BudgetPlannerPage() {
       panelOnSelect
       searchRow={
         <div className="flex w-full flex-wrap items-center gap-2">
-          <FySelect plans={plansData?.plans ?? []} value={fy} onChange={setFy} currentFy={plansData?.current_fy} startMonth={startMonth} />
-          {plan && <PlanStatusText status={plan.status} />}
           {isFinance && <button className="btn-action" onClick={() => setNewPlanOpen(true)}><FilePlus2 className="h-4 w-4 text-[var(--success)]" /> New plan</button>}
           {plan && canEditLines && <button className="btn-action" onClick={openAdd}><Plus className="h-4 w-4 text-[var(--success)]" /> Add line</button>}
           {plan && draft && lines.length > 0 && <button className="btn-action" onClick={() => setSubmitOpen(true)}><Send className="h-4 w-4 text-[var(--shell-accent)]" /> Submit for approval</button>}
@@ -183,6 +135,8 @@ export default function BudgetPlannerPage() {
           {plan && isFinance && <button className="btn-action" onClick={() => setDetailsOpen(true)}><Settings2 className="h-4 w-4 text-[var(--warning)]" /> Plan details</button>}
           {plan && isFinance && draft && <button className="btn-action" onClick={() => setDeletePlan(true)}><Trash2 className="h-4 w-4 text-[var(--danger)]" /> Delete plan</button>}
           <div className="ml-auto flex items-center gap-2">
+            {plan && <PlanStatusText status={plan.status} />}
+            <FySelect plans={plansData?.plans ?? []} value={fy} onChange={setFy} currentFy={plansData?.current_fy} startMonth={startMonth} />
             <NativeSelect aria-label="Group lines" value={group} onChange={(e) => setGroup(e.target.value as 'object' | 'none')} className="!h-8 !w-auto">
               <option value="object">Group: cost object</option>
               <option value="none">No grouping</option>
@@ -266,8 +220,7 @@ export default function BudgetPlannerPage() {
                   <tr><td colSpan={15} className="px-4 py-8 text-center text-[var(--shell-text-muted)]">No lines yet. {canEditLines ? 'Click Add line to start the plan.' : ''}</td></tr>
                 )}
                 {grouped.map((g) => (
-                  <GroupRows key={g.key} title={g.title} rows={g.rows} selectedId={selectedId} onSelect={setSelectedId} editable={!!editableCells}
-                    onSaveCell={(line, i, v) => saveCell(line, i, v)} currency={currency} />
+                  <GroupRows key={g.key} title={g.title} rows={g.rows} selectedId={selectedId} onSelect={setSelectedId} currency={currency} />
                 ))}
               </tbody>
               {visible.length > 0 && (
@@ -282,7 +235,7 @@ export default function BudgetPlannerPage() {
               )}
             </table>
           </div>
-          {draft && lines.length > 0 && <p className="shrink-0 border-t border-[var(--shell-border)] px-4 py-1.5 text-[12px] text-[var(--shell-text-muted)]">Click a month to change its amount. After approval, changes are made from Edit and need a reason.</p>}
+          {draft && lines.length > 0 && <p className="shrink-0 border-t border-[var(--shell-border)] px-4 py-1.5 text-[12px] text-[var(--shell-text-muted)]">Select a line and use Edit to change its amounts. After approval, changes need a reason.</p>}
         </div>
       )}
 
@@ -297,9 +250,8 @@ export default function BudgetPlannerPage() {
   );
 }
 
-function GroupRows({ title, rows, selectedId, onSelect, editable, onSaveCell, currency }: {
-  title: string; rows: BudgetLine[]; selectedId: number | null; onSelect: (id: number) => void; editable: boolean;
-  onSaveCell: (line: BudgetLine, index: number, amount: number) => Promise<void>; currency: string;
+function GroupRows({ title, rows, selectedId, onSelect, currency }: {
+  title: string; rows: BudgetLine[]; selectedId: number | null; onSelect: (id: number) => void; currency: string;
 }) {
   return (
     <>
@@ -326,7 +278,7 @@ function GroupRows({ title, rows, selectedId, onSelect, editable, onSaveCell, cu
             <td className="border-b border-[var(--shell-border)] px-2 py-1.5 text-[var(--shell-text-muted)]">{l.owner_name ?? '–'}</td>
             {l.periods.map((v, i) => (
               <td key={i} className="border-b border-[var(--shell-border)] px-0.5 py-1">
-                <MonthCell value={v} editable={editable} onSave={(next) => onSaveCell(l, i, next)} />
+                <span className={cn('block px-1.5 text-right tabular-nums', !v && 'text-[var(--shell-text-muted)]')}>{v ? plain(v) : '–'}</span>
               </td>
             ))}
             <td className="border-b border-[var(--shell-border)] px-3 py-1.5 text-right font-medium tabular-nums">{plain(l.total, currency)}</td>

@@ -16,6 +16,8 @@ import { NativeSelect } from '@/components/shared/modal-primitives';
 import { DetailSummary, DetailSection, DetailGrid, DetailField } from '@/components/shared/detail/detail-kit';
 import { FySelect, Kpi, KpiStrip, LevelText, LineStatusText, STATUS_TEXT, UtilBar, money, plain } from '@/components/budgets/budget-ui';
 import { formatDate } from '@/lib/currency';
+import { ChangeRequestModal } from '@/components/budgets/planning-modals';
+import { DetailActions } from '@/components/shared/detail/detail-kit';
 import { StatusText } from '@/components/data-table/cells';
 
 // Whole-rupee amount, right-aligned like MoneyCell
@@ -38,6 +40,7 @@ export default function BudgetMonitorPage() {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'pct', desc: true }]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [rowSelection, setRowSelection] = useState({});
+  const [changeFor, setChangeFor] = useState<number | null>(null);
 
   useEffect(() => { setHeader('Budget monitor', 'What has been spent, what is committed and what is left'); }, [setHeader]);
   useEffect(() => { setSelectedId(null); setRowSelection({}); }, [fy]);
@@ -104,7 +107,7 @@ export default function BudgetMonitorPage() {
       searchRow={
         <DataTableToolbar
           table={table}
-          actions={
+          filters={
             <>
               <FySelect plans={plansData?.plans ?? []} value={fy} onChange={setFy} currentFy={plansData?.current_fy} startMonth={settings?.fy_start_month ?? 4} />
               <NativeSelect aria-label="Cost object" value={object} onChange={(e) => setObject(e.target.value)} className="!h-8 !w-auto">
@@ -122,7 +125,7 @@ export default function BudgetMonitorPage() {
         />
       }
       intelligencePanel={
-        <ModuleIntelligencePanel title="Budget line" onClose={() => { setSelectedId(null); setRowSelection({}); }} hasSelection={!!selected}>
+        <ModuleIntelligencePanel title="Budget line" onClose={() => { setSelectedId(null); setRowSelection({}); }} hasSelection={!!selected} footer={selected ? <DetailActions actions={[{ label: 'Request transfer', variant: 'primary', onClick: () => setChangeFor(selected.id) }]} /> : undefined}>
           {selected && (
             <>
               <DetailSummary title={selected.label} subtitle={selected.object_name} status={selected.status} statusClass={STATUS_TEXT[selected.status]} figure={money(selected.available, currency)} figureLabel="Left" />
@@ -204,6 +207,7 @@ export default function BudgetMonitorPage() {
           />
         </div>
       </div>
+      <ChangeRequestModal isOpen={changeFor != null} onClose={() => setChangeFor(null)} prefill={changeFor != null ? { kind: 'TRANSFER', to_line_id: changeFor } : null} />
     </ModuleShell>
   );
 }

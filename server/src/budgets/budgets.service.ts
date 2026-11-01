@@ -12,7 +12,7 @@ const KIND: Record<string, string> = { PROJECT: 'PROJECT', PRODUCT: 'PRODUCT', D
 const LEVEL_RANK: Record<string, number> = { INFO: 1, CAUTION: 2, WARNING: 3, CRITICAL: 4 };
 
 type Settings = { fyStartMonth: number; overBudgetMode: string; controlLevel: string; netOfClaimableGst: boolean; approvalThreshold: number; contingencyPct: number };
-type Part = {
+export type Part = {
   txnId: number; ref: string | null; status: string; year: number; month: number; amount: number;
   costObject: string; projectId: number | null; productId: number | null; departmentId: number | null;
   typeId: number | null; categoryId: number | null; submitterName?: string | null; submittedAt?: Date | null;
@@ -191,7 +191,7 @@ export class BudgetsService {
     return parts;
   }
 
-  private partsOf(t: any, s: Settings): Part[] {
+  partsOf(t: any, s: Settings): Part[] {
     const total = n(t.totalAmount ?? t.amount);
     const cost = s.netOfClaimableGst && t.isClaimable ? n(t.netAmount ?? t.amount) : total;
     const ratio = total > 0 ? cost / total : 1;
@@ -209,6 +209,18 @@ export class BudgetsService {
       return t.splits.map((sp: any) => mk(n(sp.amount), sp.projectId, sp.productId, sp.categoryId, sp.category?.typeId));
     }
     return [mk(total, t.projectId, t.productId, t.categoryId, t.category?.typeId)];
+  }
+
+  // Expense parts matching any transaction filter, for project and product roll-ups
+  async partsWhere(where: any): Promise<Part[]> {
+    const s = await this.getSettings();
+    const txns = await this.prisma.transaction.findMany({
+      where: { type: 'expense', ...where },
+      include: { category: { select: { typeId: true } }, splits: { include: { category: { select: { typeId: true } } } } },
+    });
+    const parts: Part[] = [];
+    for (const t of txns as any[]) parts.push(...this.partsOf(t, s));
+    return parts;
   }
 
   private objectIdOf(x: { costObject: string; projectId: number | null; productId: number | null; departmentId: number | null }) {
@@ -675,6 +687,10 @@ export class BudgetsService {
     if (!full) return;
     const parts = this.partsOf(full, s);
     const typeOf = (p: Part) => (full.isSplit ? (full.splits as any[]).find((x) => x.categoryId === p.categoryId)?.category?.categoryType : (full as any).category?.categoryType);
+    const d0 = new Date(full.dateRecorded);
+    if (await this.prisma.periodLock.findUnique({ where: { year_month: { year: d0.getFullYear(), month: d0.getMonth() + 1 } } })) {
+      throw new HttpException(`${MON[d0.getMonth()]} ${d0.getFullYear()} is closed. Ask Finance to reopen it, or date the expense in an open month.`, HttpStatus.BAD_REQUEST);
+    }
     const fy = this.fyOf(new Date(full.dateRecorded), s.fyStartMonth);
     const plan = await this.prisma.budgetPlan.findUnique({ where: { fy } });
     const controlled = !!plan && CONTROLLING.includes(plan.status);

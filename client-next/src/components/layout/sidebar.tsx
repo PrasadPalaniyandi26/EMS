@@ -16,7 +16,7 @@ import {
 import {
   Home, ClipboardCheck, TrendingDown, TrendingUp,
   Users, Briefcase, Package, Building2, Target, RotateCcw,
-  BarChart2, Settings, Shield, FileBarChart, Gauge, BellRing, SlidersHorizontal,
+  BarChart2, Settings, Shield, FileBarChart, Gauge, BellRing, SlidersHorizontal, ArrowLeftRight, CalendarCheck, FolderKanban, Boxes, Layers, Percent,
   ChevronLeft, ChevronRight,
 } from 'lucide-react';
 
@@ -38,17 +38,7 @@ const NAV_GROUPS = [
   },
   {
     label: 'Operations',
-    items: [
-      { name: 'Client', href: '/manage/clients', icon: Users, iconColor: 'text-nav-cyan' },
-      { name: 'Project', href: '/manage/projects', icon: Briefcase, iconColor: 'text-nav-indigo' },
-      { name: 'Product', href: '/manage/products', icon: Package, iconColor: 'text-nav-amber' },
-    ],
-  },
-  {
-    label: 'Manage',
-    items: [
-      { name: 'Organization', href: '/manage/organization', icon: Building2, iconColor: 'text-nav-blue' },
-    ],
+    items: [],
   },
   {
     label: 'Budget',
@@ -56,7 +46,18 @@ const NAV_GROUPS = [
       { name: 'Planner', href: '/budget/planner', icon: Target, iconColor: 'text-nav-cyan' },
       { name: 'Monitor', href: '/budget/monitor', icon: Gauge, iconColor: 'text-nav-emerald' },
       { name: 'Alerts', href: '/budget/alerts', icon: BellRing, iconColor: 'text-nav-amber' },
+      { name: 'Changes', href: '/budget/changes', icon: ArrowLeftRight, iconColor: 'text-nav-violet' },
+      { name: 'Monthly close', href: '/budget/close', icon: CalendarCheck, iconColor: 'text-nav-rose' },
       { name: 'Budget settings', href: '/budget/settings', icon: SlidersHorizontal, iconColor: 'text-nav-slate' },
+    ],
+  },
+  {
+    label: 'Costing',
+    items: [
+      { name: 'Project costing', href: '/budget/projects', icon: FolderKanban, iconColor: 'text-nav-indigo' },
+      { name: 'Product costing', href: '/budget/products', icon: Boxes, iconColor: 'text-nav-orange' },
+      { name: 'Part master', href: '/budget/parts', icon: Layers, iconColor: 'text-nav-blue' },
+      { name: 'Cost rates', href: '/budget/rates', icon: Percent, iconColor: 'text-nav-emerald' },
     ],
   },
   {
@@ -64,6 +65,15 @@ const NAV_GROUPS = [
     items: [
       { name: 'Spend Analytics', href: '/analytics/resource-utilization', icon: BarChart2, iconColor: 'text-nav-purple' },
       { name: 'Transaction Reports', href: '/reporting', icon: FileBarChart, iconColor: 'text-nav-blue' },
+    ],
+  },
+  {
+    label: 'Manage',
+    items: [
+      { name: 'Client', href: '/manage/clients', icon: Users, iconColor: 'text-nav-cyan' },
+      { name: 'Project', href: '/manage/projects', icon: Briefcase, iconColor: 'text-nav-indigo' },
+      { name: 'Product', href: '/manage/products', icon: Package, iconColor: 'text-nav-amber' },
+      { name: 'Organization', href: '/manage/organization', icon: Building2, iconColor: 'text-nav-blue' },
     ],
   },
   {
@@ -126,7 +136,7 @@ export function Sidebar() {
                   )}
                   <div className="space-y-0.5">
                     {visibleItems.map((item) => {
-                      const isActive = pathname === item.href;
+                      const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(`${item.href}/`));
                       const linkEl = (
                         <Link
                           key={item.href}

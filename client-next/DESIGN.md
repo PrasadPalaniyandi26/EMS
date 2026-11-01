@@ -26,6 +26,16 @@ One set of rules for every page and dialog. Tokens live in `src/app/globals.css`
 - Tables: `DataTable` + the cells in `components/data-table/cells.tsx` (`TextCell`, `IdCell`, `DateCell`, `MoneyCell`, `StatusText`, `ToneText`). Status is coloured plain text, never a pill, dot or avatar. Page size fits the screen (`useFitPageSize`); first load shows skeleton rows.
 - Toolbar: search and filters, `Add`, and the actions for the selected item (`ToolbarActions`).
 
+## Standard page template (approved)
+Every list or workspace page is built in this order, top to bottom. The reference is `budget/products/[id]/page.tsx`.
+1. **Title** in the top bar (`useHeaderStore.setHeader`).
+2. **Tabs** (`TabBar`) when a page has several views. They are the first row under the title.
+3. **Action row** (`DataTableToolbar` in the `ModuleShell` `searchRow`). Left: the actions that are always available (`Add …`, `Propose …`), then the actions for the selected row (`Edit`, `Delete`, `Approve` …) from the same `DetailActionDef[]` the panel uses. Right: filter dropdowns (`filters` prop), then Search last.
+4. **Work area**: the `DataTable` fills the space. The right panel is fixed beside it.
+5. **Right panel** (`ModuleIntelligencePanel`): nothing selected shows a summary of the whole record (`idle`), a selected row shows its key facts (`DetailSummary`, `DetailSection`, `DetailGrid`), and the row's actions are pinned at the bottom (`DetailActions`, at most three).
+6. **Every action button has an icon, and no two actions on a page share an icon colour.** Icons are lucide, coloured with a status token: Add green (`--success`), Edit blue (`--info`), Delete red (`--danger`), and amber (`--warning`), purple (`--shell-accent`) for the rest. Because Delete is red, no other action on that page is red. `ToolbarActions` looks the icon up by label in `TOOLBAR_ICONS`; any other action passes `icon` itself. A missing icon logs a warning in development.
+7. **No actions inside rows** (no pencil or bin icons) and **no in-place editing** in a table or grid. A cell is read-only text. Every change goes through Edit (or Add) into a `ModuleModal` dialog, so several values can be changed in one save.
+
 ## Detail panel (`components/shared/detail/detail-kit.tsx`)
 `DetailSummary` (title, reference, status, headline figure), `DetailSection` (sentence-case heading, optional text action), `DetailGrid` + `DetailField` tiles two per row, `DetailAttachment`, `DetailTimeline`, `DetailAllocation`. The item's actions (`DetailActionDef[]`, built once per page, empty when nothing is selected) render both in the toolbar and pinned at the bottom of the panel with `DetailActions` (max three: filled main, outlined secondary, red-outline destructive).
 

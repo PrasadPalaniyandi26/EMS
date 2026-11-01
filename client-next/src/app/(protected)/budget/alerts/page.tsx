@@ -72,7 +72,7 @@ export default function BudgetAlertsPage() {
       searchRow={
         <DataTableToolbar
           table={table}
-          actions={
+          filters={
             <>
               <NativeSelect aria-label="Level" value={level} onChange={(e) => setLevel(e.target.value as 'ALL' | AlertLevel)} className="!h-8 !w-auto">
                 <option value="ALL">Any level</option>

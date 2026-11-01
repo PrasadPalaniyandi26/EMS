@@ -20,6 +20,8 @@ interface ModuleIntelligencePanelProps {
   footer?: React.ReactNode;
   // Overrides the default empty-state copy for this title (e.g. role-specific wording)
   emptyState?: { icon?: React.ReactNode; heading: string; body: string; tips: string[] };
+  // Shown instead of the empty state while nothing is selected (for example a summary of the whole record)
+  idle?: React.ReactNode;
 }
 
 const EMPTY_STATES: Record<string, { icon: React.ReactNode; heading: string; body: string; tips: string[] }> = {
@@ -83,6 +85,7 @@ export function ModuleIntelligencePanel({
   tabs,
   footer,
   emptyState,
+  idle,
 }: ModuleIntelligencePanelProps) {
   const empty = emptyState ? { ...EMPTY_STATES[title], ...emptyState } : EMPTY_STATES[title];
   const [activeTab, setActiveTab] = useState<string>(() => tabs?.[0]?.id ?? '');
@@ -134,7 +137,7 @@ export function ModuleIntelligencePanel({
       <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar" style={{ background: 'var(--shell-surface)' }}>
         {hasSelection ? (
           tabs && tabs.length > 0 ? activeTabContent : children
-        ) : (
+        ) : idle ? idle : (
           <div className="flex flex-col h-full">
             {/* Empty state */}
             <div className="flex flex-col items-center text-center pt-10 pb-6 px-4 gap-3">

@@ -105,8 +105,10 @@ async function main() {
   let jt = 0;
   for (const [code, name] of PROJECTS) {
     const hit = await prisma.projectType.findFirst({ where: { OR: [{ code }, { name: { equals: name, mode: 'insensitive' } }] } });
-    if (hit) await prisma.projectType.update({ where: { id: hit.id }, data: { code, name, isActive: true } });
-    else { await prisma.projectType.create({ data: { code, name } }); jt++; }
+    // J100 Bespoke Robots is the one project type that builds a physical product, so it gets a job BOM
+    const builds = code === 'J100';
+    if (hit) await prisma.projectType.update({ where: { id: hit.id }, data: { code, name, isActive: true, ...(builds ? { hasJobBom: true } : {}) } });
+    else { await prisma.projectType.create({ data: { code, name, hasJobBom: builds } }); jt++; }
   }
 
   console.log(`Expense: ${e.types} types, ${e.cats} categories added`);

@@ -8,12 +8,12 @@ const PASS = process.env.SMOKE_PASS ?? 'admin123';
 
 const PAGES = [
   '/login', '/', '/hub', '/expense', '/income', '/transactions', '/approvals', '/notifications', '/reporting', '/settings',
-  '/analytics/resource-utilization', '/budget/planner', '/budget/monitor', '/budget/alerts', '/budget/settings', '/manage/clients', '/manage/organization', '/manage/products',
+  '/analytics/resource-utilization', '/budget/planner', '/budget/monitor', '/budget/alerts', '/budget/settings', '/budget/changes', '/budget/close', '/budget/projects', '/budget/products', '/budget/parts', '/budget/rates', '/manage/clients', '/manage/organization', '/manage/products',
   '/manage/projects', '/manage/recurring', '/system/audit-log',
 ];
 const ENDPOINTS = [
   '/transactions?limit=5', '/transactions?type=expense&excludeStatus=APPROVED,REJECTED&limit=5', '/approvals/pending', '/approvals/history',
-  '/categories', '/clients', '/projects', '/products', '/budgets/plans', '/budgets/monitor', '/budgets/alerts', '/recurring', '/users', '/roles', '/dashboard/summary',
+  '/categories', '/clients', '/projects', '/products', '/budgets/plans', '/budgets/monitor', '/budgets/alerts', '/budgets/rates', '/budgets/items', '/budgets/projects', '/budgets/products', '/budgets/changes', '/budgets/close?year=2026&month=9', '/recurring', '/users', '/roles', '/dashboard/summary',
   '/notifications?limit=5', '/notifications/unread-count', '/audit?limit=5',
 ];
 

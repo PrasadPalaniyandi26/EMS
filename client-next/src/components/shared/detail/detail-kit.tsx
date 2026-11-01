@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { FileText, ArrowUpRight, Send, Pencil, Trash2, CheckCircle2, XCircle, CornerUpLeft, Ban, PauseCircle, PlayCircle, Shield, UserX, Briefcase, CreditCard } from 'lucide-react';
+import { FileText, ArrowUpRight, Send, Pencil, Trash2, CheckCircle2, XCircle, CornerUpLeft, Ban, PauseCircle, PlayCircle, Shield, UserX, Briefcase, CreditCard, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getAccessToken, API_BASE } from '@/lib/api-client';
@@ -221,6 +221,7 @@ const TOOLBAR_ICONS: Record<string, { icon: ReactNode; tone: string }> = {
   Permissions: { icon: <Shield className="h-4 w-4" />, tone: 'text-[var(--warning)]' },
   Deactivate: { icon: <UserX className="h-4 w-4" />, tone: 'text-[var(--danger)]' },
   Allocation: { icon: <Briefcase className="h-4 w-4" />, tone: 'text-[var(--info)]' },
+  Costing: { icon: <Calculator className="h-4 w-4" />, tone: 'text-[var(--warning)]' },
   Process: { icon: <CreditCard className="h-4 w-4" />, tone: 'text-[var(--shell-accent)]' },
   'Process payment': { icon: <CreditCard className="h-4 w-4" />, tone: 'text-[var(--shell-accent)]' },
 };
@@ -230,6 +231,7 @@ export function ToolbarActions({ actions }: { actions: DetailActionDef[] }) {
     <>
       {actions.map((a) => {
         const meta = TOOLBAR_ICONS[a.label];
+        if (!a.icon && !meta && process.env.NODE_ENV !== 'production') console.warn(`Toolbar action "${a.label}" has no icon. Pass an icon, or add the label to TOOLBAR_ICONS.`);
         return (
           <button key={a.label} type="button" className="btn-action" onClick={a.onClick} disabled={a.disabled}>
             {a.icon ?? (meta && <span aria-hidden className={meta.tone}>{meta.icon}</span>)}

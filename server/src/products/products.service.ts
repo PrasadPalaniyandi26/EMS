@@ -21,6 +21,7 @@ export class ProductsService {
       status: p.status || 'R&D', lead_id: p.lead_id,
       lead: p.users_products_lead_idTousers?.username || null,
       budget: p.budget ? Number(p.budget) : null,
+      standard_cost: p.standardCost == null ? null : Number(p.standardCost),
       start_date: p.start_date || null, end_date: p.end_date || null,
       category: p.category || null,
       created_by: p.createdBy, created_at: p.createdAt,

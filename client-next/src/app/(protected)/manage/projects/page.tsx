@@ -29,6 +29,7 @@ import {
 import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
+import { useRouter } from 'next/navigation';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAllocation, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import { formatCurrency, formatDate } from '@/lib/currency';
 
@@ -109,8 +110,10 @@ export default function ProjectsPage() {
     }
   };
 
+  const router = useRouter();
   const itemActions: DetailActionDef[] = selectedProject ? [
     { label: 'Edit', variant: 'primary', onClick: () => { setEditingProject(selectedProject as any); setIsModalOpen(true); } },
+    { label: 'Costing', onClick: () => router.push(`/budget/projects/${(selectedProject as any).id}`) },
     { label: 'Delete', variant: 'danger', onClick: () => setDeleteId((selectedProject as any).id) },
   ] : [];
 

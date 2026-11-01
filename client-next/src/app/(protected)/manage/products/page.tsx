@@ -29,18 +29,19 @@ import {
 import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
+import { useRouter } from 'next/navigation';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAllocation, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
-import { CurrencyInput, Field, NativeSelect, ConfirmDialog, SegmentedControl, inp } from '@/components/shared/modal-primitives';
+import { Field, NativeSelect, ConfirmDialog, SegmentedControl, inp } from '@/components/shared/modal-primitives';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 interface ProductForm {
   name: string; description: string; typeId: string; clientId: string;
-  model: string; leadEngineer: string; unitCost: string;
+  model: string; leadEngineer: string;
   category: string; status: string; startDate: string; endDate: string;
 }
 const defaultForm = (): ProductForm => ({
   name: '', description: '', typeId: '', clientId: '',
-  model: '', leadEngineer: '', unitCost: '', category: '', status: 'R&D', startDate: '', endDate: '',
+  model: '', leadEngineer: '', category: '', status: 'R&D', startDate: '', endDate: '',
 });
 
 
@@ -109,7 +110,6 @@ export default function ProductsPage() {
       clientId: String(selectedProduct.client_id),
       model: (selectedProduct as any).model || '',
       leadEngineer: String((selectedProduct as any).lead_id || ''),
-      unitCost: (selectedProduct as any).budget ? String((selectedProduct as any).budget) : '',
       category: (selectedProduct as any).category || '',
       status: (selectedProduct as any).status || 'R&D',
       startDate: (selectedProduct as any).start_date ? String((selectedProduct as any).start_date).split('T')[0] : '',
@@ -125,7 +125,7 @@ export default function ProductsPage() {
     if (!form.clientId) { toast.error('Client is required'); return; }
     if (!form.typeId) { toast.error('Product type is required'); return; }
     try {
-      const payload = { name: form.name, description: form.description, client_id: Number(form.clientId) || undefined, type_id: Number(form.typeId), lead_id: Number(form.leadEngineer) || undefined, budget: form.unitCost ? Number(form.unitCost) : undefined, category: form.category || undefined, model: form.model || undefined, status: form.status, start_date: form.startDate || null, end_date: form.endDate || null };
+      const payload = { name: form.name, description: form.description, client_id: Number(form.clientId) || undefined, type_id: Number(form.typeId), lead_id: Number(form.leadEngineer) || undefined, category: form.category || undefined, model: form.model || undefined, status: form.status, start_date: form.startDate || null, end_date: form.endDate || null };
       if (isEdit && editingId) { await api.put(`/products/${editingId}`, payload); toast.success('Product updated'); setEditOpen(false); }
       else { await api.post('/products', payload); toast.success('Product created'); setAddOpen(false); }
       invalidate('products'); setRowSelection({});
@@ -143,8 +143,10 @@ export default function ProductsPage() {
     } catch { toast.error('Failed to delete'); }
   };
 
+  const router = useRouter();
   const itemActions: DetailActionDef[] = selectedProduct ? [
     { label: 'Edit', variant: 'primary', onClick: openEdit },
+    { label: 'Costing', onClick: () => router.push(`/budget/products/${selectedProduct.id}`) },
     { label: 'Delete', variant: 'danger', onClick: () => setDeleteId(selectedProduct.id) },
   ] : [];
 
@@ -183,8 +185,8 @@ export default function ProductsPage() {
                     subtitle={pd.code || `PRD-${String(pd.id).padStart(3, '0')}`}
                     status={status}
                     statusClass="text-[var(--shell-text-muted)]"
-                    figure={pd.unit_cost != null && pd.unit_cost !== '' ? `${currencySymbol}${Number(pd.unit_cost).toLocaleString()}` : undefined}
-                    figureLabel="Est. unit cost"
+                    figure={pd.standard_cost != null ? `${currencySymbol}${Number(pd.standard_cost).toLocaleString()}` : undefined}
+                    figureLabel="Planned cost"
                   />
                   <DetailSection title="Details">
                     <DetailGrid>
@@ -273,9 +275,6 @@ export default function ProductsPage() {
               </Field>
               <Field label="Model / Version">
                 <input className={inp} placeholder="e.g. v2.1.0" value={form.model} onChange={e => setForm({ ...form, model: e.target.value })} />
-              </Field>
-              <Field label="Est. Unit Cost">
-                <CurrencyInput value={form.unitCost} onChange={(v) => setForm({ ...form, unitCost: v })} />
               </Field>
             </div>
 

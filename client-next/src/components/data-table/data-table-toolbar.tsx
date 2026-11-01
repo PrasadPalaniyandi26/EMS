@@ -9,12 +9,15 @@ import { Input } from "@/components/ui/input"
 interface DataTableToolbarProps<TData> {
   table: Table<TData>
   actions?: React.ReactNode
+  // Filter dropdowns: shown on the right, just before Search
+  filters?: React.ReactNode
   extra?: React.ReactNode
 }
 
 export function DataTableToolbar<TData>({
   table,
   actions,
+  filters,
   extra,
 }: DataTableToolbarProps<TData>) {
   if (!table) return null;
@@ -31,6 +34,7 @@ export function DataTableToolbar<TData>({
 
       {/* Right: search + reset */}
       <div className="flex items-center gap-2 ml-auto self-center">
+        {filters}
         <div className="relative w-full sm:w-[220px] min-w-[140px]">
           <Input
             placeholder="Search..."
