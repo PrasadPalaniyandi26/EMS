@@ -43,7 +43,11 @@ export interface ProjectBudget {
 }
 
 export interface ItemUse { kind: 'PRODUCT' | 'JOB'; id: number; code: string | null; name: string; quantity: number; scrap_pct: number }
-export interface ProductRow { standard_fy: number | null; fy: number; id: number; code: string | null; name: string; client_name: string | null; bom_status: string | null; bom_lines: number; rolled_cost: number | null; standard_cost: number | null; standard_approved_at: string | null; plan_status: string | null; budget_line: boolean }
+export interface ProductPricing {
+  fy: number; price: number | null; updated_by_name: string | null; updated_at: string | null; unit_cost: number; basis: 'STANDARD' | 'ROLLED';
+  profit_unit: number | null; margin_pct: number | null; planned_revenue: number | null; planned_profit: number | null; built_revenue: number | null; built_profit: number | null;
+}
+export interface ProductRow { selling_price: number | null; margin_pct: number | null; standard_fy: number | null; fy: number; id: number; code: string | null; name: string; client_name: string | null; bom_status: string | null; bom_lines: number; rolled_cost: number | null; standard_cost: number | null; standard_approved_at: string | null; plan_status: string | null; budget_line: boolean }
 export interface BomLineRow { id: number; sourcing: 'MAKE' | 'BUY'; item_id: number | null; sub_bom_id: number | null; sub_product_id: number | null; sub_standard_id: number | null; sub_drift: number; part_no: string; name: string; quantity: number; scrap_pct: number; unit_cost: number; amount: number; item_drift: number }
 export interface OperationType { id: number; name: string; is_outsourced: boolean; is_fixed: boolean; is_active: boolean; used_in: number }
 export interface OperationRow { id: number; name: string; type_id: number | null; type_name: string; is_outsourced: boolean; is_fixed: boolean; fixed_cost: number | null; role: string | null; hours: number; rate_card_id: number | null; rate: number; outsourced_cost: number | null; amount: number }
@@ -51,7 +55,7 @@ export interface CostBreakdown { material: number; scrap: number; freight: numbe
 
 export interface ProductCosting {
   product: { id: number; code: string | null; name: string; client_name: string | null; standard_cost: number | null };
-  fy: number; plan_status: string | null; budget_line: boolean; approved: { id: number; fy: number; fixed: number; total: number; material: number; scrap: number; freight: number; conversion: number; outsourced: number; overhead: number; warranty: number } | null; bom: { id: number; version: number; status: string; freight_pct: number; warranty_pct: number; overhead_rate_override: number | null; adjust_reason: string | null } | null;
+  fy: number; plan_status: string | null; budget_line: boolean; pricing: ProductPricing; approved: { id: number; fy: number; fixed: number; total: number; material: number; scrap: number; freight: number; conversion: number; outsourced: number; overhead: number; warranty: number } | null; bom: { id: number; version: number; status: string; freight_pct: number; warranty_pct: number; overhead_rate_override: number | null; adjust_reason: string | null } | null;
   lines: BomLineRow[]; operations: OperationRow[]; cost: CostBreakdown | null;
   build_plan: { year: number; month: number; label: string; planned: number; actual: number; spend: number }[];
   annual: { planned_units: number; actual_units: number; budget: number; actual_standard: number; unit_cost: number; basis: 'STANDARD' | 'ROLLED'; plan_unit_cost: number; plan_budget: number };
@@ -62,7 +66,7 @@ export interface ProductCosting {
   items: Item[]; rate_cards: { id: number; role: string; rate_per_hour: number }[]; sub_boms: { id: number; productId: number; version: number }[];
 }
 
-// The build behind a bespoke (J100) project: parts and build operations priced like a product, with no planned cost of its own
+// The build behind a bespoke (J100) project: parts and build operations priced like a product, with no standard cost of its own
 export interface JobBom {
   project: { id: number; code: string | null; name: string; client_name: string | null; type_code: string | null; type_name: string | null };
   bom: { id: number; project_id: number | null; version: number; status: string; freight_pct: number; warranty_pct: number } | null;

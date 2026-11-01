@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { Plus, Calculator, CalendarPlus, Settings2, SlidersHorizontal } from 'lucide-react';
+import { Plus, Calculator, CalendarPlus, Settings2, SlidersHorizontal, Tag } from 'lucide-react';
 import { ColumnDef, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, getSortedRowModel, SortingState } from '@tanstack/react-table';
 import api from '@/lib/api-client';
 import { useHeaderStore } from '@/stores/header-store';
@@ -18,7 +18,7 @@ import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { ConfirmDialog, NativeSelect } from '@/components/shared/modal-primitives';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAllocation, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
-import { BomLineModal, BuildPlanModal, BuildStepModal, CostAdjustmentsModal, RejectCostModal, StandardCostModal, StepTypesModal } from '@/components/budgets/planning-modals';
+import { BomLineModal, BuildPlanModal, BuildStepModal, CostAdjustmentsModal, ProductPriceModal, RejectCostModal, StandardCostModal, StepTypesModal } from '@/components/budgets/planning-modals';
 import { TabBar, money, unitPrice } from '@/components/budgets/budget-ui';
 import { formatDate } from '@/lib/currency';
 import { cn } from '@/lib/utils';
@@ -28,14 +28,14 @@ type Standard = ProductCosting['standards'][number];
 type PlanMonth = ProductCosting['build_plan'][number];
 
 const TABS: { value: Tab; label: string }[] = [
-  { value: 'bom', label: 'Bill of materials' }, { value: 'operations', label: 'Build operations' }, { value: 'standard', label: 'Planned cost' },
-  { value: 'variances', label: 'Variances' }, { value: 'plan', label: 'Build plan' },
+  { value: 'bom', label: 'Bill of materials' }, { value: 'operations', label: 'Build operations' }, { value: 'standard', label: 'Standard cost' },
+  { value: 'plan', label: 'Build plan' }, { value: 'variances', label: 'Variances' },
 ];
 const EMPTY: Record<Tab, string> = {
   bom: 'No parts yet. Click Add part to pick parts from the Part master.',
   operations: 'No build operations yet. Click Add build operation for final assembly, testing, packing or outsourced work.',
   plan: 'No build plan for this year.',
-  standard: 'No planned cost proposed yet. Use Propose planned cost to freeze the current roll-up for approval.',
+  standard: 'No standard cost proposed yet. Use Propose standard cost to freeze the current roll-up for approval.',
   variances: 'No parts on this product yet. Add parts on the Bill of materials tab.',
 };
 
@@ -50,7 +50,7 @@ const advice = (l: BomLineRow, pct: number | null) => {
   if (pct < 0) return 'Last price is below standard. If it holds, the standard may be set too high; review it at the next proposal.';
   return l.sourcing === 'MAKE'
     ? 'Last cost is above standard. Check the material and manufacturing costs on the item and the current rate card, then update the item if the rise is lasting.'
-    : 'Last paid is above standard. Check the supplier quote. If the rise is lasting, update the item standard price and propose a new planned cost.';
+    : 'Last paid is above standard. Check the supplier quote. If the rise is lasting, update the item standard price and propose a new standard cost.';
 };
 
 export default function ProductCostingDetailPage() {
@@ -69,16 +69,16 @@ export default function ProductCostingDetailPage() {
   const [opOpen, setOpOpen] = useState(false); const [editOp, setEditOp] = useState<OperationRow | null>(null); const [typesOpen, setTypesOpen] = useState(false);
   const [delBom, setDelBom] = useState<BomLineRow | null>(null); const [delOp, setDelOp] = useState<OperationRow | null>(null);
   const [approve, setApprove] = useState<number | null>(null); const [reject, setReject] = useState<number | null>(null);
-  const [planConfirm, setPlanConfirm] = useState(false); const [adjOpen, setAdjOpen] = useState(false);
+  const [planConfirm, setPlanConfirm] = useState(false); const [adjOpen, setAdjOpen] = useState(false); const [priceOpen, setPriceOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(false); const [editPlan, setEditPlan] = useState<PlanMonth | null>(null);
 
-  useEffect(() => { setHeader(data ? `${data.product.code ?? ''} ${data.product.name}`.trim() : 'Product costing', data?.product.client_name ?? 'Bill of materials and planned cost'); }, [setHeader, data]);
+  useEffect(() => { setHeader(data ? `${data.product.code ?? ''} ${data.product.name}`.trim() : 'Product costing', data?.product.client_name ?? 'Bill of materials, standard cost and margin'); }, [setHeader, data]);
 
   const act = async (job: () => Promise<unknown>, ok: string) => {
     try { await job(); toast.success(ok); invalidate('budgets'); } catch (err: any) { toast.error(err?.message || 'Could not complete that.'); }
   };
 
-  const c = data?.cost ?? null; const a = data?.annual; const v = data?.variances;
+  const c = data?.cost ?? null; const a = data?.annual; const v = data?.variances; const pr = data?.pricing;
   const std = data?.product.standard_cost ?? null;
   // Variance per part: the standard allowance for the units built, and the price effect (last price against standard)
   const units = a?.actual_units ?? 0;
@@ -94,7 +94,7 @@ export default function ProductCostingDetailPage() {
     const ym = m.year * 12 + (m.month - 1);
     if (ym > nowYm) return { label: 'Planned', tone: 'muted' };
     if (ym === nowYm) return { label: 'In progress', tone: 'muted' };
-    if (m.planned === 0 && m.actual === 0) return { label: 'No plan', tone: 'muted' };
+    if (m.planned === 0 && m.actual === 0) return { label: 'Not planned', tone: 'muted' };
     return m.actual > m.planned ? { label: 'Ahead', tone: 'success' } : m.actual === m.planned ? { label: 'On plan', tone: 'success' } : { label: 'Behind', tone: 'warning' };
   };
   const planMath = (m: PlanMonth) => ({
@@ -138,8 +138,8 @@ export default function ProductCostingDetailPage() {
       { id: 'achieved', header: headerRight('Achieved'), size: 100, cell: ({ row }) => { const st = planStatus(row.original).label; const p = st === 'Planned' ? null : planMath(row.original).achieved; return <div className="text-right"><ToneText label={p == null ? '—' : `${Math.round(p)}%`} tone={p == null || st === 'In progress' ? 'muted' : p >= 100 ? 'success' : p < 90 ? 'warning' : 'muted'} /></div>; } },
       { id: 'cost', header: headerRight('Planned cost'), cell: ({ row }) => <Num strong>{a ? money(planMath(row.original).plannedCost, currency) : '—'}</Num>, size: 130 },
       { id: 'built', header: headerRight('Built cost'), cell: ({ row }) => <Num>{row.original.actual ? money(planMath(row.original).builtCost, currency) : '—'}</Num>, size: 120 },
-      { id: 'budget', header: headerRight('Budget (E200)'), cell: ({ row }) => <Num>{a?.plan_unit_cost ? money(planMath(row.original).budget, currency) : '—'}</Num>, size: 130 },
-      { id: 'spent', header: headerRight('Spent (E200)'), cell: ({ row }) => <Num>{row.original.spend ? money(row.original.spend, currency) : '—'}</Num>, size: 120 },
+      { id: 'budget', header: headerRight('Material budget'), cell: ({ row }) => <Num>{a?.plan_unit_cost ? money(planMath(row.original).budget, currency) : '—'}</Num>, size: 130 },
+      { id: 'spent', header: headerRight('Material spend'), cell: ({ row }) => <Num>{row.original.spend ? money(row.original.spend, currency) : '—'}</Num>, size: 120 },
       { id: 'status', header: 'Status', size: 110, cell: ({ row }) => { const s = planStatus(row.original); return <ToneText label={s.label} tone={s.tone} />; } },
     ];
     if (tab === 'standard') return [
@@ -189,7 +189,7 @@ export default function ProductCostingDetailPage() {
 
   const costSummary = (
     <div className="space-y-4">
-      <DetailSummary title={data?.product.name ?? 'Product'} subtitle={data?.product.code ?? undefined} status={std != null ? `Standard ${money(std, currency)}` : 'No approved standard'}
+      <DetailSummary title={data?.product.name ?? 'Product'} subtitle={data?.product.code ?? undefined} status={std != null ? `Standard cost ${money(std, currency)}` : 'No approved standard cost'}
         statusClass={std != null && c && c.total > std * 1.05 ? 'text-[var(--warning)]' : 'text-[var(--shell-text-muted)]'} figure={money(c?.total, currency)} figureLabel="Unit cost" />
       <DetailSection title="Cost per unit">
         <DetailGrid>
@@ -202,8 +202,26 @@ export default function ProductCostingDetailPage() {
         </DetailGrid>
         {data?.bom?.adjust_reason && <p className="text-[12px] text-[var(--warning)]">Adjusted from the defaults: {data.bom.adjust_reason}</p>}
         {c?.pool_missing && !data?.bom?.overhead_rate_override && <p role="alert" className="text-[12px] text-[var(--warning)]">There are no overhead pools for {fyText(c.fy)}, so this cost carries no overhead. Add them under Cost rates.</p>}
-        {staleYear && data?.approved && <p role="alert" className="text-[12px] text-[var(--warning)]">The approved planned cost is for {fyText(data.approved.fy)}. Propose a new one for {fyText(data.fy)}.</p>}
+        {staleYear && data?.approved && <p role="alert" className="text-[12px] text-[var(--warning)]">The approved standard cost is for {fyText(data.approved.fy)}. Propose a new one for {fyText(data.fy)}.</p>}
       </DetailSection>
+      {pr && (
+        <DetailSection title={`Price and margin, ${fyText(pr.fy)}`}>
+          {pr.price == null ? (
+            <p className="text-[12px] text-[var(--shell-text-muted)]">No selling price is set for {fyText(pr.fy)}.{isFinance ? ' Use Price and margin to add one.' : ' Ask Finance to add one.'}</p>
+          ) : (
+            <>
+              <DetailGrid>
+                <DetailField label="Selling price" value={money(pr.price, currency)} />
+                <DetailField label="Cost per unit" value={pr.unit_cost > 0 ? money(pr.unit_cost, currency) : undefined} />
+                <DetailField label="Profit per unit" value={pr.profit_unit != null ? signed(pr.profit_unit) : undefined} tone={pr.profit_unit != null && pr.profit_unit < 0 ? 'danger' : 'muted'} />
+                <DetailField label="Margin" value={pr.margin_pct != null ? `${pr.margin_pct.toFixed(1)}%` : undefined} tone={pr.margin_pct != null && pr.margin_pct < 0 ? 'danger' : 'muted'} />
+              </DetailGrid>
+              {pr.margin_pct != null && pr.margin_pct < 0 && <p role="alert" className="text-[12px] text-[var(--danger)]">The cost per unit is above the selling price, so each unit sold makes a loss.</p>}
+              <p className="text-[12px] text-[var(--shell-text-muted)]">Margin is the profit per unit as a share of the selling price. {pr.basis === 'STANDARD' ? 'Cost is the approved standard cost.' : 'No standard cost is approved yet, so cost is the current rolled-up cost.'}</p>
+            </>
+          )}
+        </DetailSection>
+      )}
       {tab === 'plan' && a && (
         <DetailSection title="Year">
           <DetailGrid>
@@ -211,8 +229,12 @@ export default function ProductCostingDetailPage() {
             <DetailField label="Built units" value={a.actual_units} />
             <DetailField label="Year cost at standard" value={money(a.budget, currency)} />
             <DetailField label="For the budget plan (E200)" value={money(a.plan_budget, currency)} />
+            {pr?.planned_revenue != null && <DetailField label="Planned sales" value={money(pr.planned_revenue, currency)} />}
+            {pr?.planned_profit != null && <DetailField label="Planned profit" value={signed(pr.planned_profit)} tone={pr.planned_profit < 0 ? 'danger' : 'muted'} />}
+            {pr?.built_revenue != null && a.actual_units > 0 && <DetailField label="Sales at built units" value={money(pr.built_revenue, currency)} />}
+            {pr?.built_profit != null && a.actual_units > 0 && <DetailField label="Profit at built units" value={signed(pr.built_profit)} tone={pr.built_profit < 0 ? 'danger' : 'muted'} />}
           </DetailGrid>
-          <p className="text-[12px] text-[var(--shell-text-muted)]">{a.basis === 'STANDARD' ? 'Planned cost uses the approved standard.' : 'There is no approved standard yet, so planned cost uses the current rolled-up cost.'} The budget plan gets the bought part only: material, scrap, freight and outsourced work. Labour and overhead are not product expenses.</p>
+          <p className="text-[12px] text-[var(--shell-text-muted)]">{a.basis === 'STANDARD' ? 'Year cost uses the approved standard cost.' : 'There is no approved standard yet, so year cost uses the current rolled-up cost.'} The budget plan gets the bought part only: material, scrap, freight and outsourced work. Labour and overhead are not product expenses.</p>
           {data?.plan_status !== 'DRAFT' && <p className="text-[12px] text-[var(--warning)]">{data?.plan_status ? `The current plan is ${data.plan_status.toLowerCase()}, so its lines are locked. Ask Finance to raise a budget change for this product.` : 'There is no budget plan for the current year yet.'}</p>}
           {data && data.plan_status && !data.budget_line && <p className="text-[12px] text-[var(--warning)]">This product has no E200 budget line in the current plan, so its purchases are not checked against a budget. Add to budget plan creates one while the plan is a draft; otherwise ask Finance to raise a budget change.</p>}
         </DetailSection>
@@ -228,7 +250,7 @@ export default function ProductCostingDetailPage() {
   else if (spend > 0) {
     const pct = v && v.standard_material_for_units > 0 ? (spend / v.standard_material_for_units) * 100 : 0;
     notes.push(`Spend on materials and outsourced work is ${pct.toFixed(1)}% (${money(spend, currency)}) over the standard for ${units} units built.`);
-    if (price >= usage) notes.push(`Price is the main driver${topPrice.length ? `: ${topPrice.join(', ')} cost more than standard` : ''}. Recommendation: check supplier quotes. If the increase is lasting, update the item standard price and propose a new planned cost.`);
+    if (price >= usage) notes.push(`Price is the main driver${topPrice.length ? `: ${topPrice.join(', ')} cost more than standard` : ''}. Recommendation: check supplier quotes. If the increase is lasting, update the item standard price and propose a new standard cost.`);
     else notes.push('Quantity and scrap are the main driver: more material is used than the BOM allows. Recommendation: check scrap and BOM quantities on the shop floor, and look for purchases the BOM does not plan for.');
   } else notes.push(`Spend on materials and outsourced work is ${money(-spend, currency)} under the standard. Recommendation: confirm every material purchase for this product is recorded against its budget line, since savings can also mean missing invoices.`);
   notes.push('Only approved expenses of type E200 (materials and production) charged to this product in the current financial year are counted. Purchases charged elsewhere are not included.');
@@ -350,14 +372,24 @@ export default function ProductCostingDetailPage() {
               <DetailField label="Built" value={m.actual ? money(pm.builtCost, currency) : undefined} />
             </DetailGrid>
           </DetailSection>
-          <DetailSection title="Bought items (E200)">
+          {pr?.price != null && (
+            <DetailSection title="Sales at the planned price">
+              <DetailGrid>
+                <DetailField label="Planned sales" value={m.planned ? money(pr.price * m.planned, currency) : undefined} />
+                <DetailField label="Planned profit" value={m.planned && pr.profit_unit != null ? signed(pr.profit_unit * m.planned) : undefined} tone={pr.profit_unit != null && pr.profit_unit < 0 ? 'danger' : 'muted'} />
+                <DetailField label="Sales at built units" value={m.actual ? money(pr.price * m.actual, currency) : undefined} />
+                <DetailField label="Profit at built units" value={m.actual && pr.profit_unit != null ? signed(pr.profit_unit * m.actual) : undefined} tone={pr.profit_unit != null && pr.profit_unit < 0 ? 'danger' : 'muted'} />
+              </DetailGrid>
+            </DetailSection>
+          )}
+          <DetailSection title="Bought items (budget line E200)">
             <DetailGrid>
               <DetailField label="Budget" value={a?.plan_unit_cost ? money(pm.budget, currency) : undefined} />
               <DetailField label={left >= 0 ? 'Left' : 'Over'} value={pm.budget > 0 ? money(Math.abs(left), currency) : undefined} tone={left < 0 ? 'danger' : 'muted'} />
             </DetailGrid>
           </DetailSection>
           {ap && m.planned > 0 && (
-            <DetailSection title="Planned cost by part">
+            <DetailSection title="Planned cost by type">
               <DetailAllocation
                 items={split.map(([label, v]) => ({ label, amount: money(v * m.planned, currency), pct: ap.total > 0 ? (v / ap.total) * 100 : 0 }))}
                 total={<span className="text-[12px] text-[var(--shell-text-muted)]">Total {money(ap.total * m.planned, currency)}</span>}
@@ -371,7 +403,7 @@ export default function ProductCostingDetailPage() {
     const s = selected as Standard;
     return (
       <div className="space-y-4">
-        <DetailSummary title={`Planned cost ${fyText(s.fy)}`} status={s.status === 'APPROVED' ? 'Approved' : s.status === 'PROPOSED' ? 'Proposed' : s.status === 'REJECTED' ? 'Rejected' : 'Replaced'}
+        <DetailSummary title={`Standard cost ${fyText(s.fy)}`} status={s.status === 'APPROVED' ? 'Approved' : s.status === 'PROPOSED' ? 'Proposed' : s.status === 'REJECTED' ? 'Rejected' : 'Replaced'}
           statusClass={s.status === 'APPROVED' ? 'text-[var(--success)]' : s.status === 'PROPOSED' ? 'text-[var(--warning)]' : s.status === 'REJECTED' ? 'text-[var(--danger)]' : 'text-[var(--shell-text-muted)]'} figure={money(s.total, currency)} figureLabel="Unit cost" />
         <DetailSection title="Cost per unit">
           <DetailAllocation
@@ -413,8 +445,9 @@ export default function ProductCostingDetailPage() {
     ...(tab === 'operations' && isFinance ? [{ label: 'Add build operation', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setEditOp(null); setOpOpen(true); } }] : []),
     ...(tab === 'operations' && isFinance ? [{ label: 'Manage operation types', icon: <Settings2 className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setTypesOpen(true) }] : []),
     ...(tab === 'plan' && isFinance ? [{ label: 'Add to budget plan', icon: <CalendarPlus className="h-4 w-4 text-[var(--shell-accent)]" />, disabled: data?.plan_status !== 'DRAFT', onClick: () => setPlanConfirm(true) }] : []),
-    ...(tab === 'standard' && isFinance && data && data.lines.length > 0 ? [{ label: 'Propose planned cost', icon: <Calculator className="h-4 w-4 text-[var(--info)]" />, onClick: () => act(() => api.post(`/budgets/products/${id}/standard-cost`, {}), 'Planned cost proposed. Approve it on the Planned cost tab.') }] : []),
+    ...(tab === 'standard' && isFinance && data && data.lines.length > 0 ? [{ label: 'Propose standard cost', icon: <Calculator className="h-4 w-4 text-[var(--info)]" />, onClick: () => act(() => api.post(`/budgets/products/${id}/standard-cost`, {}), 'Standard cost proposed. Approve it on the Standard cost tab.') }] : []),
     ...((tab === 'standard' || tab === 'bom') && isFinance && data?.cost ? [{ label: 'Costing adjustments', icon: <SlidersHorizontal className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setAdjOpen(true) }] : []),
+    ...(isFinance && data ? [{ label: 'Price and margin', icon: <Tag className="h-4 w-4 text-[var(--nav-violet)]" />, onClick: () => setPriceOpen(true) }] : []),
   ];
 
   return (
@@ -435,7 +468,7 @@ export default function ProductCostingDetailPage() {
             />
           }
           intelligencePanel={
-            <ModuleIntelligencePanel title={selected ? (tab === 'operations' ? 'Build operation' : tab === 'standard' ? 'Planned cost' : tab === 'plan' ? 'Month' : 'Part') : 'Product cost'} onClose={() => setSelection({})} hasSelection={!!selected}
+            <ModuleIntelligencePanel title={selected ? (tab === 'operations' ? 'Build operation' : tab === 'standard' ? 'Standard cost' : tab === 'plan' ? 'Month' : 'Part') : 'Product cost'} onClose={() => setSelection({})} hasSelection={!!selected}
               idle={tab === 'variances' ? varianceSummary : costSummary} footer={itemActions.length ? <DetailActions actions={itemActions} /> : undefined}>
               {detail}
             </ModuleIntelligencePanel>
@@ -450,6 +483,7 @@ export default function ProductCostingDetailPage() {
       <StepTypesModal isOpen={typesOpen} onClose={() => setTypesOpen(false)} types={data?.operation_types ?? []} />
       <BuildPlanModal isOpen={planOpen} onClose={() => setPlanOpen(false)} productId={id} editing={editPlan} />
       <CostAdjustmentsModal isOpen={adjOpen} onClose={() => setAdjOpen(false)} data={data} />
+      <ProductPriceModal isOpen={priceOpen} onClose={() => setPriceOpen(false)} data={data} />
       <RejectCostModal isOpen={reject != null} onClose={() => { setReject(null); setSelection({}); }} data={data} standard={standardToReject} />
       <StandardCostModal isOpen={approve != null} onClose={() => { setApprove(null); setSelection({}); }} data={data} standard={standardToApprove} />
       <ConfirmDialog open={!!delBom} destructive title="Remove part" message={`Remove ${delBom?.name} from the BOM?`} confirmLabel="Remove" onCancel={() => setDelBom(null)}

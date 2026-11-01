@@ -59,7 +59,7 @@ export function ProjectSettingsModal({ isOpen, onClose, data }: Base & { data: P
     setWar(String(data.estimate?.warranty_pct ?? 2));
   }, [isOpen, data]);
   return (
-    <ModuleModal isOpen={isOpen} onClose={onClose} title="Project commercials" icon={<Pencil className="h-4 w-4" />} size="sm" canSave={!saving}
+    <ModuleModal isOpen={isOpen} onClose={onClose} title="Contract and margin" icon={<Pencil className="h-4 w-4" />} size="sm" canSave={!saving}
       onSave={() => run(() => api.put(`/budgets/projects/${data!.project.id}/settings`, {
         contract_value: cv === '' ? null : Number(cv), target_margin_pct: tm === '' ? null : Number(tm), risk_rating: risk || null,
         ...(data?.estimate ? { contingency_pct: Number(cont), warranty_pct: Number(war) } : {}),
@@ -365,7 +365,7 @@ export function RateCardModal({ isOpen, onClose, editing }: Base & { editing: Ra
       <div className="space-y-3">
         <Field label="Role" required>{text(role, setRole, { maxLength: 80, placeholder: 'Controls engineer' })}</Field>
         <Field label="Cost per hour" required><CurrencyInput value={rate} onChange={setRate} /></Field>
-        <Field label="Effective from" required hint={!changed ? 'The rate is unchanged, so no new dated rate is added.' : later ? 'Live costs switch to this rate on that date. Until then the current rate applies.' : 'From this date, live costs use the new rate. Approved planned costs do not change.'}>
+        <Field label="Effective from" required hint={!changed ? 'The rate is unchanged, so no new dated rate is added.' : later ? 'Live costs switch to this rate on that date. Until then the current rate applies.' : 'From this date, live costs use the new rate. Approved standard costs do not change.'}>
           <Input type="date" className={ctl} value={when} onChange={(e) => setWhen(e.target.value)} />
         </Field>
       </div>
@@ -440,7 +440,7 @@ export function BomLineModal({ isOpen, onClose, data, job, editing }: Base & { d
         {kind === 'item' ? (
           <PickSelect label="Item" required placeholder="Select item" value={itemId} onChange={setItemId} options={((job ?? data)?.items ?? []).map((i) => ({ id: String(i.id), name: `${i.part_no} ${i.name}` }))} emptyHint="Add parts in the Part master first." />
         ) : job ? (
-          <PickSelect label="Standard product" required placeholder="Select a product" value={subId} onChange={setSubId} options={job.sub_products.map((p) => ({ id: String(p.id), name: `${[p.code, p.name].filter(Boolean).join(' ')} · ${money(p.standard_cost)}` }))} emptyHint="No product has an approved planned cost yet." />
+          <PickSelect label="Standard product" required placeholder="Select a product" value={subId} onChange={setSubId} options={job.sub_products.map((p) => ({ id: String(p.id), name: `${[p.code, p.name].filter(Boolean).join(' ')} · ${money(p.standard_cost)}` }))} emptyHint="No product has an approved standard cost yet." />
         ) : (
           <PickSelect label="Sub-assembly" required placeholder="Select a product's BOM" value={subId} onChange={setSubId} options={(data?.sub_boms ?? []).map((b) => ({ id: String(b.id), name: `Product ${b.productId}, BOM v${b.version}` }))} emptyHint="No other product has a BOM yet." />
         )}
@@ -618,9 +618,9 @@ export function CostAdjustmentsModal({ isOpen, onClose, data }: Base & { data: P
     else if (ohN > dOh * 2) notes.push(`More than double the combined rate of ${money(dOh)}/h. Check the rate is a per hour figure.`);
     if (frN === 0) notes.push('Freight and handling is zero. Bought-in parts normally cost something to bring in.');
     else if (frN > dFr * 2) notes.push(`Freight and handling is more than double the usual ${dFr}%. Is it mostly heavy or imported parts?`);
-    if (waN === 0) notes.push('Warranty is zero. Repairs after sale will not be covered by the planned cost.');
+    if (waN === 0) notes.push('Warranty is zero. Repairs after sale will not be covered by the standard cost.');
     else if (waN > dWa * 2) notes.push(`Warranty is more than double the usual ${dWa}%. Use this only if the product has a known repair history.`);
-    if (Math.abs(diffPct) >= 5) notes.push(`This moves the planned cost by ${diffPct >= 0 ? '+' : ''}${diffPct.toFixed(1)}%. Finance will see the change when it is proposed.`);
+    if (Math.abs(diffPct) >= 5) notes.push(`This moves the standard cost by ${diffPct >= 0 ? '+' : ''}${diffPct.toFixed(1)}%. Finance will see the change when it is proposed.`);
   }
   const needReason = overridden && !why.trim();
   return (
@@ -629,11 +629,11 @@ export function CostAdjustmentsModal({ isOpen, onClose, data }: Base & { data: P
         <>
           <Button variant="ghost" onClick={onClose} className="h-9 px-4 text-[13px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>Cancel</Button>
           <Button disabled={saving || !valid || needReason} className="font-medium text-[13px] h-9 px-5 rounded-md" style={{ background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' }}
-            onClick={() => run(() => api.put(`/budgets/products/${data.product.id}/bom`, { overhead_rate: Math.abs(ohN - dOh) <= 0.005 ? null : ohN, freight_pct: frN, warranty_pct: waN, reason: why }), 'Adjustments saved. Propose a new planned cost to use them.')}>Save adjustments</Button>
+            onClick={() => run(() => api.put(`/budgets/products/${data.product.id}/bom`, { overhead_rate: Math.abs(ohN - dOh) <= 0.005 ? null : ohN, freight_pct: frN, warranty_pct: waN, reason: why }), 'Adjustments saved. Propose a new standard cost to use them.')}>Save adjustments</Button>
         </>
       )}>
       <div className="space-y-3">
-        <p className="text-[12px] text-[var(--shell-text-muted)]">Applies to the next planned cost you propose. Approved figures do not change.</p>
+        <p className="text-[12px] text-[var(--shell-text-muted)]">Applies to the next standard cost you propose. Approved figures do not change.</p>
         <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-3">
           <Field label="Overhead per hour" required hint={`Default ${money(dOh)}/h`}><Input type="number" min="0" step="0.5" className={ctl} value={oh} onChange={(e) => setOh(e.target.value)} /></Field>
           <Field label="Freight and handling %" required hint={`Default ${dFr}%`}><Input type="number" min="0" max="100" step="0.5" className={ctl} value={fr} onChange={(e) => setFr(e.target.value)} /></Field>
@@ -686,13 +686,13 @@ export function RecordPurchaseModal({ isOpen, onClose, item }: Base & { item: It
           </label>
         )}
         {Math.abs(drift) >= 5 && <p className="text-[12px] text-[var(--warning)]">{drift > 0 ? 'Above' : 'Below'} the standard price by {Math.abs(drift).toFixed(1)}%. Tick the box above if this is the new normal price.</p>}
-        {makeStd && <p className="text-[12px] text-[var(--shell-text-muted)]">Live product costs that use this part will change. Approved planned costs will not.</p>}
+        {makeStd && <p className="text-[12px] text-[var(--shell-text-muted)]">Live product costs that use this part will change. Approved standard costs will not.</p>}
       </div>
     </ModuleModal>
   );
 }
 
-// ─── Planned cost approval ──────────────────────────────────────────────────
+// ─── Standard cost approval ──────────────────────────────────────────────────
 
 export function RejectCostModal({ isOpen, onClose, data, standard }: Base & { data: ProductCosting | undefined; standard: ProductCosting['standards'][number] | null }) {
   const { saving, run } = useSaver(onClose);
@@ -700,10 +700,10 @@ export function RejectCostModal({ isOpen, onClose, data, standard }: Base & { da
   useEffect(() => { if (isOpen) setWhy(''); }, [isOpen]);
   if (!standard || !data) return null;
   return (
-    <ModuleModal isOpen={isOpen} onClose={onClose} size="sm" title="Reject planned cost" isDestructive icon={<XCircle className="h-4 w-4" />} canSave={!saving && !!why.trim()} saveLabel="Reject planned cost"
-      onSave={() => run(() => api.post(`/budgets/standard-costs/${standard.id}/reject`, { reason: why }), 'Planned cost rejected.')}>
+    <ModuleModal isOpen={isOpen} onClose={onClose} size="sm" title="Reject standard cost" isDestructive icon={<XCircle className="h-4 w-4" />} canSave={!saving && !!why.trim()} saveLabel="Reject standard cost"
+      onSave={() => run(() => api.post(`/budgets/standard-costs/${standard.id}/reject`, { reason: why }), 'Standard cost rejected.')}>
       <div className="space-y-3">
-        <p className="text-[13px] text-[var(--shell-text)]">{data.product.name} stays at its current planned cost. The proposed {money(standard.total)} is kept in the history as rejected.</p>
+        <p className="text-[13px] text-[var(--shell-text)]">{data.product.name} stays at its current standard cost. The proposed {money(standard.total)} is kept in the history as rejected.</p>
         <Field label="Reason" required hint="Shown with the proposal so whoever proposed it knows what to change."><Textarea className={ctl} rows={3} maxLength={300} value={why} onChange={(e) => setWhy(e.target.value)} /></Field>
       </div>
     </ModuleModal>
@@ -733,12 +733,40 @@ export function StandardCostModal({ isOpen, onClose, data, standard }: Base & { 
   const diff = old != null && old > 0 ? ((standard.total - old) / old) * 100 : null;
   const live = data.cost?.total ?? null;
   return (
-    <ModuleModal isOpen={isOpen} onClose={onClose} size="sm" title="Approve planned cost" icon={<CheckCircle2 className="h-4 w-4" />} canSave={!saving} saveLabel="Approve planned cost"
-      onSave={() => run(() => api.post(`/budgets/standard-costs/${standard.id}/approve`, {}), 'Planned cost approved.')}>
+    <ModuleModal isOpen={isOpen} onClose={onClose} size="sm" title="Approve standard cost" icon={<CheckCircle2 className="h-4 w-4" />} canSave={!saving} saveLabel="Approve standard cost"
+      onSave={() => run(() => api.post(`/budgets/standard-costs/${standard.id}/approve`, {}), 'Standard cost approved.')}>
       <div className="space-y-2 text-[13px] text-[var(--shell-text)]">
         <p>{data.product.name} will be costed at <strong className="tabular-nums">{money(standard.total)}</strong> a unit for {standard.fy}-{String(standard.fy + 1).slice(2)}.</p>
         <p className="text-[var(--shell-text-muted)]">{old != null ? `Current standard: ${money(old)}${diff != null ? ` (${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%)` : ''}.` : 'There is no approved standard yet.'} Unit cost variances are measured against the approved figure.</p>
         {live != null && Math.abs(live - standard.total) > 0.5 && <p className="text-[var(--warning)]">The current rolled-up cost is {money(live)}, which differs from this proposal. Propose again to approve the current cost.</p>}
+      </div>
+    </ModuleModal>
+  );
+}
+
+export function ProductPriceModal({ isOpen, onClose, data }: Base & { data: ProductCosting | undefined }) {
+  const { saving, run } = useSaver(onClose);
+  const [price, setPrice] = useState('');
+  useEffect(() => { if (isOpen) setPrice(data?.pricing.price != null ? String(data.pricing.price) : ''); }, [isOpen, data]);
+  if (!data) return null;
+  const p = data.pricing;
+  const sell = Number(price);
+  const valid = price === '' || (Number.isFinite(sell) && sell > 0);
+  const unit = p.unit_cost;
+  const shown = price !== '' && valid && unit > 0;
+  const margin = shown ? ((sell - unit) / sell) * 100 : null;
+  return (
+    <ModuleModal isOpen={isOpen} onClose={onClose} title="Price and margin" icon={<Pencil className="h-4 w-4" />} size="sm" canSave={!saving && valid} saveLabel="Save price"
+      onSave={() => run(() => api.put(`/budgets/products/${data.product.id}/price`, { price: price === '' ? null : sell }), price === '' ? 'Selling price removed.' : 'Selling price saved.')}>
+      <div className="space-y-3">
+        <Field label={`Selling price per unit, ${p.fy}-${String(p.fy + 1).slice(2)}`} hint="What you plan to sell one unit for this financial year. Leave blank to remove it.">
+          <CurrencyInput value={price} onChange={setPrice} />
+        </Field>
+        <div className="space-y-1 text-[13px] text-[var(--shell-text)]">
+          <p>{unit > 0 ? <>Cost per unit: <strong className="tabular-nums">{money(unit)}</strong> ({p.basis === 'STANDARD' ? 'approved standard cost' : 'rolled-up cost, no standard cost approved yet'}).</> : 'There is no cost for this product yet, so margin cannot be worked out.'}</p>
+          {shown && margin != null && <p>Profit per unit: <strong className="tabular-nums">{money(sell - unit)}</strong>. Margin: <strong className="tabular-nums">{margin.toFixed(1)}%</strong> of the selling price.</p>}
+          {!valid && <p role="alert" className="text-[var(--danger)]">Enter a selling price above zero.</p>}
+        </div>
       </div>
     </ModuleModal>
   );

@@ -103,7 +103,7 @@ export default function PartMasterPage() {
           <DetailField label="Not in any BOM" value={all.filter((i) => i.used_in === 0).length} />
         </DetailGrid>
       </DetailSection>
-      <p className="text-[12px] text-[var(--shell-text-muted)]">Changing a standard price reprices every live product cost that uses the part. Approved planned costs are not affected. Drift compares the last price paid with the standard.</p>
+      <p className="text-[12px] text-[var(--shell-text-muted)]">Changing a standard price reprices every live product cost that uses the part. Approved standard costs are not affected. Drift compares the last price paid with the standard.</p>
     </div>
   );
 

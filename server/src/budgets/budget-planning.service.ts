@@ -19,7 +19,7 @@ const JOB_LABOUR = 'Build labour and overhead (job BOM)';
 type Owner = number | { projectId: number };
 type Actor = { id: number; username?: string; role_name?: string };
 
-// Projects (estimate, milestones, earned value), products (BOM, planned cost, build plan),
+// Projects (estimate, milestones, earned value), products (BOM, standard cost, build plan),
 // rates and items, budget changes and the monthly close.
 @Injectable()
 export class BudgetPlanningService {
@@ -672,7 +672,7 @@ export class BudgetPlanningService {
 
   async removeMilestone(id: number) { await this.prisma.projectMilestone.delete({ where: { id } }); return { deleted: true }; }
 
-  // ── Products: BOM, planned cost, build plan ─────────────────────────────
+  // ── Products: BOM, standard cost, build plan ─────────────────────────────
 
   private async rollup(bomId: number, depth = 0, trail: number[] = []): Promise<any> {
     if (trail.includes(bomId)) throw bad('A sub-assembly contains itself, so the cost cannot be worked out.', HttpStatus.CONFLICT);
@@ -760,12 +760,18 @@ export class BudgetPlanningService {
     const planNow = await this.prisma.budgetPlan.findUnique({ where: { fy: fyNow } });
     const e200Now = await this.prisma.categoryType.findFirst({ where: { code: 'E200' } });
     const lineProducts = new Set<number>(planNow && e200Now ? (await this.prisma.budgetLine.findMany({ where: { planId: planNow.id, typeId: e200Now.id, isActive: true, productId: { not: null } }, select: { productId: true } })).map((x) => x.productId as number) : []);
+    const prices = new Map((await this.prisma.productPrice.findMany({ where: { fy: fyNow } })).map((x) => [x.productId, n(x.price)]));
     const out: any[] = [];
     for (const p of products) {
       const bom = boms.find((b) => b.productId === p.id);
       const cost = bom && bom._count.lines ? await this.rollup(bom.id).then((r) => r.cost.total, () => null) : null;
       const sc = std.find((x) => x.productId === p.id && x.status === 'APPROVED');
-      out.push({ id: p.id, code: p.code, name: p.name, client_name: p.client?.name ?? null, bom_status: bom?.status ?? null, bom_lines: bom?._count.lines ?? 0, rolled_cost: cost, standard_cost: p.standardCost == null ? null : n(p.standardCost), standard_approved_at: sc?.approvedAt ?? null, standard_fy: sc?.fy ?? null, fy: fyNow, plan_status: planNow?.status ?? null, budget_line: lineProducts.has(p.id) });
+      const standard = p.standardCost == null ? null : n(p.standardCost);
+      // Margin is measured on the standard cost once one is approved, otherwise on the rolled-up cost
+      const unit = standard ?? cost;
+      const price = prices.get(p.id) ?? null;
+      out.push({ id: p.id, code: p.code, name: p.name, client_name: p.client?.name ?? null, bom_status: bom?.status ?? null, bom_lines: bom?._count.lines ?? 0, rolled_cost: cost, standard_cost: standard, standard_approved_at: sc?.approvedAt ?? null, standard_fy: sc?.fy ?? null, fy: fyNow, plan_status: planNow?.status ?? null, budget_line: lineProducts.has(p.id),
+        selling_price: price, margin_pct: price != null && unit != null && unit > 0 ? r2(((price - unit) / price) * 100) : null });
     }
     return out;
   }
@@ -810,9 +816,19 @@ export class BudgetPlanningService {
     const spendByMonth = new Map<string, number>();
     for (const x of parts) if (x.costObject === 'PRODUCT' && (!e200 || x.typeId === e200.id)) spendByMonth.set(`${x.year}-${x.month}`, (spendByMonth.get(`${x.year}-${x.month}`) ?? 0) + x.amount);
     const priceVariance = roll ? r2(roll.lines.reduce((a: number, l: any) => a + l.item_drift, 0) * actualUnits) : 0;
+    // Selling price for the year against the cost per unit (the approved standard cost, else the rolled-up cost)
+    const priceRow = await this.prisma.productPrice.findUnique({ where: { productId_fy: { productId: id, fy } } });
+    const sell = priceRow ? n(priceRow.price) : null;
+    const costed = sell != null && unit > 0;
+    const pricing = {
+      fy, price: sell, updated_by_name: priceRow?.updatedByName ?? null, updated_at: priceRow?.updatedAt ?? null, unit_cost: r2(unit), basis: standardUnit != null ? 'STANDARD' : 'ROLLED',
+      profit_unit: costed ? r2(sell! - unit) : null, margin_pct: costed ? r2(((sell! - unit) / sell!) * 100) : null,
+      planned_revenue: sell != null ? r2(sell * plannedUnits) : null, planned_profit: costed ? r2((sell! - unit) * plannedUnits) : null,
+      built_revenue: sell != null ? r2(sell * actualUnits) : null, built_profit: costed ? r2((sell! - unit) * actualUnits) : null,
+    };
     return {
       product: { id: p.id, code: p.code, name: p.name, client_name: p.client?.name ?? null, standard_cost: p.standardCost == null ? null : n(p.standardCost) },
-      fy, plan_status: fyPlan?.status ?? null, budget_line: !!budgetLine,
+      fy, plan_status: fyPlan?.status ?? null, budget_line: !!budgetLine, pricing,
       approved: approved ? { id: approved.id, fy: approved.fy, fixed: n(approved.fixed), total: n(approved.total), material: n(approved.material), scrap: n(approved.scrap), freight: n(approved.freight), conversion: n(approved.conversion), outsourced: n(approved.outsourced), overhead: n(approved.overhead), warranty: n(approved.warranty) } : null,
       bom: roll?.bom ?? null, lines: roll?.lines ?? [], operations: roll?.operations ?? [], cost: roll?.cost ?? null,
       build_plan: build.map((b) => ({ ...b, spend: r2(spendByMonth.get(`${b.year}-${b.month}`) ?? 0) })), annual: { planned_units: plannedUnits, actual_units: actualUnits, budget: r2(unit * plannedUnits), actual_standard: r2(unit * actualUnits), unit_cost: unit, basis: standardUnit != null ? 'STANDARD' : 'ROLLED', plan_unit_cost: purchasedUnit, plan_budget: r2(purchasedUnit * plannedUnits) },
@@ -886,7 +902,7 @@ export class BudgetPlanningService {
         sub = { subProductId: pid, subStandardId: prev.subStandardId, subUnitCost: prev.subUnitCost == null ? null : n(prev.subUnitCost) };
       } else {
         const std = await this.prisma.standardCost.findFirst({ where: { productId: pid, status: 'APPROVED' }, orderBy: { id: 'desc' } });
-        if (!std) throw bad('That product has no approved planned cost yet.');
+        if (!std) throw bad('That product has no approved standard cost yet.');
         sub = { subProductId: pid, subStandardId: std.id, subUnitCost: n(std.total) };
       }
     }
@@ -1096,7 +1112,7 @@ export class BudgetPlanningService {
     if (!line || line.bom.projectId == null || line.subProductId == null) throw bad('Only a sub-assembly on a job BOM can be updated.');
     await this.assertJobEditable(line.bom.projectId);
     const std = await this.prisma.standardCost.findFirst({ where: { productId: line.subProductId, status: 'APPROVED' }, orderBy: { id: 'desc' } });
-    if (!std) throw bad('That product has no approved planned cost.');
+    if (!std) throw bad('That product has no approved standard cost.');
     await this.prisma.bomLine.update({ where: { id: lineId }, data: { subStandardId: std.id, subUnitCost: n(std.total) } });
     await this.syncJobEstimate(line.bom.projectId);
     return { id: lineId };
@@ -1136,18 +1152,45 @@ export class BudgetPlanningService {
     return { ok: true };
   }
 
+  // The selling price planned for this product in the current financial year; blank removes it
+  async saveProductPrice(productId: number, b: { price?: any }, user?: Actor) {
+    if (!(await this.prisma.product.findUnique({ where: { id: productId }, select: { id: true } }))) throw bad('Product not found.', HttpStatus.NOT_FOUND);
+    const s = await this.budgets.getSettings();
+    const fy = this.budgets.fyOf(new Date(), s.fyStartMonth);
+    const where = { productId_fy: { productId, fy } };
+    const before = await this.prisma.productPrice.findUnique({ where });
+    if (b.price === '' || b.price == null) {
+      if (before) {
+        await this.prisma.productPrice.delete({ where });
+        this.log('product_prices', productId, 'DELETE', user?.id, {}, { fy, price: n(before.price) });
+      }
+      return { ok: true };
+    }
+    const price = Number(b.price);
+    if (!Number.isFinite(price) || price <= 0) throw bad('Enter a selling price above zero.');
+    if (price > 99999999999) throw bad('That selling price is too large.');
+    await this.prisma.productPrice.upsert({
+      where, update: { price, updatedById: user?.id ?? null, updatedByName: user?.username ?? null },
+      create: { productId, fy, price, updatedById: user?.id ?? null, updatedByName: user?.username ?? null },
+    });
+    this.log('product_prices', productId, before ? 'UPDATE' : 'INSERT', user?.id, { fy, price }, before ? { fy, price: n(before.price) } : undefined);
+    return { ok: true };
+  }
+
   async proposeStandard(productId: number, user: Actor) {
     const bom = await this.bomFor(productId);
     const r = await this.rollup(bom.id);
     if (!r.lines.length) throw bad('Add BOM lines before costing the product.');
-    const latest = await this.prisma.standardCost.findFirst({ where: { productId }, orderBy: { id: 'desc' } });
-    if (latest && (latest.status === 'PROPOSED' || latest.status === 'APPROVED') && n(latest.total) === r.cost.total) {
-      throw bad(`The cost is unchanged since ${latest.status === 'APPROVED' ? 'the approved standard' : 'the latest proposal'}. Change the BOM or prices first.`, HttpStatus.CONFLICT);
-    }
     const s = await this.budgets.getSettings();
+    const fy = this.budgets.fyOf(new Date(), s.fyStartMonth);
+    const latest = await this.prisma.standardCost.findFirst({ where: { productId }, orderBy: { id: 'desc' } });
+    // The same figure is only a duplicate within a year; a new financial year needs its own standard cost even when nothing changed
+    if (latest && latest.fy === fy && (latest.status === 'PROPOSED' || latest.status === 'APPROVED') && n(latest.total) === r.cost.total) {
+      throw bad(`The cost is unchanged since ${latest.status === 'APPROVED' ? 'the approved standard cost' : 'the latest proposal'}. Change the BOM or prices first.`, HttpStatus.CONFLICT);
+    }
     const row = await this.prisma.standardCost.create({
       data: {
-        productId, bomId: bom.id, fy: this.budgets.fyOf(new Date(), s.fyStartMonth),
+        productId, bomId: bom.id, fy,
         material: r.cost.material, scrap: r.cost.scrap, freight: r.cost.freight, conversion: r.cost.conversion, outsourced: r.cost.outsourced, fixed: r.cost.fixed, overhead: r.cost.overhead, warranty: r.cost.warranty, total: r.cost.total,
         overheadRate: r.cost.overhead_rate, freightPct: r.bom.freight_pct, warrantyPct: r.bom.warranty_pct, adjustReason: r.bom.adjust_reason,
         proposedById: user.id, proposedByName: user.username ?? null,
@@ -1159,15 +1202,15 @@ export class BudgetPlanningService {
 
   async approveStandard(id: number, user: Actor) {
     const sc = await this.prisma.standardCost.findUnique({ where: { id } });
-    if (!sc) throw bad('Planned cost not found.', HttpStatus.NOT_FOUND);
+    if (!sc) throw bad('Standard cost not found.', HttpStatus.NOT_FOUND);
     if (sc.status === 'APPROVED') throw bad('Already approved.', HttpStatus.CONFLICT);
-    if (sc.status !== 'PROPOSED') throw bad('Only a proposed planned cost can be approved.', HttpStatus.CONFLICT);
+    if (sc.status !== 'PROPOSED') throw bad('Only a proposed standard cost can be approved.', HttpStatus.CONFLICT);
     if (sc.proposedById != null && sc.proposedById === user.id && !financeSelfApprovalAllowed()) {
       const other = await this.prisma.user.findFirst({ where: { isActive: true, id: { not: user.id }, userRoles: { some: { role: { name: { in: [ROLES.FINANCE, ROLES.ADMIN] } } } } } });
-      if (other) throw bad('You proposed this planned cost. Another Finance or Admin user needs to approve it.', HttpStatus.FORBIDDEN);
+      if (other) throw bad('You proposed this standard cost. Another Finance or Admin user needs to approve it.', HttpStatus.FORBIDDEN);
     }
     const newer = await this.prisma.standardCost.findFirst({ where: { productId: sc.productId, id: { gt: id }, status: { in: ['PROPOSED', 'APPROVED'] } } });
-    if (newer) throw bad('A newer planned cost exists for this product. Approve that one, or propose again.', HttpStatus.CONFLICT);
+    if (newer) throw bad('A newer standard cost exists for this product. Approve that one, or propose again.', HttpStatus.CONFLICT);
     await this.prisma.$transaction([
       this.prisma.standardCost.updateMany({ where: { productId: sc.productId, status: 'APPROVED' }, data: { status: 'SUPERSEDED' } }),
       this.prisma.standardCost.updateMany({ where: { productId: sc.productId, status: 'PROPOSED', id: { lt: id } }, data: { status: 'SUPERSEDED' } }),
@@ -1181,8 +1224,8 @@ export class BudgetPlanningService {
 
   async rejectStandard(id: number, b: any, user: Actor) {
     const sc = await this.prisma.standardCost.findUnique({ where: { id } });
-    if (!sc) throw bad('Planned cost not found.', HttpStatus.NOT_FOUND);
-    if (sc.status !== 'PROPOSED') throw bad('Only a proposed planned cost can be rejected.', HttpStatus.CONFLICT);
+    if (!sc) throw bad('Standard cost not found.', HttpStatus.NOT_FOUND);
+    if (sc.status !== 'PROPOSED') throw bad('Only a proposed standard cost can be rejected.', HttpStatus.CONFLICT);
     const reason = String(b?.reason ?? '').trim();
     if (!reason) throw bad('Give a reason for rejecting it.');
     await this.prisma.standardCost.update({ where: { id }, data: { status: 'REJECTED', rejectedByName: user.username ?? null, rejectedAt: new Date(), rejectReason: reason.slice(0, 300) } });
@@ -1190,7 +1233,7 @@ export class BudgetPlanningService {
     return { id };
   }
 
-  // Product line in the current plan: planned units each month times the planned cost
+  // Product line in the current plan: planned units each month times the standard cost
   async buildToPlan(productId: number, user: Actor) {
     const s = await this.budgets.getSettings();
     const fy = this.budgets.fyOf(new Date(), s.fyStartMonth);
@@ -1199,7 +1242,7 @@ export class BudgetPlanningService {
     if (plan.status !== 'DRAFT') throw bad(`The current plan is ${plan.status.toLowerCase()}, so its lines are locked. Ask Finance to raise a budget change for this product's line.`, HttpStatus.CONFLICT);
     const p = await this.prisma.product.findUnique({ where: { id: productId } });
     const approved = await this.prisma.standardCost.findFirst({ where: { productId, status: 'APPROVED' }, orderBy: { id: 'desc' } });
-    if (!approved) throw bad('Approve a planned cost first.');
+    if (!approved) throw bad('Approve a standard cost first.');
     // Only the bought part is budgeted here: material, scrap, freight and outsourced work. Labour and overhead are not product expenses.
     const unit = n(approved.material) + n(approved.scrap) + n(approved.freight) + n(approved.outsourced);
     if (!(unit > 0)) throw bad('The approved standard has no bought cost to budget.');
@@ -1214,7 +1257,7 @@ export class BudgetPlanningService {
       await this.prisma.budgetLinePeriod.deleteMany({ where: { lineId: existing.id } });
       await this.prisma.budgetLinePeriod.createMany({ data: periods.map((x) => ({ ...x, lineId: existing.id })) });
     } else {
-      await this.prisma.budgetLine.create({ data: { planId: plan.id, costObject: 'PRODUCT', productId, typeId: type.id, ownerId: p?.lead_id ?? null, note: 'From build plan × planned cost', periods: { create: periods } } });
+      await this.prisma.budgetLine.create({ data: { planId: plan.id, costObject: 'PRODUCT', productId, typeId: type.id, ownerId: p?.lead_id ?? null, note: 'From build plan × standard cost', periods: { create: periods } } });
     }
     this.log('budget_lines', productId, 'BUILD_TO_PLAN', user.id, {});
     return { updated: !!existing, total: r2(periods.reduce((a, x) => a + x.amount, 0)) };

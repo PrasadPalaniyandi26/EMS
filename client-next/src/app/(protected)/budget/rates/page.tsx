@@ -130,7 +130,7 @@ export default function RatesPage() {
           ))}
         </ul>
       </DetailSection>
-      <p className="text-[12px] text-[var(--shell-text-muted)]">A new rate applies from its effective date. From then, live costs of every build operation that uses the role change. Approved planned costs are not affected. If operations use the role, deleting it archives it instead.</p>
+      <p className="text-[12px] text-[var(--shell-text-muted)]">A new rate applies from its effective date. From then, live costs of every build operation that uses the role change. Approved standard costs are not affected. If operations use the role, deleting it archives it instead.</p>
     </div>
   ) : (
     <div className="space-y-4">

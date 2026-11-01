@@ -82,6 +82,7 @@ export class BudgetPlanningController {
   @Put('operation-types/:tid') @Roles('admin', 'finance') editOpType(@Param('tid', ParseIntPipe) tid: number, @Body() b: any, @CurrentUser() u: Actor) { return this.s.saveOperationType(tid, b, u); }
   @Delete('operation-types/:tid') @Roles('admin', 'finance') delOpType(@Param('tid', ParseIntPipe) tid: number, @CurrentUser() u: Actor) { return this.s.removeOperationType(tid, u); }
   @Put('products/:id/build-plan') buildPlan(@Param('id', ParseIntPipe) id: number, @Body() b: any, @CurrentUser() u: Actor) { return this.s.saveBuildPlan(id, b, u); }
+  @Put('products/:id/price') @Roles('admin', 'finance') price(@Param('id', ParseIntPipe) id: number, @Body() b: any, @CurrentUser() u: Actor) { return this.s.saveProductPrice(id, b, u); }
   @Post('products/:id/standard-cost') @Roles('admin', 'finance') propose(@Param('id', ParseIntPipe) id: number, @CurrentUser() u: Actor) { return this.s.proposeStandard(id, u); }
   @Post('standard-costs/:sid/approve') @Roles('admin', 'finance') approveStd(@Param('sid', ParseIntPipe) sid: number, @CurrentUser() u: Actor) { return this.s.approveStandard(sid, u); }
   @Post('standard-costs/:sid/reject') @Roles('admin', 'finance') rejectStd(@Param('sid', ParseIntPipe) sid: number, @Body() b: any, @CurrentUser() u: Actor) { return this.s.rejectStandard(sid, b, u); }

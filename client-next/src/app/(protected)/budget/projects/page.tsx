@@ -30,7 +30,7 @@ export default function ProjectBudgetsPage() {
     { accessorKey: 'name', header: 'Project', cell: ({ row }) => <TextCell value={row.original.name} strong className="block max-w-[260px] truncate" /> },
     { accessorKey: 'client_name', header: 'Client', cell: ({ row }) => <TextCell value={row.original.client_name} muted /> },
     { accessorKey: 'contract_value', header: headerRight('Contract value'), cell: ({ row }) => <Whole value={row.original.contract_value} currency={currency} />, size: 130 },
-    { accessorKey: 'estimate_total', header: headerRight('Estimate'), cell: ({ row }) => <Whole value={row.original.estimate_total} currency={currency} />, size: 120 },
+    { accessorKey: 'estimate_total', header: headerRight('Estimate cost'), cell: ({ row }) => <Whole value={row.original.estimate_total} currency={currency} />, size: 120 },
     { accessorKey: 'actual', header: headerRight('Spent'), cell: ({ row }) => <Whole value={row.original.actual} currency={currency} />, size: 110 },
     {
       accessorKey: 'projected_margin_pct', header: headerRight('Margin'), size: 100,
@@ -42,8 +42,8 @@ export default function ProjectBudgetsPage() {
     },
     { accessorKey: 'risk_rating', header: 'Risk', cell: ({ row }) => <TextCell value={row.original.risk_rating ? row.original.risk_rating.charAt(0) + row.original.risk_rating.slice(1).toLowerCase() : ''} muted />, size: 90 },
     {
-      accessorKey: 'estimate_status', header: 'Estimate', size: 110,
-      cell: ({ row }) => <ToneText label={row.original.estimate_status === 'BASELINE' ? 'Baselined' : row.original.estimate_status === 'PROPOSED' ? 'Proposed' : row.original.estimate_status ? 'Draft' : 'None'} tone={row.original.estimate_status === 'BASELINE' ? 'success' : row.original.estimate_status === 'PROPOSED' ? 'warning' : 'muted'} />,
+      accessorKey: 'estimate_status', header: 'Baseline', size: 120,
+      cell: ({ row }) => <ToneText label={row.original.estimate_status === 'BASELINE' ? 'Approved' : row.original.estimate_status === 'PROPOSED' ? 'Proposed' : row.original.estimate_status ? 'Not proposed' : 'No estimate'} tone={row.original.estimate_status === 'BASELINE' ? 'success' : row.original.estimate_status === 'PROPOSED' ? 'warning' : 'muted'} />,
     },
   ], [currency]);
 
@@ -53,7 +53,7 @@ export default function ProjectBudgetsPage() {
   });
 
   return (
-    <ModuleShell searchRow={<DataTableToolbar table={table} actions={<span className="text-[13px] text-[var(--shell-text-muted)]">Open a project to build its estimate, milestones and earned value.</span>} />}>
+    <ModuleShell searchRow={<DataTableToolbar table={table} actions={<span className="text-[13px] text-[var(--shell-text-muted)]">Open a project to build its estimate, baseline, milestones and earned value.</span>} />}>
       <DataTable isLoading={isLoading} columns={columns} data={data ?? []} tableInstance={table} onRowClick={(r) => router.push(`/budget/projects/${r.id}`)} emptyMessage="No projects yet." />
     </ModuleShell>
   );

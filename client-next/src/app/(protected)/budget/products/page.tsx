@@ -23,7 +23,7 @@ export default function ProductCostingPage() {
   const router = useRouter();
   const { data, isLoading } = useBudgetProducts();
   const [sorting, setSorting] = useState<SortingState>([]);
-  useEffect(() => { setHeader('Product costing', 'What each product costs to build, from its bill of materials'); }, [setHeader]);
+  useEffect(() => { setHeader('Product costing', 'What each product costs to build, what it sells for and its margin'); }, [setHeader]);
 
   const columns = useMemo<ColumnDef<ProductRow, any>[]>(() => [
     { accessorKey: 'code', header: 'Code', cell: ({ row }) => <IdCell value={row.original.code} />, size: 100 },
@@ -31,17 +31,22 @@ export default function ProductCostingPage() {
     { accessorKey: 'client_name', header: 'Client', cell: ({ row }) => <TextCell value={row.original.client_name} muted /> },
     { accessorKey: 'bom_lines', header: headerRight('BOM lines'), cell: ({ row }) => <div className="text-right"><TextCell value={row.original.bom_lines || ''} /></div>, size: 100 },
     { accessorKey: 'rolled_cost', header: headerRight('Rolled-up cost'), cell: ({ row }) => <Whole value={row.original.rolled_cost} currency={currency} />, size: 130 },
-    { accessorKey: 'standard_cost', header: headerRight('Planned cost'), cell: ({ row }) => <Whole value={row.original.standard_cost} currency={currency} />, size: 130 },
+    { accessorKey: 'standard_cost', header: headerRight('Standard cost'), cell: ({ row }) => <Whole value={row.original.standard_cost} currency={currency} />, size: 130 },
+    { accessorKey: 'selling_price', header: headerRight('Selling price'), cell: ({ row }) => <Whole value={row.original.selling_price} currency={currency} />, size: 130 },
     {
-      id: 'budget', header: 'Budget', size: 150,
+      accessorKey: 'margin_pct', header: headerRight('Margin'), size: 100,
+      cell: ({ row }) => { const m = row.original.margin_pct; return <div className="text-right"><ToneText label={m == null ? '—' : `${m.toFixed(1)}%`} tone={m == null ? 'muted' : m < 0 ? 'danger' : 'success'} /></div>; },
+    },
+    {
+      id: 'budget', header: 'Budget plan', size: 150,
       cell: ({ row }) => {
         const r = row.original;
-        if (!r.plan_status) return <ToneText label="No plan" tone="warning" />;
-        return r.budget_line ? <ToneText label="Budgeted" tone="success" /> : <ToneText label="No budget line" tone="warning" />;
+        if (!r.plan_status) return <ToneText label="No budget plan" tone="warning" />;
+        return r.budget_line ? <ToneText label="In budget plan" tone="success" /> : <ToneText label="Not in budget plan" tone="warning" />;
       },
     },
     {
-      id: 'status', header: 'Costing', size: 170,
+      id: 'status', header: 'Cost status', size: 170,
       cell: ({ row }) => {
         const r = row.original;
         if (r.standard_cost != null) {
@@ -60,7 +65,7 @@ export default function ProductCostingPage() {
   });
 
   return (
-    <ModuleShell searchRow={<DataTableToolbar table={table} actions={<span className="text-[13px] text-[var(--shell-text-muted)]">Open a product to build its BOM, build operations and build plan.</span>} />}>
+    <ModuleShell searchRow={<DataTableToolbar table={table} actions={<span className="text-[13px] text-[var(--shell-text-muted)]">Open a product to build its BOM, standard cost, build plan and margin.</span>} />}>
       <DataTable isLoading={isLoading} columns={columns} data={data ?? []} tableInstance={table} onRowClick={(r) => router.push(`/budget/products/${r.id}`)} emptyMessage="No products yet." />
     </ModuleShell>
   );

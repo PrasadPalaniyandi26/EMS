@@ -401,6 +401,7 @@ model Product {
   recurringTxn                  RecurringTransaction[]
   transactions                  Transaction[]
   splitLines                    TransactionSplit[]
+  prices                        ProductPrice[]
 
   @@unique([clientId, name])
   @@index([clientId])
@@ -946,6 +947,21 @@ model StandardCost {
 
   @@index([productId])
   @@map("standard_costs")
+}
+
+// What a product is planned to sell for in a financial year, so its margin can be set against the standard cost
+model ProductPrice {
+  id            Int      @id @default(autoincrement())
+  productId     Int      @map("product_id")
+  fy            Int
+  price         Decimal  @db.Decimal(14, 2)
+  updatedById   Int?     @map("updated_by_id")
+  updatedByName String?  @map("updated_by_name") @db.VarChar(100)
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, fy])
+  @@map("product_prices")
 }
 
 model ProductionPlan {

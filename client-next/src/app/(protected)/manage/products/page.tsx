@@ -186,7 +186,7 @@ export default function ProductsPage() {
                     status={status}
                     statusClass="text-[var(--shell-text-muted)]"
                     figure={pd.standard_cost != null ? `${currencySymbol}${Number(pd.standard_cost).toLocaleString()}` : undefined}
-                    figureLabel="Planned cost"
+                    figureLabel="Standard cost"
                   />
                   <DetailSection title="Details">
                     <DetailGrid>

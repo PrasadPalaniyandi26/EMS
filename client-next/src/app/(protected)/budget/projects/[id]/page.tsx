@@ -184,7 +184,7 @@ export default function ProjectBudgetPage() {
     ...(tab === 'baselines' && est && isFinance ? [{ label: 'Propose baseline', icon: <Flag className="h-4 w-4 text-[var(--shell-accent)]" />, onClick: () => setBaselineOpen(true) }] : []),
     ...(tab === 'milestones' ? [{ label: 'Add milestone', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setEditMs(null); setMsOpen(true); } }] : []),
     ...(tab === 'evm' && e && est ? [{ label: 'Chart', icon: <TrendingUp className="h-4 w-4 text-[var(--info)]" />, onClick: () => setEvmOpen(true) }] : []),
-    { label: 'Commercials', icon: <Settings2 className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setSetOpen(true) },
+    { label: 'Contract and margin', icon: <Settings2 className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setSetOpen(true) },
   ];
 
   const summary = !data || !m || !t || !e ? null : (
@@ -206,8 +206,9 @@ export default function ProjectBudgetPage() {
         <DetailGrid>
           <DetailField label="Contract value" value={m.contract_value != null ? money(m.contract_value, currency) : 'Not set'} />
           <DetailField label="Target margin" value={m.target_pct != null ? `${m.target_pct}%` : 'Not set'} />
-          <DetailField label="At estimate" value={m.estimate_margin_pct != null ? `${m.estimate_margin_pct.toFixed(1)}%` : '–'} tone={marginTone} />
-          <DetailField label="Projected" value={m.projected_margin_pct != null ? `${m.projected_margin_pct.toFixed(1)}%` : '–'} tone={m.projected_margin_pct != null && m.projected_margin_pct < 0 ? 'danger' : 'muted'} />
+          <DetailField label="Profit at estimate" value={m.contract_value != null ? money(m.contract_value - t.total, currency) : '–'} tone={m.contract_value != null && m.contract_value < t.total ? 'danger' : 'muted'} />
+          <DetailField label="Margin at estimate" value={m.estimate_margin_pct != null ? `${m.estimate_margin_pct.toFixed(1)}%` : '–'} tone={marginTone} />
+          <DetailField wide label="Projected margin" value={m.projected_margin_pct != null ? `${m.projected_margin_pct.toFixed(1)}%` : '–'} tone={m.projected_margin_pct != null && m.projected_margin_pct < 0 ? 'danger' : 'muted'} />
         </DetailGrid>
         {m.estimate_margin_pct != null && m.target_pct != null && (
           <p className={cn('text-[12px]', m.estimate_margin_pct < m.target_pct ? 'text-[var(--warning)]' : 'text-[var(--success)]')}>
