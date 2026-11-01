@@ -122,3 +122,11 @@ export function Grid({ head, children, className }: { head: { label: string; rig
   );
 }
 export const td = 'border-b border-[var(--shell-border)] px-4 py-2 text-[var(--shell-text)]';
+
+// Margin against its goals: below zero or the minimum is red, below the target amber, otherwise green
+export function marginTone(m: number | null, target: number | null, min: number | null): 'danger' | 'warning' | 'success' | 'muted' {
+  if (m == null) return 'muted';
+  if (m < 0 || (min != null && m < min)) return 'danger';
+  if (target != null && m < target) return 'warning';
+  return 'success';
+}

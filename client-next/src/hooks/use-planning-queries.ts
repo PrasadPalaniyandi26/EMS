@@ -20,7 +20,7 @@ export interface Item {
 }
 
 export interface ProjectRow {
-  id: number; code: string | null; name: string; client_name: string | null; contract_value: number | null; target_margin_pct: number | null;
+  id: number; code: string | null; name: string; client_name: string | null; contract_value: number | null; target_margin_pct: number | null; min_margin_pct: number | null;
   risk_rating: string | null; estimate_status: string | null; estimate_total: number | null; actual: number; projected_margin_pct: number | null;
 }
 
@@ -33,21 +33,22 @@ export interface Milestone { id: number; name: string; weight_pct: number; plann
 export interface Evm { bac: number; pv: number; ev: number; ac: number; cpi: number | null; spi: number | null; eac: number; etc: number; vac: number; tcpi: number | null; spend_low: boolean; series: { label: string; pv: number; ev: number | null; ac: number | null }[]; last_spend: string | null; percent_complete: number; percent_planned: number; weight_total: number }
 
 export interface ProjectBudget {
-  project: { id: number; code: string | null; name: string; client_name: string | null; contract_value: number | null; target_margin_pct: number | null; risk_rating: string | null; start_date: string | null; end_date: string | null; type_code: string | null; has_job_bom: boolean };
+  project: { id: number; code: string | null; name: string; client_name: string | null; contract_value: number | null; target_margin_pct: number | null; min_margin_pct: number | null; risk_rating: string | null; start_date: string | null; end_date: string | null; type_code: string | null; has_job_bom: boolean };
   estimate: { id: number; version: number; contingency_pct: number; warranty_pct: number; note: string | null } | null;
   baselines: BaselineRow[]; baseline: BaselineRow | null; changed_since_baseline: boolean;
   lines: EstimateLineRow[]; phases: { phase: string; amount: number }[];
   totals: { direct: number; contingency: number; warranty: number; total: number };
-  margin: { contract_value: number | null; target_pct: number | null; estimate_margin_pct: number | null; projected_margin_pct: number | null };
+  margin: { contract_value: number | null; target_pct: number | null; min_pct: number | null; estimate_margin_pct: number | null; projected_margin_pct: number | null };
   evm: Evm; milestones: Milestone[]; rate_cards: RateCard[]; suggested_contingency_pct: number;
 }
 
 export interface ItemUse { kind: 'PRODUCT' | 'JOB'; id: number; code: string | null; name: string; quantity: number; scrap_pct: number }
 export interface ProductPricing {
   fy: number; price: number | null; updated_by_name: string | null; updated_at: string | null; unit_cost: number; basis: 'STANDARD' | 'ROLLED';
+  target_margin_pct: number | null; min_margin_pct: number | null; price_for_target: number | null; price_for_min: number | null; rolled_cost: number | null; margin_at_rolled_pct: number | null;
   profit_unit: number | null; margin_pct: number | null; planned_revenue: number | null; planned_profit: number | null; built_revenue: number | null; built_profit: number | null;
 }
-export interface ProductRow { selling_price: number | null; margin_pct: number | null; standard_fy: number | null; fy: number; id: number; code: string | null; name: string; client_name: string | null; bom_status: string | null; bom_lines: number; rolled_cost: number | null; standard_cost: number | null; standard_approved_at: string | null; plan_status: string | null; budget_line: boolean }
+export interface ProductRow { selling_price: number | null; target_margin_pct: number | null; min_margin_pct: number | null; margin_pct: number | null; standard_fy: number | null; fy: number; id: number; code: string | null; name: string; client_name: string | null; bom_status: string | null; bom_lines: number; rolled_cost: number | null; standard_cost: number | null; standard_approved_at: string | null; plan_status: string | null; budget_line: boolean }
 export interface BomLineRow { id: number; sourcing: 'MAKE' | 'BUY'; item_id: number | null; sub_bom_id: number | null; sub_product_id: number | null; sub_standard_id: number | null; sub_drift: number; part_no: string; name: string; quantity: number; scrap_pct: number; unit_cost: number; amount: number; item_drift: number }
 export interface OperationType { id: number; name: string; is_outsourced: boolean; is_fixed: boolean; is_active: boolean; used_in: number }
 export interface OperationRow { id: number; name: string; type_id: number | null; type_name: string; is_outsourced: boolean; is_fixed: boolean; fixed_cost: number | null; role: string | null; hours: number; rate_card_id: number | null; rate: number; outsourced_cost: number | null; amount: number }

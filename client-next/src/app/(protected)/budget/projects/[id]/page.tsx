@@ -77,7 +77,9 @@ export default function ProjectBudgetPage() {
   const m = data?.margin; const est = data?.estimate ?? null; const t = data?.totals; const e = data?.evm;
   const baseline = data?.baseline ?? null;
   const proposed = data?.baselines.find((b) => b.status === 'PROPOSED') ?? null;
-  const marginTone = !m || m.estimate_margin_pct == null ? undefined : m.estimate_margin_pct < 0 ? 'danger' : m.target_pct != null && m.estimate_margin_pct < m.target_pct ? 'warning' : undefined;
+  // Red below zero or the minimum margin, amber below the target
+  const toneOf = (v: number | null | undefined) => (!m || v == null ? undefined : v < 0 || (m.min_pct != null && v < m.min_pct) ? 'danger' as const : m.target_pct != null && v < m.target_pct ? 'warning' as const : undefined);
+  const marginTone = toneOf(m?.estimate_margin_pct);
   const weightLeft = e ? Math.max(0, Math.round((100 - e.weight_total) * 100) / 100) : 100;
 
   const measures = useMemo<Measure[]>(() => {
@@ -205,12 +207,16 @@ export default function ProjectBudgetPage() {
       <DetailSection title="Margin">
         <DetailGrid>
           <DetailField label="Contract value" value={m.contract_value != null ? money(m.contract_value, currency) : 'Not set'} />
-          <DetailField label="Target margin" value={m.target_pct != null ? `${m.target_pct}%` : 'Not set'} />
           <DetailField label="Profit at estimate" value={m.contract_value != null ? money(m.contract_value - t.total, currency) : '–'} tone={m.contract_value != null && m.contract_value < t.total ? 'danger' : 'muted'} />
           <DetailField label="Margin at estimate" value={m.estimate_margin_pct != null ? `${m.estimate_margin_pct.toFixed(1)}%` : '–'} tone={marginTone} />
-          <DetailField wide label="Projected margin" value={m.projected_margin_pct != null ? `${m.projected_margin_pct.toFixed(1)}%` : '–'} tone={m.projected_margin_pct != null && m.projected_margin_pct < 0 ? 'danger' : 'muted'} />
+          <DetailField label="Projected margin" value={m.projected_margin_pct != null ? `${m.projected_margin_pct.toFixed(1)}%` : '–'} tone={toneOf(m.projected_margin_pct) ?? 'muted'} />
+          <DetailField label="Target margin" value={m.target_pct != null ? `${m.target_pct}%` : 'Not set'} />
+          <DetailField label="Minimum margin" value={m.min_pct != null ? `${m.min_pct}%` : 'Not set'} />
         </DetailGrid>
-        {m.estimate_margin_pct != null && m.target_pct != null && (
+        {m.estimate_margin_pct != null && m.min_pct != null && m.estimate_margin_pct < m.min_pct && (
+          <p role="alert" className="text-[12px] text-[var(--danger)]">The estimate leaves {m.estimate_margin_pct.toFixed(1)}% margin, below the minimum of {m.min_pct}%. Price would need to be at least {money(t.total / (1 - m.min_pct / 100), currency)}.</p>
+        )}
+        {m.estimate_margin_pct != null && m.target_pct != null && (m.min_pct == null || m.estimate_margin_pct >= m.min_pct) && (
           <p className={cn('text-[12px]', m.estimate_margin_pct < m.target_pct ? 'text-[var(--warning)]' : 'text-[var(--success)]')}>
             {m.estimate_margin_pct >= m.target_pct
               ? `The estimate leaves ${m.estimate_margin_pct.toFixed(1)}% margin, which meets the ${m.target_pct}% target.`

@@ -331,6 +331,7 @@ model Project {
   category                      String?                @db.VarChar(100)
   contractValue                 Decimal?               @map("contract_value") @db.Decimal(14, 2)
   targetMarginPct               Decimal?               @map("target_margin_pct") @db.Decimal(5, 2)
+  minMarginPct                  Decimal?               @map("min_margin_pct") @db.Decimal(5, 2)
   riskRating                    String?                @map("risk_rating") @db.VarChar(10)
   client                        Client                 @relation(fields: [clientId], references: [id])
   creator                       User?                  @relation("ProjectCreator", fields: [createdBy], references: [id])
@@ -954,7 +955,10 @@ model ProductPrice {
   id            Int      @id @default(autoincrement())
   productId     Int      @map("product_id")
   fy            Int
-  price         Decimal  @db.Decimal(14, 2)
+  price         Decimal? @db.Decimal(14, 2)
+  // Margins are goals to track against, as a share of the selling price
+  targetMarginPct Decimal? @map("target_margin_pct") @db.Decimal(5, 2)
+  minMarginPct    Decimal? @map("min_margin_pct") @db.Decimal(5, 2)
   updatedById   Int?     @map("updated_by_id")
   updatedByName String?  @map("updated_by_name") @db.VarChar(100)
   updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")

@@ -19,7 +19,7 @@ import { ModuleIntelligencePanel } from '@/components/shared/module/module-intel
 import { ConfirmDialog, NativeSelect } from '@/components/shared/modal-primitives';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAllocation, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import { BomLineModal, BuildPlanModal, BuildStepModal, ProductPricingModal, RejectCostModal, StandardCostModal, StepTypesModal } from '@/components/budgets/planning-modals';
-import { TabBar, money, unitPrice } from '@/components/budgets/budget-ui';
+import { TabBar, marginTone, money, unitPrice } from '@/components/budgets/budget-ui';
 import { formatDate } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 
@@ -206,17 +206,34 @@ export default function ProductCostingDetailPage() {
       </DetailSection>
       {pr && (
         <DetailSection title={`Price and margin, ${fyText(pr.fy)}`}>
-          {pr.price == null ? (
+          {pr.price == null && pr.target_margin_pct == null && pr.min_margin_pct == null ? (
             <p className="text-[12px] text-[var(--shell-text-muted)]">No selling price is set for {fyText(pr.fy)}.{isFinance ? ' Use Price and costing to add one.' : ' Ask Finance to add one.'}</p>
           ) : (
             <>
               <DetailGrid>
-                <DetailField label="Selling price" value={money(pr.price, currency)} />
+                <DetailField label="Selling price" value={pr.price != null ? money(pr.price, currency) : 'Not set'} />
                 <DetailField label="Cost per unit" value={pr.unit_cost > 0 ? money(pr.unit_cost, currency) : undefined} />
                 <DetailField label="Profit per unit" value={pr.profit_unit != null ? signed(pr.profit_unit) : undefined} tone={pr.profit_unit != null && pr.profit_unit < 0 ? 'danger' : 'muted'} />
-                <DetailField label="Margin" value={pr.margin_pct != null ? `${pr.margin_pct.toFixed(1)}%` : undefined} tone={pr.margin_pct != null && pr.margin_pct < 0 ? 'danger' : 'muted'} />
+                <DetailField label="Margin" value={pr.margin_pct != null ? `${pr.margin_pct.toFixed(1)}%` : undefined} tone={marginTone(pr.margin_pct, pr.target_margin_pct, pr.min_margin_pct)} />
+                <DetailField label="Target margin" value={pr.target_margin_pct != null ? `${pr.target_margin_pct}%` : 'Not set'} />
+                <DetailField label="Minimum margin" value={pr.min_margin_pct != null ? `${pr.min_margin_pct}%` : 'Not set'} />
+                {pr.margin_at_rolled_pct != null && pr.rolled_cost != null && Math.abs(pr.rolled_cost - pr.unit_cost) > 0.5 && (
+                  <DetailField wide label="Margin at today's cost" value={`${pr.margin_at_rolled_pct.toFixed(1)}% (cost ${money(pr.rolled_cost, currency)})`} tone={marginTone(pr.margin_at_rolled_pct, pr.target_margin_pct, pr.min_margin_pct)} />
+                )}
+                {pr.price_for_target != null && (pr.price == null || Math.abs(pr.price - pr.price_for_target) > 0.5) && (
+                  <DetailField wide label="Price for the target margin" value={money(pr.price_for_target, currency)} />
+                )}
               </DetailGrid>
               {pr.margin_pct != null && pr.margin_pct < 0 && <p role="alert" className="text-[12px] text-[var(--danger)]">The cost per unit is above the selling price, so each unit sold makes a loss.</p>}
+              {pr.margin_pct != null && pr.margin_pct >= 0 && pr.min_margin_pct != null && pr.margin_pct < pr.min_margin_pct && (
+                <p role="alert" className="text-[12px] text-[var(--danger)]">Margin is below the minimum of {pr.min_margin_pct}%.{pr.price_for_min != null ? ` A price of ${money(pr.price_for_min, currency)} or more would meet it.` : ''}</p>
+              )}
+              {pr.margin_pct != null && (pr.min_margin_pct == null || pr.margin_pct >= pr.min_margin_pct) && pr.target_margin_pct != null && pr.margin_pct < pr.target_margin_pct && (
+                <p className="text-[12px] text-[var(--warning)]">Margin is below the target of {pr.target_margin_pct}%.{pr.price_for_target != null ? ` A price of ${money(pr.price_for_target, currency)} would reach it.` : ''}</p>
+              )}
+              {pr.margin_at_rolled_pct != null && pr.margin_pct != null && pr.margin_at_rolled_pct < pr.margin_pct - 0.05 && pr.rolled_cost != null && Math.abs(pr.rolled_cost - pr.unit_cost) > 0.5 && (
+                <p className="text-[12px] text-[var(--warning)]">Parts or rates have moved since the standard cost was approved. At today's cost of {money(pr.rolled_cost, currency)} the margin would be {pr.margin_at_rolled_pct.toFixed(1)}%. The selling price stays as set.</p>
+              )}
               <p className="text-[12px] text-[var(--shell-text-muted)]">Margin is the profit per unit as a share of the selling price. {pr.basis === 'STANDARD' ? 'Cost is the approved standard cost.' : 'No standard cost is approved yet, so cost is the current rolled-up cost.'}</p>
             </>
           )}

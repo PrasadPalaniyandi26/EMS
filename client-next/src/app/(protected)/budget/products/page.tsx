@@ -11,7 +11,7 @@ import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
 import { IdCell, TextCell, ToneText, headerRight } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
-import { plain } from '@/components/budgets/budget-ui';
+import { marginTone, plain } from '@/components/budgets/budget-ui';
 
 const Whole = ({ value, currency }: { value: number | null; currency: string }) => (
   <div className="text-right text-[13px] font-medium tabular-nums text-[var(--shell-text)]">{value == null ? '—' : plain(value, currency)}</div>
@@ -35,7 +35,7 @@ export default function ProductCostingPage() {
     { accessorKey: 'selling_price', header: headerRight('Selling price'), cell: ({ row }) => <Whole value={row.original.selling_price} currency={currency} />, size: 130 },
     {
       accessorKey: 'margin_pct', header: headerRight('Margin'), size: 100,
-      cell: ({ row }) => { const m = row.original.margin_pct; return <div className="text-right"><ToneText label={m == null ? '—' : `${m.toFixed(1)}%`} tone={m == null ? 'muted' : m < 0 ? 'danger' : 'success'} /></div>; },
+      cell: ({ row }) => { const m = row.original.margin_pct; return <div className="text-right"><ToneText label={m == null ? '—' : `${m.toFixed(1)}%`} tone={marginTone(m, row.original.target_margin_pct, row.original.min_margin_pct)} /></div>; },
     },
     {
       id: 'budget', header: 'Budget plan', size: 150,

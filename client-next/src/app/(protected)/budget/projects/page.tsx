@@ -11,7 +11,7 @@ import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
 import { IdCell, TextCell, ToneText, headerRight } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
-import { plain } from '@/components/budgets/budget-ui';
+import { marginTone, plain } from '@/components/budgets/budget-ui';
 
 const Whole = ({ value, currency }: { value: number | null; currency: string }) => (
   <div className="text-right text-[13px] font-medium tabular-nums text-[var(--shell-text)]">{value == null ? '—' : plain(value, currency)}</div>
@@ -35,9 +35,9 @@ export default function ProjectBudgetsPage() {
     {
       accessorKey: 'projected_margin_pct', header: headerRight('Margin'), size: 100,
       cell: ({ row }) => {
-        const m = row.original.projected_margin_pct; const t = row.original.target_margin_pct;
+        const m = row.original.projected_margin_pct;
         if (m == null) return <div className="text-right"><TextCell value="" /></div>;
-        return <div className="text-right"><ToneText label={`${m.toFixed(1)}%`} tone={m < 0 ? 'danger' : t != null && m < t ? 'warning' : 'success'} /></div>;
+        return <div className="text-right"><ToneText label={`${m.toFixed(1)}%`} tone={marginTone(m, row.original.target_margin_pct, row.original.min_margin_pct)} /></div>;
       },
     },
     { accessorKey: 'risk_rating', header: 'Risk', cell: ({ row }) => <TextCell value={row.original.risk_rating ? row.original.risk_rating.charAt(0) + row.original.risk_rating.slice(1).toLowerCase() : ''} muted />, size: 90 },

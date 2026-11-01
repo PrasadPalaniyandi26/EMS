@@ -54,7 +54,7 @@ const COST_COLUMN = 'md:border-l md:border-[var(--shell-border)] md:pl-6';
 
 export function ProjectSettingsModal({ isOpen, onClose, data }: Base & { data: ProjectBudget | undefined }) {
   const { saving, run } = useSaver(onClose);
-  const [cv, setCv] = useState(''); const [tm, setTm] = useState(''); const [risk, setRisk] = useState('');
+  const [cv, setCv] = useState(''); const [tm, setTm] = useState(''); const [mn, setMn] = useState(''); const [risk, setRisk] = useState('');
   const [cont, setCont] = useState(''); const [war, setWar] = useState('');
   // Fill the fields when the dialog opens only, so a refresh in the background never wipes what is being typed
   const latest = useRef(data); latest.current = data;
@@ -63,15 +63,18 @@ export function ProjectSettingsModal({ isOpen, onClose, data }: Base & { data: P
     if (!isOpen || !d) return;
     setCv(d.project.contract_value != null ? String(d.project.contract_value) : '');
     setTm(d.project.target_margin_pct != null ? String(d.project.target_margin_pct) : '');
+    setMn(d.project.min_margin_pct != null ? String(d.project.min_margin_pct) : '');
     setRisk(d.project.risk_rating ?? '');
     setCont(String(d.estimate?.contingency_pct ?? d.suggested_contingency_pct));
     setWar(String(d.estimate?.warranty_pct ?? 2));
   }, [isOpen]);
   const est = data?.estimate ?? null;
   const num = (v: string) => (v === '' ? NaN : Number(v));
-  const cvN = num(cv); const tmN = num(tm); const contN = num(cont); const warN = num(war);
+  const cvN = num(cv); const tmN = num(tm); const mnN = num(mn); const contN = num(cont); const warN = num(war);
   const cvOk = cv === '' || cvN >= 0;
   const tmOk = tm === '' || (tmN >= 0 && tmN <= 100);
+  const mnOk = mn === '' || (mnN >= 0 && mnN < 100);
+  const orderOk = !(tm !== '' && mn !== '' && tmOk && mnOk && mnN > tmN);
   const allowOk = !est || (contN >= 0 && contN <= 100 && warN >= 0 && warN <= 100);
   // What the estimate comes to with these allowances: warranty is charged on direct cost plus contingency
   const direct = data?.totals.direct ?? 0;
@@ -81,10 +84,11 @@ export function ProjectSettingsModal({ isOpen, onClose, data }: Base & { data: P
   const hasCv = cv !== '' && cvOk && cvN > 0;
   const margin = est && allowOk && hasCv ? ((cvN - total) / cvN) * 100 : null;
   const target = tm !== '' && tmOk ? tmN : null;
+  const floor = mn !== '' && mnOk ? mnN : null;
   return (
-    <ModuleModal isOpen={isOpen} onClose={onClose} title="Price and costing" icon={<Pencil className="h-4 w-4" />} size={est ? 'xl' : 'sm'} saveLabel="Save changes" canSave={!saving && cvOk && tmOk && allowOk}
+    <ModuleModal isOpen={isOpen} onClose={onClose} title="Price and costing" icon={<Pencil className="h-4 w-4" />} size={est ? 'xl' : 'sm'} saveLabel="Save changes" canSave={!saving && cvOk && tmOk && mnOk && orderOk && allowOk}
       onSave={() => run(() => api.put(`/budgets/projects/${data!.project.id}/settings`, {
-        contract_value: cv === '' ? null : Number(cv), target_margin_pct: tm === '' ? null : Number(tm), risk_rating: risk || null,
+        contract_value: cv === '' ? null : Number(cv), target_margin_pct: tm === '' ? null : Number(tm), min_margin_pct: mn === '' ? null : Number(mn), risk_rating: risk || null,
         ...(est ? { contingency_pct: Number(cont), warranty_pct: Number(war) } : {}),
       }), 'Project updated.')}>
       <div className={pricingGrid(!!est)}>
@@ -93,13 +97,14 @@ export function ProjectSettingsModal({ isOpen, onClose, data }: Base & { data: P
           <div className="space-y-3">
             <Field label="Contract value" hint="What the client pays for the project." error={!cvOk ? 'Enter zero or more.' : undefined}><CurrencyInput value={cv} onChange={setCv} /></Field>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Target margin %" error={!tmOk ? 'Enter 0 to 100.' : undefined}><Input type="number" min="0" max="100" step="0.5" className={ctl} value={tm} onChange={(e) => setTm(e.target.value)} /></Field>
-              <Field label="Risk">
-                <NativeSelect value={risk} onChange={(e) => setRisk(e.target.value)}>
-                  <option value="">Not rated</option><option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option>
-                </NativeSelect>
-              </Field>
+              <Field label="Target margin %" hint="Your goal for the project." error={!tmOk ? 'Enter 0 to 100.' : undefined}><Input type="number" min="0" max="100" step="0.5" className={ctl} value={tm} onChange={(e) => setTm(e.target.value)} /></Field>
+              <Field label="Minimum margin %" hint="Below this is flagged." error={!mnOk ? 'Enter 0 up to 100.' : !orderOk ? 'Cannot be above the target.' : undefined}><Input type="number" min="0" max="99.99" step="0.5" className={ctl} value={mn} onChange={(e) => setMn(e.target.value)} /></Field>
             </div>
+            <Field label="Risk">
+              <NativeSelect value={risk} onChange={(e) => setRisk(e.target.value)}>
+                <option value="">Not rated</option><option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option>
+              </NativeSelect>
+            </Field>
           </div>
         </section>
 
@@ -119,9 +124,9 @@ export function ProjectSettingsModal({ isOpen, onClose, data }: Base & { data: P
                 <div className="flex justify-between border-t border-[var(--shell-border)] pt-1 font-medium"><span>Estimate</span><span className="tabular-nums">{money(total)}</span></div>
               </div>
               {margin != null && (
-                <p className={cn('text-[13px]', target != null && margin < target ? 'text-[var(--warning)]' : 'text-[var(--shell-text)]')}>
+                <p className={cn('text-[13px]', floor != null && margin < floor ? 'text-[var(--danger)]' : target != null && margin < target ? 'text-[var(--warning)]' : 'text-[var(--shell-text)]')}>
                   Profit at estimate <strong className="tabular-nums">{money(cvN - total)}</strong>. Margin <strong className="tabular-nums">{margin.toFixed(1)}%</strong> of the contract value
-                  {target != null ? (margin >= target ? `, which meets the ${target}% target.` : `, below the ${target}% target. The contract value would need to be ${money(total / (1 - target / 100))} to reach it.`) : '.'}
+                  {floor != null && margin < floor ? `, below the ${floor}% minimum. The contract value would need to be at least ${money(total / (1 - floor / 100))}.` : target != null ? (margin >= target ? `, which meets the ${target}% target.` : `, below the ${target}% target. The contract value would need to be ${money(total / (1 - target / 100))} to reach it.`) : '.'}
                 </p>
               )}
               {!hasCv && <p className="text-[12px] text-[var(--shell-text-muted)]">Enter the contract value to see the margin.</p>}
@@ -646,7 +651,9 @@ export function BomSettingsModal({ isOpen, onClose, url, freight, warranty }: Ba
 export function ProductPricingModal({ isOpen, onClose, data }: Base & { data: ProductCosting | undefined }) {
   const { saving, run } = useSaver(onClose);
   const invalidate = useInvalidate();
-  const [price, setPrice] = useState('');
+  const [price, setPrice] = useState(''); const [target, setTarget] = useState(''); const [floor, setFloor] = useState('');
+  // True while the price on screen was worked out from the target margin, so changing the target moves it
+  const [auto, setAuto] = useState(false);
   const [oh, setOh] = useState(''); const [fr, setFr] = useState(''); const [wa, setWa] = useState(''); const [why, setWhy] = useState('');
   const c = data?.cost ?? null; const bom = data?.bom ?? null;
   const dOh = c?.default_overhead_rate ?? 0; const dFr = c?.default_freight_pct ?? 2; const dWa = c?.default_warranty_pct ?? 1.5;
@@ -656,6 +663,7 @@ export function ProductPricingModal({ isOpen, onClose, data }: Base & { data: Pr
     const d = latest.current;
     if (!isOpen || !d) return;
     setPrice(d.pricing.price != null ? String(d.pricing.price) : '');
+    setTarget(d.pricing.target_margin_pct != null ? String(d.pricing.target_margin_pct) : ''); setFloor(d.pricing.min_margin_pct != null ? String(d.pricing.min_margin_pct) : ''); setAuto(false);
     if (d.cost && d.bom) {
       setOh(String(d.bom.overhead_rate_override ?? d.cost.default_overhead_rate)); setFr(String(d.bom.freight_pct)); setWa(String(d.bom.warranty_pct)); setWhy(d.bom.adjust_reason ?? '');
     }
@@ -672,6 +680,25 @@ export function ProductPricingModal({ isOpen, onClose, data }: Base & { data: Pr
   const priceDirty = price === '' ? p.price != null : Number(price) !== p.price;
   const unit = p.unit_cost;
   const margin = price !== '' && priceValid && unit > 0 ? ((sell - unit) / sell) * 100 : null;
+
+  // Margin goals, as a share of the selling price. The price only follows the target while it was worked out from it
+  const targetN = num(target); const floorN = num(floor);
+  const targetOk = target === '' || (targetN >= 0 && targetN < 100);
+  const floorOk = floor === '' || (floorN >= 0 && floorN < 100);
+  const orderOk = !(target !== '' && floor !== '' && targetOk && floorOk && floorN > targetN);
+  const goalsDirty = (target === '' ? p.target_margin_pct != null : targetN !== p.target_margin_pct) || (floor === '' ? p.min_margin_pct != null : floorN !== p.min_margin_pct);
+  const priceSideDirty = priceDirty || goalsDirty;
+  const priceFor = (m: number) => Math.round((unit / (1 - m / 100)) * 100) / 100;
+  const offer = target !== '' && targetOk && unit > 0 ? priceFor(targetN) : null;
+  const changeTarget = (v: string) => {
+    setTarget(v);
+    const t = Number(v);
+    if (v !== '' && t >= 0 && t < 100 && unit > 0 && (auto || price === '')) { setPrice(String(priceFor(t))); setAuto(true); }
+  };
+  const goal = margin == null ? null
+    : floor !== '' && floorOk && margin < floorN ? { tone: 'text-[var(--danger)]', text: `Below the minimum margin of ${floorN}%.` }
+    : target !== '' && targetOk && margin < targetN ? { tone: 'text-[var(--warning)]', text: `Below the target margin of ${targetN}%.` }
+    : target !== '' && targetOk ? { tone: 'text-[var(--success)]', text: `Meets the target margin of ${targetN}%.` } : null;
 
   // Cost settings, only when the product has a cost to adjust
   const ohN = num(oh); const frN = num(fr); const waN = num(wa);
@@ -695,37 +722,49 @@ export function ProductPricingModal({ isOpen, onClose, data }: Base & { data: Pr
   }
   const marginAtNew = costDirty && price !== '' && priceValid && rolled > 0 ? ((sell - rolled) / sell) * 100 : null;
 
-  const canSave = !saving && priceValid && costValid && (priceDirty || costDirty) && !needReason;
+  const canSave = !saving && priceValid && targetOk && floorOk && orderOk && costValid && (priceSideDirty || costDirty) && !needReason;
   const save = async () => {
-    const savedPrice = priceDirty;
-    if (savedPrice) await api.put(`/budgets/products/${data.product.id}/price`, { price: price === '' ? null : sell });
+    const savedPrice = priceSideDirty;
+    if (savedPrice) await api.put(`/budgets/products/${data.product.id}/price`, { price: price === '' ? null : sell, target_margin_pct: target === '' ? null : targetN, min_margin_pct: floor === '' ? null : floorN });
     if (costDirty) {
       try {
         await api.put(`/budgets/products/${data.product.id}/bom`, { overhead_rate: Math.abs(ohN - dOh) <= 0.005 ? null : ohN, freight_pct: frN, warranty_pct: waN, reason: why });
       } catch (e: any) {
         // The price is already saved, so refresh the page behind and keep the dialog open for the cost settings
-        if (savedPrice) { invalidate('budgets'); throw new Error(`The selling price was saved, but the cost settings were not: ${e?.message || 'could not save'}`); }
+        if (savedPrice) { invalidate('budgets'); throw new Error(`The price and margins were saved, but the cost settings were not: ${e?.message || 'could not save'}`); }
         throw e;
       }
     }
   };
-  const done = costDirty && priceDirty ? 'Selling price and cost settings saved. Propose a new standard cost to use the cost settings.'
-    : costDirty ? 'Cost settings saved. Propose a new standard cost to use them.' : price === '' ? 'Selling price removed.' : 'Selling price saved.';
+  const nothingLeft = price === '' && target === '' && floor === '';
+  const done = costDirty && priceSideDirty ? 'Price, margins and cost settings saved. Propose a new standard cost to use the cost settings.'
+    : costDirty ? 'Cost settings saved. Propose a new standard cost to use them.' : nothingLeft ? 'Selling price and margins removed.' : 'Selling price and margins saved.';
 
   return (
     <ModuleModal isOpen={isOpen} onClose={onClose} size={c && bom ? 'xl' : 'sm'} title="Price and costing" icon={<Pencil className="h-4 w-4" />} canSave={canSave} saveLabel="Save changes" onSave={() => run(save, done)}>
       <div className={pricingGrid(!!(c && bom))}>
         <section aria-label="Selling price" className={priceColumn(!!(c && bom))}>
-          <SectionHeader label={`Selling price, ${fy}`} />
+          <SectionHeader label={`Selling price and margin, ${fy}`} />
           <div className="space-y-3">
             <Field label="Selling price per unit" hint="What you plan to sell one unit for this financial year. Leave blank to remove it." error={!priceValid ? 'Enter a selling price above zero.' : undefined}>
-              <CurrencyInput value={price} onChange={setPrice} />
+              <CurrencyInput value={price} onChange={(v) => { setPrice(v); setAuto(false); }} />
             </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Target margin %" hint="Your goal. Fills the price if none is set." error={!targetOk ? 'Enter 0 up to 100.' : undefined}><Input type="number" min="0" max="99.99" step="0.5" className={ctl} value={target} onChange={(e) => changeTarget(e.target.value)} /></Field>
+              <Field label="Minimum margin %" hint="Below this is flagged." error={!floorOk ? 'Enter 0 up to 100.' : !orderOk ? 'Cannot be above the target.' : undefined}><Input type="number" min="0" max="99.99" step="0.5" className={ctl} value={floor} onChange={(e) => setFloor(e.target.value)} /></Field>
+            </div>
             <div className="space-y-1 text-[13px] text-[var(--shell-text)]">
               <p>{unit > 0 ? <>Cost per unit: <strong className="tabular-nums">{money(unit)}</strong> ({p.basis === 'STANDARD' ? 'approved standard cost' : 'rolled-up cost, no standard cost approved yet'}).</> : 'There is no cost for this product yet, so margin cannot be worked out.'}</p>
               {margin != null && <p>Profit per unit: <strong className="tabular-nums">{money(sell - unit)}</strong>. Margin: <strong className="tabular-nums">{margin.toFixed(1)}%</strong> of the selling price.</p>}
-              {marginAtNew != null && <p className="text-[var(--shell-text-muted)]">With the cost settings below, the rolled-up cost is {money(rolled)} and the margin would be {marginAtNew.toFixed(1)}%.</p>}
+              {goal && <p className={goal.tone}>{goal.text}</p>}
+              {marginAtNew != null && <p className="text-[var(--shell-text-muted)]">With the cost settings on the right, the rolled-up cost is {money(rolled)} and the margin would be {marginAtNew.toFixed(1)}%.</p>}
             </div>
+            {offer != null && (price === '' || !priceValid || Math.abs(sell - offer) > 0.005) && (
+              <div className="flex items-center justify-between gap-3 rounded-md border border-[var(--shell-border)] p-3 text-[13px]">
+                <span>Price for the target margin: <strong className="tabular-nums">{money(offer)}</strong></span>
+                <Button type="button" variant="outline" size="sm" onClick={() => { setPrice(String(offer)); setAuto(true); }} className="h-8 shrink-0 px-3 text-[13px] font-medium">Use this price</Button>
+              </div>
+            )}
           </div>
         </section>
 

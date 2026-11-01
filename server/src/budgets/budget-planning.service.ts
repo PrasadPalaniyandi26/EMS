@@ -410,7 +410,7 @@ export class BudgetPlanningService {
       const mine = bases.filter((b) => b.projectId === p.id);
       const state = mine.some((b) => b.status === 'APPROVED') ? 'BASELINE' : mine.some((b) => b.status === 'PROPOSED') ? 'PROPOSED' : est ? 'DRAFT' : null;
       return {
-        id: p.id, code: p.code, name: p.name, client_name: p.client?.name ?? null, contract_value: cv, target_margin_pct: p.targetMarginPct == null ? null : n(p.targetMarginPct),
+        id: p.id, code: p.code, name: p.name, client_name: p.client?.name ?? null, contract_value: cv, target_margin_pct: p.targetMarginPct == null ? null : n(p.targetMarginPct), min_margin_pct: p.minMarginPct == null ? null : n(p.minMarginPct),
         risk_rating: p.riskRating, estimate_status: state, estimate_total: t?.total ?? null, actual: r2(ac.get(p.id) ?? 0),
         projected_margin_pct: cv && t ? r2(((cv - t.total) / cv) * 100) : null,
       };
@@ -488,12 +488,12 @@ export class BudgetPlanningService {
     };
     const projectedCost = r2(eac * (1 + n(est?.warrantyPct) / 100));
     const margin = {
-      contract_value: cv, target_pct: p.targetMarginPct == null ? null : n(p.targetMarginPct),
+      contract_value: cv, target_pct: p.targetMarginPct == null ? null : n(p.targetMarginPct), min_pct: p.minMarginPct == null ? null : n(p.minMarginPct),
       estimate_margin_pct: cv ? r2(((cv - t.total) / cv) * 100) : null,
       projected_margin_pct: cv && !spendLow ? r2(((cv - projectedCost) / cv) * 100) : null,
     };
     return {
-      project: { id: p.id, code: p.code, name: p.name, client_name: p.client?.name ?? null, contract_value: cv, target_margin_pct: margin.target_pct, risk_rating: p.riskRating, start_date: p.start_date, end_date: p.end_date, type_code: p.type?.code ?? null, has_job_bom: !!p.type?.hasJobBom },
+      project: { id: p.id, code: p.code, name: p.name, client_name: p.client?.name ?? null, contract_value: cv, target_margin_pct: margin.target_pct, min_margin_pct: margin.min_pct, risk_rating: p.riskRating, start_date: p.start_date, end_date: p.end_date, type_code: p.type?.code ?? null, has_job_bom: !!p.type?.hasJobBom },
       estimate: est ? { id: est.id, version: est.version, contingency_pct: n(est.contingencyPct), warranty_pct: n(est.warrantyPct), note: est.note } : null,
       baselines, baseline: approved, changed_since_baseline: approved ? approved.total !== t.total : false,
       lines, phases, totals: t, margin, evm,
@@ -508,6 +508,16 @@ export class BudgetPlanningService {
     const data: any = {};
     if (b.contract_value !== undefined) data.contractValue = b.contract_value === '' || b.contract_value === null ? null : Number(b.contract_value);
     if (b.target_margin_pct !== undefined) data.targetMarginPct = b.target_margin_pct === '' || b.target_margin_pct === null ? null : Number(b.target_margin_pct);
+    if (b.min_margin_pct !== undefined) {
+      data.minMarginPct = b.min_margin_pct === '' || b.min_margin_pct === null ? null : Number(b.min_margin_pct);
+      if (data.minMarginPct != null && (!Number.isFinite(data.minMarginPct) || data.minMarginPct < 0 || data.minMarginPct >= 100)) throw bad('Minimum margin must be from 0 up to, but not including, 100.');
+    }
+    if (data.targetMarginPct !== undefined || data.minMarginPct !== undefined) {
+      const stored = await this.prisma.project.findUnique({ where: { id }, select: { targetMarginPct: true, minMarginPct: true } });
+      const target = data.targetMarginPct !== undefined ? data.targetMarginPct : stored?.targetMarginPct == null ? null : n(stored.targetMarginPct);
+      const floor = data.minMarginPct !== undefined ? data.minMarginPct : stored?.minMarginPct == null ? null : n(stored.minMarginPct);
+      if (target != null && floor != null && floor > target) throw bad('The minimum margin cannot be above the target margin.');
+    }
     if (b.risk_rating !== undefined) {
       if (b.risk_rating && !['LOW', 'MEDIUM', 'HIGH'].includes(b.risk_rating)) throw bad('Risk must be low, medium or high.');
       data.riskRating = b.risk_rating || null;
@@ -760,7 +770,7 @@ export class BudgetPlanningService {
     const planNow = await this.prisma.budgetPlan.findUnique({ where: { fy: fyNow } });
     const e200Now = await this.prisma.categoryType.findFirst({ where: { code: 'E200' } });
     const lineProducts = new Set<number>(planNow && e200Now ? (await this.prisma.budgetLine.findMany({ where: { planId: planNow.id, typeId: e200Now.id, isActive: true, productId: { not: null } }, select: { productId: true } })).map((x) => x.productId as number) : []);
-    const prices = new Map((await this.prisma.productPrice.findMany({ where: { fy: fyNow } })).map((x) => [x.productId, n(x.price)]));
+    const priceRows = new Map((await this.prisma.productPrice.findMany({ where: { fy: fyNow } })).map((x) => [x.productId, x]));
     const out: any[] = [];
     for (const p of products) {
       const bom = boms.find((b) => b.productId === p.id);
@@ -769,9 +779,10 @@ export class BudgetPlanningService {
       const standard = p.standardCost == null ? null : n(p.standardCost);
       // Margin is measured on the standard cost once one is approved, otherwise on the rolled-up cost
       const unit = standard ?? cost;
-      const price = prices.get(p.id) ?? null;
+      const pr = priceRows.get(p.id);
+      const price = pr?.price == null ? null : n(pr.price);
       out.push({ id: p.id, code: p.code, name: p.name, client_name: p.client?.name ?? null, bom_status: bom?.status ?? null, bom_lines: bom?._count.lines ?? 0, rolled_cost: cost, standard_cost: standard, standard_approved_at: sc?.approvedAt ?? null, standard_fy: sc?.fy ?? null, fy: fyNow, plan_status: planNow?.status ?? null, budget_line: lineProducts.has(p.id),
-        selling_price: price, margin_pct: price != null && unit != null && unit > 0 ? r2(((price - unit) / price) * 100) : null });
+        selling_price: price, target_margin_pct: pr?.targetMarginPct == null ? null : n(pr.targetMarginPct), min_margin_pct: pr?.minMarginPct == null ? null : n(pr.minMarginPct), margin_pct: price != null && unit != null && unit > 0 ? r2(((price - unit) / price) * 100) : null });
     }
     return out;
   }
@@ -818,10 +829,18 @@ export class BudgetPlanningService {
     const priceVariance = roll ? r2(roll.lines.reduce((a: number, l: any) => a + l.item_drift, 0) * actualUnits) : 0;
     // Selling price for the year against the cost per unit (the approved standard cost, else the rolled-up cost)
     const priceRow = await this.prisma.productPrice.findUnique({ where: { productId_fy: { productId: id, fy } } });
-    const sell = priceRow ? n(priceRow.price) : null;
+    const sell = priceRow?.price == null ? null : n(priceRow.price);
     const costed = sell != null && unit > 0;
+    const target = priceRow?.targetMarginPct == null ? null : n(priceRow.targetMarginPct);
+    const floor = priceRow?.minMarginPct == null ? null : n(priceRow.minMarginPct);
+    // The live roll-up shows where margin is heading when parts or rates have moved since the standard cost was approved
+    const live = roll && roll.cost.total > 0 ? roll.cost.total : null;
     const pricing = {
       fy, price: sell, updated_by_name: priceRow?.updatedByName ?? null, updated_at: priceRow?.updatedAt ?? null, unit_cost: r2(unit), basis: standardUnit != null ? 'STANDARD' : 'ROLLED',
+      target_margin_pct: target, min_margin_pct: floor,
+      price_for_target: target != null && unit > 0 ? r2(unit / (1 - target / 100)) : null,
+      price_for_min: floor != null && unit > 0 ? r2(unit / (1 - floor / 100)) : null,
+      rolled_cost: live == null ? null : r2(live), margin_at_rolled_pct: sell != null && live != null ? r2(((sell - live) / sell) * 100) : null,
       profit_unit: costed ? r2(sell! - unit) : null, margin_pct: costed ? r2(((sell! - unit) / sell!) * 100) : null,
       planned_revenue: sell != null ? r2(sell * plannedUnits) : null, planned_profit: costed ? r2((sell! - unit) * plannedUnits) : null,
       built_revenue: sell != null ? r2(sell * actualUnits) : null, built_profit: costed ? r2((sell! - unit) * actualUnits) : null,
@@ -1153,27 +1172,39 @@ export class BudgetPlanningService {
   }
 
   // The selling price planned for this product in the current financial year; blank removes it
-  async saveProductPrice(productId: number, b: { price?: any }, user?: Actor) {
+  // The price and margin goals for this product in the current financial year; a blank value clears it, and the row goes once all three are blank.
+  // The price is what is quoted, so it stays as entered when the cost moves; the margins are goals to track against.
+  async saveProductPrice(productId: number, b: { price?: any; target_margin_pct?: any; min_margin_pct?: any }, user?: Actor) {
     if (!(await this.prisma.product.findUnique({ where: { id: productId }, select: { id: true } }))) throw bad('Product not found.', HttpStatus.NOT_FOUND);
     const s = await this.budgets.getSettings();
     const fy = this.budgets.fyOf(new Date(), s.fyStartMonth);
     const where = { productId_fy: { productId, fy } };
     const before = await this.prisma.productPrice.findUnique({ where });
-    if (b.price === '' || b.price == null) {
+    const blank = (v: any) => v === '' || v == null;
+    const margin = (v: any, label: string) => {
+      if (blank(v)) return null;
+      const x = Number(v);
+      if (!Number.isFinite(x) || x < 0 || x >= 100) throw bad(`${label} must be from 0 up to, but not including, 100.`);
+      return x;
+    };
+    // A field left out of the request keeps what is stored; one sent blank is cleared
+    const price = b.price === undefined ? (before?.price == null ? null : n(before.price)) : blank(b.price) ? null : Number(b.price);
+    if (price != null && (!Number.isFinite(price) || price <= 0)) throw bad('Enter a selling price above zero.');
+    if (price != null && price > 99999999999) throw bad('That selling price is too large.');
+    const target = b.target_margin_pct === undefined ? (before?.targetMarginPct == null ? null : n(before.targetMarginPct)) : margin(b.target_margin_pct, 'Target margin');
+    const min = b.min_margin_pct === undefined ? (before?.minMarginPct == null ? null : n(before.minMarginPct)) : margin(b.min_margin_pct, 'Minimum margin');
+    if (target != null && min != null && min > target) throw bad('The minimum margin cannot be above the target margin.');
+    const was = before ? { fy, price: before.price == null ? null : n(before.price), target_margin_pct: before.targetMarginPct == null ? null : n(before.targetMarginPct), min_margin_pct: before.minMarginPct == null ? null : n(before.minMarginPct) } : undefined;
+    if (price == null && target == null && min == null) {
       if (before) {
         await this.prisma.productPrice.delete({ where });
-        this.log('product_prices', productId, 'DELETE', user?.id, {}, { fy, price: n(before.price) });
+        this.log('product_prices', productId, 'DELETE', user?.id, {}, was);
       }
       return { ok: true };
     }
-    const price = Number(b.price);
-    if (!Number.isFinite(price) || price <= 0) throw bad('Enter a selling price above zero.');
-    if (price > 99999999999) throw bad('That selling price is too large.');
-    await this.prisma.productPrice.upsert({
-      where, update: { price, updatedById: user?.id ?? null, updatedByName: user?.username ?? null },
-      create: { productId, fy, price, updatedById: user?.id ?? null, updatedByName: user?.username ?? null },
-    });
-    this.log('product_prices', productId, before ? 'UPDATE' : 'INSERT', user?.id, { fy, price }, before ? { fy, price: n(before.price) } : undefined);
+    const data = { price, targetMarginPct: target, minMarginPct: min, updatedById: user?.id ?? null, updatedByName: user?.username ?? null };
+    await this.prisma.productPrice.upsert({ where, update: data, create: { productId, fy, ...data } });
+    this.log('product_prices', productId, before ? 'UPDATE' : 'INSERT', user?.id, { fy, price, target_margin_pct: target, min_margin_pct: min }, was);
     return { ok: true };
   }
 
