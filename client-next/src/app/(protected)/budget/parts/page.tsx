@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Download, Plus, ShoppingCart, Tags, Upload } from 'lucide-react';
+import { Download, Network, Plus, ShoppingCart, Tags, Upload } from 'lucide-react';
 import { ColumnDef, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, getSortedRowModel, SortingState } from '@tanstack/react-table';
 import api from '@/lib/api-client';
 import { downloadCsv, toCsv } from '@/lib/csv';
@@ -19,7 +19,7 @@ import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { ConfirmDialog, NativeSelect } from '@/components/shared/modal-primitives';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
-import { ItemCategoriesModal, ItemModal, RecordPurchaseModal } from '@/components/budgets/planning-modals';
+import { ItemCategoriesModal, ItemModal, PartUsageModal, RecordPurchaseModal } from '@/components/budgets/planning-modals';
 import { useItemCategories } from '@/hooks/use-planning-queries';
 import { ImportModal } from '@/components/budgets/import-modal';
 import { money, unitPlain } from '@/components/budgets/budget-ui';
@@ -43,7 +43,7 @@ export default function PartMasterPage() {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [selection, setSelection] = useState<Record<string, boolean>>({});
   const [sourcing, setSourcing] = useState<Sourcing>('ALL'); const [price, setPrice] = useState<Price>('ALL'); const [use, setUse] = useState<Use>('ALL');
-  const [open, setOpen] = useState(false); const [editing, setEditing] = useState<Item | null>(null); const [del, setDel] = useState<Item | null>(null); const [buyFor, setBuyFor] = useState<Item | null>(null); const [catsOpen, setCatsOpen] = useState(false); const [category, setCategory] = useState('ALL');
+  const [open, setOpen] = useState(false); const [editing, setEditing] = useState<Item | null>(null); const [del, setDel] = useState<Item | null>(null); const [buyFor, setBuyFor] = useState<Item | null>(null); const [catsOpen, setCatsOpen] = useState(false); const [whereFor, setWhereFor] = useState<Item | null>(null); const [category, setCategory] = useState('ALL');
   const categories = useItemCategories(); const [impOpen, setImpOpen] = useState(false);
   useEffect(() => { setHeader('Part master', 'Parts, bought or made, and their standard prices'); }, [setHeader]);
 
@@ -80,10 +80,14 @@ export default function PartMasterPage() {
   const prices = useItemPrices(selected?.id ?? null);
   const canUseLast = !!selected && selected.sourcing === 'BUY' && selected.last_price != null && selected.last_price !== selected.standard_price;
 
-  const itemActions: DetailActionDef[] = !selected || !canEdit ? [] : [
-    { label: 'Edit', onClick: () => { setEditing(selected); setOpen(true); } },
-    { label: 'Record purchase', variant: 'primary' as const, icon: <ShoppingCart className="h-4 w-4 text-[var(--nav-violet)]" />, onClick: () => setBuyFor(selected) },
-    { label: selected.used_in ? 'Archive' : 'Delete', variant: 'danger', onClick: () => setDel(selected) },
+  // Anyone can see where a part is used; changing it is for Finance and Admin
+  const itemActions: DetailActionDef[] = !selected ? [] : [
+    ...(canEdit ? [
+      { label: 'Edit', onClick: () => { setEditing(selected); setOpen(true); } },
+      { label: 'Record purchase', variant: 'primary' as const, icon: <ShoppingCart className="h-4 w-4 text-[var(--nav-violet)]" />, onClick: () => setBuyFor(selected) },
+    ] : []),
+    { label: 'Where used', icon: <Network className="h-4 w-4 text-[var(--nav-orange)]" />, onClick: () => setWhereFor(selected) },
+    ...(canEdit ? [{ label: selected.used_in ? 'Archive' : 'Delete', variant: 'danger' as const, onClick: () => setDel(selected) }] : []),
   ];
   const exportParts = () => downloadCsv('part-master.csv', toCsv(PART_HEADERS, (data ?? []).map((i) => [i.part_no, i.name, i.category_name ?? '', i.sourcing === 'MAKE' ? 'Make' : 'Buy', i.uom, i.standard_price, i.material_cost ?? '', i.manufacturing_cost ?? '', i.last_price ?? '', i.supplier ?? '', i.lead_time_days ?? ''])));
   const alwaysActions: DetailActionDef[] = [
@@ -191,6 +195,7 @@ export default function PartMasterPage() {
         message={del?.used_in ? `${del.name} is in ${del.used_in} BOM line(s). It will be archived and leave the pickers. Adding a part with the same number brings it back.` : `Delete ${del?.name}?`} onCancel={() => setDel(null)}
         onConfirm={async () => { const i = del; setDel(null); if (!i) return; try { await api.delete(`/budgets/items/${i.id}`); toast.success(i.used_in ? 'Part archived.' : 'Part deleted.'); invalidate('budgets'); setSelection({}); } catch (e: any) { toast.error(e?.message || 'Could not remove.'); } }} />
       <ItemCategoriesModal isOpen={catsOpen} onClose={() => setCatsOpen(false)} />
+      <PartUsageModal isOpen={!!whereFor} onClose={() => setWhereFor(null)} item={whereFor} />
       <RecordPurchaseModal isOpen={!!buyFor} onClose={() => setBuyFor(null)} item={buyFor} />
       <ImportModal isOpen={impOpen} onClose={() => setImpOpen(false)} title="Import parts" endpoint="/budgets/items/import" templateName="part-master-template.csv" headers={PART_HEADERS}
         sample={[['CONN-24', '24-pin terminal block', 'Electronics', 'Buy', 'nos', '95', '', '', '102', 'Phoenix', '10'], ['SUB-FRAME', 'Welded frame', 'Mechanical', 'Make', 'nos', '', '4200', '1800', '', '', '']]}

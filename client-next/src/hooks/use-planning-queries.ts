@@ -42,7 +42,7 @@ export interface ProjectBudget {
   evm: Evm; milestones: Milestone[]; rate_cards: RateCard[]; suggested_contingency_pct: number;
 }
 
-export interface ItemUse { kind: 'PRODUCT' | 'JOB'; id: number; code: string | null; name: string; quantity: number; scrap_pct: number }
+export interface ItemUse { kind: 'PRODUCT' | 'JOB'; id: number; code: string | null; name: string; client_name: string | null; quantity: number; scrap_pct: number; line_cost: number }
 export interface ProductPricing {
   fy: number; price: number | null; updated_by_name: string | null; updated_at: string | null; unit_cost: number; basis: 'STANDARD' | 'ROLLED';
   target_margin_pct: number | null; min_margin_pct: number | null; price_for_target: number | null; price_for_min: number | null; rolled_cost: number | null; margin_at_rolled_pct: number | null;

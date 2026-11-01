@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, ArrowLeftRight, CheckCircle2, XCircle, ClipboardList, Clock } from 'lucide-react';
+import { Plus, Pencil, Trash2, ArrowLeftRight, CheckCircle2, XCircle, ClipboardList, Clock, Network } from 'lucide-react';
 import { fyLabel } from '@/hooks/use-budget-queries';
 import api from '@/lib/api-client';
 import { ModuleModal } from '@/components/shared/module/module-modal';
@@ -14,8 +14,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useCategoryTypes, useInvalidate } from '@/hooks/use-queries';
 import { useBudgetMonitor } from '@/hooks/use-budget-queries';
 import type { BaselineRow, BudgetChangeRow, CloseLine, EstimateLineRow, Item, JobBom, Milestone, OperationRow, OperationType, BomLineRow, OverheadRate, RateCard, ProductCosting, ProjectBudget } from '@/hooks/use-planning-queries';
-import { money, plain, unitPrice } from '@/components/budgets/budget-ui';
-import { useItemCategories, useEstimatePhases, type ItemCategory } from '@/hooks/use-planning-queries';
+import { Grid, money, plain, td, unitPrice } from '@/components/budgets/budget-ui';
+import { useItemCategories, useEstimatePhases, useItemUsage, type ItemCategory } from '@/hooks/use-planning-queries';
 import { ManageList } from '@/components/manage/manage-list';
 import { sortByCode } from '@/lib/codes';
 import { cn } from '@/lib/utils';
@@ -318,8 +318,8 @@ export function ItemModal({ isOpen, onClose, editing }: Base & { editing: Item |
         ) : (
           <Field label="Standard price" required><CurrencyInput value={f.standard_price} onChange={set('standard_price')} /></Field>
         )}
-        <Field label="Last paid price" hint="Shows the drift from standard."><CurrencyInput value={f.last_price} onChange={set('last_price')} /></Field>
         <Field label="Unit of measure">{text(f.uom, set('uom'), { maxLength: 12 })}</Field>
+        <Field label="Last paid price" hint="Shows the drift from standard."><CurrencyInput value={f.last_price} onChange={set('last_price')} /></Field>
         <Field label="Lead time (days)"><Input type="number" min="0" className={ctl} value={f.lead_time_days} onChange={(e) => set('lead_time_days')(e.target.value)} /></Field>
         <div className="md:col-span-2"><Field label="Supplier">{text(f.supplier, set('supplier'), { maxLength: 120 })}</Field></div>
       </div>
@@ -641,6 +641,51 @@ export function BomSettingsModal({ isOpen, onClose, url, freight, warranty }: Ba
       <div className="space-y-3">
         <Field label="Freight and handling %" required hint="Added to parts and scrap."><Input type="number" min="0" max="100" step="0.5" className={ctl} value={fr} onChange={(e) => setFr(e.target.value)} /></Field>
         {warranty != null && <Field label="Warranty %" required hint="Added to the whole cost."><Input type="number" min="0" max="100" step="0.5" className={ctl} value={wa} onChange={(e) => setWa(e.target.value)} /></Field>}
+      </div>
+    </ModuleModal>
+  );
+}
+
+// Where a part is used: one row per product or job BOM, with what the part adds to one unit there
+export function PartUsageModal({ isOpen, onClose, item }: Base & { item: Item | null }) {
+  const usage = useItemUsage(isOpen && item ? item.id : null);
+  const rows = useMemo(() => {
+    const byOwner = new Map<string, { key: string; kind: 'PRODUCT' | 'JOB'; code: string | null; name: string; client: string | null; quantity: number; cost: number; lines: number }>();
+    for (const u of usage.data ?? []) {
+      const key = `${u.kind}-${u.id}`;
+      const r = byOwner.get(key) ?? { key, kind: u.kind, code: u.code, name: u.name, client: u.client_name, quantity: 0, cost: 0, lines: 0 };
+      r.quantity += u.quantity; r.cost += u.line_cost; r.lines += 1;
+      byOwner.set(key, r);
+    }
+    return [...byOwner.values()].sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'PRODUCT' ? -1 : 1) || (a.code ?? a.name).localeCompare(b.code ?? b.name));
+  }, [usage.data]);
+  if (!item) return null;
+  const products = rows.filter((r) => r.kind === 'PRODUCT').length; const jobs = rows.length - products;
+  const qty = (v: number) => String(Math.round(v * 1000) / 1000);
+  return (
+    <ModuleModal isOpen={isOpen} onClose={onClose} size="lg" title={`Where used: ${item.part_no}`} icon={<Network className="h-4 w-4" />}
+      footer={<Button onClick={onClose} className="h-8 px-5 text-[12px] font-semibold">Close</Button>}>
+      <div className="space-y-3">
+        <p className="text-[13px] text-[var(--shell-text)]">
+          <strong>{item.name}</strong> at a standard price of <span className="tabular-nums">{unitPrice(item.standard_price)}</span> per {item.uom}.
+          {usage.data && (rows.length ? ` It is in ${[products ? `${products} product${products === 1 ? '' : 's'}` : '', jobs ? `${jobs} job BOM${jobs === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and ')}.` : ' It is not in any BOM.')}
+        </p>
+        {usage.isLoading ? <p className="text-[12px] text-[var(--shell-text-muted)]">Loading…</p> : rows.length > 0 && (
+          <div className="max-h-[50vh] overflow-auto rounded-md border border-[var(--shell-border)]">
+            <Grid head={[{ label: 'Used in' }, { label: 'Type', w: 'w-28' }, { label: 'Client' }, { label: 'Quantity per unit', right: true, w: 'w-40' }, { label: 'Cost per unit', right: true, w: 'w-36' }]}>
+              {rows.map((r) => (
+                <tr key={r.key}>
+                  <td className={td}><span className="text-[12px] text-[var(--shell-text-muted)]">{r.code}</span> <span className="font-medium">{r.name}</span></td>
+                  <td className={td}>{r.kind === 'PRODUCT' ? 'Product' : 'Job BOM'}</td>
+                  <td className={cn(td, 'text-[var(--shell-text-muted)]')}>{r.client ?? '—'}</td>
+                  <td className={cn(td, 'text-right tabular-nums')}>{qty(r.quantity)} {item.uom}{r.lines > 1 && <span className="text-[var(--shell-text-muted)]"> ({r.lines} lines)</span>}</td>
+                  <td className={cn(td, 'text-right font-medium tabular-nums')}>{unitPrice(r.cost)}</td>
+                </tr>
+              ))}
+            </Grid>
+          </div>
+        )}
+        {rows.length > 0 && <p className="text-[12px] text-[var(--shell-text-muted)]">Cost per unit is the quantity, with scrap, at the part's standard price. A product that lists the part on more than one line is shown once, with the lines added together.</p>}
       </div>
     </ModuleModal>
   );

@@ -370,18 +370,22 @@ export class BudgetPlanningService {
 
   // Where a part is used: the products and job BOMs that have a line for it
   async itemUsage(id: number) {
+    const item = await this.prisma.item.findUnique({ where: { id }, select: { standardPrice: true } });
+    const price = item ? n(item.standardPrice) : 0;
     const lines = await this.prisma.bomLine.findMany({ where: { itemId: id }, include: { bom: true }, orderBy: { id: 'asc' } });
     const productIds = lines.map((l) => l.bom.productId).filter((x): x is number => x != null);
     const projectIds = lines.map((l) => l.bom.projectId).filter((x): x is number => x != null);
-    const [products, projects] = await Promise.all<{ id: number; code: string | null; name: string }[]>([
-      productIds.length ? this.prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true, code: true, name: true } }) : [],
-      projectIds.length ? this.prisma.project.findMany({ where: { id: { in: projectIds } }, select: { id: true, code: true, name: true } }) : [],
+    const [products, projects] = await Promise.all<{ id: number; code: string | null; name: string; client: { name: string } | null }[]>([
+      productIds.length ? this.prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true, code: true, name: true, client: { select: { name: true } } } }) : [],
+      projectIds.length ? this.prisma.project.findMany({ where: { id: { in: projectIds } }, select: { id: true, code: true, name: true, client: { select: { name: true } } } }) : [],
     ]);
     return lines.map((l) => {
       const prod = l.bom.productId != null ? products.find((x) => x.id === l.bom.productId) : null;
       const proj = l.bom.projectId != null ? projects.find((x) => x.id === l.bom.projectId) : null;
       const o = prod ?? proj;
-      return { kind: prod ? 'PRODUCT' : 'JOB', id: o?.id ?? 0, code: o?.code ?? null, name: o?.name ?? 'Unknown', quantity: n(l.quantity), scrap_pct: n(l.scrapPct) };
+      const quantity = n(l.quantity); const scrap = n(l.scrapPct);
+      // What the line adds to one unit of the product (or one job), at the part's standard price and with scrap
+      return { kind: prod ? 'PRODUCT' : 'JOB', id: o?.id ?? 0, code: o?.code ?? null, name: o?.name ?? 'Unknown', client_name: o?.client?.name ?? null, quantity, scrap_pct: scrap, line_cost: r2(quantity * (1 + scrap / 100) * price) };
     });
   }
 
