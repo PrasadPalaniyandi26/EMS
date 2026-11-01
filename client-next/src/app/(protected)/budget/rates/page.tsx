@@ -82,10 +82,10 @@ export default function RatesPage() {
   const exportRates = () => downloadCsv('cost-rates.csv', toCsv(['role', 'rate_per_hour', 'effective_from'], (data?.cards ?? []).map((c) => [c.role, c.rate_per_hour, String(c.effective_from).slice(0, 10)])));
   const alwaysActions: DetailActionDef[] = tab === 'cards'
     ? [
-        ...(canEdit ? [{ label: 'Add rate', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setCard(null); setCardOpen(true); } }, { label: 'Import', icon: <Upload className="h-4 w-4 text-[var(--info)]" />, onClick: () => setImpOpen(true) }] : []),
+        ...(canEdit ? [{ label: 'Add rate', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setCard(null); setCardOpen(true); } }, { label: 'Import', icon: <Upload className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setImpOpen(true) }] : []),
         { label: 'Export', icon: <Download className="h-4 w-4 text-[var(--shell-text-muted)]" />, onClick: exportRates },
       ]
-    : !canEdit ? [] : [{ label: 'Add pool', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setOh(null); setOhOpen(true); } }, { label: 'Base hours', icon: <Clock className="h-4 w-4 text-[var(--info)]" />, onClick: () => setBaseOpen(true) }];
+    : !canEdit ? [] : [{ label: 'Add pool', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setOh(null); setOhOpen(true); } }, { label: 'Base hours', icon: <Clock className="h-4 w-4 text-[var(--nav-cyan)]" />, onClick: () => setBaseOpen(true) }];
 
   const remove = async (job: () => Promise<any>, ok: string, archivedMsg?: string) => { try { const r = await job(); toast.success(r?.data?.archived && archivedMsg ? archivedMsg : ok); invalidate('budgets'); setSelection({}); } catch (e: any) { toast.error(e?.message || 'Could not remove.'); } };
 

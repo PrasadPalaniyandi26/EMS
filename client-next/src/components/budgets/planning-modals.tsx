@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, ArrowLeftRight, CheckCircle2, XCircle, ClipboardList, Clock } from 'lucide-react';
 import { fyLabel } from '@/hooks/use-budget-queries';
 import api from '@/lib/api-client';
 import { ModuleModal } from '@/components/shared/module/module-modal';
-import { ConfirmDialog, Field, NativeSelect, CurrencyInput, SegmentedControl, inp } from '@/components/shared/modal-primitives';
+import { ConfirmDialog, Field, NativeSelect, CurrencyInput, SectionHeader, SegmentedControl, inp } from '@/components/shared/modal-primitives';
 import { PickSelect } from '@/components/shared/pick-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,7 @@ import { money, plain, unitPrice } from '@/components/budgets/budget-ui';
 import { useItemCategories, useEstimatePhases, type ItemCategory } from '@/hooks/use-planning-queries';
 import { ManageList } from '@/components/manage/manage-list';
 import { sortByCode } from '@/lib/codes';
+import { cn } from '@/lib/utils';
 
 const ctl = `${inp} border-input bg-transparent text-[var(--shell-text)]`;
 const text = (v: string, set: (s: string) => void, extra: Record<string, unknown> = {}) => (
@@ -44,41 +45,88 @@ function useSaver(onClose: () => void) {
 
 interface Base { isOpen: boolean; onClose: () => void }
 
+// One layout for the product and project "Price and costing" dialogs: what it sells for on the left, what it costs on the right
+const pricingGrid = (two: boolean) => cn('grid grid-cols-1 gap-y-5', two && 'md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]');
+const priceColumn = (two: boolean) => cn(two && 'md:pr-6');
+const COST_COLUMN = 'md:border-l md:border-[var(--shell-border)] md:pl-6';
+
 // ─── Project settings ────────────────────────────────────────────────────────
 
 export function ProjectSettingsModal({ isOpen, onClose, data }: Base & { data: ProjectBudget | undefined }) {
   const { saving, run } = useSaver(onClose);
   const [cv, setCv] = useState(''); const [tm, setTm] = useState(''); const [risk, setRisk] = useState('');
   const [cont, setCont] = useState(''); const [war, setWar] = useState('');
+  // Fill the fields when the dialog opens only, so a refresh in the background never wipes what is being typed
+  const latest = useRef(data); latest.current = data;
   useEffect(() => {
-    if (!isOpen || !data) return;
-    setCv(data.project.contract_value != null ? String(data.project.contract_value) : '');
-    setTm(data.project.target_margin_pct != null ? String(data.project.target_margin_pct) : '');
-    setRisk(data.project.risk_rating ?? '');
-    setCont(String(data.estimate?.contingency_pct ?? data.suggested_contingency_pct));
-    setWar(String(data.estimate?.warranty_pct ?? 2));
-  }, [isOpen, data]);
+    const d = latest.current;
+    if (!isOpen || !d) return;
+    setCv(d.project.contract_value != null ? String(d.project.contract_value) : '');
+    setTm(d.project.target_margin_pct != null ? String(d.project.target_margin_pct) : '');
+    setRisk(d.project.risk_rating ?? '');
+    setCont(String(d.estimate?.contingency_pct ?? d.suggested_contingency_pct));
+    setWar(String(d.estimate?.warranty_pct ?? 2));
+  }, [isOpen]);
+  const est = data?.estimate ?? null;
+  const num = (v: string) => (v === '' ? NaN : Number(v));
+  const cvN = num(cv); const tmN = num(tm); const contN = num(cont); const warN = num(war);
+  const cvOk = cv === '' || cvN >= 0;
+  const tmOk = tm === '' || (tmN >= 0 && tmN <= 100);
+  const allowOk = !est || (contN >= 0 && contN <= 100 && warN >= 0 && warN <= 100);
+  // What the estimate comes to with these allowances: warranty is charged on direct cost plus contingency
+  const direct = data?.totals.direct ?? 0;
+  const contAmt = allowOk && est ? direct * (contN / 100) : 0;
+  const warAmt = allowOk && est ? (direct + contAmt) * (warN / 100) : 0;
+  const total = direct + contAmt + warAmt;
+  const hasCv = cv !== '' && cvOk && cvN > 0;
+  const margin = est && allowOk && hasCv ? ((cvN - total) / cvN) * 100 : null;
+  const target = tm !== '' && tmOk ? tmN : null;
   return (
-    <ModuleModal isOpen={isOpen} onClose={onClose} title="Contract and margin" icon={<Pencil className="h-4 w-4" />} size="sm" canSave={!saving}
+    <ModuleModal isOpen={isOpen} onClose={onClose} title="Price and costing" icon={<Pencil className="h-4 w-4" />} size={est ? 'xl' : 'sm'} saveLabel="Save changes" canSave={!saving && cvOk && tmOk && allowOk}
       onSave={() => run(() => api.put(`/budgets/projects/${data!.project.id}/settings`, {
         contract_value: cv === '' ? null : Number(cv), target_margin_pct: tm === '' ? null : Number(tm), risk_rating: risk || null,
-        ...(data?.estimate ? { contingency_pct: Number(cont), warranty_pct: Number(war) } : {}),
+        ...(est ? { contingency_pct: Number(cont), warranty_pct: Number(war) } : {}),
       }), 'Project updated.')}>
-      <div className="space-y-3">
-        <Field label="Contract value"><CurrencyInput value={cv} onChange={setCv} /></Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Target margin %"><Input type="number" min="0" max="100" step="0.5" className={ctl} value={tm} onChange={(e) => setTm(e.target.value)} /></Field>
-          <Field label="Risk">
-            <NativeSelect value={risk} onChange={(e) => setRisk(e.target.value)}>
-              <option value="">Not rated</option><option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option>
-            </NativeSelect>
-          </Field>
-        </div>
-        {data?.estimate && (
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Contingency %" hint={`Suggested ${data.suggested_contingency_pct}% for this risk.`}><Input type="number" min="0" max="100" step="0.5" className={ctl} value={cont} onChange={(e) => setCont(e.target.value)} /></Field>
-            <Field label="Warranty %"><Input type="number" min="0" max="100" step="0.5" className={ctl} value={war} onChange={(e) => setWar(e.target.value)} /></Field>
+      <div className={pricingGrid(!!est)}>
+        <section aria-label="Contract price" className={priceColumn(!!est)}>
+          <SectionHeader label="Contract price" />
+          <div className="space-y-3">
+            <Field label="Contract value" hint="What the client pays for the project." error={!cvOk ? 'Enter zero or more.' : undefined}><CurrencyInput value={cv} onChange={setCv} /></Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Target margin %" error={!tmOk ? 'Enter 0 to 100.' : undefined}><Input type="number" min="0" max="100" step="0.5" className={ctl} value={tm} onChange={(e) => setTm(e.target.value)} /></Field>
+              <Field label="Risk">
+                <NativeSelect value={risk} onChange={(e) => setRisk(e.target.value)}>
+                  <option value="">Not rated</option><option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option>
+                </NativeSelect>
+              </Field>
+            </div>
           </div>
+        </section>
+
+        {est && data && (
+          <section aria-label="Cost settings" className={COST_COLUMN}>
+            <SectionHeader label="Cost settings" />
+            <div className="space-y-3">
+              <p className="text-[12px] text-[var(--shell-text-muted)]">Added on top of the direct cost of the estimate lines. Warranty is charged on the direct cost plus contingency.</p>
+              <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+                <Field label="Contingency %" hint={`Suggested ${data.suggested_contingency_pct}% for this risk.`} error={!(contN >= 0 && contN <= 100) ? 'Enter 0 to 100.' : undefined}><Input type="number" min="0" max="100" step="0.5" className={ctl} value={cont} onChange={(e) => setCont(e.target.value)} /></Field>
+                <Field label="Warranty %" error={!(warN >= 0 && warN <= 100) ? 'Enter 0 to 100.' : undefined}><Input type="number" min="0" max="100" step="0.5" className={ctl} value={war} onChange={(e) => setWar(e.target.value)} /></Field>
+              </div>
+              <div className="space-y-1 rounded-md border border-[var(--shell-border)] p-3 text-[13px]">
+                <div className="flex justify-between"><span className="text-[var(--shell-text-muted)]">Direct cost</span><span className="tabular-nums">{money(direct)}</span></div>
+                <div className="flex justify-between"><span className="text-[var(--shell-text-muted)]">Contingency</span><span className="tabular-nums">{money(contAmt)}</span></div>
+                <div className="flex justify-between"><span className="text-[var(--shell-text-muted)]">Warranty</span><span className="tabular-nums">{money(warAmt)}</span></div>
+                <div className="flex justify-between border-t border-[var(--shell-border)] pt-1 font-medium"><span>Estimate</span><span className="tabular-nums">{money(total)}</span></div>
+              </div>
+              {margin != null && (
+                <p className={cn('text-[13px]', target != null && margin < target ? 'text-[var(--warning)]' : 'text-[var(--shell-text)]')}>
+                  Profit at estimate <strong className="tabular-nums">{money(cvN - total)}</strong>. Margin <strong className="tabular-nums">{margin.toFixed(1)}%</strong> of the contract value
+                  {target != null ? (margin >= target ? `, which meets the ${target}% target.` : `, below the ${target}% target. The contract value would need to be ${money(total / (1 - target / 100))} to reach it.`) : '.'}
+                </p>
+              )}
+              {!hasCv && <p className="text-[12px] text-[var(--shell-text-muted)]">Enter the contract value to see the margin.</p>}
+            </div>
+          </section>
         )}
       </div>
     </ModuleModal>
@@ -593,25 +641,48 @@ export function BomSettingsModal({ isOpen, onClose, url, freight, warranty }: Ba
   );
 }
 
-// A product's overhead rate, freight and warranty against the company defaults, with live feedback on what the change does
-export function CostAdjustmentsModal({ isOpen, onClose, data }: Base & { data: ProductCosting | undefined }) {
+// A product's selling price for the year and its cost settings (overhead rate, freight, warranty against the company defaults), in one dialog.
+// The price takes effect at once; the cost settings apply to the next standard cost that is proposed.
+export function ProductPricingModal({ isOpen, onClose, data }: Base & { data: ProductCosting | undefined }) {
   const { saving, run } = useSaver(onClose);
+  const invalidate = useInvalidate();
+  const [price, setPrice] = useState('');
   const [oh, setOh] = useState(''); const [fr, setFr] = useState(''); const [wa, setWa] = useState(''); const [why, setWhy] = useState('');
-  const c = data?.cost; const bom = data?.bom;
+  const c = data?.cost ?? null; const bom = data?.bom ?? null;
   const dOh = c?.default_overhead_rate ?? 0; const dFr = c?.default_freight_pct ?? 2; const dWa = c?.default_warranty_pct ?? 1.5;
+  // Fill the fields when the dialog opens only, so a refresh in the background never wipes what is being typed
+  const latest = useRef(data); latest.current = data;
   useEffect(() => {
-    if (!isOpen || !c || !bom) return;
-    setOh(String(bom.overhead_rate_override ?? dOh)); setFr(String(bom.freight_pct)); setWa(String(bom.warranty_pct)); setWhy(bom.adjust_reason ?? '');
-  }, [isOpen, c, bom, dOh]);
-  if (!data || !c || !bom) return null;
+    const d = latest.current;
+    if (!isOpen || !d) return;
+    setPrice(d.pricing.price != null ? String(d.pricing.price) : '');
+    if (d.cost && d.bom) {
+      setOh(String(d.bom.overhead_rate_override ?? d.cost.default_overhead_rate)); setFr(String(d.bom.freight_pct)); setWa(String(d.bom.warranty_pct)); setWhy(d.bom.adjust_reason ?? '');
+    }
+  }, [isOpen]);
+  if (!data) return null;
+
+  const p = data.pricing;
+  const fy = `${p.fy}-${String(p.fy + 1).slice(2)}`;
   const num = (v: string) => (v === '' ? NaN : Number(v));
+
+  // Selling price
+  const sell = num(price);
+  const priceValid = price === '' || (Number.isFinite(sell) && sell > 0);
+  const priceDirty = price === '' ? p.price != null : Number(price) !== p.price;
+  const unit = p.unit_cost;
+  const margin = price !== '' && priceValid && unit > 0 ? ((sell - unit) / sell) * 100 : null;
+
+  // Cost settings, only when the product has a cost to adjust
   const ohN = num(oh); const frN = num(fr); const waN = num(wa);
-  const valid = ohN >= 0 && frN >= 0 && frN <= 100 && waN >= 0 && waN <= 100;
-  const total = valid ? (c.base_cost + c.freight_base * (frN / 100) + c.hours * ohN) * (1 + waN / 100) : c.total;
-  const diff = total - c.total; const diffPct = c.total > 0 ? (diff / c.total) * 100 : 0;
-  const overridden = valid && (Math.abs(ohN - dOh) > 0.005 || frN !== dFr || waN !== dWa);
+  const costValid = !c || !bom || (ohN >= 0 && frN >= 0 && frN <= 100 && waN >= 0 && waN <= 100);
+  const costDirty = !!c && !!bom && costValid && (Math.abs(ohN - (bom.overhead_rate_override ?? dOh)) > 0.005 || frN !== bom.freight_pct || waN !== bom.warranty_pct || why.trim() !== (bom.adjust_reason ?? '').trim());
+  const rolled = c && costValid ? (c.base_cost + c.freight_base * (frN / 100) + c.hours * ohN) * (1 + waN / 100) : (c?.total ?? 0);
+  const diff = c ? rolled - c.total : 0; const diffPct = c && c.total > 0 ? (diff / c.total) * 100 : 0;
+  const overridden = !!c && costValid && (Math.abs(ohN - dOh) > 0.005 || frN !== dFr || waN !== dWa);
+  const needReason = costDirty && overridden && !why.trim();
   const notes: string[] = [];
-  if (valid) {
+  if (c && costValid) {
     if (c.hours <= 0) notes.push('This product has no in-house build hours, so the overhead rate changes nothing yet.');
     else if (ohN === 0) notes.push('Zero overhead means in-house work is costed as if the workshop were free. The overhead pools will not be recovered from this product.');
     else if (ohN < dOh - 0.005) notes.push(`Below the combined rate of ${money(dOh)}/h. The shortfall is not recovered from this product, so other products or the budget absorb it.`);
@@ -622,37 +693,69 @@ export function CostAdjustmentsModal({ isOpen, onClose, data }: Base & { data: P
     else if (waN > dWa * 2) notes.push(`Warranty is more than double the usual ${dWa}%. Use this only if the product has a known repair history.`);
     if (Math.abs(diffPct) >= 5) notes.push(`This moves the standard cost by ${diffPct >= 0 ? '+' : ''}${diffPct.toFixed(1)}%. Finance will see the change when it is proposed.`);
   }
-  const needReason = overridden && !why.trim();
+  const marginAtNew = costDirty && price !== '' && priceValid && rolled > 0 ? ((sell - rolled) / sell) * 100 : null;
+
+  const canSave = !saving && priceValid && costValid && (priceDirty || costDirty) && !needReason;
+  const save = async () => {
+    const savedPrice = priceDirty;
+    if (savedPrice) await api.put(`/budgets/products/${data.product.id}/price`, { price: price === '' ? null : sell });
+    if (costDirty) {
+      try {
+        await api.put(`/budgets/products/${data.product.id}/bom`, { overhead_rate: Math.abs(ohN - dOh) <= 0.005 ? null : ohN, freight_pct: frN, warranty_pct: waN, reason: why });
+      } catch (e: any) {
+        // The price is already saved, so refresh the page behind and keep the dialog open for the cost settings
+        if (savedPrice) { invalidate('budgets'); throw new Error(`The selling price was saved, but the cost settings were not: ${e?.message || 'could not save'}`); }
+        throw e;
+      }
+    }
+  };
+  const done = costDirty && priceDirty ? 'Selling price and cost settings saved. Propose a new standard cost to use the cost settings.'
+    : costDirty ? 'Cost settings saved. Propose a new standard cost to use them.' : price === '' ? 'Selling price removed.' : 'Selling price saved.';
+
   return (
-    <ModuleModal isOpen={isOpen} onClose={onClose} size="md" title="Costing adjustments" icon={<Pencil className="h-4 w-4" />}
-      footer={(
-        <>
-          <Button variant="ghost" onClick={onClose} className="h-9 px-4 text-[13px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>Cancel</Button>
-          <Button disabled={saving || !valid || needReason} className="font-medium text-[13px] h-9 px-5 rounded-md" style={{ background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' }}
-            onClick={() => run(() => api.put(`/budgets/products/${data.product.id}/bom`, { overhead_rate: Math.abs(ohN - dOh) <= 0.005 ? null : ohN, freight_pct: frN, warranty_pct: waN, reason: why }), 'Adjustments saved. Propose a new standard cost to use them.')}>Save adjustments</Button>
-        </>
-      )}>
-      <div className="space-y-3">
-        <p className="text-[12px] text-[var(--shell-text-muted)]">Applies to the next standard cost you propose. Approved figures do not change.</p>
-        <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-3">
-          <Field label="Overhead per hour" required hint={`Default ${money(dOh)}/h`}><Input type="number" min="0" step="0.5" className={ctl} value={oh} onChange={(e) => setOh(e.target.value)} /></Field>
-          <Field label="Freight and handling %" required hint={`Default ${dFr}%`}><Input type="number" min="0" max="100" step="0.5" className={ctl} value={fr} onChange={(e) => setFr(e.target.value)} /></Field>
-          <Field label="Warranty %" required hint={`Default ${dWa}%`}><Input type="number" min="0" max="100" step="0.5" className={ctl} value={wa} onChange={(e) => setWa(e.target.value)} /></Field>
-        </div>
-        <div className="space-y-1.5">
-          <div className="flex h-8 items-center justify-between">
-            <p id="reason-label" className="text-[13px] font-medium text-[var(--shell-text)]">Reason{overridden && <span className="text-[var(--danger)]"> *</span>}</p>
-            <Button type="button" variant="outline" size="sm" onClick={() => { setOh(String(dOh)); setFr(String(dFr)); setWa(String(dWa)); setWhy(''); }} className="h-8 px-3 text-[13px] font-medium">Set default</Button>
+    <ModuleModal isOpen={isOpen} onClose={onClose} size={c && bom ? 'xl' : 'sm'} title="Price and costing" icon={<Pencil className="h-4 w-4" />} canSave={canSave} saveLabel="Save changes" onSave={() => run(save, done)}>
+      <div className={pricingGrid(!!(c && bom))}>
+        <section aria-label="Selling price" className={priceColumn(!!(c && bom))}>
+          <SectionHeader label={`Selling price, ${fy}`} />
+          <div className="space-y-3">
+            <Field label="Selling price per unit" hint="What you plan to sell one unit for this financial year. Leave blank to remove it." error={!priceValid ? 'Enter a selling price above zero.' : undefined}>
+              <CurrencyInput value={price} onChange={setPrice} />
+            </Field>
+            <div className="space-y-1 text-[13px] text-[var(--shell-text)]">
+              <p>{unit > 0 ? <>Cost per unit: <strong className="tabular-nums">{money(unit)}</strong> ({p.basis === 'STANDARD' ? 'approved standard cost' : 'rolled-up cost, no standard cost approved yet'}).</> : 'There is no cost for this product yet, so margin cannot be worked out.'}</p>
+              {margin != null && <p>Profit per unit: <strong className="tabular-nums">{money(sell - unit)}</strong>. Margin: <strong className="tabular-nums">{margin.toFixed(1)}%</strong> of the selling price.</p>}
+              {marginAtNew != null && <p className="text-[var(--shell-text-muted)]">With the cost settings below, the rolled-up cost is {money(rolled)} and the margin would be {marginAtNew.toFixed(1)}%.</p>}
+            </div>
           </div>
-          <Textarea aria-labelledby="reason-label" className={ctl} rows={2} maxLength={300} value={why} onChange={(e) => setWhy(e.target.value)} />
-          <p className="text-[12px] text-[var(--shell-text-muted)]">{overridden ? 'Required while any value differs from the default.' : 'Optional while everything is at the default.'}</p>
-        </div>
-        <div className="rounded-md border border-[var(--shell-border)] p-3 text-[13px]">
-          <div className="flex justify-between"><span className="text-[var(--shell-text-muted)]">Rolled-up cost per unit</span><span className="tabular-nums">{money(c.total)} → <strong>{money(total)}</strong></span></div>
-          {valid && Math.abs(diff) >= 0.005 && <div className="mt-1 text-[12px] text-[var(--shell-text-muted)]">{diff < 0 ? 'Lowers' : 'Raises'} the cost by {money(Math.abs(diff))} a unit ({diffPct >= 0 ? '+' : ''}{diffPct.toFixed(1)}%).</div>}
-        </div>
-        {notes.length > 0 && (
-          <ul className="space-y-1 text-[12px] text-[var(--warning)]" aria-label="Warnings">{notes.map((t) => <li key={t}>{t}</li>)}</ul>
+        </section>
+
+        {c && bom && (
+          <section aria-label="Cost settings" className={COST_COLUMN}>
+            <SectionHeader label="Cost settings" />
+            <div className="space-y-3">
+              <p className="text-[12px] text-[var(--shell-text-muted)]">Apply to the next standard cost you propose. Approved figures do not change.</p>
+              <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-3">
+                <Field label="Overhead per hour" required hint={`Default ${money(dOh)}/h`}><Input type="number" min="0" step="0.5" className={ctl} value={oh} onChange={(e) => setOh(e.target.value)} /></Field>
+                <Field label="Freight and handling %" required hint={`Default ${dFr}%`}><Input type="number" min="0" max="100" step="0.5" className={ctl} value={fr} onChange={(e) => setFr(e.target.value)} /></Field>
+                <Field label="Warranty %" required hint={`Default ${dWa}%`}><Input type="number" min="0" max="100" step="0.5" className={ctl} value={wa} onChange={(e) => setWa(e.target.value)} /></Field>
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex h-8 items-center justify-between">
+                  <p id="reason-label" className="text-[13px] font-medium text-[var(--shell-text)]">Reason{overridden && <span className="text-[var(--danger)]"> *</span>}</p>
+                  <Button type="button" variant="outline" size="sm" onClick={() => { setOh(String(dOh)); setFr(String(dFr)); setWa(String(dWa)); setWhy(''); }} className="h-8 px-3 text-[13px] font-medium">Set default</Button>
+                </div>
+                <Textarea aria-labelledby="reason-label" className={ctl} rows={2} maxLength={300} value={why} onChange={(e) => setWhy(e.target.value)} />
+                <p className="text-[12px] text-[var(--shell-text-muted)]">{overridden ? 'Required while any value differs from the default.' : 'Optional while everything is at the default.'}</p>
+              </div>
+              <div className="rounded-md border border-[var(--shell-border)] p-3 text-[13px]">
+                <div className="flex justify-between"><span className="text-[var(--shell-text-muted)]">Rolled-up cost per unit</span><span className="tabular-nums">{money(c.total)} → <strong>{money(rolled)}</strong></span></div>
+                {costValid && Math.abs(diff) >= 0.005 && <div className="mt-1 text-[12px] text-[var(--shell-text-muted)]">{diff < 0 ? 'Lowers' : 'Raises'} the cost by {money(Math.abs(diff))} a unit ({diffPct >= 0 ? '+' : ''}{diffPct.toFixed(1)}%).</div>}
+              </div>
+              {notes.length > 0 && (
+                <ul className="space-y-1 text-[12px] text-[var(--warning)]" aria-label="Warnings">{notes.map((t) => <li key={t}>{t}</li>)}</ul>
+              )}
+            </div>
+          </section>
         )}
       </div>
     </ModuleModal>
@@ -739,34 +842,6 @@ export function StandardCostModal({ isOpen, onClose, data, standard }: Base & { 
         <p>{data.product.name} will be costed at <strong className="tabular-nums">{money(standard.total)}</strong> a unit for {standard.fy}-{String(standard.fy + 1).slice(2)}.</p>
         <p className="text-[var(--shell-text-muted)]">{old != null ? `Current standard: ${money(old)}${diff != null ? ` (${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%)` : ''}.` : 'There is no approved standard yet.'} Unit cost variances are measured against the approved figure.</p>
         {live != null && Math.abs(live - standard.total) > 0.5 && <p className="text-[var(--warning)]">The current rolled-up cost is {money(live)}, which differs from this proposal. Propose again to approve the current cost.</p>}
-      </div>
-    </ModuleModal>
-  );
-}
-
-export function ProductPriceModal({ isOpen, onClose, data }: Base & { data: ProductCosting | undefined }) {
-  const { saving, run } = useSaver(onClose);
-  const [price, setPrice] = useState('');
-  useEffect(() => { if (isOpen) setPrice(data?.pricing.price != null ? String(data.pricing.price) : ''); }, [isOpen, data]);
-  if (!data) return null;
-  const p = data.pricing;
-  const sell = Number(price);
-  const valid = price === '' || (Number.isFinite(sell) && sell > 0);
-  const unit = p.unit_cost;
-  const shown = price !== '' && valid && unit > 0;
-  const margin = shown ? ((sell - unit) / sell) * 100 : null;
-  return (
-    <ModuleModal isOpen={isOpen} onClose={onClose} title="Price and margin" icon={<Pencil className="h-4 w-4" />} size="sm" canSave={!saving && valid} saveLabel="Save price"
-      onSave={() => run(() => api.put(`/budgets/products/${data.product.id}/price`, { price: price === '' ? null : sell }), price === '' ? 'Selling price removed.' : 'Selling price saved.')}>
-      <div className="space-y-3">
-        <Field label={`Selling price per unit, ${p.fy}-${String(p.fy + 1).slice(2)}`} hint="What you plan to sell one unit for this financial year. Leave blank to remove it.">
-          <CurrencyInput value={price} onChange={setPrice} />
-        </Field>
-        <div className="space-y-1 text-[13px] text-[var(--shell-text)]">
-          <p>{unit > 0 ? <>Cost per unit: <strong className="tabular-nums">{money(unit)}</strong> ({p.basis === 'STANDARD' ? 'approved standard cost' : 'rolled-up cost, no standard cost approved yet'}).</> : 'There is no cost for this product yet, so margin cannot be worked out.'}</p>
-          {shown && margin != null && <p>Profit per unit: <strong className="tabular-nums">{money(sell - unit)}</strong>. Margin: <strong className="tabular-nums">{margin.toFixed(1)}%</strong> of the selling price.</p>}
-          {!valid && <p role="alert" className="text-[var(--danger)]">Enter a selling price above zero.</p>}
-        </div>
       </div>
     </ModuleModal>
   );

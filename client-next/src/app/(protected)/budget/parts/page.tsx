@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Download, Plus, Tags, Upload } from 'lucide-react';
+import { Download, Plus, ShoppingCart, Tags, Upload } from 'lucide-react';
 import { ColumnDef, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, getSortedRowModel, SortingState } from '@tanstack/react-table';
 import api from '@/lib/api-client';
 import { downloadCsv, toCsv } from '@/lib/csv';
@@ -82,12 +82,12 @@ export default function PartMasterPage() {
 
   const itemActions: DetailActionDef[] = !selected || !canEdit ? [] : [
     { label: 'Edit', onClick: () => { setEditing(selected); setOpen(true); } },
-    { label: 'Record purchase', variant: 'primary' as const, onClick: () => setBuyFor(selected) },
+    { label: 'Record purchase', variant: 'primary' as const, icon: <ShoppingCart className="h-4 w-4 text-[var(--nav-violet)]" />, onClick: () => setBuyFor(selected) },
     { label: selected.used_in ? 'Archive' : 'Delete', variant: 'danger', onClick: () => setDel(selected) },
   ];
   const exportParts = () => downloadCsv('part-master.csv', toCsv(PART_HEADERS, (data ?? []).map((i) => [i.part_no, i.name, i.category_name ?? '', i.sourcing === 'MAKE' ? 'Make' : 'Buy', i.uom, i.standard_price, i.material_cost ?? '', i.manufacturing_cost ?? '', i.last_price ?? '', i.supplier ?? '', i.lead_time_days ?? ''])));
   const alwaysActions: DetailActionDef[] = [
-    ...(canEdit ? [{ label: 'Add part', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setEditing(null); setOpen(true); } }, { label: 'Import', icon: <Upload className="h-4 w-4 text-[var(--info)]" />, onClick: () => setImpOpen(true) }, { label: 'Categories', icon: <Tags className="h-4 w-4 text-[var(--shell-accent)]" />, onClick: () => setCatsOpen(true) }] : []),
+    ...(canEdit ? [{ label: 'Add part', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setEditing(null); setOpen(true); } }, { label: 'Import', icon: <Upload className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setImpOpen(true) }, { label: 'Categories', icon: <Tags className="h-4 w-4 text-[var(--nav-cyan)]" />, onClick: () => setCatsOpen(true) }] : []),
     { label: 'Export', icon: <Download className="h-4 w-4 text-[var(--shell-text-muted)]" />, onClick: exportParts },
   ];
 

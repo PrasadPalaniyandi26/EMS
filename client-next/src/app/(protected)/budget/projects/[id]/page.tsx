@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { Plus, Flag, Settings2, CheckCheck, RefreshCw, XCircle, TrendingUp } from 'lucide-react';
+import { Plus, Flag, Settings2, CheckCheck, RefreshCw, XCircle, Tag, TrendingUp } from 'lucide-react';
 import { ColumnDef, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, getSortedRowModel, SortingState } from '@tanstack/react-table';
 import api from '@/lib/api-client';
 import { useHeaderStore } from '@/stores/header-store';
@@ -163,13 +163,13 @@ export default function ProjectBudgetPage() {
       { label: 'Reject', variant: 'danger' as const, icon: <XCircle className="h-4 w-4 text-[var(--danger)]" />, onClick: () => setRejBase(selected) },
     ] : []) :
     tab === 'jobbom' ? [
-      ...(selected.sub_drift ? [{ label: 'Update to current standard', variant: 'primary' as const, icon: <RefreshCw className="h-4 w-4 text-[var(--shell-accent)]" />, onClick: () => act(() => api.post(`/budgets/job-bom/lines/${selected.id}/refresh`, {}), 'Priced at the current standard.') }] : []),
+      ...(selected.sub_drift ? [{ label: 'Update to current standard', variant: 'primary' as const, icon: <RefreshCw className="h-4 w-4 text-[var(--nav-cyan)]" />, onClick: () => act(() => api.post(`/budgets/job-bom/lines/${selected.id}/refresh`, {}), 'Priced at the current standard.') }] : []),
       { label: 'Edit', onClick: () => { setEditPart(selected); setPartOpen(true); } },
       { label: 'Delete', variant: 'danger', onClick: () => setDelPart(selected) },
     ] :
     tab === 'jobsteps' ? [{ label: 'Edit', onClick: () => { setEditStep(selected); setStepOpen(true); } }, { label: 'Delete', variant: 'danger', onClick: () => setDelStep(selected) }] :
     tab === 'milestones' ? [
-      ...(!selected.done_date ? [{ label: 'Mark done', variant: 'primary' as const, icon: <CheckCheck className="h-4 w-4 text-[var(--success)]" />, onClick: () => act(() => api.put(`/budgets/projects/${id}/milestones/${selected.id}`, { name: selected.name, weight_pct: selected.weight_pct, planned_date: selected.planned_date.slice(0, 10), done_date: new Date().toISOString().slice(0, 10) }), 'Milestone marked done.') }] : []),
+      ...(!selected.done_date ? [{ label: 'Mark done', variant: 'primary' as const, icon: <CheckCheck className="h-4 w-4 text-[var(--nav-cyan)]" />, onClick: () => act(() => api.put(`/budgets/projects/${id}/milestones/${selected.id}`, { name: selected.name, weight_pct: selected.weight_pct, planned_date: selected.planned_date.slice(0, 10), done_date: new Date().toISOString().slice(0, 10) }), 'Milestone marked done.') }] : []),
       { label: 'Edit', onClick: () => { setEditMs(selected); setMsOpen(true); } },
       { label: 'Delete', variant: 'danger', onClick: () => setDelMs(selected) },
     ] : [];
@@ -180,11 +180,11 @@ export default function ProjectBudgetPage() {
     ...(tab === 'jobsteps' ? [{ label: 'Add build operation', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setEditStep(null); setStepOpen(true); } }] : []),
     ...(tab === 'jobsteps' && isFinance ? [{ label: 'Manage operation types', icon: <Settings2 className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setTypesOpen(true) }] : []),
     ...(tab === 'estimate' ? [{ label: 'Add line', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setEditLine(null); setLineOpen(true); } }] : []),
-    ...(tab === 'estimate' && isFinance ? [{ label: 'Manage phases', icon: <Settings2 className="h-4 w-4 text-[var(--nav-violet)]" />, onClick: () => setPhasesOpen(true) }] : []),
+    ...(tab === 'estimate' && isFinance ? [{ label: 'Manage phases', icon: <Settings2 className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setPhasesOpen(true) }] : []),
     ...(tab === 'baselines' && est && isFinance ? [{ label: 'Propose baseline', icon: <Flag className="h-4 w-4 text-[var(--shell-accent)]" />, onClick: () => setBaselineOpen(true) }] : []),
     ...(tab === 'milestones' ? [{ label: 'Add milestone', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setEditMs(null); setMsOpen(true); } }] : []),
     ...(tab === 'evm' && e && est ? [{ label: 'Chart', icon: <TrendingUp className="h-4 w-4 text-[var(--info)]" />, onClick: () => setEvmOpen(true) }] : []),
-    { label: 'Contract and margin', icon: <Settings2 className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setSetOpen(true) },
+    { label: 'Price and costing', icon: <Tag className="h-4 w-4 text-[var(--nav-violet)]" />, onClick: () => setSetOpen(true) },
   ];
 
   const summary = !data || !m || !t || !e ? null : (

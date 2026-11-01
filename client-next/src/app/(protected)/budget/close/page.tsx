@@ -70,7 +70,7 @@ export default function MonthlyClosePage() {
     ? [{ label: selected.note ? 'Edit reason' : 'Explain', variant: 'primary', icon: <MessageSquarePlus className="h-4 w-4 text-[var(--info)]" />, onClick: () => setLine(selected) }] : [];
   const alwaysActions: DetailActionDef[] = data?.locked
     ? (role === 'ADMIN' ? [{ label: 'Reopen month', icon: <Unlock className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setUnlockOpen(true) }] : [])
-    : (data?.plan && isFinance ? [{ label: 'Close month', icon: <Lock className="h-4 w-4 text-[var(--shell-accent)]" />, onClick: () => setLockOpen(true) }] : []);
+    : (data?.plan && isFinance ? [{ label: 'Close month', icon: <Lock className="h-4 w-4 text-[var(--nav-violet)]" />, onClick: () => setLockOpen(true) }] : []);
 
   const over = (data?.totals?.actual ?? 0) > (data?.totals?.budget ?? 0);
   const summary = (

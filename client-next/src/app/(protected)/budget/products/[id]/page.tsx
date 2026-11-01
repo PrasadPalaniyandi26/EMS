@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { Plus, Calculator, CalendarPlus, Settings2, SlidersHorizontal, Tag } from 'lucide-react';
+import { Plus, Calculator, CalendarPlus, Settings2, Tag } from 'lucide-react';
 import { ColumnDef, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, getSortedRowModel, SortingState } from '@tanstack/react-table';
 import api from '@/lib/api-client';
 import { useHeaderStore } from '@/stores/header-store';
@@ -18,7 +18,7 @@ import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { ConfirmDialog, NativeSelect } from '@/components/shared/modal-primitives';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAllocation, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
-import { BomLineModal, BuildPlanModal, BuildStepModal, CostAdjustmentsModal, ProductPriceModal, RejectCostModal, StandardCostModal, StepTypesModal } from '@/components/budgets/planning-modals';
+import { BomLineModal, BuildPlanModal, BuildStepModal, ProductPricingModal, RejectCostModal, StandardCostModal, StepTypesModal } from '@/components/budgets/planning-modals';
 import { TabBar, money, unitPrice } from '@/components/budgets/budget-ui';
 import { formatDate } from '@/lib/currency';
 import { cn } from '@/lib/utils';
@@ -69,7 +69,7 @@ export default function ProductCostingDetailPage() {
   const [opOpen, setOpOpen] = useState(false); const [editOp, setEditOp] = useState<OperationRow | null>(null); const [typesOpen, setTypesOpen] = useState(false);
   const [delBom, setDelBom] = useState<BomLineRow | null>(null); const [delOp, setDelOp] = useState<OperationRow | null>(null);
   const [approve, setApprove] = useState<number | null>(null); const [reject, setReject] = useState<number | null>(null);
-  const [planConfirm, setPlanConfirm] = useState(false); const [adjOpen, setAdjOpen] = useState(false); const [priceOpen, setPriceOpen] = useState(false);
+  const [planConfirm, setPlanConfirm] = useState(false); const [pricingOpen, setPricingOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(false); const [editPlan, setEditPlan] = useState<PlanMonth | null>(null);
 
   useEffect(() => { setHeader(data ? `${data.product.code ?? ''} ${data.product.name}`.trim() : 'Product costing', data?.product.client_name ?? 'Bill of materials, standard cost and margin'); }, [setHeader, data]);
@@ -207,7 +207,7 @@ export default function ProductCostingDetailPage() {
       {pr && (
         <DetailSection title={`Price and margin, ${fyText(pr.fy)}`}>
           {pr.price == null ? (
-            <p className="text-[12px] text-[var(--shell-text-muted)]">No selling price is set for {fyText(pr.fy)}.{isFinance ? ' Use Price and margin to add one.' : ' Ask Finance to add one.'}</p>
+            <p className="text-[12px] text-[var(--shell-text-muted)]">No selling price is set for {fyText(pr.fy)}.{isFinance ? ' Use Price and costing to add one.' : ' Ask Finance to add one.'}</p>
           ) : (
             <>
               <DetailGrid>
@@ -444,10 +444,9 @@ export default function ProductCostingDetailPage() {
     ...(tab === 'bom' && isFinance ? [{ label: 'Add part', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setEditBom(null); setBomOpen(true); } }] : []),
     ...(tab === 'operations' && isFinance ? [{ label: 'Add build operation', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setEditOp(null); setOpOpen(true); } }] : []),
     ...(tab === 'operations' && isFinance ? [{ label: 'Manage operation types', icon: <Settings2 className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setTypesOpen(true) }] : []),
-    ...(tab === 'plan' && isFinance ? [{ label: 'Add to budget plan', icon: <CalendarPlus className="h-4 w-4 text-[var(--shell-accent)]" />, disabled: data?.plan_status !== 'DRAFT', onClick: () => setPlanConfirm(true) }] : []),
+    ...(tab === 'plan' && isFinance ? [{ label: 'Add to budget plan', icon: <CalendarPlus className="h-4 w-4 text-[var(--nav-cyan)]" />, disabled: data?.plan_status !== 'DRAFT', onClick: () => setPlanConfirm(true) }] : []),
     ...(tab === 'standard' && isFinance && data && data.lines.length > 0 ? [{ label: 'Propose standard cost', icon: <Calculator className="h-4 w-4 text-[var(--info)]" />, onClick: () => act(() => api.post(`/budgets/products/${id}/standard-cost`, {}), 'Standard cost proposed. Approve it on the Standard cost tab.') }] : []),
-    ...((tab === 'standard' || tab === 'bom') && isFinance && data?.cost ? [{ label: 'Costing adjustments', icon: <SlidersHorizontal className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setAdjOpen(true) }] : []),
-    ...(isFinance && data ? [{ label: 'Price and margin', icon: <Tag className="h-4 w-4 text-[var(--nav-violet)]" />, onClick: () => setPriceOpen(true) }] : []),
+    ...(isFinance && data ? [{ label: 'Price and costing', icon: <Tag className="h-4 w-4 text-[var(--nav-violet)]" />, onClick: () => setPricingOpen(true) }] : []),
   ];
 
   return (
@@ -482,8 +481,7 @@ export default function ProductCostingDetailPage() {
       <BuildStepModal isOpen={opOpen} onClose={() => setOpOpen(false)} data={data} editing={editOp} />
       <StepTypesModal isOpen={typesOpen} onClose={() => setTypesOpen(false)} types={data?.operation_types ?? []} />
       <BuildPlanModal isOpen={planOpen} onClose={() => setPlanOpen(false)} productId={id} editing={editPlan} />
-      <CostAdjustmentsModal isOpen={adjOpen} onClose={() => setAdjOpen(false)} data={data} />
-      <ProductPriceModal isOpen={priceOpen} onClose={() => setPriceOpen(false)} data={data} />
+      <ProductPricingModal isOpen={pricingOpen} onClose={() => setPricingOpen(false)} data={data} />
       <RejectCostModal isOpen={reject != null} onClose={() => { setReject(null); setSelection({}); }} data={data} standard={standardToReject} />
       <StandardCostModal isOpen={approve != null} onClose={() => { setApprove(null); setSelection({}); }} data={data} standard={standardToApprove} />
       <ConfirmDialog open={!!delBom} destructive title="Remove part" message={`Remove ${delBom?.name} from the BOM?`} confirmLabel="Remove" onCancel={() => setDelBom(null)}

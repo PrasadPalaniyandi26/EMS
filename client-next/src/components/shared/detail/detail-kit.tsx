@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { FileText, ArrowUpRight, Send, Pencil, Trash2, CheckCircle2, XCircle, CornerUpLeft, Ban, PauseCircle, PlayCircle, Shield, UserX, Briefcase, CreditCard, Calculator } from 'lucide-react';
+import { FileText, ArrowUpRight, Send, Pencil, Trash2, CheckCircle2, XCircle, CornerUpLeft, Ban, PauseCircle, PlayCircle, Shield, UserX, Briefcase, CreditCard, Calculator, Archive } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getAccessToken, API_BASE } from '@/lib/api-client';
@@ -199,7 +199,7 @@ export function DetailActions({ actions }: { actions: DetailActionDef[] }) {
             a.variant === 'danger' && 'border-[var(--danger)] bg-transparent text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)]',
           )}
         >
-          {a.icon}{a.label}
+          {a.icon && <span aria-hidden className={cn('inline-flex', a.variant === 'primary' && '[&_svg]:!text-[var(--shell-accent-fg)]', a.variant === 'danger' && '[&_svg]:!text-[var(--danger)]')}>{a.icon}</span>}{a.label}
         </button>
       ))}
     </div>
@@ -222,6 +222,7 @@ const TOOLBAR_ICONS: Record<string, { icon: ReactNode; tone: string }> = {
   Deactivate: { icon: <UserX className="h-4 w-4" />, tone: 'text-[var(--danger)]' },
   Allocation: { icon: <Briefcase className="h-4 w-4" />, tone: 'text-[var(--info)]' },
   Costing: { icon: <Calculator className="h-4 w-4" />, tone: 'text-[var(--warning)]' },
+  Archive: { icon: <Archive className="h-4 w-4" />, tone: 'text-[var(--danger)]' },
   Process: { icon: <CreditCard className="h-4 w-4" />, tone: 'text-[var(--shell-accent)]' },
   'Process payment': { icon: <CreditCard className="h-4 w-4" />, tone: 'text-[var(--shell-accent)]' },
 };
