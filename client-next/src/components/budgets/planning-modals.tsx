@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, ArrowLeftRight, CheckCircle2, XCircle, ClipboardList, Clock, Network, Replace, Layers, History, Star, Unlink } from 'lucide-react';
 import { fyLabel } from '@/hooks/use-budget-queries';
@@ -298,32 +298,38 @@ export function ItemModal({ isOpen, onClose, editing }: Base & { editing: Item |
         };
         return editing ? api.put(`/budgets/items/${editing.id}`, body) : api.post('/budgets/items', body);
       }, editing ? 'Part updated.' : 'Part added.')}>
-      <div className="grid grid-cols-1 gap-x-6 gap-y-3 md:grid-cols-2">
-        <div className="space-y-1.5 md:col-span-2">
+      <div className="grid grid-cols-1 gap-x-5 gap-y-3 md:grid-cols-3">
+        <div className="space-y-1.5 md:col-span-3">
           <p id="item-sourcing" className="text-[13px] font-medium text-[var(--shell-text)]">Sourcing</p>
           <SegmentedControl labelledBy="item-sourcing" value={f.sourcing} onChange={(v) => setF((x) => ({ ...x, sourcing: v }))} options={[{ value: 'BUY' as const, label: 'Buy' }, { value: 'MAKE' as const, label: 'Make' }]} />
         </div>
         <Field label="Part number" required>{text(f.part_no, set('part_no'), { maxLength: 40 })}</Field>
         <Field label="Name" required>{text(f.name, set('name'), { maxLength: 150 })}</Field>
-        <Field label="Category" hint="Groups parts in the Part master. Manage the list there."><CategoryPicker value={f.category_id} onChange={set('category_id')} /></Field>
+        <Field label="Category" hint="Manage the list in the Part master."><CategoryPicker value={f.category_id} onChange={set('category_id')} /></Field>
         {make ? (
           <>
             <Field label="Material cost" required hint="Raw material per unit."><CurrencyInput value={f.material_cost} onChange={set('material_cost')} /></Field>
             <Field label="Manufacturing cost" required hint="Machining, bending or other work per unit."><CurrencyInput value={f.manufacturing_cost} onChange={set('manufacturing_cost')} /></Field>
-            <Field label="Standard price" hint="Material plus manufacturing. Calculated, not typed.">
+            <Field label="Standard price" hint="Material plus manufacturing. Calculated.">
               <div className="flex h-9 items-center rounded-md border border-[var(--input)] bg-transparent px-3 text-[13px] tabular-nums text-[var(--shell-text)]">
                 <span className="mr-2 text-[var(--shell-text-muted)]">₹</span>{standard.toFixed(2)}
               </div>
             </Field>
+            <Field label="Unit of measure">{text(f.uom, set('uom'), { maxLength: 12 })}</Field>
+            <Field label="Last paid price" hint="Shows the drift from standard."><CurrencyInput value={f.last_price} onChange={set('last_price')} /></Field>
+            <Field label="Supplier">{text(f.supplier, set('supplier'), { maxLength: 120 })}</Field>
+            <Field label="Lead time (days)"><Input type="number" min="0" className={ctl} value={f.lead_time_days} onChange={(e) => set('lead_time_days')(e.target.value)} /></Field>
           </>
         ) : (
-          <Field label="Standard price" required><CurrencyInput value={f.standard_price} onChange={set('standard_price')} /></Field>
+          <>
+            <Field label="OEM part number" required hint="The manufacturer's own number. The same whoever sells it.">{text(f.oem_part_no, set('oem_part_no'), { maxLength: 60 })}</Field>
+            <Field label="Standard price" required><CurrencyInput value={f.standard_price} onChange={set('standard_price')} /></Field>
+            <Field label="Unit of measure">{text(f.uom, set('uom'), { maxLength: 12 })}</Field>
+            <Field label="Supplier">{text(f.supplier, set('supplier'), { maxLength: 120 })}</Field>
+            <Field label="Last paid price" hint="Shows the drift from standard."><CurrencyInput value={f.last_price} onChange={set('last_price')} /></Field>
+            <Field label="Lead time (days)"><Input type="number" min="0" className={ctl} value={f.lead_time_days} onChange={(e) => set('lead_time_days')(e.target.value)} /></Field>
+          </>
         )}
-        <Field label="Unit of measure">{text(f.uom, set('uom'), { maxLength: 12 })}</Field>
-        <Field label="Last paid price" hint="Shows the drift from standard."><CurrencyInput value={f.last_price} onChange={set('last_price')} /></Field>
-        {!make && <Field label="OEM part number" required hint="The manufacturer's own number for the part. It stays the same whoever sells it.">{text(f.oem_part_no, set('oem_part_no'), { maxLength: 60 })}</Field>}
-        <Field label="Supplier">{text(f.supplier, set('supplier'), { maxLength: 120 })}</Field>
-        <Field label="Lead time (days)"><Input type="number" min="0" className={ctl} value={f.lead_time_days} onChange={(e) => set('lead_time_days')(e.target.value)} /></Field>
       </div>
     </ModuleModal>
   );
@@ -1050,6 +1056,67 @@ export function VarianceModal({ isOpen, onClose, line, year, month }: Base & { l
 
 const PART_EVENT: Record<string, string> = { ADDED: 'Added', EDITED: 'Edited', PURCHASE: 'Purchase', REPLACEMENT: 'Replacement', ALTERNATE: 'Alternate', RETIRED: 'Retired' };
 
+// Pick a part from a list that grows long: search by part number, name, OEM part number or supplier, and narrow by category.
+// Only the first few matches are listed, so the dialog stays short however many parts there are.
+const PICKER_ROWS = 8;
+function PartPicker({ label, required, options, value, onChange, emptyHint, afterChoice }: {
+  label: string; required?: boolean; options: { item: Item; tag?: string }[]; value: string; onChange: (id: string) => void; emptyHint?: string; afterChoice?: React.ReactNode;
+}) {
+  const { data: cats } = useItemCategories();
+  const [q, setQ] = useState(''); const [cat, setCat] = useState('ALL');
+  const labelId = useId();
+  const chosen = options.find((o) => String(o.item.id) === value) ?? null;
+  const term = q.trim().toLowerCase();
+  const matches = options.filter(({ item: i }) =>
+    (cat === 'ALL' || (cat === 'NONE' ? i.category_id == null : String(i.category_id) === cat))
+    && (!term || [i.part_no, i.name, i.oem_part_no, i.supplier].some((v) => !!v && v.toLowerCase().includes(term))));
+  const detail = (i: Item) => [i.oem_part_no ? `OEM ${i.oem_part_no}` : '', i.supplier ?? '', unitPrice(i.standard_price)].filter(Boolean).join(' · ');
+  return (
+    <div className="space-y-1.5">
+      <p id={labelId} className="text-[13px] font-medium text-[var(--shell-text)]">{label}{required && <span className="text-[var(--danger)]"> *</span>}</p>
+      {chosen ? (
+        <div className="flex items-center gap-3 rounded-md border border-[var(--input)] px-3 py-2">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13px] text-[var(--shell-text)]"><span className="text-[12px] text-[var(--shell-text-muted)]">{chosen.item.part_no}</span> <span className="font-medium">{chosen.item.name}</span>{chosen.tag && <span className="text-[var(--success)]"> · {chosen.tag}</span>}</p>
+            <p className="truncate text-[12px] text-[var(--shell-text-muted)]">{detail(chosen.item)}</p>
+          </div>
+          <Button type="button" variant="ghost" onClick={() => onChange('')} className="h-8 px-3 text-[13px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>Change</Button>
+          {afterChoice}
+        </div>
+      ) : (
+        <>
+          <div className="flex gap-2">
+            <Input aria-labelledby={labelId} className={ctl} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by part number, name, OEM part number or supplier" />
+            {(cats?.length ?? 0) > 0 && (
+              <div className="w-48 shrink-0">
+                <NativeSelect aria-label="Category" value={cat} onChange={(e) => setCat(e.target.value)}>
+                  <option value="ALL">Any category</option><option value="NONE">No category</option>
+                  {(cats ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </NativeSelect>
+              </div>
+            )}
+          </div>
+          {options.length === 0 ? (emptyHint ? <p className="text-[12px] text-[var(--shell-text-muted)]">{emptyHint}</p> : null) : matches.length === 0 ? <p className="text-[12px] text-[var(--shell-text-muted)]">No part matches. Try another number or name.</p> : (
+            <>
+              <ul role="listbox" aria-labelledby={labelId} className="divide-y divide-[var(--shell-border)] overflow-hidden rounded-md border border-[var(--shell-border)]">
+                {matches.slice(0, PICKER_ROWS).map(({ item: i, tag }) => (
+                  <li key={i.id} role="option" aria-selected={false}>
+                    <button type="button" onClick={() => { onChange(String(i.id)); setQ(''); }} className="block w-full px-3 py-2 text-left hover:bg-[var(--shell-hover)] focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]">
+                      <span className="block truncate text-[13px] text-[var(--shell-text)]"><span className="text-[12px] text-[var(--shell-text-muted)]">{i.part_no}</span> <span className="font-medium">{i.name}</span>{tag && <span className="text-[var(--success)]"> · {tag}</span>}</span>
+                      <span className="block truncate text-[12px] text-[var(--shell-text-muted)]">{detail(i)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {matches.length > PICKER_ROWS && <p className="text-[12px] text-[var(--shell-text-muted)]">Showing the first {PICKER_ROWS} of {matches.length}. Keep typing to narrow it down.</p>}
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 // Replace a part with another from a date, or retire it. A date that has come takes effect at once; a later one waits, and the part stays in use until then.
 export function PartReplaceModal({ isOpen, onClose, item, items }: Base & { item: Item | null; items: Item[] }) {
   const { saving, run } = useSaver(onClose);
@@ -1069,7 +1136,7 @@ export function PartReplaceModal({ isOpen, onClose, item, items }: Base & { item
   const options = items
     .filter((i) => i.id !== item.id && i.status === 'ACTIVE' && i.uom === item.uom && !i.scheduled)
     .sort((a, b) => Number(alt.has(b.id)) - Number(alt.has(a.id)) || Number(!!alt.get(b.id)?.is_default) - Number(!!alt.get(a.id)?.is_default) || a.part_no.localeCompare(b.part_no))
-    .map((i) => ({ id: String(i.id), name: `${i.part_no} ${i.name}${i.oem_part_no ? ` · OEM ${i.oem_part_no}` : ''}${alt.has(i.id) ? (alt.get(i.id)!.is_default ? ' · default alternate' : ' · alternate') : ''}` }));
+    .map((i) => ({ item: i, tag: alt.has(i.id) ? (alt.get(i.id)!.is_default ? 'default alternate' : 'alternate') : undefined }));
   const owners = new Set((usage.data ?? []).map((u) => `${u.kind}-${u.id}`));
   const jobs = [...owners].filter((k) => k.startsWith('JOB')).length; const products = owners.size - jobs;
   const where = [products ? `${products} product${products === 1 ? '' : 's'}` : '', jobs ? `${jobs} job BOM${jobs === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and ');
@@ -1086,7 +1153,7 @@ export function PartReplaceModal({ isOpen, onClose, item, items }: Base & { item
           <SegmentedControl labelledBy="replace-mode" value={mode} onChange={setMode} options={[{ value: 'REPLACE' as const, label: 'Replace with another part' }, { value: 'RETIRE' as const, label: 'Retire, no replacement' }]} />
         </div>
         {mode === 'REPLACE' && (
-          <PickSelect label="Replacement part" required placeholder="Select a part" value={succ} onChange={setSucc} options={options}
+          <PartPicker label="Replacement part" required value={succ} onChange={setSucc} options={options}
             emptyHint={`No other active part is measured in ${item.uom}. Add the replacement to the Part master first.`} />
         )}
         <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
@@ -1124,7 +1191,7 @@ export function PartAlternatesModal({ isOpen, onClose, item, items, canEdit }: B
   const chosen = members.find((m) => m.id === sel) ?? null;
   const candidates = items.filter((i) => i.id !== item.id && i.status === 'ACTIVE' && i.sourcing === 'BUY' && i.uom === item.uom && i.alternates.length === 0 && !i.scheduled)
     .sort((a, b) => Number(sameOem(b.oem_part_no)) - Number(sameOem(a.oem_part_no)) || a.part_no.localeCompare(b.part_no))
-    .map((i) => ({ id: String(i.id), name: `${i.part_no} ${i.name}${i.oem_part_no ? ` · OEM ${i.oem_part_no}` : ''}${sameOem(i.oem_part_no) ? ' · same OEM part' : ''}` }));
+    .map((i) => ({ item: i, tag: sameOem(i.oem_part_no) ? 'same OEM part' : undefined }));
   const act = async (job: () => Promise<unknown>, ok: string) => {
     setBusy(true);
     try { await job(); toast.success(ok); invalidate('budgets'); } catch (e: any) { toast.error(e?.message || 'Could not save.'); } finally { setBusy(false); }
@@ -1135,10 +1202,8 @@ export function PartAlternatesModal({ isOpen, onClose, item, items, canEdit }: B
       <div className="space-y-4">
         <p className="text-[13px] text-[var(--shell-text-muted)]">Alternates are bought parts that meet the same spec and are measured in the same unit ({item.uom}). The default is the one to buy first, and the one offered first when a part is replaced.</p>
         {canEdit && item.sourcing === 'BUY' && item.status === 'ACTIVE' && (
-          <div className="flex items-end gap-3">
-            <div className="min-w-0 flex-1"><PickSelect label="Add an alternate" placeholder="Select a part" value={pick} onChange={setPick} options={candidates} emptyHint={`No other bought part is measured in ${item.uom} and free to add.`} /></div>
-            <Button type="button" disabled={!pick || busy} onClick={() => act(() => api.post(`/budgets/items/${item.id}/alternates`, { alternate_id: Number(pick) }), 'Alternate added.').then(() => setPick(''))} className="h-9 px-4 text-[13px] font-medium">Add</Button>
-          </div>
+          <PartPicker label="Add an alternate" value={pick} onChange={setPick} options={candidates} emptyHint={`No other bought part is measured in ${item.uom} and free to add.`}
+            afterChoice={<Button type="button" disabled={busy} onClick={() => act(() => api.post(`/budgets/items/${item.id}/alternates`, { alternate_id: Number(pick) }), 'Alternate added.').then(() => setPick(''))} className="h-8 px-4 text-[13px] font-medium">Add</Button>} />
         )}
         {!inGroup ? <p className="text-[13px] text-[var(--shell-text)]">{canEdit ? 'This part has no alternates yet. The first one you add makes this part the default.' : 'This part has no alternates.'}</p> : (
           <>
