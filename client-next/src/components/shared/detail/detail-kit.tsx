@@ -185,7 +185,7 @@ export function DetailActions({ actions }: { actions: DetailActionDef[] }) {
   const list = actions.filter(Boolean);
   if (list.length === 0) return null;
   return (
-    <div className={cn('grid gap-2', list.length === 1 ? 'grid-cols-1' : list.length === 2 ? 'grid-cols-2' : 'grid-cols-3')}>
+    <div className={cn('grid gap-2', list.length === 1 ? 'grid-cols-1' : list.length === 2 ? 'grid-cols-2' : 'grid-cols-2 [&>*:last-child:nth-child(odd)]:col-span-2')}>
       {list.map((a) => (
         <button
           key={a.label}
@@ -193,7 +193,7 @@ export function DetailActions({ actions }: { actions: DetailActionDef[] }) {
           onClick={a.onClick}
           disabled={a.disabled}
           className={cn(
-            'inline-flex h-9 items-center justify-center gap-1.5 rounded-md border px-3 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--shell-accent)] disabled:cursor-not-allowed disabled:opacity-40',
+            'inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border px-3 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--shell-accent)] disabled:cursor-not-allowed disabled:opacity-40',
             (a.variant ?? 'secondary') === 'primary' && 'border-transparent bg-[var(--shell-accent)] text-[var(--shell-accent-fg)] hover:opacity-90',
             (a.variant ?? 'secondary') === 'secondary' && 'border-[var(--input)] bg-transparent text-[var(--shell-text)] hover:bg-[var(--shell-hover)]',
             a.variant === 'danger' && 'border-[var(--danger)] bg-transparent text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)]',

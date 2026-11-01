@@ -76,7 +76,7 @@ export function ModuleShell({
 
       {/* Row 2: Tactical Filters & Search — full width */}
       {searchRow && (
-        <div className="px-4 h-12 flex items-center shrink-0 border-b border-[var(--shell-border)]">
+        <div className="px-4 min-h-12 py-1.5 flex items-center shrink-0 border-b border-[var(--shell-border)]">
           {searchRow}
         </div>
       )}
