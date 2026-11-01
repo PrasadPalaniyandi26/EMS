@@ -13,10 +13,11 @@ import { MONTH_NAMES } from '@/hooks/use-budget-queries';
 import { useDataTable } from '@/hooks/use-data-table';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
+import { type FilterDef } from '@/components/data-table/filters';
 import { TextCell, ToneText, headerRight } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
-import { ConfirmDialog, NativeSelect } from '@/components/shared/modal-primitives';
+import { ConfirmDialog } from '@/components/shared/modal-primitives';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import { VARIANCE_REASONS, VarianceModal } from '@/components/budgets/planning-modals';
 import { money } from '@/components/budgets/budget-ui';
@@ -117,14 +118,10 @@ export default function MonthlyClosePage() {
         showPanel={!!selected}
         searchRow={
           <DataTableToolbar table={table} actions={<><ToolbarActions actions={alwaysActions} /><ToolbarActions actions={itemActions} /></>}
-            filters={<>
-              <NativeSelect aria-label="Month" value={month} onChange={(e) => { setMonth(Number(e.target.value)); setSelection({}); }} className="!h-8 !w-auto">
-                {MONTH_NAMES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-              </NativeSelect>
-              <NativeSelect aria-label="Year" value={year} onChange={(e) => { setYear(Number(e.target.value)); setSelection({}); }} className="!h-8 !w-auto">
-                {years.map((y) => <option key={y} value={y}>{y}</option>)}
-              </NativeSelect>
-            </>} />
+            filterDefs={[
+              { id: 'month', label: 'Month', value: String(month), onChange: (v) => { setMonth(Number(v)); setSelection({}); }, options: MONTH_NAMES.map((m, i) => ({ value: String(i + 1), label: m })) },
+              { id: 'year', label: 'Year', value: String(year), onChange: (v) => { setYear(Number(v)); setSelection({}); }, options: years.map((y) => ({ value: String(y), label: String(y) })) },
+            ]} />
         }
         intelligencePanel={
           <ModuleIntelligencePanel title={selected ? 'Budget line' : 'Monthly close'} onClose={() => setSelection({})} hasSelection={!!selected}

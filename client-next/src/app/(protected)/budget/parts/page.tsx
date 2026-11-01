@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Download, Network, Plus, ShoppingCart, Tags, Upload } from 'lucide-react';
+import { CalendarX2, Layers, Network, Plus, Replace, ShoppingCart, Tags } from 'lucide-react';
 import { ColumnDef, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, getSortedRowModel, SortingState } from '@tanstack/react-table';
 import api from '@/lib/api-client';
 import { downloadCsv, toCsv } from '@/lib/csv';
@@ -10,16 +10,17 @@ import { formatDate } from '@/lib/currency';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useInvalidate } from '@/hooks/use-queries';
-import { useItems, useItemPrices, useItemUsage, type Item } from '@/hooks/use-planning-queries';
+import { useItems, useItemPrices, useItemUsage, usePartHistory, type Item } from '@/hooks/use-planning-queries';
 import { useDataTable } from '@/hooks/use-data-table';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
+import { type FilterDef } from '@/components/data-table/filters';
 import { IdCell, TextCell, ToneText, headerRight } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
-import { ConfirmDialog, NativeSelect } from '@/components/shared/modal-primitives';
+import { ConfirmDialog } from '@/components/shared/modal-primitives';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
-import { ItemCategoriesModal, ItemModal, PartUsageModal, RecordPurchaseModal } from '@/components/budgets/planning-modals';
+import { ItemCategoriesModal, ItemModal, PartAlternatesModal, PartHistoryModal, PartReplaceModal, PartUsageModal, RecordPurchaseModal } from '@/components/budgets/planning-modals';
 import { useItemCategories } from '@/hooks/use-planning-queries';
 import { ImportModal } from '@/components/budgets/import-modal';
 import { money, unitPlain } from '@/components/budgets/budget-ui';
@@ -31,31 +32,36 @@ const Whole = ({ value, currency }: { value: number | null; currency: string }) 
 type Sourcing = 'ALL' | 'BUY' | 'MAKE';
 type Price = 'ALL' | 'DRIFT' | 'NO_LAST';
 type Use = 'ALL' | 'USED' | 'UNUSED';
+type Life = 'ACTIVE' | 'ENDED' | 'ALL';
+const lifeText = (i: Item) => (i.status === 'REPLACED' ? `Replaced ${formatDate(i.status_from)}` : i.status === 'RETIRED' ? `Retired${i.status_from ? ` ${formatDate(i.status_from)}` : ''}` : i.scheduled ? `${i.scheduled.successor_id ? 'Replaced' : 'Retired'} from ${formatDate(i.scheduled.effective_from)}` : '');
 const driftOf = (i: Item) => Math.abs(i.price_drift_pct) >= 5;
-const PART_HEADERS = ['part_no', 'name', 'category', 'make_or_buy', 'uom', 'standard_price', 'material_cost', 'manufacturing_cost', 'last_price', 'supplier', 'lead_time_days'];
+const PART_HEADERS = ['part_no', 'name', 'category', 'make_or_buy', 'uom', 'standard_price', 'material_cost', 'manufacturing_cost', 'last_price', 'supplier', 'lead_time_days', 'oem_part_no'];
 
 export default function PartMasterPage() {
   const setHeader = useHeaderStore((s) => s.setHeader);
   const currency = useAuthStore((s) => s.user?.currency || 'INR');
   const canEdit = useAuthStore((s) => ['ADMIN', 'FINANCE'].includes((s.user?.role_name || '').toUpperCase()));
   const invalidate = useInvalidate();
-  const { data, isLoading } = useItems();
+  const { data, isLoading } = useItems(true);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [selection, setSelection] = useState<Record<string, boolean>>({});
-  const [sourcing, setSourcing] = useState<Sourcing>('ALL'); const [price, setPrice] = useState<Price>('ALL'); const [use, setUse] = useState<Use>('ALL');
+  const [sourcing, setSourcing] = useState<Sourcing>('ALL'); const [price, setPrice] = useState<Price>('ALL'); const [use, setUse] = useState<Use>('ALL'); const [life, setLife] = useState<Life>('ACTIVE');
+  const [replaceId, setReplaceId] = useState<number | null>(null); const [altId, setAltId] = useState<number | null>(null); const [historyFor, setHistoryFor] = useState<Item | null>(null); const [cancelRep, setCancelRep] = useState<Item | null>(null);
   const [open, setOpen] = useState(false); const [editing, setEditing] = useState<Item | null>(null); const [del, setDel] = useState<Item | null>(null); const [buyFor, setBuyFor] = useState<Item | null>(null); const [catsOpen, setCatsOpen] = useState(false); const [whereFor, setWhereFor] = useState<Item | null>(null); const [category, setCategory] = useState('ALL');
   const categories = useItemCategories(); const [impOpen, setImpOpen] = useState(false);
   useEffect(() => { setHeader('Part master', 'Parts, bought or made, and their standard prices'); }, [setHeader]);
 
   const rows = useMemo(() => (data ?? []).filter((i) =>
-    (sourcing === 'ALL' || i.sourcing === sourcing)
+    (life === 'ALL' || (life === 'ACTIVE' ? i.status === 'ACTIVE' : i.status !== 'ACTIVE'))
+    && (sourcing === 'ALL' || i.sourcing === sourcing)
     && (price === 'ALL' || (price === 'DRIFT' ? driftOf(i) : i.last_price == null))
     && (use === 'ALL' || (use === 'USED' ? i.used_in > 0 : i.used_in === 0))
-    && (category === 'ALL' || (category === 'NONE' ? i.category_id == null : String(i.category_id) === category))), [data, sourcing, price, use, category]);
+    && (category === 'ALL' || (category === 'NONE' ? i.category_id == null : String(i.category_id) === category))), [data, life, sourcing, price, use, category]);
 
   const columns = useMemo<ColumnDef<Item, any>[]>(() => [
     { accessorKey: 'part_no', header: 'Part', cell: ({ row }) => <IdCell value={row.original.part_no} />, size: 120 },
     { accessorKey: 'name', header: 'Name', cell: ({ row }) => <TextCell value={row.original.name} strong className="block max-w-[280px] truncate" /> },
+    { accessorKey: 'oem_part_no', header: 'OEM part number' },
     { accessorKey: 'category_name', header: 'Category', cell: ({ row }) => <TextCell value={row.original.category_name} muted />, size: 140 },
     { accessorKey: 'sourcing', header: 'Make / Buy', cell: ({ row }) => <TextCell value={row.original.sourcing === 'MAKE' ? 'Make' : 'Buy'} />, size: 90 },
     { accessorKey: 'uom', header: 'Unit', cell: ({ row }) => <TextCell value={row.original.uom} muted />, size: 70 },
@@ -68,34 +74,41 @@ export default function PartMasterPage() {
     { accessorKey: 'supplier', header: 'Supplier', cell: ({ row }) => <TextCell value={row.original.supplier} muted /> },
     { accessorKey: 'lead_time_days', header: headerRight('Lead time'), cell: ({ row }) => <div className="text-right"><TextCell value={row.original.lead_time_days != null ? `${row.original.lead_time_days} d` : ''} muted /></div>, size: 90 },
     { accessorKey: 'used_in', header: headerRight('In BOMs'), cell: ({ row }) => <div className="text-right"><TextCell value={row.original.used_in || ''} /></div>, size: 80 },
+    { id: 'alternate', header: 'Alternate', cell: ({ row }) => (row.original.is_default_alternate ? <ToneText label="Default" tone="success" /> : row.original.alternates.length ? <ToneText label="Alternate" tone="muted" /> : <TextCell value="" />), size: 100 },
+    { id: 'life', header: 'Status', cell: ({ row }) => { const t = lifeText(row.original); return t ? <ToneText label={t} tone={row.original.status === 'ACTIVE' ? 'warning' : 'muted'} /> : <TextCell value="" />; }, size: 170 },
   ], [currency]);
 
   const table = useDataTable({
-    data: rows, columns, state: { sorting, rowSelection: selection }, onSortingChange: setSorting, getRowId: (r) => String(r.id),
+    data: rows, columns, state: { sorting, rowSelection: selection, columnVisibility: { oem_part_no: false } }, onSortingChange: setSorting, getRowId: (r) => String(r.id),
     enableRowSelection: true, enableMultiRowSelection: false, onRowSelectionChange: (u) => setSelection(typeof u === 'function' ? u(selection) : u),
-    getCoreRowModel: getCoreRowModel(), getFilteredRowModel: getFilteredRowModel(), getPaginationRowModel: getPaginationRowModel(), getSortedRowModel: getSortedRowModel(),
+    getColumnCanGlobalFilter: () => true, getCoreRowModel: getCoreRowModel(), getFilteredRowModel: getFilteredRowModel(), getPaginationRowModel: getPaginationRowModel(), getSortedRowModel: getSortedRowModel(),
   });
   const selected = rows.find((i) => String(i.id) === Object.keys(selection)[0]) ?? null;
   const usage = useItemUsage(selected?.id ?? null);
+  const history = usePartHistory(selected?.id ?? null);
+  const replaceItem = replaceId != null ? (data ?? []).find((i) => i.id === replaceId) ?? null : null;
+  const altItem = altId != null ? (data ?? []).find((i) => i.id === altId) ?? null : null;
   const prices = useItemPrices(selected?.id ?? null);
   const canUseLast = !!selected && selected.sourcing === 'BUY' && selected.last_price != null && selected.last_price !== selected.standard_price;
 
   // Anyone can see where a part is used; changing it is for Finance and Admin
   const itemActions: DetailActionDef[] = !selected ? [] : [
-    ...(canEdit ? [
-      { label: 'Edit', onClick: () => { setEditing(selected); setOpen(true); } },
-      { label: 'Record purchase', variant: 'primary' as const, icon: <ShoppingCart className="h-4 w-4 text-[var(--nav-violet)]" />, onClick: () => setBuyFor(selected) },
-    ] : []),
+    ...(canEdit && selected.status === 'ACTIVE' ? [{ label: 'Edit', onClick: () => { setEditing(selected); setOpen(true); } }] : []),
     { label: 'Where used', icon: <Network className="h-4 w-4 text-[var(--nav-orange)]" />, onClick: () => setWhereFor(selected) },
-    ...(canEdit ? [{ label: selected.used_in ? 'Archive' : 'Delete', variant: 'danger' as const, onClick: () => setDel(selected) }] : []),
+    ...(selected.sourcing === 'BUY' && selected.status === 'ACTIVE' ? [{ label: 'Alternates', icon: <Layers className="h-4 w-4 text-[var(--nav-purple)]" />, onClick: () => setAltId(selected.id) }] : []),
+    ...(canEdit && selected.status === 'ACTIVE' ? [selected.scheduled
+      ? { label: 'Cancel replacement', icon: <CalendarX2 className="h-4 w-4 text-[var(--nav-indigo)]" />, onClick: () => setCancelRep(selected) }
+      : { label: 'Replace', icon: <Replace className="h-4 w-4 text-[var(--nav-indigo)]" />, onClick: () => setReplaceId(selected.id) }] : []),
+    ...(canEdit && selected.status === 'ACTIVE' ? [{ label: 'Record purchase', variant: 'primary' as const, icon: <ShoppingCart className="h-4 w-4 text-[var(--nav-violet)]" />, onClick: () => setBuyFor(selected) }] : []),
+    // A part that has been on a BOM is replaced or retired, never deleted, so its history stays
+    ...(canEdit && !selected.ever_used ? [{ label: 'Delete', variant: 'danger' as const, onClick: () => setDel(selected) }] : []),
   ];
-  const exportParts = () => downloadCsv('part-master.csv', toCsv(PART_HEADERS, (data ?? []).map((i) => [i.part_no, i.name, i.category_name ?? '', i.sourcing === 'MAKE' ? 'Make' : 'Buy', i.uom, i.standard_price, i.material_cost ?? '', i.manufacturing_cost ?? '', i.last_price ?? '', i.supplier ?? '', i.lead_time_days ?? ''])));
+  const exportParts = () => downloadCsv('part-master.csv', toCsv(PART_HEADERS, (data ?? []).map((i) => [i.part_no, i.name, i.category_name ?? '', i.sourcing === 'MAKE' ? 'Make' : 'Buy', i.uom, i.standard_price, i.material_cost ?? '', i.manufacturing_cost ?? '', i.last_price ?? '', i.supplier ?? '', i.lead_time_days ?? '', i.oem_part_no ?? ''])));
   const alwaysActions: DetailActionDef[] = [
-    ...(canEdit ? [{ label: 'Add part', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setEditing(null); setOpen(true); } }, { label: 'Import', icon: <Upload className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setImpOpen(true) }, { label: 'Categories', icon: <Tags className="h-4 w-4 text-[var(--nav-cyan)]" />, onClick: () => setCatsOpen(true) }] : []),
-    { label: 'Export', icon: <Download className="h-4 w-4 text-[var(--shell-text-muted)]" />, onClick: exportParts },
+    ...(canEdit ? [{ label: 'Add part', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setEditing(null); setOpen(true); } }, { label: 'Categories', icon: <Tags className="h-4 w-4 text-[var(--nav-cyan)]" />, onClick: () => setCatsOpen(true) }] : []),
   ];
 
-  const all = data ?? [];
+  const all = (data ?? []).filter((i) => i.status === 'ACTIVE');
   const summary = (
     <div className="space-y-4">
       <DetailSummary title="Part master" subtitle="Standard prices used in every BOM" figure={all.length} figureLabel="Parts" />
@@ -124,6 +137,40 @@ export default function PartMasterPage() {
         </DetailGrid>
         {canUseLast && canEdit && <p className="text-[12px] text-[var(--warning)]">Last paid differs from the standard. Record a purchase and tick the standard price box to adopt it.</p>}
       </DetailSection>
+      {(selected.status !== 'ACTIVE' || selected.scheduled) && (
+        <DetailSection title={selected.status === 'ACTIVE' ? 'Due to change' : selected.status === 'REPLACED' ? 'Replaced' : 'Retired'}>
+          <DetailGrid>
+            {selected.status === 'ACTIVE' && selected.scheduled ? (
+              <>
+                <DetailField label={selected.scheduled.successor_id ? 'Replaced by' : 'Retired'} value={selected.scheduled.successor_id ? `${selected.scheduled.successor_part_no} ${selected.scheduled.successor_name ?? ''}` : 'No replacement'} wide />
+                <DetailField label="From" value={formatDate(selected.scheduled.effective_from)} />
+              </>
+            ) : (
+              <>
+                {selected.status === 'REPLACED' && <DetailField label="Replaced by" value={`${selected.replaced_by_part_no ?? ''} ${selected.replaced_by_name ?? ''}`.trim()} wide />}
+                <DetailField label="From" value={selected.status_from ? formatDate(selected.status_from) : undefined} />
+              </>
+            )}
+          </DetailGrid>
+          {(selected.scheduled?.reason ?? selected.status_reason) && <p className="text-[12px] text-[var(--shell-text-muted)]">Reason: {selected.scheduled?.reason ?? selected.status_reason}</p>}
+        </DetailSection>
+      )}
+      {selected.sourcing === 'BUY' && selected.status === 'ACTIVE' && (
+        <DetailSection title={`Alternates${selected.alternates.length ? ` (${selected.alternates.length})` : ''}`}
+          action={<button type="button" onClick={() => setAltId(selected.id)} className="text-[12px] font-medium text-[var(--shell-accent)] hover:underline focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]">{canEdit ? (selected.alternates.length ? 'Manage' : 'Add') : 'See all'}</button>}>
+          {!selected.alternates.length ? <p className="text-[12px] text-[var(--shell-text-muted)]">No alternates. Add bought parts that meet the same spec.</p> : (
+            <ul className="space-y-1.5">
+              {[{ id: selected.id, part_no: selected.part_no, oem_part_no: selected.oem_part_no, standard_price: selected.standard_price, is_default: selected.is_default_alternate, self: true }, ...selected.alternates.map((a) => ({ ...a, self: false }))]
+                .sort((x, y) => Number(y.is_default) - Number(x.is_default) || x.part_no.localeCompare(y.part_no)).map((a) => (
+                <li key={a.id} className="flex items-baseline justify-between gap-3 text-[13px]">
+                  <span className="min-w-0 truncate text-[var(--shell-text)]">{a.part_no}{a.oem_part_no ? <span className="text-[var(--shell-text-muted)]"> · OEM {a.oem_part_no}</span> : null}{a.self ? <span className="text-[var(--shell-text-muted)]"> (this part)</span> : null}{a.is_default ? <span className="font-medium text-[var(--success)]"> · Default</span> : null}</span>
+                  <span className="shrink-0 tabular-nums text-[var(--shell-text-muted)]">{unitPlain(a.standard_price, currency)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </DetailSection>
+      )}
       <DetailSection title="Prices paid">
         {!prices.data?.length ? <p className="text-[12px] text-[var(--shell-text-muted)]">No purchases recorded yet.</p> : (
           <ul className="space-y-1.5">
@@ -138,10 +185,23 @@ export default function PartMasterPage() {
       </DetailSection>
       <DetailSection title="Supply">
         <DetailGrid>
+          {selected.sourcing === 'BUY' && <DetailField label="OEM part number" value={selected.oem_part_no ?? undefined} wide />}
           <DetailField label="Category" value={selected.category_name ?? undefined} />
           <DetailField label="Supplier" value={selected.supplier ?? undefined} />
           <DetailField label="Lead time" value={selected.lead_time_days != null ? `${selected.lead_time_days} days` : undefined} />
         </DetailGrid>
+      </DetailSection>
+      <DetailSection title="History" action={<button type="button" onClick={() => setHistoryFor(selected)} className="text-[12px] font-medium text-[var(--shell-accent)] hover:underline focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]">See all</button>}>
+        {!history.data?.length ? <p className="text-[12px] text-[var(--shell-text-muted)]">{history.isLoading ? 'Loading…' : 'Nothing recorded yet.'}</p> : (
+          <ul className="space-y-1.5">
+            {history.data.slice(0, 4).map((e, i) => (
+              <li key={`${e.at}-${i}`} className="flex items-baseline justify-between gap-3 text-[13px]">
+                <span className="min-w-0 truncate text-[var(--shell-text)]">{e.text}</span>
+                <span className="shrink-0 tabular-nums text-[var(--shell-text-muted)]">{formatDate(e.at)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </DetailSection>
       <DetailSection title={`Where used${usage.data ? ` (${usage.data.length})` : ''}`}>
         {usage.isLoading ? <p className="text-[12px] text-[var(--shell-text-muted)]">Loading…</p>
@@ -160,28 +220,18 @@ export default function PartMasterPage() {
     </div>
   );
 
-  const filters = (
-    <>
-      <NativeSelect aria-label="Make or buy" value={sourcing} onChange={(e) => setSourcing(e.target.value as Sourcing)} className="!h-8 !w-auto">
-        <option value="ALL">Make and buy</option><option value="BUY">Bought</option><option value="MAKE">Made</option>
-      </NativeSelect>
-      <NativeSelect aria-label="Price" value={price} onChange={(e) => setPrice(e.target.value as Price)} className="!h-8 !w-auto">
-        <option value="ALL">Any price</option><option value="DRIFT">Moved 5% or more</option><option value="NO_LAST">No last paid</option>
-      </NativeSelect>
-      <NativeSelect aria-label="Category" value={category} onChange={(e) => setCategory(e.target.value)} className="!h-8 !w-auto">
-        <option value="ALL">Any category</option><option value="NONE">No category</option>
-        {(categories.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-      </NativeSelect>
-      <NativeSelect aria-label="Use" value={use} onChange={(e) => setUse(e.target.value as Use)} className="!h-8 !w-auto">
-        <option value="ALL">Used or not</option><option value="USED">In BOMs</option><option value="UNUSED">Not in a BOM</option>
-      </NativeSelect>
-    </>
-  );
+  const filterDefs: FilterDef[] = [
+    { id: 'sourcing', label: 'Make or buy', value: sourcing, onChange: (v) => setSourcing(v as Sourcing), options: [{ value: 'ALL', label: 'Make and buy' }, { value: 'BUY', label: 'Bought' }, { value: 'MAKE', label: 'Made' }] },
+    { id: 'price', label: 'Price', value: price, onChange: (v) => setPrice(v as Price), options: [{ value: 'ALL', label: 'Any price' }, { value: 'DRIFT', label: 'Moved 5% or more' }, { value: 'NO_LAST', label: 'No last paid' }] },
+    { id: 'category', label: 'Category', value: category, onChange: setCategory, options: [{ value: 'ALL', label: 'Any category' }, { value: 'NONE', label: 'No category' }, ...(categories.data ?? []).map((c) => ({ value: String(c.id), label: c.name }))] },
+    { id: 'life', label: 'Part status', value: life, onChange: (v) => setLife(v as Life), options: [{ value: 'ACTIVE', label: 'Active parts' }, { value: 'ENDED', label: 'Replaced or retired' }, { value: 'ALL', label: 'All parts' }] },
+    { id: 'use', label: 'In BOMs', value: use, onChange: (v) => setUse(v as Use), options: [{ value: 'ALL', label: 'Used or not' }, { value: 'USED', label: 'In BOMs' }, { value: 'UNUSED', label: 'Not in a BOM' }] },
+  ];
 
   return (
     <ModuleShell
       showPanel={!!selected}
-      searchRow={<DataTableToolbar table={table} filters={filters} actions={<><ToolbarActions actions={alwaysActions} /><ToolbarActions actions={itemActions} /></>} />}
+      searchRow={<DataTableToolbar table={table} filterDefs={filterDefs} onImport={canEdit ? () => setImpOpen(true) : undefined} onExport={exportParts} actions={<><ToolbarActions actions={alwaysActions} /><ToolbarActions actions={itemActions} /></>} />}
       intelligencePanel={
         <ModuleIntelligencePanel title={selected ? 'Part' : 'Part master'} onClose={() => setSelection({})} hasSelection={!!selected}
           idle={summary} footer={itemActions.length ? <DetailActions actions={itemActions} /> : undefined}>
@@ -191,15 +241,20 @@ export default function PartMasterPage() {
     >
       <DataTable isLoading={isLoading} columns={columns} data={rows} tableInstance={table} emptyMessage={canEdit ? 'No parts match. Click Add part to create one.' : 'No parts match.'} />
       <ItemModal isOpen={open} onClose={() => setOpen(false)} editing={editing} />
-      <ConfirmDialog open={!!del} destructive title={del?.used_in ? 'Archive part' : 'Delete part'} confirmLabel={del?.used_in ? 'Archive' : 'Delete'}
-        message={del?.used_in ? `${del.name} is in ${del.used_in} BOM line(s). It will be archived and leave the pickers. Adding a part with the same number brings it back.` : `Delete ${del?.name}?`} onCancel={() => setDel(null)}
-        onConfirm={async () => { const i = del; setDel(null); if (!i) return; try { await api.delete(`/budgets/items/${i.id}`); toast.success(i.used_in ? 'Part archived.' : 'Part deleted.'); invalidate('budgets'); setSelection({}); } catch (e: any) { toast.error(e?.message || 'Could not remove.'); } }} />
+      <ConfirmDialog open={!!del} destructive title="Delete part" confirmLabel="Delete"
+        message={`Delete ${del?.name}? It has never been on a BOM. Its price history goes with it. A part that has been used is replaced or retired instead.`} onCancel={() => setDel(null)}
+        onConfirm={async () => { const i = del; setDel(null); if (!i) return; try { await api.delete(`/budgets/items/${i.id}`); toast.success('Part deleted.'); invalidate('budgets'); setSelection({}); } catch (e: any) { toast.error(e?.message || 'Could not remove.'); } }} />
       <ItemCategoriesModal isOpen={catsOpen} onClose={() => setCatsOpen(false)} />
+      <PartReplaceModal isOpen={!!replaceItem} onClose={() => setReplaceId(null)} item={replaceItem} items={data ?? []} />
+      <PartAlternatesModal isOpen={!!altItem} onClose={() => setAltId(null)} item={altItem} items={data ?? []} canEdit={canEdit} />
+      <PartHistoryModal isOpen={!!historyFor} onClose={() => setHistoryFor(null)} item={historyFor} />
+      <ConfirmDialog open={!!cancelRep} title="Cancel replacement" confirmLabel="Cancel replacement" message={`Keep ${cancelRep?.name} as it is? The change scheduled for ${cancelRep?.scheduled ? formatDate(cancelRep.scheduled.effective_from) : ''} will not happen.`} onCancel={() => setCancelRep(null)}
+        onConfirm={async () => { const i = cancelRep; setCancelRep(null); if (!i?.scheduled) return; try { await api.delete(`/budgets/part-replacements/${i.scheduled.id}`); toast.success('Replacement cancelled.'); invalidate('budgets'); } catch (e: any) { toast.error(e?.message || 'Could not cancel.'); } }} />
       <PartUsageModal isOpen={!!whereFor} onClose={() => setWhereFor(null)} item={whereFor} />
       <RecordPurchaseModal isOpen={!!buyFor} onClose={() => setBuyFor(null)} item={buyFor} />
       <ImportModal isOpen={impOpen} onClose={() => setImpOpen(false)} title="Import parts" endpoint="/budgets/items/import" templateName="part-master-template.csv" headers={PART_HEADERS}
-        sample={[['CONN-24', '24-pin terminal block', 'Electronics', 'Buy', 'nos', '95', '', '', '102', 'Phoenix', '10'], ['SUB-FRAME', 'Welded frame', 'Mechanical', 'Make', 'nos', '', '4200', '1800', '', '', '']]}
-        notes="One row per part, matched by part_no. Category must match a name under Part categories. A new part is added and an existing one is updated. Blank cells keep the current value. Make_or_buy is Buy or Make; a made part is priced from its material and manufacturing cost." />
+        sample={[['CONN-24', '24-pin terminal block', 'Electronics', 'Buy', 'nos', '95', '', '', '102', 'Phoenix', '10', '1757019'], ['SUB-FRAME', 'Welded frame', 'Mechanical', 'Make', 'nos', '', '4200', '1800', '', '', '', '']]}
+        notes="One row per part, matched by part_no. Category must match a name under Part categories. A new part is added and an existing one is updated. Blank cells keep the current value. Make_or_buy is Buy or Make; a bought part needs its oem_part_no (the manufacturer's number); a made part is priced from its material and manufacturing cost." />
     </ModuleShell>
   );
 }

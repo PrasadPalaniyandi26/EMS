@@ -9,12 +9,13 @@ import { useBudgetLine, useBudgetMonitor, useBudgetPlans, useBudgetSettings, typ
 import { useDataTable } from '@/hooks/use-data-table';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
+import { type FilterDef } from '@/components/data-table/filters';
 import { IdCell, TextCell, headerRight } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
-import { NativeSelect } from '@/components/shared/modal-primitives';
+
 import { DetailSummary, DetailSection, DetailGrid, DetailField } from '@/components/shared/detail/detail-kit';
-import { FySelect, Kpi, KpiStrip, LevelText, LineStatusText, STATUS_TEXT, UtilBar, money, plain } from '@/components/budgets/budget-ui';
+import { Kpi, KpiStrip, LevelText, LineStatusText, STATUS_TEXT, UtilBar, fyOptions, money, plain } from '@/components/budgets/budget-ui';
 import { formatDate } from '@/lib/currency';
 import { ChangeRequestModal } from '@/components/budgets/planning-modals';
 import { DetailActions } from '@/components/shared/detail/detail-kit';
@@ -107,21 +108,11 @@ export default function BudgetMonitorPage() {
       searchRow={
         <DataTableToolbar
           table={table}
-          filters={
-            <>
-              <FySelect plans={plansData?.plans ?? []} value={fy} onChange={setFy} currentFy={plansData?.current_fy} startMonth={settings?.fy_start_month ?? 4} />
-              <NativeSelect aria-label="Cost object" value={object} onChange={(e) => setObject(e.target.value)} className="!h-8 !w-auto">
-                <option value="ALL">All cost objects</option>
-                <option value="PROJECT">Projects</option>
-                <option value="PRODUCT">Products</option>
-                <option value="DEPARTMENT">Overheads</option>
-                <option value="RESERVE">Reserve</option>
-              </NativeSelect>
-              <NativeSelect aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value as (typeof STATUS_FILTERS)[number])} className="!h-8 !w-auto">
-                {STATUS_FILTERS.map((s) => <option key={s} value={s}>{s === 'All' ? 'Any status' : s}</option>)}
-              </NativeSelect>
-            </>
-          }
+          filterDefs={[
+            { id: 'fy', label: 'Financial year', value: fy == null ? '' : String(fy), onChange: (v) => setFy(Number(v)), defaultValue: plansData?.current_fy != null ? String(plansData.current_fy) : undefined, options: fyOptions(plansData?.plans ?? [], plansData?.current_fy, settings?.fy_start_month ?? 4) },
+            { id: 'object', label: 'Cost object', value: object, onChange: setObject, options: [{ value: 'ALL', label: 'All cost objects' }, { value: 'PROJECT', label: 'Projects' }, { value: 'PRODUCT', label: 'Products' }, { value: 'DEPARTMENT', label: 'Overheads' }, { value: 'RESERVE', label: 'Reserve' }] },
+            { id: 'status', label: 'Status', value: status, onChange: (v) => setStatus(v as (typeof STATUS_FILTERS)[number]), options: STATUS_FILTERS.map((s) => ({ value: s, label: s === 'All' ? 'Any status' : s })) },
+          ]}
         />
       }
       intelligencePanel={

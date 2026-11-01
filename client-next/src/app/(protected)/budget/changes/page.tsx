@@ -12,10 +12,11 @@ import { useBudgetChanges, type BudgetChangeRow } from '@/hooks/use-planning-que
 import { useDataTable } from '@/hooks/use-data-table';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
+import { type FilterDef } from '@/components/data-table/filters';
 import { DateCell, TextCell, ToneText, headerRight } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
-import { ConfirmDialog, NativeSelect } from '@/components/shared/modal-primitives';
+import { ConfirmDialog } from '@/components/shared/modal-primitives';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import { ChangeDecisionModal, ChangeRequestModal } from '@/components/budgets/planning-modals';
 import { plain, money } from '@/components/budgets/budget-ui';
@@ -66,11 +67,9 @@ export default function BudgetChangesPage() {
     <ModuleShell
       showPanel={!!selected}
       searchRow={
-        <DataTableToolbar table={table} filters={
-          <NativeSelect aria-label="Status" value={status} onChange={(e) => { setStatus(e.target.value); setSelection({}); }} className="!h-8 !w-auto">
-            <option value="PENDING">Pending</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option><option value="ALL">All</option>
-          </NativeSelect>
-        } actions={<>
+        <DataTableToolbar table={table} filterDefs={[
+          { id: 'status', label: 'Status', value: status, onChange: (v) => { setStatus(v); setSelection({}); }, options: [{ value: 'PENDING', label: 'Pending' }, { value: 'APPROVED', label: 'Approved' }, { value: 'REJECTED', label: 'Rejected' }, { value: 'ALL', label: 'All' }] },
+        ]} actions={<>
           <button className="btn-action" onClick={() => setReqOpen(true)}><Plus className="h-4 w-4 text-[var(--success)]" /> Request change</button>
           <ToolbarActions actions={actions.filter((a) => a.label !== 'Withdraw')} />
         </>} />

@@ -6,9 +6,10 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useTransactions, useClients } from '@/hooks/use-queries';
 import api, { getAccessToken, API_BASE } from '@/lib/api-client';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Filters, type FilterDef } from '@/components/data-table/filters';
+import { Field } from '@/components/shared/modal-primitives';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Search, Calendar, ChevronLeft, ChevronRight, FileText, ArrowUpRight, CreditCard, Download, CheckCircle2, Clock, PauseCircle, Wallet } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FileText, ArrowUpRight, CreditCard, Download, CheckCircle2, Clock, PauseCircle, Wallet } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { getStatusConfig } from '@/lib/status';
 import { formatCurrency, formatDate, getDateRange, toLocalYMD } from '@/lib/currency';
@@ -33,6 +34,23 @@ export default function TransactionsPage() {
   const [exporting, setExporting] = useState(false);
 
   const { data: clients } = useClients();
+
+  // Five controls, so they live in the Filters dialog. The date range opens its two dates when it is Custom.
+  const filterDefs: FilterDef[] = [
+    {
+      id: 'date', label: 'Date range', value: datePreset, onChange: setDatePreset,
+      options: [{ value: 'all', label: 'All time' }, { value: 'thisWeek', label: 'This week' }, { value: 'lastWeek', label: 'Last week' }, { value: 'thisMonth', label: 'This month' }, { value: 'lastMonth', label: 'Last month' }, { value: 'calYear', label: 'This year' }, { value: 'finYear', label: 'Financial year' }, { value: 'custom', label: 'Custom' }],
+      extra: (v) => v === 'custom' ? (
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="From"><Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></Field>
+          <Field label="To"><Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></Field>
+        </div>
+      ) : null,
+    },
+    { id: 'type', label: 'Type', value: filterType, onChange: setFilterType, options: [{ value: 'all', label: 'All types' }, { value: 'income', label: 'Income' }, { value: 'expense', label: 'Expense' }] },
+    { id: 'payment', label: 'Payment method', value: filterPayment, onChange: setFilterPayment, options: [{ value: 'all', label: 'All methods' }, { value: 'cash', label: 'Cash' }, { value: 'card', label: 'Card' }, { value: 'bank_transfer', label: 'Bank transfer' }, { value: 'upi', label: 'UPI' }, { value: 'cheque', label: 'Cheque' }] },
+    { id: 'client', label: 'Client', value: filterClient, onChange: setFilterClient, options: [{ value: 'all', label: 'All clients' }, ...(clients || []).map((c: any) => ({ value: String(c.id), label: c.name }))] },
+  ];
 
   const filters = useMemo(() => {
     const f: Record<string, string> = {};
@@ -164,82 +182,22 @@ export default function TransactionsPage() {
         </ModuleIntelligencePanel>
       }
     >
-      {/* Filter Area */}
-      <div className="px-4 pt-3 pb-2.5 shrink-0 border-b border-[var(--shell-border)]">
-        <div className="flex items-center gap-3 mb-2.5">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--shell-text-muted)]" />
-            <Input
-              aria-label="Search transactions"
-              className="pl-9 h-9 bg-[var(--shell-bg)] border-[var(--shell-border)] text-xs focus-visible:ring-1 focus-visible:ring-[color-mix(in_srgb,var(--info)_50%,transparent)]"
-              placeholder="Search description, category..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <Select value={datePreset} onValueChange={setDatePreset}>
-              <SelectTrigger aria-label="Date range" className="h-9 w-[140px] bg-[var(--shell-bg)] border-[var(--shell-border)] text-xs">
-                <SelectValue placeholder="Date Range" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Time</SelectItem>
-                <SelectItem value="thisWeek">This Week</SelectItem>
-                <SelectItem value="lastWeek">Last Week</SelectItem>
-                <SelectItem value="thisMonth">This Month</SelectItem>
-                <SelectItem value="lastMonth">Last Month</SelectItem>
-                <SelectItem value="calYear">This Year</SelectItem>
-                <SelectItem value="finYear">Financial Year</SelectItem>
-                <SelectItem value="custom">Custom</SelectItem>
-              </SelectContent>
-            </Select>
-            <div className="flex items-center gap-2 bg-[var(--shell-bg)] border border-[var(--shell-border)] rounded-md px-3 h-9 text-xs font-medium text-[var(--shell-text-muted)]">
-              <Calendar className="h-3.5 w-3.5 text-[var(--shell-text-muted)]" />
-              <input aria-label="From date" className="bg-transparent border-none p-0 w-[78px] text-center focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-              <span className="text-[var(--shell-text-muted)]">to</span>
-              <input aria-label="To date" className="bg-transparent border-none p-0 w-[78px] text-center focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} />
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center justify-between">
-          <div className="flex gap-2 flex-wrap">
-            <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger aria-label="Filter by type" className="h-8 w-[130px] bg-[var(--shell-hover)] border-[var(--shell-border)] text-[12px] font-medium"><SelectValue placeholder="Type: All" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Type: All</SelectItem>
-                <SelectItem value="income">Income</SelectItem>
-                <SelectItem value="expense">Expense</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={filterPayment} onValueChange={setFilterPayment}>
-              <SelectTrigger aria-label="Filter by payment method" className="h-8 w-[150px] bg-[var(--shell-hover)] border-[var(--shell-border)] text-[12px] font-medium"><SelectValue placeholder="Payment: All" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Payment: All</SelectItem>
-                <SelectItem value="cash">Cash</SelectItem>
-                <SelectItem value="card">Card</SelectItem>
-                <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                <SelectItem value="upi">UPI</SelectItem>
-                <SelectItem value="cheque">Cheque</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={filterClient} onValueChange={setFilterClient}>
-              <SelectTrigger aria-label="Filter by client" className="h-8 w-[150px] bg-[var(--shell-hover)] border-[var(--shell-border)] text-[12px] font-medium"><SelectValue placeholder="Client: All" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Client: All</SelectItem>
-                {(clients || []).map((c: any) => (
-                  <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <button
-            onClick={handleExportCsv}
-            disabled={exporting}
-            className="flex items-center gap-1.5 h-8 px-3 rounded-md border border-[var(--shell-border)] bg-[var(--shell-hover)] text-[12px] font-semibold text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] hover:bg-[var(--shell-surface)] transition-colors disabled:opacity-50"
-          >
-            <Download className="h-3.5 w-3.5" />
-            {exporting ? 'Exporting...' : 'Export CSV'}
-          </button>
+      {/* Export, Filters and Search on the right, in the same order as every list page */}
+      <div className="px-4 min-h-12 py-1.5 shrink-0 flex flex-wrap items-center justify-end gap-2 border-b border-[var(--shell-border)]">
+        <button type="button" className="btn-action" onClick={handleExportCsv} disabled={exporting}>
+          <Download aria-hidden className="h-4 w-4 text-[var(--shell-text-muted)]" />
+          {exporting ? 'Exporting…' : 'Export'}
+        </button>
+        <Filters defs={filterDefs} />
+        <div className="relative w-full sm:w-[220px] min-w-[140px]">
+          <Input
+            aria-label="Search transactions"
+            placeholder="Search..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-8 w-full rounded-md pl-3 text-[13px] focus-visible:ring-1"
+            style={{ background: 'transparent', border: '1px solid var(--input)', color: 'var(--shell-text)' }}
+          />
         </div>
       </div>
 

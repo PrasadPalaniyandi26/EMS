@@ -28,7 +28,7 @@ export class BudgetPlanningController {
   @Delete('overhead-rates/:id') @Roles('admin', 'finance') delOh(@Param('id', ParseIntPipe) id: number, @CurrentUser() u: Actor) { return this.s.removeOverhead(id, u); }
 
   // Item master
-  @Get('items') items() { return this.s.items(); }
+  @Get('items') items(@Query('all') all?: string) { return this.s.items(all === '1' || all === 'true'); }
   @Get('item-categories') itemCategories() { return this.s.itemCategories(); }
   @Post('item-categories') @Roles('admin', 'finance') addItemCategory(@Body() b: any, @CurrentUser() u: Actor) { return this.s.saveItemCategory(null, b, u); }
   @Put('item-categories/:id') @Roles('admin', 'finance') editItemCategory(@Param('id', ParseIntPipe) id: number, @Body() b: any, @CurrentUser() u: Actor) { return this.s.saveItemCategory(id, b, u); }
@@ -39,6 +39,12 @@ export class BudgetPlanningController {
   @Delete('items/:id') @Roles('admin', 'finance') delItem(@Param('id', ParseIntPipe) id: number, @CurrentUser() u: Actor) { return this.s.removeItem(id, u); }
   @Get('items/:id/prices') itemPrices(@Param('id', ParseIntPipe) id: number) { return this.s.itemPrices(id); }
   @Post('items/:id/purchase') @Roles('admin', 'finance') purchase(@Param('id', ParseIntPipe) id: number, @Body() b: any, @CurrentUser() u: Actor) { return this.s.recordPurchase(id, b, u); }
+  @Post('items/:id/replace') @Roles('admin', 'finance') replacePart(@Param('id', ParseIntPipe) id: number, @Body() b: any, @CurrentUser() u: Actor) { return this.s.replacePart(id, b, u); }
+  @Delete('part-replacements/:rid') @Roles('admin', 'finance') cancelReplacement(@Param('rid', ParseIntPipe) rid: number, @CurrentUser() u: Actor) { return this.s.cancelReplacement(rid, u); }
+  @Get('items/:id/history') partHistory(@Param('id', ParseIntPipe) id: number) { return this.s.partHistory(id); }
+  @Post('items/:id/alternates') @Roles('admin', 'finance') addAlternate(@Param('id', ParseIntPipe) id: number, @Body() b: any, @CurrentUser() u: Actor) { return this.s.addAlternate(id, b, u); }
+  @Put('items/:id/default-alternate') @Roles('admin', 'finance') defaultAlternate(@Param('id', ParseIntPipe) id: number, @CurrentUser() u: Actor) { return this.s.setDefaultAlternate(id, u); }
+  @Delete('items/:id/alternates') @Roles('admin', 'finance') removeAlternate(@Param('id', ParseIntPipe) id: number, @CurrentUser() u: Actor) { return this.s.removeAlternate(id, u); }
   @Get('items/:id/usage') itemUsage(@Param('id', ParseIntPipe) id: number) { return this.s.itemUsage(id); }
 
   // Projects

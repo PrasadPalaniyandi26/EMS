@@ -1,4 +1,5 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { BudgetsService } from './budgets.service';
@@ -165,19 +166,36 @@ export class BudgetPlanningService {
 
   // ── Items ────────────────────────────────────────────────────────────────
 
-  async items() {
-    const rows = await this.prisma.item.findMany({ where: { isActive: true }, orderBy: { partNo: 'asc' } });
-    const usage = await this.prisma.bomLine.groupBy({ by: ['itemId'], _count: { _all: true } });
+  // Parts with their life (active, replaced or retired), alternates and any scheduled replacement. Pickers use the active ones; the Part master asks for all.
+  async items(all = false) {
+    await this.applyDueReplacements();
+    const rows = await this.prisma.item.findMany({ where: all ? {} : { isActive: true }, orderBy: { partNo: 'asc' } });
+    const current = (await this.currentBoms()).map((b) => b.id);
+    const usage = await this.prisma.bomLine.groupBy({ by: ['itemId'], where: { bomId: { in: current } }, _count: { _all: true } });
     const used = new Map(usage.map((u) => [u.itemId, u._count._all]));
+    const ever = new Set((await this.prisma.bomLine.groupBy({ by: ['itemId'], _count: { _all: true } })).map((u) => u.itemId));
     const cats = new Map((await this.prisma.itemCategory.findMany({ select: { id: true, name: true } })).map((c) => [c.id, c.name]));
     const paid = new Map((await this.prisma.itemPriceLog.groupBy({ by: ['itemId'], _max: { paidOn: true } })).map((x) => [x.itemId, x._max.paidOn]));
-    return rows.map((i) => ({
-      last_paid_on: paid.get(i.id) ?? null,
-      id: i.id, part_no: i.partNo, name: i.name, category_id: i.categoryId, category_name: cats.get(i.categoryId ?? -1) ?? null, uom: i.uom, standard_price: n(i.standardPrice),
-      last_price: i.lastPrice == null ? null : n(i.lastPrice), supplier: i.supplier, lead_time_days: i.leadTimeDays, sourcing: i.sourcing,
-      material_cost: i.materialCost == null ? null : n(i.materialCost), manufacturing_cost: i.manufacturingCost == null ? null : n(i.manufacturingCost), used_in: used.get(i.id) ?? 0,
-      price_drift_pct: i.lastPrice != null && n(i.standardPrice) > 0 ? r2(((n(i.lastPrice) - n(i.standardPrice)) / n(i.standardPrice)) * 100) : 0,
-    }));
+    const pending = new Map((await this.prisma.partReplacement.findMany({ where: { status: 'SCHEDULED' }, include: { successor: { select: { id: true, partNo: true, name: true } } } })).map((r) => [r.itemId, r]));
+    const successors = new Map((await this.prisma.item.findMany({ where: { id: { in: rows.map((r) => r.replacedById).filter((x): x is number => x != null) } }, select: { id: true, partNo: true, name: true } })).map((x) => [x.id, x]));
+    const members = await this.prisma.item.findMany({ where: { alternateGroupId: { not: null }, isActive: true } });
+    return rows.map((i) => {
+      const next = pending.get(i.id); const by = i.replacedById != null ? successors.get(i.replacedById) : null;
+      return {
+        last_paid_on: paid.get(i.id) ?? null,
+        id: i.id, part_no: i.partNo, name: i.name, category_id: i.categoryId, category_name: cats.get(i.categoryId ?? -1) ?? null, uom: i.uom, standard_price: n(i.standardPrice),
+        last_price: i.lastPrice == null ? null : n(i.lastPrice), supplier: i.supplier, lead_time_days: i.leadTimeDays, sourcing: i.sourcing,
+        material_cost: i.materialCost == null ? null : n(i.materialCost), manufacturing_cost: i.manufacturingCost == null ? null : n(i.manufacturingCost), used_in: used.get(i.id) ?? 0,
+        price_drift_pct: i.lastPrice != null && n(i.standardPrice) > 0 ? r2(((n(i.lastPrice) - n(i.standardPrice)) / n(i.standardPrice)) * 100) : 0,
+        oem_part_no: i.oemPartNo, status: i.status, status_from: i.statusFrom, status_reason: i.statusReason, replaced_by_id: i.replacedById, replaced_by_part_no: by?.partNo ?? null, replaced_by_name: by?.name ?? null,
+        ever_used: ever.has(i.id),
+        scheduled: next ? { id: next.id, effective_from: next.effectiveFrom, reason: next.reason, successor_id: next.successorId, successor_part_no: next.successor?.partNo ?? null, successor_name: next.successor?.name ?? null } : null,
+        is_default_alternate: i.isDefaultAlternate,
+        alternates: i.alternateGroupId == null ? [] : members.filter((m) => m.alternateGroupId === i.alternateGroupId && m.id !== i.id).map((m) => ({
+          id: m.id, part_no: m.partNo, oem_part_no: m.oemPartNo, name: m.name, standard_price: n(m.standardPrice), last_price: m.lastPrice == null ? null : n(m.lastPrice), supplier: m.supplier, lead_time_days: m.leadTimeDays, is_default: m.isDefaultAlternate,
+        })).sort((a, b) => Number(b.is_default) - Number(a.is_default) || a.part_no.localeCompare(b.part_no)),
+      };
+    });
   }
 
   async saveItem(id: number | null, b: any, user?: Actor, dry = false) {
@@ -187,6 +205,9 @@ export class BudgetPlanningService {
     const make = String(b.sourcing).toUpperCase() === 'MAKE';
     const material = Number(b.material_cost) || 0;
     const manufacturing = Number(b.manufacturing_cost) || 0;
+    const oem = String(b.oem_part_no ?? '').trim();
+    if (!make && !oem) throw bad('Enter the OEM part number: the number the manufacturer uses for the part.');
+    if (oem.length > 60) throw bad('The OEM part number can be up to 60 characters.');
     const standard = make ? material + manufacturing : Number(b.standard_price);
     if (!(standard >= 0)) throw bad('Enter the standard price.');
     const hasLast = !(b.last_price === '' || b.last_price == null);
@@ -194,23 +215,27 @@ export class BudgetPlanningService {
     if (b.lead_time_days !== '' && b.lead_time_days != null && !(Number.isInteger(Number(b.lead_time_days)) && Number(b.lead_time_days) >= 0)) throw bad('Lead time must be a whole number of days, zero or more.');
     if (make && (!(material >= 0) || !(manufacturing >= 0))) throw bad('Material and manufacturing costs must be zero or more.');
     const clash = await this.prisma.item.findFirst({ where: { partNo, ...(id ? { NOT: { id } } : {}) } });
-    // A part number held by an archived part is taken back by the part being added
-    const restoreId = clash && !clash.isActive && !id ? clash.id : null;
-    if (clash && restoreId == null) throw bad(clash.isActive ? 'Another item already has that part number.' : 'An archived part uses that part number. Add the part again to bring it back.', HttpStatus.CONFLICT);
+    if (clash) throw bad(clash.status === 'ACTIVE' ? 'Another item already has that part number.' : 'That part number belongs to a replaced or retired part. Part numbers are not reused, so use a new one.', HttpStatus.CONFLICT);
+    const current = id ? await this.prisma.item.findUnique({ where: { id } }) : null;
+    if (current && current.status !== 'ACTIVE') throw bad('A replaced or retired part cannot be edited.', HttpStatus.CONFLICT);
+    const unit = String(b.uom || 'nos').slice(0, 12);
+    if (current?.alternateGroupId != null && current.uom !== unit && (await this.prisma.item.count({ where: { alternateGroupId: current.alternateGroupId, isActive: true } })) > 1) throw bad('Alternates share a unit of measure. Remove this part from its alternates before changing the unit.', HttpStatus.CONFLICT);
     const data = {
       partNo, name, categoryId: await this.checkCategory(b.category_id), uom: String(b.uom || 'nos').slice(0, 12),
       standardPrice: standard, materialCost: make ? material : null, manufacturingCost: make ? manufacturing : null, lastPrice: b.last_price === '' || b.last_price == null ? null : Number(b.last_price),
       supplier: b.supplier?.trim() || null, leadTimeDays: b.lead_time_days ? Number(b.lead_time_days) : null,
-      sourcing: make ? 'MAKE' : 'BUY',
+      sourcing: make ? 'MAKE' : 'BUY', oemPartNo: make ? null : oem,
     };
-    const target = id ?? restoreId;
+    const target = id;
     if (dry) return { id: target ?? 0 };
     const before = target ? await this.prisma.item.findUnique({ where: { id: target } }) : null;
-    const row = target ? await this.prisma.item.update({ where: { id: target }, data: { ...data, isActive: true } }) : await this.prisma.item.create({ data });
+    const row = target ? await this.prisma.item.update({ where: { id: target }, data }) : await this.prisma.item.create({ data });
+    // Alternates are bought parts: a part that becomes made leaves its alternates
+    if (row.sourcing === 'MAKE' && row.alternateGroupId != null) await this.leaveAlternates(this.prisma, row.id);
     if (data.lastPrice != null && (before?.lastPrice == null || n(before.lastPrice) !== data.lastPrice)) {
       await this.prisma.itemPriceLog.create({ data: { itemId: row.id, price: data.lastPrice, paidOn: this.today(), supplier: data.supplier, note: 'Entered on the part', recordedByName: user?.username ?? null } });
     }
-    this.log('items', row.id, restoreId ? 'RESTORE' : id ? 'UPDATE' : 'INSERT', user?.id, { part_no: partNo, name, sourcing: data.sourcing, standard_price: standard, last_price: data.lastPrice }, before ? { part_no: before.partNo, name: before.name, sourcing: before.sourcing, standard_price: n(before.standardPrice), last_price: before.lastPrice == null ? null : n(before.lastPrice) } : undefined);
+    this.log('items', row.id, id ? 'UPDATE' : 'INSERT', user?.id, { part_no: partNo, name, sourcing: data.sourcing, standard_price: standard, last_price: data.lastPrice, oem_part_no: data.oemPartNo }, before ? { part_no: before.partNo, name: before.name, sourcing: before.sourcing, standard_price: n(before.standardPrice), last_price: before.lastPrice == null ? null : n(before.lastPrice), oem_part_no: before.oemPartNo } : undefined);
     return { id: row.id };
   }
 
@@ -221,14 +246,218 @@ export class BudgetPlanningService {
     return c.id;
   }
 
+  // A part that has been on a BOM, or has a replacement history, is replaced or retired instead, so its history stays
   async removeItem(id: number, user?: Actor) {
-    const used = await this.prisma.bomLine.count({ where: { itemId: id } });
+    const onBoms = await this.prisma.bomLine.count({ where: { itemId: id } });
+    const history = await this.prisma.partReplacement.count({ where: { OR: [{ itemId: id }, { successorId: id }] } });
+    if (onBoms || history) throw bad('This part has been on a BOM or has a replacement history, so it cannot be deleted. Replace or retire it instead.', HttpStatus.CONFLICT);
     const before = await this.prisma.item.findUnique({ where: { id } });
-    const old = before ? { part_no: before.partNo, name: before.name } : undefined;
-    if (used) { await this.prisma.item.update({ where: { id }, data: { isActive: false } }); this.log('items', id, 'ARCHIVE', user?.id, {}, old); return { archived: true }; }
+    if (!before) throw bad('Part not found.', HttpStatus.NOT_FOUND);
+    await this.leaveAlternates(this.prisma, id);
     await this.prisma.item.delete({ where: { id } });
-    this.log('items', id, 'DELETE', user?.id, {}, old);
-    return { archived: false };
+    this.log('items', id, 'DELETE', user?.id, {}, { part_no: before.partNo, name: before.name });
+    return { deleted: true };
+  }
+
+
+  // ── Part life: replace or retire on a date, alternates and history ───────
+
+  // The BOM version in force for each product and each job: the latest one (a new version only exists once it is due)
+  private async currentBoms() {
+    const all = await this.prisma.bom.findMany({ select: { id: true, productId: true, projectId: true, version: true } });
+    const best = new Map<string, (typeof all)[number]>();
+    for (const b of all) {
+      const key = b.productId != null ? `P${b.productId}` : `J${b.projectId}`;
+      const cur = best.get(key);
+      if (!cur || b.version > cur.version) best.set(key, b);
+    }
+    return [...best.values()];
+  }
+
+  // A part leaves its alternates. The default passes to another member; a group left with one part is dissolved.
+  // The successor of a replaced part takes its place in the group when it is not in one already.
+  private async leaveAlternates(db: any, itemId: number, successorId?: number | null) {
+    const it = await db.item.findUnique({ where: { id: itemId } });
+    if (!it || it.alternateGroupId == null) return;
+    const group = it.alternateGroupId;
+    const rest = await db.item.findMany({ where: { alternateGroupId: group, id: { not: itemId }, isActive: true }, orderBy: { partNo: 'asc' } });
+    const ids = rest.map((r: any) => r.id);
+    await db.item.update({ where: { id: itemId }, data: { alternateGroupId: null, isDefaultAlternate: false } });
+    if (successorId != null) {
+      const succ = await db.item.findUnique({ where: { id: successorId } });
+      if (succ && succ.alternateGroupId == null && succ.sourcing === 'BUY') {
+        await db.item.update({ where: { id: successorId }, data: { alternateGroupId: group, isDefaultAlternate: it.isDefaultAlternate } });
+        ids.push(successorId);
+        return;
+      }
+    }
+    if (ids.length <= 1) { await db.item.updateMany({ where: { id: { in: ids } }, data: { alternateGroupId: null, isDefaultAlternate: false } }); return; }
+    if (it.isDefaultAlternate && !rest.some((r: any) => r.isDefaultAlternate)) await db.item.update({ where: { id: rest[0].id }, data: { isDefaultAlternate: true } });
+  }
+
+  // Replace a part with another on a date, or retire it when there is no replacement. A date that has come is applied at once; a later one waits.
+  async replacePart(id: number, b: any, user: Actor) {
+    const item = await this.prisma.item.findUnique({ where: { id } });
+    if (!item) throw bad('Part not found.', HttpStatus.NOT_FOUND);
+    if (item.status !== 'ACTIVE') throw bad('That part has already been replaced or retired.', HttpStatus.CONFLICT);
+    if (await this.prisma.partReplacement.findFirst({ where: { itemId: id, status: 'SCHEDULED' } })) throw bad('A replacement is already scheduled for this part. Cancel it first.', HttpStatus.CONFLICT);
+    if (await this.prisma.partReplacement.findFirst({ where: { successorId: id, status: 'SCHEDULED' } })) throw bad('This part is due to take over from another part. Cancel that replacement first.', HttpStatus.CONFLICT);
+    const successorId = b.successor_id === '' || b.successor_id == null ? null : Number(b.successor_id);
+    let succ: any = null;
+    if (successorId != null) {
+      if (successorId === id) throw bad('A part cannot replace itself.');
+      succ = await this.prisma.item.findUnique({ where: { id: successorId } });
+      if (!succ || succ.status !== 'ACTIVE') throw bad('Choose an active part as the replacement.');
+      if (succ.uom !== item.uom) throw bad(`The replacement is measured in ${succ.uom} and this part in ${item.uom}. Make the units match first.`);
+      if (await this.prisma.partReplacement.findFirst({ where: { itemId: successorId, status: 'SCHEDULED' } })) throw bad('The replacement part is itself due to be replaced. Choose another part.', HttpStatus.CONFLICT);
+    }
+    const when = this.asDate(b.effective_from, 'the effective date');
+    if (when.getTime() < this.today().getTime()) throw bad('The effective date cannot be in the past.');
+    const reason = String(b.reason ?? '').trim();
+    if (!reason) throw bad('Give a reason.');
+    const row = await this.prisma.partReplacement.create({ data: { itemId: id, successorId, effectiveFrom: when, reason: reason.slice(0, 300), createdById: user.id, createdByName: user.username ?? null } });
+    let applied: number | null = null;
+    if (when.getTime() <= this.today().getTime()) applied = await this.applyReplacement(row.id, user.id);
+    return { id: row.id, applied: applied != null, boms_changed: applied ?? 0 };
+  }
+
+  async cancelReplacement(id: number, user: Actor) {
+    const r = await this.prisma.partReplacement.findUnique({ where: { id } });
+    if (!r) throw bad('Replacement not found.', HttpStatus.NOT_FOUND);
+    if (r.status !== 'SCHEDULED') throw bad('Only a scheduled replacement can be cancelled.', HttpStatus.CONFLICT);
+    await this.prisma.partReplacement.update({ where: { id }, data: { status: 'CANCELLED', cancelledAt: new Date() } });
+    return { id };
+  }
+
+  // Replacements that have come due are applied when parts or products are read, and every hour
+  async applyDueReplacements() {
+    const due = await this.prisma.partReplacement.findMany({ where: { status: 'SCHEDULED', effectiveFrom: { lte: this.today() } }, orderBy: { effectiveFrom: 'asc' }, select: { id: true } });
+    for (const d of due) await this.applyReplacement(d.id);
+  }
+
+  @Cron(CronExpression.EVERY_HOUR)
+  async applyDueReplacementsJob() { await this.applyDueReplacements().catch(() => undefined); }
+
+  // Every BOM now in force that uses the part gets a new version from the date: the successor in place of the part, or without it when retired.
+  // The old version is kept, so what a product was made of is never lost. Approved standard costs are snapshots and do not change.
+  private async applyReplacement(repId: number, userId?: number): Promise<number | null> {
+    const rep = await this.prisma.partReplacement.findUnique({ where: { id: repId }, include: { item: true, successor: true } });
+    if (!rep || rep.status !== 'SCHEDULED') return null;
+    const current = await this.currentBoms();
+    const lines = await this.prisma.bomLine.findMany({ where: { itemId: rep.itemId, bomId: { in: current.map((b) => b.id) } }, select: { bomId: true } });
+    const bomIds = [...new Set(lines.map((l) => l.bomId))];
+    const jobs: number[] = [];
+    const note = rep.successor ? `${rep.item.partNo} replaced by ${rep.successor.partNo}` : `${rep.item.partNo} retired`;
+    let changed = 0;
+    const claimed = await this.prisma.$transaction(async (tx) => {
+      const claim = await tx.partReplacement.updateMany({ where: { id: repId, status: 'SCHEDULED' }, data: { status: 'APPLIED', appliedAt: new Date() } });
+      if (claim.count === 0) return false;
+      for (const bomId of bomIds) {
+        const old = await tx.bom.findUnique({ where: { id: bomId }, include: { lines: true, operations: true } });
+        if (!old) continue;
+        const next = await tx.bom.create({ data: {
+          productId: old.productId, projectId: old.projectId, version: old.version + 1, status: 'DRAFT', freightPct: old.freightPct, warrantyPct: old.warrantyPct,
+          overheadRateOverride: old.overheadRateOverride, adjustReason: old.adjustReason, effectiveFrom: rep.effectiveFrom, changeNote: note,
+        } });
+        const keep = old.lines.filter((l) => l.itemId !== rep.itemId || rep.successorId != null);
+        if (keep.length) await tx.bomLine.createMany({ data: keep.map((l) => ({
+          bomId: next.id, itemId: l.itemId === rep.itemId ? rep.successorId : l.itemId, subBomId: l.subBomId, subProductId: l.subProductId, subStandardId: l.subStandardId, subUnitCost: l.subUnitCost, quantity: l.quantity, scrapPct: l.scrapPct,
+        })) });
+        if (old.operations.length) await tx.bomOperation.createMany({ data: old.operations.map((o) => ({
+          bomId: next.id, name: o.name, hours: o.hours, rateCardId: o.rateCardId, outsourcedCost: o.outsourcedCost, fixedCost: o.fixedCost, operationTypeId: o.operationTypeId,
+        })) });
+        // A product used as a sub-assembly elsewhere follows its new version
+        await tx.bomLine.updateMany({ where: { subBomId: old.id, bomId: { not: next.id } }, data: { subBomId: next.id } });
+        if (old.projectId != null) jobs.push(old.projectId);
+        changed++;
+      }
+      await this.leaveAlternates(tx, rep.itemId, rep.successorId);
+      await tx.item.update({ where: { id: rep.itemId }, data: { status: rep.successorId != null ? 'REPLACED' : 'RETIRED', statusFrom: rep.effectiveFrom, statusReason: rep.reason, replacedById: rep.successorId, isActive: false } });
+      await tx.partReplacement.update({ where: { id: repId }, data: { bomsChanged: changed } });
+      return true;
+    });
+    if (!claimed) return null;
+    for (const j of jobs) await this.syncJobEstimate(j);
+    return changed;
+  }
+
+  // Parts that meet the same spec: bought parts with the same unit. The first part added becomes the default.
+  async addAlternate(id: number, b: any, user: Actor) {
+    const altId = Number(b.alternate_id);
+    if (!Number.isInteger(altId) || altId === id) throw bad('Choose another part.');
+    const [a, c] = await Promise.all([this.prisma.item.findUnique({ where: { id } }), this.prisma.item.findUnique({ where: { id: altId } })]);
+    if (!a || !c) throw bad('Part not found.', HttpStatus.NOT_FOUND);
+    if (a.status !== 'ACTIVE' || c.status !== 'ACTIVE') throw bad('Alternates must be active parts.');
+    if (a.sourcing !== 'BUY' || c.sourcing !== 'BUY') throw bad('Only bought parts have alternates.');
+    if (a.uom !== c.uom) throw bad(`The alternate is measured in ${c.uom} and this part in ${a.uom}. Alternates must share a unit.`);
+    if (c.alternateGroupId != null) throw bad(c.alternateGroupId === a.alternateGroupId ? 'That part is already an alternate.' : 'That part is already an alternate of another part. Remove it from there first.', HttpStatus.CONFLICT);
+    const group = a.alternateGroupId ?? a.id;
+    await this.prisma.$transaction([
+      ...(a.alternateGroupId == null ? [this.prisma.item.update({ where: { id: a.id }, data: { alternateGroupId: group, isDefaultAlternate: true } })] : []),
+      this.prisma.item.update({ where: { id: c.id }, data: { alternateGroupId: group, isDefaultAlternate: false } }),
+    ]);
+    this.log('items', a.id, 'ALT_ADD', user.id, { alternate: c.partNo });
+    this.log('items', c.id, 'ALT_ADD', user.id, { alternate: a.partNo });
+    return { group };
+  }
+
+  async setDefaultAlternate(id: number, user: Actor) {
+    const it = await this.prisma.item.findUnique({ where: { id } });
+    if (!it || it.alternateGroupId == null) throw bad('This part has no alternates.', HttpStatus.CONFLICT);
+    await this.prisma.$transaction([
+      this.prisma.item.updateMany({ where: { alternateGroupId: it.alternateGroupId }, data: { isDefaultAlternate: false } }),
+      this.prisma.item.update({ where: { id }, data: { isDefaultAlternate: true } }),
+    ]);
+    this.log('items', id, 'ALT_DEFAULT', user.id, { part_no: it.partNo });
+    return { id };
+  }
+
+  async removeAlternate(id: number, user: Actor) {
+    const it = await this.prisma.item.findUnique({ where: { id } });
+    if (!it || it.alternateGroupId == null) throw bad('This part has no alternates.', HttpStatus.CONFLICT);
+    await this.prisma.$transaction(async (tx) => { await this.leaveAlternates(tx, id); });
+    this.log('items', id, 'ALT_REMOVE', user.id, { part_no: it.partNo });
+    return { id };
+  }
+
+  // What happened to a part, newest first: edits, purchases, replacements and alternates
+  async partHistory(id: number) {
+    const item = await this.prisma.item.findUnique({ where: { id } });
+    if (!item) throw bad('Part not found.', HttpStatus.NOT_FOUND);
+    const [logs, prices, reps] = await Promise.all([
+      this.prisma.auditLog.findMany({ where: { tableName: 'items', recordId: id }, orderBy: { changedAt: 'desc' }, take: 200, include: { user: { select: { username: true } } } }),
+      this.prisma.itemPriceLog.findMany({ where: { itemId: id }, orderBy: [{ paidOn: 'desc' }, { id: 'desc' }], take: 100 }),
+      this.prisma.partReplacement.findMany({ where: { OR: [{ itemId: id }, { successorId: id }] }, include: { item: { select: { partNo: true } }, successor: { select: { partNo: true } } }, orderBy: { id: 'desc' } }),
+    ]);
+    const ev: { at: Date; kind: string; text: string; by: string | null }[] = [];
+    const parse = (v: string | null) => { try { return v ? JSON.parse(v) : {}; } catch { return {}; } };
+    const LABEL: Record<string, string> = { part_no: 'Part number', oem_part_no: 'OEM part number', name: 'Name', sourcing: 'Make or buy', standard_price: 'Standard price', last_price: 'Last paid price' };
+    const day = (d: Date) => d.toISOString().slice(0, 10);
+    for (const l of logs) {
+      const now = parse(l.newValues); const was = parse(l.oldValues);
+      if (l.action === 'INSERT') ev.push({ at: l.changedAt, kind: 'ADDED', text: 'Part added', by: l.user?.username ?? null });
+      else if (l.action === 'UPDATE') {
+        const diffs = Object.keys(LABEL).filter((k) => was[k] !== undefined && now[k] !== undefined && String(was[k]) !== String(now[k])).map((k) => `${LABEL[k]} ${was[k] ?? 'blank'} to ${now[k] ?? 'blank'}`);
+        ev.push({ at: l.changedAt, kind: 'EDITED', text: diffs.length ? diffs.join('. ') : 'Details edited', by: l.user?.username ?? null });
+      } else if (l.action === 'ALT_ADD') ev.push({ at: l.changedAt, kind: 'ALTERNATE', text: `Alternate added: ${now.alternate}`, by: l.user?.username ?? null });
+      else if (l.action === 'ALT_DEFAULT') ev.push({ at: l.changedAt, kind: 'ALTERNATE', text: 'Made the default alternate', by: l.user?.username ?? null });
+      else if (l.action === 'ALT_REMOVE') ev.push({ at: l.changedAt, kind: 'ALTERNATE', text: 'Removed from its alternates', by: l.user?.username ?? null });
+      else if (l.action === 'ARCHIVE') ev.push({ at: l.changedAt, kind: 'RETIRED', text: 'Archived', by: l.user?.username ?? null });
+      else if (l.action === 'RESTORE') ev.push({ at: l.changedAt, kind: 'ADDED', text: 'Brought back', by: l.user?.username ?? null });
+    }
+    for (const p of prices) {
+      if (p.note === 'Entered on the part') continue;
+      ev.push({ at: p.paidOn, kind: 'PURCHASE', text: `Bought at ${n(p.price)}${p.supplier ? ` from ${p.supplier}` : ''}${p.note ? `. ${p.note}` : ''}`, by: p.recordedByName });
+    }
+    for (const r of reps) {
+      const mine = r.itemId === id;
+      const other = mine ? r.successor?.partNo : r.item.partNo;
+      if (mine) ev.push({ at: r.createdAt, kind: 'REPLACEMENT', text: `${r.successorId ? `Replacement by ${other}` : 'Retirement'} scheduled from ${day(r.effectiveFrom)}. Reason: ${r.reason}`, by: r.createdByName });
+      else ev.push({ at: r.createdAt, kind: 'REPLACEMENT', text: `Set to take over from ${other} from ${day(r.effectiveFrom)}`, by: r.createdByName });
+      if (r.appliedAt) ev.push({ at: r.appliedAt, kind: 'REPLACEMENT', text: mine ? `${r.successorId ? `Replaced by ${other}` : 'Retired'}. ${r.bomsChanged} BOM${r.bomsChanged === 1 ? '' : 's'} got a new version` : `Took over from ${other}`, by: null });
+      if (r.cancelledAt) ev.push({ at: r.cancelledAt, kind: 'REPLACEMENT', text: 'Scheduled replacement cancelled', by: null });
+    }
+    return ev.sort((a, b) => b.at.getTime() - a.at.getTime()).map((e) => ({ at: e.at, kind: e.kind, text: e.text, by: e.by }));
   }
 
   // Record what was paid for a part; the newest entry becomes its last paid price
@@ -293,13 +522,13 @@ export class BudgetPlanningService {
         part_no: partNo, name: pick('name', ex?.name ?? ''), sourcing, uom: pick('uom', ex?.uom ?? 'nos'),
         standard_price: pick('standard_price', ex ? n(ex.standardPrice) : ''),
         material_cost: pick('material_cost', ex?.materialCost == null ? '' : n(ex.materialCost)), manufacturing_cost: pick('manufacturing_cost', ex?.manufacturingCost == null ? '' : n(ex.manufacturingCost)),
-        last_price: pick('last_price', ex?.lastPrice == null ? '' : n(ex.lastPrice)), supplier: pick('supplier', ex?.supplier ?? ''), lead_time_days: pick('lead_time_days', ex?.leadTimeDays ?? ''),
+        oem_part_no: pick('oem_part_no', ex?.oemPartNo ?? ''), last_price: pick('last_price', ex?.lastPrice == null ? '' : n(ex.lastPrice)), supplier: pick('supplier', ex?.supplier ?? ''), lead_time_days: pick('lead_time_days', ex?.leadTimeDays ?? ''),
         category_id: catId ?? ex?.categoryId ?? null,
       };
-      const id = ex?.isActive ? ex.id : null;
+      const id = ex?.status === 'ACTIVE' ? ex.id : null;
       try { await this.saveItem(id, body, user, true); } catch (e: any) { errors.push({ row, message: e?.message ?? 'Row is not valid.' }); continue; }
       plan.push({ id, body });
-      if (ex?.isActive) updated++; else created++;
+      if (ex?.status === 'ACTIVE') updated++; else created++;
     }
     if (errors.length || dry) return { dry_run: true, created, updated, errors, applied: false };
     for (const x of plan) await this.saveItem(x.id, x.body, user);
@@ -370,9 +599,11 @@ export class BudgetPlanningService {
 
   // Where a part is used: the products and job BOMs that have a line for it
   async itemUsage(id: number) {
+    await this.applyDueReplacements();
+    const current = (await this.currentBoms()).map((b) => b.id);
     const item = await this.prisma.item.findUnique({ where: { id }, select: { standardPrice: true } });
     const price = item ? n(item.standardPrice) : 0;
-    const lines = await this.prisma.bomLine.findMany({ where: { itemId: id }, include: { bom: true }, orderBy: { id: 'asc' } });
+    const lines = await this.prisma.bomLine.findMany({ where: { itemId: id, bomId: { in: current } }, include: { bom: true }, orderBy: { id: 'asc' } });
     const productIds = lines.map((l) => l.bom.productId).filter((x): x is number => x != null);
     const projectIds = lines.map((l) => l.bom.projectId).filter((x): x is number => x != null);
     const [products, projects] = await Promise.all<{ id: number; code: string | null; name: string; client: { name: string } | null }[]>([
@@ -764,6 +995,7 @@ export class BudgetPlanningService {
   }
 
   async products() {
+    await this.applyDueReplacements();
     const [products, boms, std] = await Promise.all([
       this.prisma.product.findMany({ where: { isActive: true, isSystem: false }, orderBy: { name: 'asc' }, include: { client: { select: { name: true } } } }),
       this.prisma.bom.findMany({ orderBy: { version: 'desc' }, include: { _count: { select: { lines: true } } } }),
@@ -792,6 +1024,7 @@ export class BudgetPlanningService {
   }
 
   async product(id: number) {
+    await this.applyDueReplacements();
     const p = await this.prisma.product.findUnique({ where: { id }, include: { client: { select: { name: true } } } });
     if (!p) throw bad('Product not found.', HttpStatus.NOT_FOUND);
     const s = await this.budgets.getSettings();

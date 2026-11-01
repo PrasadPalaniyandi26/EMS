@@ -76,6 +76,12 @@ export function FySelect({ plans, value, onChange, currentFy, startMonth = 4 }: 
   );
 }
 
+// The financial years to choose from, as filter options: the plans that exist, plus the current year when it has none yet
+export function fyOptions(plans: BudgetPlanInfo[], currentFy?: number, startMonth = 4) {
+  const label = (fy: number) => (startMonth === 1 ? `FY ${fy}` : `FY ${fy}-${String(fy + 1).slice(2)}`);
+  return [...new Set([...plans.map((p) => p.fy), ...(currentFy != null ? [currentFy] : [])])].sort((a, b) => b - a).map((fy) => ({ value: String(fy), label: label(fy) }));
+}
+
 // One KPI cell for a strip of figures
 export function Kpi({ label, value, sub, tone }: { label: string; value: ReactNode; sub?: ReactNode; tone?: 'danger' | 'warning' }) {
   return (

@@ -13,10 +13,11 @@ import { useProductCosting, type BomLineRow, type OperationRow, type ProductCost
 import { useDataTable } from '@/hooks/use-data-table';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
+import { type FilterDef } from '@/components/data-table/filters';
 import { DateCell, IdCell, TextCell, ToneText, headerRight } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
-import { ConfirmDialog, NativeSelect } from '@/components/shared/modal-primitives';
+import { ConfirmDialog } from '@/components/shared/modal-primitives';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAllocation, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import { BomLineModal, BuildPlanModal, BuildStepModal, ProductPricingModal, RejectCostModal, StandardCostModal, StepTypesModal } from '@/components/budgets/planning-modals';
 import { TabBar, marginTone, money, unitPrice } from '@/components/budgets/budget-ui';
@@ -476,11 +477,9 @@ export default function ProductCostingDetailPage() {
             <DataTableToolbar
               table={table}
               actions={<><ToolbarActions actions={alwaysActions} /><ToolbarActions actions={itemActions} /></>}
-              filters={tab === 'bom' || tab === 'variances' ? (
-                <NativeSelect aria-label="Make or buy" value={sourcing} onChange={(e) => { setSourcing(e.target.value); setSelection({}); }} className="!h-8 !w-auto">
-                  <option value="ALL">Make and buy</option><option value="MAKE">Make</option><option value="BUY">Buy</option>
-                </NativeSelect>
-              ) : undefined}
+              filterDefs={tab === 'bom' || tab === 'variances' ? [
+                { id: 'sourcing', label: 'Make or buy', value: sourcing, onChange: (v) => { setSourcing(v); setSelection({}); }, options: [{ value: 'ALL', label: 'Make and buy' }, { value: 'MAKE', label: 'Make' }, { value: 'BUY', label: 'Buy' }] },
+              ] : undefined}
             />
           }
           intelligencePanel={

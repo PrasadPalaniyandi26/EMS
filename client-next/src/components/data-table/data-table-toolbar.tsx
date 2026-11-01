@@ -1,23 +1,31 @@
 "use client"
 
 import { Table } from "@tanstack/react-table"
-import { X } from "lucide-react"
+import { Download, Upload, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Filters, type FilterDef } from "@/components/data-table/filters"
 
 interface DataTableToolbarProps<TData> {
   table: Table<TData>
   actions?: React.ReactNode
-  // Filter dropdowns: shown on the right, just before Search
-  filters?: React.ReactNode
+  // Filters, shown on the right just before Search. Up to two sit in the row as dropdowns; more go into one "Filters…" dialog
+  filterDefs?: FilterDef[]
+  // Import and Export sit on the right with the filters and Search, in the order Import, Export, Filters, Search
+  onImport?: () => void
+  onExport?: () => void
+  exporting?: boolean
   extra?: React.ReactNode
 }
 
 export function DataTableToolbar<TData>({
   table,
   actions,
-  filters,
+  filterDefs,
+  onImport,
+  onExport,
+  exporting,
   extra,
 }: DataTableToolbarProps<TData>) {
   if (!table) return null;
@@ -34,7 +42,19 @@ export function DataTableToolbar<TData>({
 
       {/* Right: search + reset */}
       <div className="flex items-center gap-2 ml-auto self-center">
-        {filters}
+        {onImport && (
+          <button type="button" className="btn-action" onClick={onImport}>
+            <Upload aria-hidden className="h-4 w-4 text-[var(--warning)]" />
+            Import
+          </button>
+        )}
+        {onExport && (
+          <button type="button" className="btn-action" onClick={onExport} disabled={exporting}>
+            <Download aria-hidden className="h-4 w-4 text-[var(--shell-text-muted)]" />
+            {exporting ? "Exporting…" : "Export"}
+          </button>
+        )}
+        {filterDefs && <Filters defs={filterDefs} />}
         <div className="relative w-full sm:w-[220px] min-w-[140px]">
           <Input
             placeholder="Search..."

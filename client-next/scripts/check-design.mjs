@@ -44,6 +44,15 @@ for (const file of walk(SRC)) {
     console.log(`${relative(process.cwd(), file)}  dialog has required fields but no canSave on its save button`);
     problems++;
   }
+  // Toolbar order is Import, Export, Filters, Search: Import and Export are toolbar props, and filters are `filterDefs` (three or more go into the Filters dialog)
+  if (/<DataTableToolbar/.test(text) && /label: '(Import|Export)'/.test(text)) {
+    console.log(`${relative(process.cwd(), file)}  Import and Export go in DataTableToolbar's onImport / onExport, not in the action list`);
+    problems++;
+  }
+  if (/<DataTableToolbar/.test(text) && /\bfilters=\{/.test(text)) {
+    console.log(`${relative(process.cwd(), file)}  pass filters as filterDefs so more than two collapse into the Filters dialog`);
+    problems++;
+  }
 }
 console.log(problems === 0 ? 'Design check passed.' : `\n${problems} design problem(s).`);
 process.exit(problems === 0 ? 0 : 1);

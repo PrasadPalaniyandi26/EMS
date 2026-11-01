@@ -8,9 +8,9 @@ import { useBudgetAlerts, type AlertLevel, type BudgetAlert } from '@/hooks/use-
 import { useDataTable } from '@/hooks/use-data-table';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
+import { type FilterDef } from '@/components/data-table/filters';
 import { DateCell, TextCell } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
-import { NativeSelect } from '@/components/shared/modal-primitives';
 import { Kpi, KpiStrip, LevelText } from '@/components/budgets/budget-ui';
 
 const ACTIONS: Record<string, { label: string; href: (a: BudgetAlert) => string }> = {
@@ -72,22 +72,10 @@ export default function BudgetAlertsPage() {
       searchRow={
         <DataTableToolbar
           table={table}
-          filters={
-            <>
-              <NativeSelect aria-label="Level" value={level} onChange={(e) => setLevel(e.target.value as 'ALL' | AlertLevel)} className="!h-8 !w-auto">
-                <option value="ALL">Any level</option>
-                <option value="CRITICAL">Critical</option>
-                <option value="WARNING">Warning</option>
-                <option value="CAUTION">Caution</option>
-                <option value="INFO">Info</option>
-              </NativeSelect>
-              <NativeSelect aria-label="Show" value={status} onChange={(e) => setStatus(e.target.value as 'OPEN' | 'RESOLVED' | 'ALL')} className="!h-8 !w-auto">
-                <option value="OPEN">Open alerts</option>
-                <option value="RESOLVED">Resolved</option>
-                <option value="ALL">Open and resolved</option>
-              </NativeSelect>
-            </>
-          }
+          filterDefs={[
+            { id: 'level', label: 'Level', value: level, onChange: (v) => setLevel(v as 'ALL' | AlertLevel), options: [{ value: 'ALL', label: 'Any level' }, { value: 'CRITICAL', label: 'Critical' }, { value: 'WARNING', label: 'Warning' }, { value: 'CAUTION', label: 'Caution' }, { value: 'INFO', label: 'Info' }] },
+            { id: 'status', label: 'Show', value: status, onChange: (v) => setStatus(v as 'OPEN' | 'RESOLVED' | 'ALL'), options: [{ value: 'OPEN', label: 'Open alerts' }, { value: 'RESOLVED', label: 'Resolved' }, { value: 'ALL', label: 'Open and resolved' }] },
+          ]}
         />
       }
     >

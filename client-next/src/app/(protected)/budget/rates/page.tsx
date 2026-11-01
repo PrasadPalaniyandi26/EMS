@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Clock, Download, Plus, Upload } from 'lucide-react';
+import { Clock, Plus } from 'lucide-react';
 import { ColumnDef, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, getSortedRowModel, SortingState } from '@tanstack/react-table';
 import api from '@/lib/api-client';
 import { downloadCsv, toCsv } from '@/lib/csv';
@@ -13,10 +13,11 @@ import { useRates, type OverheadRate, type RateCard } from '@/hooks/use-planning
 import { useDataTable } from '@/hooks/use-data-table';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
+import { type FilterDef } from '@/components/data-table/filters';
 import { DateCell, TextCell, headerRight } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
-import { ConfirmDialog, NativeSelect } from '@/components/shared/modal-primitives';
+import { ConfirmDialog } from '@/components/shared/modal-primitives';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailActions, DetailAllocation, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import { OverheadBaseModal, OverheadModal, RateCardModal } from '@/components/budgets/planning-modals';
 import { ImportModal } from '@/components/budgets/import-modal';
@@ -82,8 +83,7 @@ export default function RatesPage() {
   const exportRates = () => downloadCsv('cost-rates.csv', toCsv(['role', 'rate_per_hour', 'effective_from'], (data?.cards ?? []).map((c) => [c.role, c.rate_per_hour, String(c.effective_from).slice(0, 10)])));
   const alwaysActions: DetailActionDef[] = tab === 'cards'
     ? [
-        ...(canEdit ? [{ label: 'Add rate', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setCard(null); setCardOpen(true); } }, { label: 'Import', icon: <Upload className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setImpOpen(true) }] : []),
-        { label: 'Export', icon: <Download className="h-4 w-4 text-[var(--shell-text-muted)]" />, onClick: exportRates },
+        ...(canEdit ? [{ label: 'Add rate', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setCard(null); setCardOpen(true); } }] : []),
       ]
     : !canEdit ? [] : [{ label: 'Add pool', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setOh(null); setOhOpen(true); } }, { label: 'Base hours', icon: <Clock className="h-4 w-4 text-[var(--nav-cyan)]" />, onClick: () => setBaseOpen(true) }];
 
@@ -163,11 +163,10 @@ export default function RatesPage() {
         <ModuleShell
           showPanel={!!selected}
           searchRow={<DataTableToolbar table={table} actions={<><ToolbarActions actions={alwaysActions} /><ToolbarActions actions={itemActions} /></>}
-            filters={tab === 'overheads' ? (
-              <NativeSelect aria-label="Financial year" value={String(viewFy)} onChange={(e) => { setFyView(Number(e.target.value)); setSelection({}); }} className="!h-8 !w-auto">
-                {(data?.fys ?? [fy]).map((y) => <option key={y} value={y}>{fyLabel(y)}{y === fy ? ' (this year)' : ''}</option>)}
-              </NativeSelect>
-            ) : undefined} />}
+            onImport={tab === 'cards' && canEdit ? () => setImpOpen(true) : undefined} onExport={tab === 'cards' ? exportRates : undefined}
+            filterDefs={tab === 'overheads' ? [
+              { id: 'fy', label: 'Financial year', value: String(viewFy), defaultValue: String(fy), onChange: (v) => { setFyView(Number(v)); setSelection({}); }, options: (data?.fys ?? [fy]).map((y) => ({ value: String(y), label: `${fyLabel(y)}${y === fy ? ' (this year)' : ''}` })) },
+            ] : undefined} />}
           intelligencePanel={
             <ModuleIntelligencePanel title={selected ? (tab === 'cards' ? 'Rate' : 'Overhead pool') : 'Cost rates'} onClose={() => setSelection({})} hasSelection={!!selected}
               idle={summary} footer={itemActions.length ? <DetailActions actions={itemActions} /> : undefined}>

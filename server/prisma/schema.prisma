@@ -830,14 +830,50 @@ model Item {
   standardPrice     Decimal  @map("standard_price") @db.Decimal(12, 2)
   lastPrice         Decimal? @map("last_price") @db.Decimal(12, 2)
   supplier          String?  @db.VarChar(120)
+  // Bought parts: the manufacturer's (OEM) own number for the part; our own part number is partNo
+  oemPartNo         String?  @map("oem_part_no") @db.VarChar(60)
   leadTimeDays      Int?     @map("lead_time_days")
   sourcing          String   @default("BUY") @db.VarChar(4)
   materialCost      Decimal? @map("material_cost") @db.Decimal(12, 2)
   manufacturingCost Decimal? @map("manufacturing_cost") @db.Decimal(12, 2)
   isActive          Boolean  @default(true) @map("is_active")
+  // Life of the part: ACTIVE, then REPLACED (a successor takes over) or RETIRED (no successor), from statusFrom. Part numbers are never reused
+  status            String   @default("ACTIVE") @db.VarChar(10)
+  statusFrom        DateTime? @map("status_from") @db.Date
+  statusReason      String?  @map("status_reason") @db.VarChar(300)
+  replacedById      Int?     @map("replaced_by_id")
+  // Parts that meet the same spec share a group; one of them is the default
+  alternateGroupId   Int?    @map("alternate_group_id")
+  isDefaultAlternate Boolean @default(false) @map("is_default_alternate")
   priceLog          ItemPriceLog[]
+  replacements      PartReplacement[] @relation("ReplacedPart")
+  successions       PartReplacement[] @relation("Successor")
+
+  @@index([alternateGroupId])
 
   @@map("items")
+}
+
+// A part taken out of use on a date, with the part that takes over (none when it is retired)
+model PartReplacement {
+  id            Int       @id @default(autoincrement())
+  itemId        Int       @map("item_id")
+  successorId   Int?      @map("successor_id")
+  effectiveFrom DateTime  @map("effective_from") @db.Date
+  reason        String    @db.VarChar(300)
+  status        String    @default("SCHEDULED") @db.VarChar(10)
+  bomsChanged   Int       @default(0) @map("boms_changed")
+  createdById   Int?      @map("created_by_id")
+  createdByName String?   @map("created_by_name") @db.VarChar(100)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  appliedAt     DateTime? @map("applied_at")
+  cancelledAt   DateTime? @map("cancelled_at")
+  item          Item      @relation("ReplacedPart", fields: [itemId], references: [id])
+  successor     Item?     @relation("Successor", fields: [successorId], references: [id], onDelete: SetNull)
+
+  @@index([itemId])
+  @@index([status, effectiveFrom])
+  @@map("part_replacements")
 }
 
 model Bom {
@@ -851,6 +887,9 @@ model Bom {
   // Products only: a rate per hour used in place of the combined overhead rate, with the reason for any adjustment to overhead, freight or warranty
   overheadRateOverride Decimal? @map("overhead_rate_override") @db.Decimal(10, 2)
   adjustReason         String?  @map("adjust_reason") @db.VarChar(300)
+  // From when this version is in force, and why it was made (for example a part replaced)
+  effectiveFrom        DateTime? @map("effective_from") @db.Date
+  changeNote           String?  @map("change_note") @db.VarChar(300)
   createdAt   DateTime       @default(now()) @map("created_at")
   project     Project?       @relation(fields: [projectId], references: [id], onDelete: Cascade)
   lines       BomLine[]

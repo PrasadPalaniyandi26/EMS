@@ -17,7 +17,12 @@ export interface ImportResult { dry_run: boolean; created: number; updated: numb
 export interface Item {
   last_paid_on: string | null; category_name: string | null; id: number; part_no: string; name: string; category_id: number | null; uom: string; standard_price: number; last_price: number | null;
   supplier: string | null; lead_time_days: number | null; sourcing: 'MAKE' | 'BUY'; material_cost: number | null; manufacturing_cost: number | null; used_in: number; price_drift_pct: number;
+  oem_part_no: string | null; status: 'ACTIVE' | 'REPLACED' | 'RETIRED'; status_from: string | null; status_reason: string | null; replaced_by_id: number | null; replaced_by_part_no: string | null; replaced_by_name: string | null;
+  ever_used: boolean; scheduled: PartScheduled | null; is_default_alternate: boolean; alternates: PartAlternate[];
 }
+export interface PartScheduled { id: number; effective_from: string; reason: string; successor_id: number | null; successor_part_no: string | null; successor_name: string | null }
+export interface PartAlternate { id: number; part_no: string; oem_part_no: string | null; name: string; standard_price: number; last_price: number | null; supplier: string | null; lead_time_days: number | null; is_default: boolean }
+export interface PartEvent { at: string; kind: string; text: string; by: string | null }
 
 export interface ProjectRow {
   id: number; code: string | null; name: string; client_name: string | null; contract_value: number | null; target_margin_pct: number | null; min_margin_pct: number | null;
@@ -96,7 +101,9 @@ export interface ItemCategory { id: number; name: string; used_in: number }
 export const useItemCategories = () => useQuery({ queryKey: [KEY, 'item-categories'], queryFn: () => get<ItemCategory[]>('/budgets/item-categories'), staleTime: 0 });
 export interface EstimatePhase { id: number; name: string; used_in: number }
 export const useEstimatePhases = () => useQuery({ queryKey: [KEY, 'estimate-phases'], queryFn: () => get<EstimatePhase[]>('/budgets/estimate-phases'), staleTime: 0 });
-export const useItems = () => useQuery({ queryKey: [KEY, 'items'], queryFn: () => get<Item[]>('/budgets/items'), staleTime: 0 });
+// Active parts for the pickers; the Part master asks for every part, replaced and retired included
+export const useItems = (all = false) => useQuery({ queryKey: [KEY, 'items', all], queryFn: () => get<Item[]>(`/budgets/items${all ? '?all=1' : ''}`), staleTime: 0 });
+export const usePartHistory = (id: number | null) => useQuery({ queryKey: [KEY, 'part-history', id], queryFn: () => get<PartEvent[]>(`/budgets/items/${id}/history`), enabled: id != null, staleTime: 0 });
 export const useBudgetProjects = () => useQuery({ queryKey: [KEY, 'projects'], queryFn: () => get<ProjectRow[]>('/budgets/projects'), staleTime: 0 });
 export const useProjectBudget = (id: number | null) => useQuery({ queryKey: [KEY, 'project', id], queryFn: () => get<ProjectBudget>(`/budgets/projects/${id}`), enabled: id != null, staleTime: 0 });
 export const useBudgetProducts = () => useQuery({ queryKey: [KEY, 'products'], queryFn: () => get<ProductRow[]>('/budgets/products'), staleTime: 0 });

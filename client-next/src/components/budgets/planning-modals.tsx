@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, ArrowLeftRight, CheckCircle2, XCircle, ClipboardList, Clock, Network } from 'lucide-react';
+import { Plus, Pencil, Trash2, ArrowLeftRight, CheckCircle2, XCircle, ClipboardList, Clock, Network, Replace, Layers, History, Star, Unlink } from 'lucide-react';
 import { fyLabel } from '@/hooks/use-budget-queries';
 import api from '@/lib/api-client';
 import { ModuleModal } from '@/components/shared/module/module-modal';
@@ -15,7 +15,8 @@ import { useCategoryTypes, useInvalidate } from '@/hooks/use-queries';
 import { useBudgetMonitor } from '@/hooks/use-budget-queries';
 import type { BaselineRow, BudgetChangeRow, CloseLine, EstimateLineRow, Item, JobBom, Milestone, OperationRow, OperationType, BomLineRow, OverheadRate, RateCard, ProductCosting, ProjectBudget } from '@/hooks/use-planning-queries';
 import { Grid, money, plain, td, unitPrice } from '@/components/budgets/budget-ui';
-import { useItemCategories, useEstimatePhases, useItemUsage, type ItemCategory } from '@/hooks/use-planning-queries';
+import { useItemCategories, useEstimatePhases, useItemUsage, usePartHistory, type ItemCategory } from '@/hooks/use-planning-queries';
+import { formatDate } from '@/lib/currency';
 import { ManageList } from '@/components/manage/manage-list';
 import { sortByCode } from '@/lib/codes';
 import { cn } from '@/lib/utils';
@@ -270,12 +271,12 @@ export function MilestoneModal({ isOpen, onClose, projectId, editing, weightLeft
 
 export function ItemModal({ isOpen, onClose, editing }: Base & { editing: Item | null }) {
   const { saving, run } = useSaver(onClose);
-  const blank = { part_no: '', name: '', sourcing: 'BUY' as 'BUY' | 'MAKE', uom: 'nos', standard_price: '', material_cost: '', manufacturing_cost: '', last_price: '', supplier: '', lead_time_days: '', category_id: '' };
+  const blank = { part_no: '', oem_part_no: '', name: '', sourcing: 'BUY' as 'BUY' | 'MAKE', uom: 'nos', standard_price: '', material_cost: '', manufacturing_cost: '', last_price: '', supplier: '', lead_time_days: '', category_id: '' };
   const [f, setF] = useState(blank);
   useEffect(() => {
     if (!isOpen) return;
     setF(editing
-      ? { part_no: editing.part_no, name: editing.name, sourcing: editing.sourcing ?? 'BUY', uom: editing.uom, standard_price: String(editing.standard_price),
+      ? { part_no: editing.part_no, oem_part_no: editing.oem_part_no ?? '', name: editing.name, sourcing: editing.sourcing ?? 'BUY', uom: editing.uom, standard_price: String(editing.standard_price),
           material_cost: editing.material_cost != null ? String(editing.material_cost) : '', manufacturing_cost: editing.manufacturing_cost != null ? String(editing.manufacturing_cost) : '',
           last_price: editing.last_price != null ? String(editing.last_price) : '', supplier: editing.supplier ?? '', category_id: editing.category_id != null ? String(editing.category_id) : '', lead_time_days: editing.lead_time_days != null ? String(editing.lead_time_days) : '' }
       : blank);
@@ -287,10 +288,10 @@ export function ItemModal({ isOpen, onClose, editing }: Base & { editing: Item |
   const priceOk = make ? f.material_cost !== '' || f.manufacturing_cost !== '' : f.standard_price !== '' && Number(f.standard_price) >= 0;
   return (
     <ModuleModal isOpen={isOpen} onClose={onClose} size="lg" title={editing ? 'Edit part' : 'Add part'} icon={editing ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-      canSave={!saving && !!f.part_no.trim() && !!f.name.trim() && priceOk && standard >= 0} saveLabel={editing ? 'Update part' : 'Add part'}
+      canSave={!saving && !!f.part_no.trim() && !!f.name.trim() && (make || !!f.oem_part_no.trim()) && priceOk && standard >= 0} saveLabel={editing ? 'Update part' : 'Add part'}
       onSave={() => run(() => {
         const body = {
-          part_no: f.part_no, name: f.name, sourcing: f.sourcing, uom: f.uom, supplier: f.supplier, lead_time_days: f.lead_time_days ? Number(f.lead_time_days) : null,
+          part_no: f.part_no, oem_part_no: make ? null : f.oem_part_no, name: f.name, sourcing: f.sourcing, uom: f.uom, supplier: f.supplier, lead_time_days: f.lead_time_days ? Number(f.lead_time_days) : null,
           standard_price: standard, material_cost: make ? Number(f.material_cost) || 0 : null, manufacturing_cost: make ? Number(f.manufacturing_cost) || 0 : null,
           last_price: f.last_price === '' ? null : Number(f.last_price),
           category_id: f.category_id === '' ? null : Number(f.category_id),
@@ -320,8 +321,9 @@ export function ItemModal({ isOpen, onClose, editing }: Base & { editing: Item |
         )}
         <Field label="Unit of measure">{text(f.uom, set('uom'), { maxLength: 12 })}</Field>
         <Field label="Last paid price" hint="Shows the drift from standard."><CurrencyInput value={f.last_price} onChange={set('last_price')} /></Field>
+        {!make && <Field label="OEM part number" required hint="The manufacturer's own number for the part. It stays the same whoever sells it.">{text(f.oem_part_no, set('oem_part_no'), { maxLength: 60 })}</Field>}
+        <Field label="Supplier">{text(f.supplier, set('supplier'), { maxLength: 120 })}</Field>
         <Field label="Lead time (days)"><Input type="number" min="0" className={ctl} value={f.lead_time_days} onChange={(e) => set('lead_time_days')(e.target.value)} /></Field>
-        <div className="md:col-span-2"><Field label="Supplier">{text(f.supplier, set('supplier'), { maxLength: 120 })}</Field></div>
       </div>
     </ModuleModal>
   );
@@ -491,7 +493,7 @@ export function BomLineModal({ isOpen, onClose, data, job, editing }: Base & { d
           <SegmentedControl labelledBy="bom-kind" value={kind} onChange={setKind} options={[{ value: 'item' as const, label: 'An item' }, { value: 'sub' as const, label: job ? 'A standard product' : 'A sub-assembly' }]} />
         </div>
         {kind === 'item' ? (
-          <PickSelect label="Item" required placeholder="Select item" value={itemId} onChange={setItemId} options={((job ?? data)?.items ?? []).map((i) => ({ id: String(i.id), name: `${i.part_no} ${i.name}` }))} emptyHint="Add parts in the Part master first." />
+          <PickSelect label="Item" required placeholder="Select item" value={itemId} onChange={setItemId} options={((job ?? data)?.items ?? []).map((i) => ({ id: String(i.id), name: `${i.part_no} ${i.name}${i.oem_part_no ? ` · OEM ${i.oem_part_no}` : ''}` }))} emptyHint="Add parts in the Part master first." />
         ) : job ? (
           <PickSelect label="Standard product" required placeholder="Select a product" value={subId} onChange={setSubId} options={job.sub_products.map((p) => ({ id: String(p.id), name: `${[p.code, p.name].filter(Boolean).join(' ')} · ${money(p.standard_cost)}` }))} emptyHint="No product has an approved standard cost yet." />
         ) : (
@@ -667,7 +669,7 @@ export function PartUsageModal({ isOpen, onClose, item }: Base & { item: Item | 
       footer={<Button onClick={onClose} className="h-8 px-5 text-[12px] font-semibold">Close</Button>}>
       <div className="space-y-3">
         <p className="text-[13px] text-[var(--shell-text)]">
-          <strong>{item.name}</strong> at a standard price of <span className="tabular-nums">{unitPrice(item.standard_price)}</span> per {item.uom}.
+          <strong>{item.name}</strong>{item.oem_part_no ? ` (OEM part number ${item.oem_part_no})` : ''} at a standard price of <span className="tabular-nums">{unitPrice(item.standard_price)}</span> per {item.uom}.
           {usage.data && (rows.length ? ` It is in ${[products ? `${products} product${products === 1 ? '' : 's'}` : '', jobs ? `${jobs} job BOM${jobs === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and ')}.` : ' It is not in any BOM.')}
         </p>
         {usage.isLoading ? <p className="text-[12px] text-[var(--shell-text-muted)]">Loading…</p> : rows.length > 0 && (
@@ -860,7 +862,7 @@ export function RecordPurchaseModal({ isOpen, onClose, item }: Base & { item: It
       canSave={!saving && price !== '' && p >= 0 && !!paidOn && paidOn <= localToday()} saveLabel="Save purchase"
       onSave={() => run(() => api.post(`/budgets/items/${item.id}/purchase`, { price: p, paid_on: paidOn, supplier, make_standard: buy && makeStd }), 'Purchase recorded.')}>
       <div className="space-y-3">
-        <p className="text-[13px] text-[var(--shell-text)]">{item.part_no} {item.name}. Standard price {money(item.standard_price)}.</p>
+        <p className="text-[13px] text-[var(--shell-text)]">{item.part_no} {item.name}{item.oem_part_no ? ` (OEM ${item.oem_part_no})` : ''}. Standard price {money(item.standard_price)}.</p>
         <div className="grid grid-cols-2 gap-3">
           <Field label={`Price paid per ${item.uom}`} required><CurrencyInput value={price} onChange={setPrice} /></Field>
           <Field label="Paid on" required><Input type="date" max={localToday()} className={ctl} value={paidOn} onChange={(e) => setPaidOn(e.target.value)} /></Field>
@@ -1044,3 +1046,161 @@ export function VarianceModal({ isOpen, onClose, line, year, month }: Base & { l
   );
 }
 
+// ─── Part life: replace or retire on a date, alternates, history ───────────
+
+const PART_EVENT: Record<string, string> = { ADDED: 'Added', EDITED: 'Edited', PURCHASE: 'Purchase', REPLACEMENT: 'Replacement', ALTERNATE: 'Alternate', RETIRED: 'Retired' };
+
+// Replace a part with another from a date, or retire it. A date that has come takes effect at once; a later one waits, and the part stays in use until then.
+export function PartReplaceModal({ isOpen, onClose, item, items }: Base & { item: Item | null; items: Item[] }) {
+  const { saving, run } = useSaver(onClose);
+  const usage = useItemUsage(isOpen && item ? item.id : null);
+  const [mode, setMode] = useState<'REPLACE' | 'RETIRE'>('REPLACE');
+  const [succ, setSucc] = useState(''); const [when, setWhen] = useState(''); const [why, setWhy] = useState('');
+  // Fill the fields when the dialog opens only, so a refresh in the background never wipes what is being typed
+  const latest = useRef(item); latest.current = item;
+  useEffect(() => {
+    const it = latest.current;
+    if (!isOpen || !it) return;
+    setMode('REPLACE'); setSucc(String(it.alternates.find((a) => a.is_default)?.id ?? '')); setWhen(localToday()); setWhy('');
+  }, [isOpen]);
+  if (!item) return null;
+  const today = localToday();
+  const alt = new Map(item.alternates.map((a) => [a.id, a]));
+  const options = items
+    .filter((i) => i.id !== item.id && i.status === 'ACTIVE' && i.uom === item.uom && !i.scheduled)
+    .sort((a, b) => Number(alt.has(b.id)) - Number(alt.has(a.id)) || Number(!!alt.get(b.id)?.is_default) - Number(!!alt.get(a.id)?.is_default) || a.part_no.localeCompare(b.part_no))
+    .map((i) => ({ id: String(i.id), name: `${i.part_no} ${i.name}${i.oem_part_no ? ` · OEM ${i.oem_part_no}` : ''}${alt.has(i.id) ? (alt.get(i.id)!.is_default ? ' · default alternate' : ' · alternate') : ''}` }));
+  const owners = new Set((usage.data ?? []).map((u) => `${u.kind}-${u.id}`));
+  const jobs = [...owners].filter((k) => k.startsWith('JOB')).length; const products = owners.size - jobs;
+  const where = [products ? `${products} product${products === 1 ? '' : 's'}` : '', jobs ? `${jobs} job BOM${jobs === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and ');
+  const dateOk = !!when && when >= today;
+  const canSave = !saving && dateOk && !!why.trim() && (mode === 'RETIRE' || !!succ);
+  return (
+    <ModuleModal isOpen={isOpen} onClose={onClose} size="md" title={`Replace ${item.part_no}`} icon={<Replace className="h-4 w-4" />} canSave={canSave} saveLabel={when > today ? 'Schedule' : mode === 'RETIRE' ? 'Retire part' : 'Replace part'}
+      onSave={() => run(() => api.post(`/budgets/items/${item.id}/replace`, { successor_id: mode === 'REPLACE' ? Number(succ) : null, effective_from: when, reason: why }),
+        when > today ? `Scheduled for ${formatDate(when)}. It takes effect on that date.` : 'Done. BOMs that used the part now have a new version.')}>
+      <div className="space-y-4">
+        <p className="text-[13px] text-[var(--shell-text)]"><strong>{item.name}</strong>{item.oem_part_no ? ` (OEM part number ${item.oem_part_no})` : ''} will no longer be offered when building a BOM. Its history stays, and its part number is not reused.</p>
+        <div className="space-y-1.5">
+          <p id="replace-mode" className="text-[13px] font-medium text-[var(--shell-text)]">What happens to it</p>
+          <SegmentedControl labelledBy="replace-mode" value={mode} onChange={setMode} options={[{ value: 'REPLACE' as const, label: 'Replace with another part' }, { value: 'RETIRE' as const, label: 'Retire, no replacement' }]} />
+        </div>
+        {mode === 'REPLACE' && (
+          <PickSelect label="Replacement part" required placeholder="Select a part" value={succ} onChange={setSucc} options={options}
+            emptyHint={`No other active part is measured in ${item.uom}. Add the replacement to the Part master first.`} />
+        )}
+        <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+          <Field label="Effective from" required hint={when > today ? 'Until then the part stays in use.' : 'Takes effect today.'} error={when && when < today ? 'The date cannot be in the past.' : undefined}>
+            <Input type="date" min={today} className={ctl} value={when} onChange={(e) => setWhen(e.target.value)} />
+          </Field>
+        </div>
+        <Field label="Reason" required hint="Kept in the part's history."><Textarea className={ctl} rows={2} maxLength={300} value={why} onChange={(e) => setWhy(e.target.value)} /></Field>
+        <div className="rounded-md border border-[var(--shell-border)] p-3 text-[13px] text-[var(--shell-text)]">
+          {usage.isLoading ? 'Checking where it is used…' : owners.size === 0 ? 'It is not on any BOM, so only the part itself changes.' : (
+            <>
+              It is on {owners.size} BOM{owners.size === 1 ? '' : 's'} ({where}). From the date each gets a new version {mode === 'REPLACE' ? 'with the replacement in its place' : 'without it'}, and the version in force today is kept as it is. Approved standard costs do not change; propose new ones to use the new BOMs.
+              {mode === 'RETIRE' && <span className="mt-1 block text-[var(--warning)]">Retiring removes the part from those BOMs, which lowers their cost.</span>}
+            </>
+          )}
+        </div>
+      </div>
+    </ModuleModal>
+  );
+}
+
+// Alternates: bought parts that meet the same spec and share a unit. One of them is the default, the first to buy and the first offered when a part is replaced.
+export function PartAlternatesModal({ isOpen, onClose, item, items, canEdit }: Base & { item: Item | null; items: Item[]; canEdit: boolean }) {
+  const invalidate = useInvalidate();
+  const [pick, setPick] = useState(''); const [sel, setSel] = useState<number | null>(null); const [busy, setBusy] = useState(false);
+  useEffect(() => { if (isOpen) { setPick(''); setSel(null); } }, [isOpen]);
+  if (!item) return null;
+  const members = [
+    { id: item.id, part_no: item.part_no, oem_part_no: item.oem_part_no, name: item.name, supplier: item.supplier, standard_price: item.standard_price, last_price: item.last_price, lead_time_days: item.lead_time_days, is_default: item.is_default_alternate },
+    ...item.alternates,
+  ].sort((a, b) => Number(b.is_default) - Number(a.is_default) || a.part_no.localeCompare(b.part_no));
+  const inGroup = item.alternates.length > 0;
+  // The same OEM part number from another seller is the same part; a different number is another make that meets the same spec
+  const sameOem = (v: string | null) => !!v && !!item.oem_part_no && v.trim().toLowerCase() === item.oem_part_no.trim().toLowerCase();
+  const chosen = members.find((m) => m.id === sel) ?? null;
+  const candidates = items.filter((i) => i.id !== item.id && i.status === 'ACTIVE' && i.sourcing === 'BUY' && i.uom === item.uom && i.alternates.length === 0 && !i.scheduled)
+    .sort((a, b) => Number(sameOem(b.oem_part_no)) - Number(sameOem(a.oem_part_no)) || a.part_no.localeCompare(b.part_no))
+    .map((i) => ({ id: String(i.id), name: `${i.part_no} ${i.name}${i.oem_part_no ? ` · OEM ${i.oem_part_no}` : ''}${sameOem(i.oem_part_no) ? ' · same OEM part' : ''}` }));
+  const act = async (job: () => Promise<unknown>, ok: string) => {
+    setBusy(true);
+    try { await job(); toast.success(ok); invalidate('budgets'); } catch (e: any) { toast.error(e?.message || 'Could not save.'); } finally { setBusy(false); }
+  };
+  return (
+    <ModuleModal isOpen={isOpen} onClose={onClose} size="lg" title={`Alternates for ${item.part_no}`} icon={<Layers className="h-4 w-4" />}
+      footer={<Button onClick={onClose} className="h-9 px-5 text-[13px] font-medium">Done</Button>}>
+      <div className="space-y-4">
+        <p className="text-[13px] text-[var(--shell-text-muted)]">Alternates are bought parts that meet the same spec and are measured in the same unit ({item.uom}). The default is the one to buy first, and the one offered first when a part is replaced.</p>
+        {canEdit && item.sourcing === 'BUY' && item.status === 'ACTIVE' && (
+          <div className="flex items-end gap-3">
+            <div className="min-w-0 flex-1"><PickSelect label="Add an alternate" placeholder="Select a part" value={pick} onChange={setPick} options={candidates} emptyHint={`No other bought part is measured in ${item.uom} and free to add.`} /></div>
+            <Button type="button" disabled={!pick || busy} onClick={() => act(() => api.post(`/budgets/items/${item.id}/alternates`, { alternate_id: Number(pick) }), 'Alternate added.').then(() => setPick(''))} className="h-9 px-4 text-[13px] font-medium">Add</Button>
+          </div>
+        )}
+        {!inGroup ? <p className="text-[13px] text-[var(--shell-text)]">{canEdit ? 'This part has no alternates yet. The first one you add makes this part the default.' : 'This part has no alternates.'}</p> : (
+          <>
+            <div className="overflow-auto rounded-md border border-[var(--shell-border)]">
+              <Grid head={[{ label: 'Part' }, { label: 'OEM part number', w: 'w-40' }, { label: 'Supplier' }, { label: 'Standard price', right: true, w: 'w-32' }, { label: 'Last paid', right: true, w: 'w-28' }, { label: 'Lead time', right: true, w: 'w-24' }, { label: 'Default', w: 'w-24' }]}>
+                {members.map((m) => (
+                  <tr key={m.id} tabIndex={0} aria-selected={sel === m.id} onClick={() => setSel(m.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSel(m.id); } }}
+                    className={cn('cursor-pointer hover:bg-[var(--shell-hover)] focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]', sel === m.id && 'bg-[var(--shell-hover)]')}>
+                    <td className={td}><span className="text-[12px] text-[var(--shell-text-muted)]">{m.part_no}</span> <span className="font-medium">{m.name}</span>{m.id === item.id && <span className="text-[var(--shell-text-muted)]"> (this part)</span>}</td>
+                    <td className={td}>{m.oem_part_no ?? '—'}{m.id !== item.id && sameOem(m.oem_part_no) && <span className="block text-[12px] text-[var(--shell-text-muted)]">Same part, another source</span>}</td>
+                    <td className={cn(td, 'text-[var(--shell-text-muted)]')}>{m.supplier ?? '—'}</td>
+                    <td className={cn(td, 'text-right tabular-nums')}>{unitPrice(m.standard_price)}</td>
+                    <td className={cn(td, 'text-right tabular-nums')}>{m.last_price != null ? unitPrice(m.last_price) : '—'}</td>
+                    <td className={cn(td, 'text-right tabular-nums text-[var(--shell-text-muted)]')}>{m.lead_time_days != null ? `${m.lead_time_days} d` : '—'}</td>
+                    <td className={cn(td, m.is_default ? 'font-medium text-[var(--success)]' : 'text-[var(--shell-text-muted)]')}>{m.is_default ? 'Default' : ''}</td>
+                  </tr>
+                ))}
+              </Grid>
+            </div>
+            {canEdit && <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[12px] text-[var(--shell-text-muted)]">{chosen ? `Selected: ${chosen.part_no}` : 'Select a row to change it.'}</span>
+              <div className="ml-auto flex gap-2">
+                <button type="button" className="btn-action" disabled={!chosen || chosen.is_default || busy} onClick={() => chosen && act(() => api.put(`/budgets/items/${chosen.id}/default-alternate`, {}), `${chosen.part_no} is the default now.`)}>
+                  <Star aria-hidden className="h-4 w-4 text-[var(--success)]" />Make default
+                </button>
+                <button type="button" className="btn-action" disabled={!chosen || busy} onClick={() => chosen && act(() => api.delete(`/budgets/items/${chosen.id}/alternates`), `${chosen.part_no} removed from the alternates.`).then(() => setSel(null))}>
+                  <Unlink aria-hidden className="h-4 w-4 text-[var(--danger)]" />Remove
+                </button>
+              </div>
+            </div>}
+          </>
+        )}
+      </div>
+    </ModuleModal>
+  );
+}
+
+// What happened to a part, newest first
+export function PartHistoryModal({ isOpen, onClose, item }: Base & { item: Item | null }) {
+  const history = usePartHistory(isOpen && item ? item.id : null);
+  if (!item) return null;
+  const rows = history.data ?? [];
+  return (
+    <ModuleModal isOpen={isOpen} onClose={onClose} size="lg" title={`History: ${item.part_no}`} icon={<History className="h-4 w-4" />}
+      footer={<Button onClick={onClose} className="h-8 px-5 text-[12px] font-semibold">Close</Button>}>
+      <div className="space-y-3">
+        <p className="text-[13px] text-[var(--shell-text)]"><strong>{item.name}</strong>: edits, purchases, replacements and alternates, newest first.</p>
+        {history.isLoading ? <p className="text-[12px] text-[var(--shell-text-muted)]">Loading…</p> : rows.length === 0 ? <p className="text-[12px] text-[var(--shell-text-muted)]">Nothing recorded yet.</p> : (
+          <div className="max-h-[55vh] overflow-auto rounded-md border border-[var(--shell-border)]">
+            <Grid head={[{ label: 'Date', w: 'w-28' }, { label: 'Event', w: 'w-32' }, { label: 'Details' }, { label: 'By', w: 'w-28' }]}>
+              {rows.map((e, i) => (
+                <tr key={`${e.at}-${i}`}>
+                  <td className={cn(td, 'tabular-nums')}>{formatDate(e.at)}</td>
+                  <td className={cn(td, 'font-medium')}>{PART_EVENT[e.kind] ?? e.kind}</td>
+                  <td className={td}>{e.text}</td>
+                  <td className={cn(td, 'text-[var(--shell-text-muted)]')}>{e.by ?? '—'}</td>
+                </tr>
+              ))}
+            </Grid>
+          </div>
+        )}
+      </div>
+    </ModuleModal>
+  );
+}
