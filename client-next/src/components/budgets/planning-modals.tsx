@@ -1059,15 +1059,22 @@ const PART_EVENT: Record<string, string> = { ADDED: 'Added', EDITED: 'Edited', P
 // Pick a part from a list that grows long: search by part number, name, OEM part number or supplier, and narrow by category.
 // Only the first few matches are listed, so the dialog stays short however many parts there are.
 const PICKER_ROWS = 8;
-function PartPicker({ label, required, options, value, onChange, emptyHint, afterChoice }: {
+function PartPicker({ label, required, options, value, onChange, emptyHint, afterChoice, sameCategoryAs, showAlternatesOnly }: {
   label: string; required?: boolean; options: { item: Item; tag?: string }[]; value: string; onChange: (id: string) => void; emptyHint?: string; afterChoice?: React.ReactNode;
+  // The part being matched: the list opens on its category, so the usual choices come first
+  sameCategoryAs?: Item;
+  // Shows only the parts already grouped with this one as alternates
+  showAlternatesOnly?: boolean;
 }) {
   const { data: cats } = useItemCategories();
-  const [q, setQ] = useState(''); const [cat, setCat] = useState('ALL');
+  const [q, setQ] = useState('');
+  const [altOnly, setAltOnly] = useState(false);
+  const [cat, setCat] = useState(sameCategoryAs ? (sameCategoryAs.category_id != null ? String(sameCategoryAs.category_id) : 'NONE') : 'ALL');
   const labelId = useId();
   const chosen = options.find((o) => String(o.item.id) === value) ?? null;
   const term = q.trim().toLowerCase();
-  const matches = options.filter(({ item: i }) =>
+  const matches = options.filter(({ item: i, tag }) =>
+    (!altOnly || (tag ?? '').includes('alternate')) &&
     (cat === 'ALL' || (cat === 'NONE' ? i.category_id == null : String(i.category_id) === cat))
     && (!term || [i.part_no, i.name, i.oem_part_no, i.supplier].some((v) => !!v && v.toLowerCase().includes(term))));
   const detail = (i: Item) => [i.oem_part_no ? `OEM ${i.oem_part_no}` : '', i.supplier ?? '', unitPrice(i.standard_price)].filter(Boolean).join(' · ');
@@ -1085,10 +1092,13 @@ function PartPicker({ label, required, options, value, onChange, emptyHint, afte
         </div>
       ) : (
         <>
+          {showAlternatesOnly && (
+            <label className="flex items-center gap-2 text-[13px] text-[var(--shell-text)]"><input type="checkbox" checked={altOnly} onChange={(e) => setAltOnly(e.target.checked)} className="h-4 w-4" />Alternates only</label>
+          )}
           <div className="flex gap-2">
-            <Input aria-labelledby={labelId} className={ctl} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by part number, name, OEM part number or supplier" />
+            <Input aria-labelledby={labelId} className={`${ctl} min-w-0 flex-1`} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by part number, name, OEM part number or supplier" />
             {(cats?.length ?? 0) > 0 && (
-              <div className="w-48 shrink-0">
+              <div className="w-56 shrink-0">
                 <NativeSelect aria-label="Category" value={cat} onChange={(e) => setCat(e.target.value)}>
                   <option value="ALL">Any category</option><option value="NONE">No category</option>
                   {(cats ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -1143,33 +1153,35 @@ export function PartReplaceModal({ isOpen, onClose, item, items }: Base & { item
   const dateOk = !!when && when >= today;
   const canSave = !saving && dateOk && !!why.trim() && (mode === 'RETIRE' || !!succ);
   return (
-    <ModuleModal isOpen={isOpen} onClose={onClose} size="md" title={`Replace ${item.part_no}`} icon={<Replace className="h-4 w-4" />} canSave={canSave} saveLabel={when > today ? 'Schedule' : mode === 'RETIRE' ? 'Retire part' : 'Replace part'}
+    <ModuleModal isOpen={isOpen} onClose={onClose} size="xl" title={`Replace ${item.part_no}`} icon={<Replace className="h-4 w-4" />} canSave={canSave} saveLabel={when > today ? 'Schedule' : mode === 'RETIRE' ? 'Retire part' : 'Replace part'}
       onSave={() => run(() => api.post(`/budgets/items/${item.id}/replace`, { successor_id: mode === 'REPLACE' ? Number(succ) : null, effective_from: when, reason: why }),
         when > today ? `Scheduled for ${formatDate(when)}. It takes effect on that date.` : 'Done. BOMs that used the part now have a new version.')}>
-      <div className="space-y-4">
-        <p className="text-[13px] text-[var(--shell-text)]"><strong>{item.name}</strong>{item.oem_part_no ? ` (OEM part number ${item.oem_part_no})` : ''} will no longer be offered when building a BOM. Its history stays, and its part number is not reused.</p>
-        <div className="space-y-1.5">
-          <p id="replace-mode" className="text-[13px] font-medium text-[var(--shell-text)]">What happens to it</p>
-          <SegmentedControl labelledBy="replace-mode" value={mode} onChange={setMode} options={[{ value: 'REPLACE' as const, label: 'Replace with another part' }, { value: 'RETIRE' as const, label: 'Retire, no replacement' }]} />
-        </div>
-        {mode === 'REPLACE' && (
-          <PartPicker label="Replacement part" required value={succ} onChange={setSucc} options={options}
-            emptyHint={`No other active part is measured in ${item.uom}. Add the replacement to the Part master first.`} />
-        )}
-        <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-x-6 gap-y-5 md:grid-cols-3">
+        <p className="text-[13px] text-[var(--shell-text)] md:col-span-3"><strong>{item.name}</strong>{item.oem_part_no ? ` (OEM part number ${item.oem_part_no})` : ''} will no longer be offered when building a BOM. Its history stays, and its part number is not reused.</p>
+        <div className={cn('space-y-4', mode === 'REPLACE' ? '' : 'md:col-span-3')}>
+          <div className="space-y-1.5">
+            <p id="replace-mode" className="text-[13px] font-medium text-[var(--shell-text)]">What happens to it</p>
+            <SegmentedControl labelledBy="replace-mode" value={mode} onChange={setMode} options={[{ value: 'REPLACE' as const, label: 'Replace' }, { value: 'RETIRE' as const, label: 'Retire' }]} />
+          </div>
           <Field label="Effective from" required hint={when > today ? 'Until then the part stays in use.' : 'Takes effect today.'} error={when && when < today ? 'The date cannot be in the past.' : undefined}>
             <Input type="date" min={today} className={ctl} value={when} onChange={(e) => setWhen(e.target.value)} />
           </Field>
+          <Field label="Reason" required hint="Kept in the part's history."><Textarea className={ctl} rows={3} maxLength={300} value={why} onChange={(e) => setWhy(e.target.value)} /></Field>
+          <div className="rounded-md border border-[var(--shell-border)] p-3 text-[13px] text-[var(--shell-text)]">
+            {usage.isLoading ? 'Checking where it is used…' : owners.size === 0 ? 'It is not on any BOM, so only the part itself changes.' : (
+              <>
+                It is on {owners.size} BOM{owners.size === 1 ? '' : 's'} ({where}). From the date each gets a new version {mode === 'REPLACE' ? 'with the replacement in its place' : 'without it'}, and the version in force today is kept as it is. Approved standard costs do not change; propose new ones to use the new BOMs.
+                {mode === 'RETIRE' && <span className="mt-1 block text-[var(--warning)]">Retiring removes the part from those BOMs, which lowers their cost.</span>}
+              </>
+            )}
+          </div>
         </div>
-        <Field label="Reason" required hint="Kept in the part's history."><Textarea className={ctl} rows={2} maxLength={300} value={why} onChange={(e) => setWhy(e.target.value)} /></Field>
-        <div className="rounded-md border border-[var(--shell-border)] p-3 text-[13px] text-[var(--shell-text)]">
-          {usage.isLoading ? 'Checking where it is used…' : owners.size === 0 ? 'It is not on any BOM, so only the part itself changes.' : (
-            <>
-              It is on {owners.size} BOM{owners.size === 1 ? '' : 's'} ({where}). From the date each gets a new version {mode === 'REPLACE' ? 'with the replacement in its place' : 'without it'}, and the version in force today is kept as it is. Approved standard costs do not change; propose new ones to use the new BOMs.
-              {mode === 'RETIRE' && <span className="mt-1 block text-[var(--warning)]">Retiring removes the part from those BOMs, which lowers their cost.</span>}
-            </>
-          )}
-        </div>
+        {mode === 'REPLACE' && (
+          <div className="md:col-span-2">
+            <PartPicker key={item.id} label="Replacement part" required value={succ} onChange={setSucc} options={options} sameCategoryAs={item} showAlternatesOnly
+              emptyHint={`No other active part is measured in ${item.uom}. Add the replacement to the Part master first.`} />
+          </div>
+        )}
       </div>
     </ModuleModal>
   );
@@ -1202,7 +1214,7 @@ export function PartAlternatesModal({ isOpen, onClose, item, items, canEdit }: B
       <div className="space-y-4">
         <p className="text-[13px] text-[var(--shell-text-muted)]">Alternates are bought parts that meet the same spec and are measured in the same unit ({item.uom}). The default is the one to buy first, and the one offered first when a part is replaced.</p>
         {canEdit && item.sourcing === 'BUY' && item.status === 'ACTIVE' && (
-          <PartPicker label="Add an alternate" value={pick} onChange={setPick} options={candidates} emptyHint={`No other bought part is measured in ${item.uom} and free to add.`}
+          <PartPicker key={item.id} label="Add an alternate" value={pick} onChange={setPick} options={candidates} sameCategoryAs={item} emptyHint={`No other bought part is measured in ${item.uom} and free to add.`}
             afterChoice={<Button type="button" disabled={busy} onClick={() => act(() => api.post(`/budgets/items/${item.id}/alternates`, { alternate_id: Number(pick) }), 'Alternate added.').then(() => setPick(''))} className="h-8 px-4 text-[13px] font-medium">Add</Button>} />
         )}
         {!inGroup ? <p className="text-[13px] text-[var(--shell-text)]">{canEdit ? 'This part has no alternates yet. The first one you add makes this part the default.' : 'This part has no alternates.'}</p> : (
