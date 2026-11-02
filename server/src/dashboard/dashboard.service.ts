@@ -312,16 +312,19 @@ export class DashboardService {
     if (!spent.length) return [];
 
     const projectIds = spent.map((r) => r.projectId).filter(Boolean) as number[];
-    const projects = await this.prisma.project.findMany({
-      where: { id: { in: projectIds } },
-      select: { id: true, name: true, budget: true },
-    });
+    const [projects, baselines] = await Promise.all([
+      this.prisma.project.findMany({ where: { id: { in: projectIds } }, select: { id: true, name: true } }),
+      // The budget is the approved estimate baseline's direct cost; the newest approved one counts
+      this.prisma.estimateBaseline.findMany({ where: { projectId: { in: projectIds }, status: 'APPROVED' }, orderBy: { id: 'desc' }, select: { projectId: true, direct: true } }),
+    ]);
     const projMap = Object.fromEntries(projects.map((p) => [p.id, p]));
+    const baseMap = new Map<number, number>();
+    for (const b of baselines) if (!baseMap.has(b.projectId)) baseMap.set(b.projectId, Number(b.direct));
 
     return spent.map((r) => {
       const proj = projMap[r.projectId!];
       const spentAmt = parseFloat((Number(r._sum.amount) || 0).toFixed(2));
-      const budget   = proj?.budget ? parseFloat(Number(proj.budget).toFixed(2)) : 0;
+      const budget   = parseFloat((baseMap.get(r.projectId!) ?? 0).toFixed(2));
       return {
         project_id:   r.projectId,
         project_name: proj?.name || 'Unknown',

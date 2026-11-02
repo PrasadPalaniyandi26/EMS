@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Plus, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { ModuleModal } from '@/components/shared/module/module-modal';
-import { Field, NativeSelect, CurrencyInput, SegmentedControl, inp } from '@/components/shared/modal-primitives';
+import { Field, NativeSelect, SegmentedControl, inp } from '@/components/shared/modal-primitives';
 import { TypeCategoryFields } from '@/components/shared/type-category-fields';
 import type { TypeCategory } from '@/hooks/use-queries';
 
@@ -23,7 +23,7 @@ interface ProjectModalProps {
 
 const EMPTY = {
   name: '', client_id: '', type_id: '',
-  lead: '', category: '', budget: '', start_date: '', end_date: '',
+  lead: '', category: '', start_date: '', end_date: '',
   status: 'Active', description: '',
 };
 
@@ -41,7 +41,6 @@ export function ProjectModal({
         type_id: String(editing.type_id || ''),
         lead: String(editing.lead_id || editing.lead || ''),
         category: editing.category || '',
-        budget: editing.budget || '',
         start_date: editing.start_date ? String(editing.start_date).split('T')[0] : '',
         end_date: editing.end_date ? String(editing.end_date).split('T')[0] : '',
         status: editing.status || 'Active',
@@ -116,16 +115,13 @@ export function ProjectModal({
           />
         </div>
 
-        {/* Column 3: who leads it and what it costs */}
+        {/* Column 3: who leads it */}
         <div className="space-y-3">
           <Field label="Lead / Manager">
             <NativeSelect value={form.lead} onChange={(e) => set('lead', e.target.value)}>
               <option value="">Assign lead</option>
               {users.map((u) => <option key={u.id} value={u.id}>{u.username || u.name}</option>)}
             </NativeSelect>
-          </Field>
-          <Field label="Estimated Budget">
-            <CurrencyInput value={form.budget} onChange={(v) => set('budget', v)} />
           </Field>
         </div>
 

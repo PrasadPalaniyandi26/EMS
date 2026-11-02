@@ -2,7 +2,7 @@
 
 import { ColumnDef } from "@tanstack/react-table"
 import { Project } from "@/lib/types"
-import { IdCell, TextCell, MoneyCell, ToneText, headerRight } from "@/components/data-table/cells"
+import { IdCell, TextCell, ToneText } from "@/components/data-table/cells"
 
 const STATUS_TONE: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'muted'> = {
   'Active': 'success',
@@ -40,10 +40,5 @@ export const columns: ColumnDef<Project>[] = [
       const status = (row.original as any).status || "Active"
       return <ToneText label={status} tone={STATUS_TONE[status] || 'muted'} />
     },
-  },
-  {
-    accessorKey: "budget",
-    header: headerRight("Est. budget"),
-    cell: ({ row }) => <MoneyCell value={(row.original as any).budget} currency="INR" />,
   },
 ]

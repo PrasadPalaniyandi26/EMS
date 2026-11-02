@@ -116,14 +116,14 @@ async function main() {
       projects.push(await prisma.project.create({
         data: {
           clientId: client.id, typeId: pt.id, name: `${c.code} Project ${i}`, code: `PRJ-${String(pn).padStart(3, '0')}`,
-          status: i === 2 && !c.active ? 'Closed' : 'Active', lead_id: users.mgr1.id, budget: between(2, 12) * 100000,
+          status: i === 2 && !c.active ? 'Closed' : 'Active', lead_id: users.mgr1.id,
           start_date: daysAgo(300), end_date: daysAgo(-120), category: 'Delivery', isActive: c.active, createdBy: admin.id,
         },
       }));
       products.push(await prisma.product.create({
         data: {
           clientId: client.id, typeId: prt.id, name: `${c.code} Product ${i}`, code: `PRD-${String(pn).padStart(3, '0')}`,
-          status: pick(['R&D', 'Pilot', 'Production']), lead_id: users.mgr2.id, budget: between(1, 8) * 100000,
+          status: pick(['R&D', 'Pilot', 'Production']), lead_id: users.mgr2.id,
           start_date: daysAgo(250), category: 'Platform', isActive: c.active, createdBy: admin.id,
         },
       }));

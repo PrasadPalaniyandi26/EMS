@@ -31,7 +31,7 @@ import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { useRouter } from 'next/navigation';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAllocation, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
-import { formatCurrency, formatDate } from '@/lib/currency';
+import { formatDate } from '@/lib/currency';
 
 export default function ProjectsPage() {
   const setHeader = useHeaderStore((s) => s.setHeader);
@@ -155,8 +155,6 @@ export default function ProjectsPage() {
                     subtitle={pr.code || 'Code pending'}
                     status={status}
                     statusClass={tone[status] || 'text-[var(--shell-text-muted)]'}
-                    figure={formatCurrency(Number(pr.budget || 0), 'INR')}
-                    figureLabel="Est. budget"
                   />
                   <DetailSection title="Details">
                     <DetailGrid>

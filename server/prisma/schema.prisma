@@ -325,7 +325,6 @@ model Project {
   code                          String?                @unique @db.VarChar(20)
   status                        String?                @default("Active") @db.VarChar(30)
   lead_id                       Int?
-  budget                        Decimal?               @db.Decimal(14, 2)
   start_date                    DateTime?              @db.Date
   end_date                      DateTime?              @db.Date
   category                      String?                @db.VarChar(100)
@@ -390,11 +389,10 @@ model Product {
   code                          String?                @unique @db.VarChar(20)
   status                        String?                @default("R&D") @db.VarChar(30)
   lead_id                       Int?
-  budget                        Decimal?               @db.Decimal(14, 2)
   start_date                    DateTime?              @db.Date
   end_date                      DateTime?              @db.Date
   category                      String?                @db.VarChar(100)
-  standardCost                  Decimal?               @map("standard_cost") @db.Decimal(14, 2)
+  standardCost                 Decimal?               @map("standard_cost") @db.Decimal(14, 2)
   client                        Client                 @relation(fields: [clientId], references: [id])
   creator                       User?                  @relation("ProductCreator", fields: [createdBy], references: [id])
   users_products_lead_idTousers User?                  @relation("products_lead_idTousers", fields: [lead_id], references: [id], onUpdate: NoAction)
