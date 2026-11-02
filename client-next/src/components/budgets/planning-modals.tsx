@@ -269,7 +269,8 @@ export function MilestoneModal({ isOpen, onClose, projectId, editing, weightLeft
 
 // ─── Item ────────────────────────────────────────────────────────────────────
 
-export function ItemModal({ isOpen, onClose, editing }: Base & { editing: Item | null }) {
+// With `project`, the new part is for that project's job BOM only and no other BOM or picker offers it
+export function ItemModal({ isOpen, onClose, editing, project, onSaved }: Base & { editing: Item | null; project?: { id: number; code: string | null }; onSaved?: (id: number) => void }) {
   const { saving, run } = useSaver(onClose);
   const blank = { part_no: '', oem_part_no: '', name: '', sourcing: 'BUY' as 'BUY' | 'MAKE', uom: 'nos', standard_price: '', material_cost: '', manufacturing_cost: '', last_price: '', supplier: '', lead_time_days: '', category_id: '' };
   const [f, setF] = useState(blank);
@@ -289,16 +290,21 @@ export function ItemModal({ isOpen, onClose, editing }: Base & { editing: Item |
   return (
     <ModuleModal isOpen={isOpen} onClose={onClose} size="lg" title={editing ? 'Edit part' : 'Add part'} icon={editing ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
       canSave={!saving && !!f.part_no.trim() && !!f.name.trim() && (make || !!f.oem_part_no.trim()) && priceOk && standard >= 0} saveLabel={editing ? 'Update part' : 'Add part'}
-      onSave={() => run(() => {
+      onSave={() => { let savedId = 0; return run(async () => {
         const body = {
           part_no: f.part_no, oem_part_no: make ? null : f.oem_part_no, name: f.name, sourcing: f.sourcing, uom: f.uom, supplier: f.supplier, lead_time_days: f.lead_time_days ? Number(f.lead_time_days) : null,
           standard_price: standard, material_cost: make ? Number(f.material_cost) || 0 : null, manufacturing_cost: make ? Number(f.manufacturing_cost) || 0 : null,
           last_price: f.last_price === '' ? null : Number(f.last_price),
           category_id: f.category_id === '' ? null : Number(f.category_id),
         };
-        return editing ? api.put(`/budgets/items/${editing.id}`, body) : api.post('/budgets/items', body);
-      }, editing ? 'Part updated.' : 'Part added.')}>
+        if (editing) { await api.put(`/budgets/items/${editing.id}`, body); return; }
+        const res: any = await api.post(project ? `/budgets/projects/${project.id}/job-bom/parts` : '/budgets/items', body);
+        savedId = Number(res?.data?.id) || 0;
+      }, editing ? 'Part updated.' : 'Part added.', () => { if (savedId) onSaved?.(savedId); }); }}>
       <div className="grid grid-cols-1 gap-x-5 gap-y-3 md:grid-cols-3">
+        {project && !editing && (
+          <p className="text-[13px] text-[var(--shell-text-muted)] md:col-span-3">This part is for {project.code ?? 'this project'} only. It goes on this job BOM and is not offered on any other BOM.</p>
+        )}
         <div className="space-y-1.5 md:col-span-3">
           <p id="item-sourcing" className="text-[13px] font-medium text-[var(--shell-text)]">Sourcing</p>
           <SegmentedControl labelledBy="item-sourcing" value={f.sourcing} onChange={(v) => setF((x) => ({ ...x, sourcing: v }))} options={[{ value: 'BUY' as const, label: 'Buy' }, { value: 'MAKE' as const, label: 'Make' }]} />
@@ -476,16 +482,20 @@ export function BomLineModal({ isOpen, onClose, data, job, editing }: Base & { d
   const { saving, run } = useSaver(onClose);
   const [kind, setKind] = useState<'item' | 'sub'>('item');
   const [itemId, setItemId] = useState(''); const [subId, setSubId] = useState(''); const [qty, setQty] = useState(''); const [scrap, setScrap] = useState('0');
+  const [newPartOpen, setNewPartOpen] = useState(false);
+  // Only the dialog opening or another line resets the form; a refetch of the BOM (a new part was just added) must not
+  const isJob = !!job;
   useEffect(() => {
     if (!isOpen) return;
-    const sub = job ? editing?.sub_product_id : editing?.sub_bom_id;
+    const sub = isJob ? editing?.sub_product_id : editing?.sub_bom_id;
     setKind(sub ? 'sub' : 'item'); setItemId(editing?.item_id ? String(editing.item_id) : ''); setSubId(sub ? String(sub) : '');
     setQty(editing ? String(editing.quantity) : ''); setScrap(editing ? String(editing.scrap_pct) : '0');
-  }, [isOpen, editing, job]);
+  }, [isOpen, editing, isJob]);
   const item = (job ?? data)?.items.find((i) => String(i.id) === itemId);
   const base = job ? `/budgets/projects/${job.project.id}/job-bom/lines` : `/budgets/products/${data?.product.id}/bom-lines`;
   return (
-    <ModuleModal isOpen={isOpen} onClose={onClose} size="sm" title={editing ? 'Edit BOM line' : 'Add BOM line'} icon={editing ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+    <>
+    <ModuleModal isOpen={isOpen} onClose={onClose} size="xl" title={editing ? 'Edit BOM line' : 'Add BOM line'} icon={editing ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
       canSave={!saving && (kind === 'item' ? !!itemId : !!subId) && Number(qty) > 0} saveLabel={editing ? 'Update line' : 'Add line'}
       onSave={() => run(() => {
         const body = job
@@ -493,24 +503,37 @@ export function BomLineModal({ isOpen, onClose, data, job, editing }: Base & { d
           : { item_id: kind === 'item' ? Number(itemId) : null, sub_bom_id: kind === 'sub' ? Number(subId) : null, quantity: Number(qty), scrap_pct: Number(scrap) || 0 };
         return editing ? api.put(`${base}/${editing.id}`, body) : api.post(base, body);
       }, editing ? 'BOM line updated.' : 'BOM line added.')}>
-      <div className="space-y-3">
-        <div className="space-y-1.5">
-          <p id="bom-kind" className="text-[13px] font-medium text-[var(--shell-text)]">Part is</p>
-          <SegmentedControl labelledBy="bom-kind" value={kind} onChange={setKind} options={[{ value: 'item' as const, label: 'An item' }, { value: 'sub' as const, label: job ? 'A standard product' : 'A sub-assembly' }]} />
-        </div>
-        {kind === 'item' ? (
-          <PickSelect label="Item" required placeholder="Select item" value={itemId} onChange={setItemId} options={((job ?? data)?.items ?? []).map((i) => ({ id: String(i.id), name: `${i.part_no} ${i.name}${i.oem_part_no ? ` · OEM ${i.oem_part_no}` : ''}` }))} emptyHint="Add parts in the Part master first." />
-        ) : job ? (
-          <PickSelect label="Standard product" required placeholder="Select a product" value={subId} onChange={setSubId} options={job.sub_products.map((p) => ({ id: String(p.id), name: `${[p.code, p.name].filter(Boolean).join(' ')} · ${money(p.standard_cost)}` }))} emptyHint="No product has an approved standard cost yet." />
-        ) : (
-          <PickSelect label="Sub-assembly" required placeholder="Select a product's BOM" value={subId} onChange={setSubId} options={(data?.sub_boms ?? []).map((b) => ({ id: String(b.id), name: `Product ${b.productId}, BOM v${b.version}` }))} emptyHint="No other product has a BOM yet." />
-        )}
-        <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 items-start gap-x-6 gap-y-4 md:grid-cols-3">
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <p id="bom-kind" className="text-[13px] font-medium text-[var(--shell-text)]">Part is</p>
+            <SegmentedControl labelledBy="bom-kind" value={kind} onChange={setKind} options={[{ value: 'item' as const, label: 'An item' }, { value: 'sub' as const, label: job ? 'A standard product' : 'A sub-assembly' }]} />
+          </div>
           <Field label="Quantity" required hint={item ? `Per ${item.uom} at ${unitPrice(item.standard_price)}` : undefined}><Input type="number" min="0" step="0.01" className={ctl} value={qty} onChange={(e) => setQty(e.target.value)} /></Field>
           <Field label="Scrap %"><Input type="number" min="0" max="100" step="0.5" className={ctl} value={scrap} onChange={(e) => setScrap(e.target.value)} /></Field>
         </div>
+        <div className="space-y-3 md:col-span-2">
+          {kind === 'item' ? (
+            <>
+              <PartPicker label="Part" required value={itemId} onChange={setItemId}
+                options={((job ?? data)?.items ?? []).map((i) => ({ item: i, tag: i.project_id != null ? 'this project only' : undefined }))}
+                emptyHint={job ? 'No parts yet. Add one to the Part master, or create a part for this project only.' : 'Add parts in the Part master first.'} />
+              {job && !editing && (
+                <Button type="button" variant="outline" onClick={() => setNewPartOpen(true)} className="h-9 gap-2 px-3 text-[13px] font-medium">
+                  <Plus className="h-4 w-4 text-[var(--success)]" />New part for this project only
+                </Button>
+              )}
+            </>
+          ) : job ? (
+            <PickSelect label="Standard product" required placeholder="Select a product" value={subId} onChange={setSubId} options={job.sub_products.map((p) => ({ id: String(p.id), name: `${[p.code, p.name].filter(Boolean).join(' ')} · ${money(p.standard_cost)}` }))} emptyHint="No product has an approved standard cost yet." />
+          ) : (
+            <PickSelect label="Sub-assembly" required placeholder="Select a product's BOM" value={subId} onChange={setSubId} options={(data?.sub_boms ?? []).map((b) => ({ id: String(b.id), name: `Product ${b.productId}, BOM v${b.version}` }))} emptyHint="No other product has a BOM yet." />
+          )}
+        </div>
       </div>
     </ModuleModal>
+    {job && <ItemModal isOpen={newPartOpen} onClose={() => setNewPartOpen(false)} editing={null} project={{ id: job.project.id, code: job.project.code }} onSaved={(id) => { setKind('item'); setItemId(String(id)); }} />}
+    </>
   );
 }
 
@@ -1057,8 +1080,8 @@ export function VarianceModal({ isOpen, onClose, line, year, month }: Base & { l
 const PART_EVENT: Record<string, string> = { ADDED: 'Added', EDITED: 'Edited', PURCHASE: 'Purchase', REPLACEMENT: 'Replacement', ALTERNATE: 'Alternate', RETIRED: 'Retired' };
 
 // Pick a part from a list that grows long: search by part number, name, OEM part number or supplier, and narrow by category.
-// Only the first few matches are listed, so the dialog stays short however many parts there are.
-const PICKER_ROWS = 8;
+// The list shows about six rows and scrolls for the rest, so the dialog stays short however many parts there are.
+const PICKER_LIMIT = 100;
 function PartPicker({ label, required, options, value, onChange, emptyHint, afterChoice, sameCategoryAs, showAlternatesOnly }: {
   label: string; required?: boolean; options: { item: Item; tag?: string }[]; value: string; onChange: (id: string) => void; emptyHint?: string; afterChoice?: React.ReactNode;
   // The part being matched: the list opens on its category, so the usual choices come first
@@ -1108,8 +1131,8 @@ function PartPicker({ label, required, options, value, onChange, emptyHint, afte
           </div>
           {options.length === 0 ? (emptyHint ? <p className="text-[12px] text-[var(--shell-text-muted)]">{emptyHint}</p> : null) : matches.length === 0 ? <p className="text-[12px] text-[var(--shell-text-muted)]">No part matches. Try another number or name.</p> : (
             <>
-              <ul role="listbox" aria-labelledby={labelId} className="divide-y divide-[var(--shell-border)] overflow-hidden rounded-md border border-[var(--shell-border)]">
-                {matches.slice(0, PICKER_ROWS).map(({ item: i, tag }) => (
+              <ul role="listbox" aria-labelledby={labelId} className="max-h-80 divide-y divide-[var(--shell-border)] overflow-y-auto rounded-md border border-[var(--shell-border)]">
+                {matches.slice(0, PICKER_LIMIT).map(({ item: i, tag }) => (
                   <li key={i.id} role="option" aria-selected={false}>
                     <button type="button" onClick={() => { onChange(String(i.id)); setQ(''); }} className="block w-full px-3 py-2 text-left hover:bg-[var(--shell-hover)] focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]">
                       <span className="block truncate text-[13px] text-[var(--shell-text)]"><span className="text-[12px] text-[var(--shell-text-muted)]">{i.part_no}</span> <span className="font-medium">{i.name}</span>{tag && <span className="text-[var(--success)]"> · {tag}</span>}</span>
@@ -1118,7 +1141,7 @@ function PartPicker({ label, required, options, value, onChange, emptyHint, afte
                   </li>
                 ))}
               </ul>
-              {matches.length > PICKER_ROWS && <p className="text-[12px] text-[var(--shell-text-muted)]">Showing the first {PICKER_ROWS} of {matches.length}. Keep typing to narrow it down.</p>}
+              {matches.length > PICKER_LIMIT && <p className="text-[12px] text-[var(--shell-text-muted)]">Showing the first {PICKER_LIMIT} of {matches.length}. Keep typing to narrow it down.</p>}
             </>
           )}
         </>
@@ -1144,7 +1167,7 @@ export function PartReplaceModal({ isOpen, onClose, item, items }: Base & { item
   const today = localToday();
   const alt = new Map(item.alternates.map((a) => [a.id, a]));
   const options = items
-    .filter((i) => i.id !== item.id && i.status === 'ACTIVE' && i.uom === item.uom && !i.scheduled)
+    .filter((i) => i.id !== item.id && i.status === 'ACTIVE' && i.uom === item.uom && !i.scheduled && (i.project_id == null || i.project_id === item.project_id))
     .sort((a, b) => Number(alt.has(b.id)) - Number(alt.has(a.id)) || Number(!!alt.get(b.id)?.is_default) - Number(!!alt.get(a.id)?.is_default) || a.part_no.localeCompare(b.part_no))
     .map((i) => ({ item: i, tag: alt.has(i.id) ? (alt.get(i.id)!.is_default ? 'default alternate' : 'alternate') : undefined }));
   const owners = new Set((usage.data ?? []).map((u) => `${u.kind}-${u.id}`));
@@ -1201,7 +1224,7 @@ export function PartAlternatesModal({ isOpen, onClose, item, items, canEdit }: B
   // The same OEM part number from another seller is the same part; a different number is another make that meets the same spec
   const sameOem = (v: string | null) => !!v && !!item.oem_part_no && v.trim().toLowerCase() === item.oem_part_no.trim().toLowerCase();
   const chosen = members.find((m) => m.id === sel) ?? null;
-  const candidates = items.filter((i) => i.id !== item.id && i.status === 'ACTIVE' && i.sourcing === 'BUY' && i.uom === item.uom && i.alternates.length === 0 && !i.scheduled)
+  const candidates = items.filter((i) => i.id !== item.id && i.status === 'ACTIVE' && i.sourcing === 'BUY' && i.uom === item.uom && i.alternates.length === 0 && !i.scheduled && i.project_id == null)
     .sort((a, b) => Number(sameOem(b.oem_part_no)) - Number(sameOem(a.oem_part_no)) || a.part_no.localeCompare(b.part_no))
     .map((i) => ({ item: i, tag: sameOem(i.oem_part_no) ? 'same OEM part' : undefined }));
   const act = async (job: () => Promise<unknown>, ok: string) => {

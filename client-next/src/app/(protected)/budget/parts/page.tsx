@@ -95,7 +95,7 @@ export default function PartMasterPage() {
   const itemActions: DetailActionDef[] = !selected ? [] : [
     ...(canEdit && selected.status === 'ACTIVE' ? [{ label: 'Edit', onClick: () => { setEditing(selected); setOpen(true); } }] : []),
     { label: 'Where used', icon: <Network className="h-4 w-4 text-[var(--nav-orange)]" />, onClick: () => setWhereFor(selected) },
-    ...(selected.sourcing === 'BUY' && selected.status === 'ACTIVE' ? [{ label: 'Alternates', icon: <Layers className="h-4 w-4 text-[var(--nav-purple)]" />, onClick: () => setAltId(selected.id) }] : []),
+    ...(selected.sourcing === 'BUY' && selected.status === 'ACTIVE' && selected.project_id == null ? [{ label: 'Alternates', icon: <Layers className="h-4 w-4 text-[var(--nav-purple)]" />, onClick: () => setAltId(selected.id) }] : []),
     ...(canEdit && selected.status === 'ACTIVE' ? [selected.scheduled
       ? { label: 'Cancel replacement', icon: <CalendarX2 className="h-4 w-4 text-[var(--nav-indigo)]" />, onClick: () => setCancelRep(selected) }
       : { label: 'Replace', icon: <Replace className="h-4 w-4 text-[var(--nav-indigo)]" />, onClick: () => setReplaceId(selected.id) }] : []),
@@ -186,6 +186,7 @@ export default function PartMasterPage() {
       <DetailSection title="Supply">
         <DetailGrid>
           {selected.sourcing === 'BUY' && <DetailField label="OEM part number" value={selected.oem_part_no ?? undefined} wide />}
+          {selected.project_id != null && <DetailField label="Used on" value={`${selected.project_code ?? 'One project'} only`} wide />}
           <DetailField label="Category" value={selected.category_name ?? undefined} />
           <DetailField label="Supplier" value={selected.supplier ?? undefined} />
           <DetailField label="Lead time" value={selected.lead_time_days != null ? `${selected.lead_time_days} days` : undefined} />

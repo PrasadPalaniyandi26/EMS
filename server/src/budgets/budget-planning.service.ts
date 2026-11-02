@@ -167,9 +167,11 @@ export class BudgetPlanningService {
   // ── Items ────────────────────────────────────────────────────────────────
 
   // Parts with their life (active, replaced or retired), alternates and any scheduled replacement. Pickers use the active ones; the Part master asks for all.
-  async items(all = false) {
+  // A project-only part is offered on that project's job BOM (projectId) and in the Part master (all), nowhere else
+  async items(all = false, projectId?: number) {
     await this.applyDueReplacements();
-    const rows = await this.prisma.item.findMany({ where: all ? {} : { isActive: true }, orderBy: { partNo: 'asc' } });
+    const rows = await this.prisma.item.findMany({ where: all ? {} : { isActive: true, OR: [{ projectId: null }, ...(projectId != null ? [{ projectId }] : [])] }, orderBy: { partNo: 'asc' } });
+    const owners = new Map((await this.prisma.project.findMany({ where: { id: { in: rows.map((r) => r.projectId).filter((x): x is number => x != null) } }, select: { id: true, code: true } })).map((x) => [x.id, x.code]));
     const current = (await this.currentBoms()).map((b) => b.id);
     const usage = await this.prisma.bomLine.groupBy({ by: ['itemId'], where: { bomId: { in: current } }, _count: { _all: true } });
     const used = new Map(usage.map((u) => [u.itemId, u._count._all]));
@@ -191,6 +193,7 @@ export class BudgetPlanningService {
         ever_used: ever.has(i.id),
         scheduled: next ? { id: next.id, effective_from: next.effectiveFrom, reason: next.reason, successor_id: next.successorId, successor_part_no: next.successor?.partNo ?? null, successor_name: next.successor?.name ?? null } : null,
         is_default_alternate: i.isDefaultAlternate,
+        project_id: i.projectId, project_code: i.projectId != null ? owners.get(i.projectId) ?? null : null,
         alternates: i.alternateGroupId == null ? [] : members.filter((m) => m.alternateGroupId === i.alternateGroupId && m.id !== i.id).map((m) => ({
           id: m.id, part_no: m.partNo, oem_part_no: m.oemPartNo, name: m.name, standard_price: n(m.standardPrice), last_price: m.lastPrice == null ? null : n(m.lastPrice), supplier: m.supplier, lead_time_days: m.leadTimeDays, is_default: m.isDefaultAlternate,
         })).sort((a, b) => Number(b.is_default) - Number(a.is_default) || a.part_no.localeCompare(b.part_no)),
@@ -220,8 +223,12 @@ export class BudgetPlanningService {
     if (current && current.status !== 'ACTIVE') throw bad('A replaced or retired part cannot be edited.', HttpStatus.CONFLICT);
     const unit = String(b.uom || 'nos').slice(0, 12);
     if (current?.alternateGroupId != null && current.uom !== unit && (await this.prisma.item.count({ where: { alternateGroupId: current.alternateGroupId, isActive: true } })) > 1) throw bad('Alternates share a unit of measure. Remove this part from its alternates before changing the unit.', HttpStatus.CONFLICT);
+    // Only a new part can be made project-only; an existing part keeps the scope it was created with
+    const ownerId = current ? current.projectId : b.project_id === '' || b.project_id == null ? null : Number(b.project_id);
+    if (!current && ownerId != null && !(await this.prisma.project.findUnique({ where: { id: ownerId }, select: { id: true } }))) throw bad('Project not found.', HttpStatus.NOT_FOUND);
     const data = {
       partNo, name, categoryId: await this.checkCategory(b.category_id), uom: String(b.uom || 'nos').slice(0, 12),
+      ...(current ? {} : { projectId: ownerId }),
       standardPrice: standard, materialCost: make ? material : null, manufacturingCost: make ? manufacturing : null, lastPrice: b.last_price === '' || b.last_price == null ? null : Number(b.last_price),
       supplier: b.supplier?.trim() || null, leadTimeDays: b.lead_time_days ? Number(b.lead_time_days) : null,
       sourcing: make ? 'MAKE' : 'BUY', oemPartNo: make ? null : oem,
@@ -308,6 +315,7 @@ export class BudgetPlanningService {
       if (successorId === id) throw bad('A part cannot replace itself.');
       succ = await this.prisma.item.findUnique({ where: { id: successorId } });
       if (!succ || succ.status !== 'ACTIVE') throw bad('Choose an active part as the replacement.');
+      if (succ.projectId != null && succ.projectId !== item.projectId) throw bad('That part is for one project only, so it cannot replace this one.');
       if (succ.uom !== item.uom) throw bad(`The replacement is measured in ${succ.uom} and this part in ${item.uom}. Make the units match first.`);
       if (await this.prisma.partReplacement.findFirst({ where: { itemId: successorId, status: 'SCHEDULED' } })) throw bad('The replacement part is itself due to be replaced. Choose another part.', HttpStatus.CONFLICT);
     }
@@ -389,6 +397,7 @@ export class BudgetPlanningService {
     if (!a || !c) throw bad('Part not found.', HttpStatus.NOT_FOUND);
     if (a.status !== 'ACTIVE' || c.status !== 'ACTIVE') throw bad('Alternates must be active parts.');
     if (a.sourcing !== 'BUY' || c.sourcing !== 'BUY') throw bad('Only bought parts have alternates.');
+    if (a.projectId != null || c.projectId != null) throw bad('A part for one project only cannot be an alternate.');
     if (a.uom !== c.uom) throw bad(`The alternate is measured in ${c.uom} and this part in ${a.uom}. Alternates must share a unit.`);
     if (c.alternateGroupId != null) throw bad(c.alternateGroupId === a.alternateGroupId ? 'That part is already an alternate.' : 'That part is already an alternate of another part. Remove it from there first.', HttpStatus.CONFLICT);
     const group = a.alternateGroupId ?? a.id;
@@ -638,6 +647,11 @@ export class BudgetPlanningService {
     ]);
     const ac = new Map<number, number>();
     for (const p of spend) if (p.projectId) ac.set(p.projectId, (ac.get(p.projectId) ?? 0) + p.amount);
+    // The standard products on a project's current job BOM, if it has one
+    const jobBoms = await this.prisma.bom.findMany({ where: { projectId: { not: null } }, orderBy: { version: 'desc' }, select: { projectId: true, lines: { where: { subProductId: { not: null } }, select: { subProductId: true } } } });
+    const productsOf = new Map<number, number[]>();
+    for (const b of jobBoms) if (b.projectId != null && !productsOf.has(b.projectId)) productsOf.set(b.projectId, [...new Set(b.lines.map((l) => l.subProductId as number))]);
+    const named = new Map((await this.prisma.product.findMany({ where: { id: { in: [...productsOf.values()].flat() } }, select: { id: true, code: true, name: true } })).map((x) => [x.id, x]));
     return projects.map((p) => {
       const est = ests.find((e) => e.projectId === p.id);
       const t = est ? this.estimateTotals(est, est.lines) : null;
@@ -646,6 +660,7 @@ export class BudgetPlanningService {
       const state = mine.some((b) => b.status === 'APPROVED') ? 'BASELINE' : mine.some((b) => b.status === 'PROPOSED') ? 'PROPOSED' : est ? 'DRAFT' : null;
       return {
         id: p.id, code: p.code, name: p.name, client_name: p.client?.name ?? null, contract_value: cv, target_margin_pct: p.targetMarginPct == null ? null : n(p.targetMarginPct), min_margin_pct: p.minMarginPct == null ? null : n(p.minMarginPct),
+        products: (productsOf.get(p.id) ?? []).flatMap((id) => { const x = named.get(id); return x ? [{ id: x.id, code: x.code, name: x.name }] : []; }),
         risk_rating: p.riskRating, estimate_status: state, estimate_total: t?.total ?? null, actual: r2(ac.get(p.id) ?? 0),
         projected_margin_pct: cv && t ? r2(((cv - t.total) / cv) * 100) : null,
       };
@@ -1147,6 +1162,10 @@ export class BudgetPlanningService {
     if (jobId == null && b.sub_product_id) throw bad('A standard product can be a sub-assembly on a job BOM only.');
     if (!b.item_id && !b.sub_bom_id && !b.sub_product_id) throw bad('Choose an item or a sub-assembly.');
     if (b.scrap_pct !== undefined && b.scrap_pct !== '' && b.scrap_pct !== null && !(Number(b.scrap_pct) >= 0 && Number(b.scrap_pct) <= 100)) throw bad('Scrap % must be between 0 and 100.');
+    if (b.item_id) {
+      const owner = await this.prisma.item.findUnique({ where: { id: Number(b.item_id) }, select: { projectId: true } });
+      if (owner?.projectId != null && owner.projectId !== jobId) throw bad('That part is for one project only. It can go on that project\'s job BOM and nowhere else.', HttpStatus.CONFLICT);
+    }
     if (b.sub_bom_id && Number(b.sub_bom_id) === bom.id) throw bad('A BOM cannot contain itself.');
     if (b.sub_bom_id && !b.item_id) await this.assertSubAssemblyFits(bom.id, Number(b.sub_bom_id));
     // A job's sub-assembly keeps the approved standard it was priced at; it only moves when the line is refreshed
@@ -1330,7 +1349,7 @@ export class BudgetPlanningService {
     const bom = await this.prisma.bom.findFirst({ where: { projectId }, orderBy: { version: 'desc' } });
     const [roll, items, cards, stds, products, types] = await Promise.all([
       bom ? this.rollup(bom.id) : Promise.resolve(null),
-      this.items(),
+      this.items(false, projectId),
       this.prisma.rateCard.findMany({ where: { isActive: true }, orderBy: { role: 'asc' } }),
       this.prisma.standardCost.findMany({ where: { status: 'APPROVED' }, orderBy: { id: 'desc' } }),
       this.prisma.product.findMany({ where: { isActive: true, isSystem: false }, orderBy: { name: 'asc' }, select: { id: true, code: true, name: true } }),
@@ -1347,6 +1366,12 @@ export class BudgetPlanningService {
       rate_cards: await this.rateNow(cards).then((rm) => cards.map((c) => ({ id: c.id, role: c.role, rate_per_hour: rm.get(c.id)?.rate ?? n(c.ratePerHour) }))),
       sub_products: subProducts,
     };
+  }
+
+  // A one-off part for this project's job BOM, added by whoever can edit the job BOM
+  async addProjectPart(projectId: number, b: any, user?: Actor) {
+    await this.assertJobEditable(projectId);
+    return this.saveItem(null, { ...b, project_id: projectId }, user);
   }
 
   async saveJobBomSettings(projectId: number, b: any, user?: Actor) {

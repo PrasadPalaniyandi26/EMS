@@ -19,6 +19,7 @@ export interface Item {
   supplier: string | null; lead_time_days: number | null; sourcing: 'MAKE' | 'BUY'; material_cost: number | null; manufacturing_cost: number | null; used_in: number; price_drift_pct: number;
   oem_part_no: string | null; status: 'ACTIVE' | 'REPLACED' | 'RETIRED'; status_from: string | null; status_reason: string | null; replaced_by_id: number | null; replaced_by_part_no: string | null; replaced_by_name: string | null;
   ever_used: boolean; scheduled: PartScheduled | null; is_default_alternate: boolean; alternates: PartAlternate[];
+  project_id: number | null; project_code: string | null;
 }
 export interface PartScheduled { id: number; effective_from: string; reason: string; successor_id: number | null; successor_part_no: string | null; successor_name: string | null }
 export interface PartAlternate { id: number; part_no: string; oem_part_no: string | null; name: string; standard_price: number; last_price: number | null; supplier: string | null; lead_time_days: number | null; is_default: boolean }
@@ -27,6 +28,7 @@ export interface PartEvent { at: string; kind: string; text: string; by: string 
 export interface ProjectRow {
   id: number; code: string | null; name: string; client_name: string | null; contract_value: number | null; target_margin_pct: number | null; min_margin_pct: number | null;
   risk_rating: string | null; estimate_status: string | null; estimate_total: number | null; actual: number; projected_margin_pct: number | null;
+  products: { id: number; code: string | null; name: string }[];
 }
 
 export interface EstimateLineRow { id: number; phase: string; type_id: number | null; type_label: string; description: string; quantity: number; unit: string; rate: number; amount: number; basis: string | null; managed: boolean }

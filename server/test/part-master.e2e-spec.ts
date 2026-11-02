@@ -48,8 +48,10 @@ describe('Part master (e2e)', () => {
   const allParts = async () => data(await call('get', '/budgets/items?all=1', admin)) as any[];
   const part = async (partNo: string) => (await allParts()).find((i) => i.part_no === partNo);
   const create = (body: Record<string, unknown>) => call('post', '/budgets/items', admin, body);
-  const today = () => new Date().toISOString().slice(0, 10);
-  const tomorrow = () => new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  // The server dates in its own time zone, so the tests do too (UTC can already be the next day)
+  const localDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const today = () => localDate(new Date());
+  const tomorrow = () => localDate(new Date(Date.now() + 86400000));
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -211,6 +213,32 @@ describe('Part master (e2e)', () => {
       expect(kinds.has('REPLACEMENT')).toBe(true);
       expect(kinds.has('ALTERNATE')).toBe(true);
       expect(kinds.has('ADDED')).toBe(true);
+    });
+  });
+
+  describe('project-only parts', () => {
+    const JOB_PROJECT = 10;
+
+    it('is created from the job BOM, listed for that project and the Part master only', async () => {
+      const made = await call('post', `/budgets/projects/${JOB_PROJECT}/job-bom/parts`, admin, { part_no: 'ZZ-P1', name: 'One-off', sourcing: 'BUY', standard_price: 50, uom: 'nos', oem_part_no: 'OEM-P1' });
+      expect(made.status).toBe(201);
+      expect((await part('ZZ-P1')).project_id).toBe(JOB_PROJECT);
+      expect((data(await call('get', '/budgets/items', admin)) as any[]).some((i) => i.part_no === 'ZZ-P1')).toBe(false);
+      expect((data(await call('get', `/budgets/projects/${JOB_PROJECT}/job-bom`, admin)).items as any[]).some((i) => i.part_no === 'ZZ-P1')).toBe(true);
+      expect((data(await call('get', `/budgets/products/${TEST_PRODUCT}`, admin)).items as any[]).some((i) => i.part_no === 'ZZ-P1')).toBe(false);
+    });
+
+    it('cannot go on a product BOM, and cannot be an alternate', async () => {
+      const p = await part('ZZ-P1');
+      expect((await call('post', `/budgets/products/${TEST_PRODUCT}/bom-lines`, admin, { item_id: p.id, quantity: 1 })).status).toBe(409);
+      expect((await create({ part_no: 'ZZ-P2', name: 'Global', sourcing: 'BUY', standard_price: 50, uom: 'nos', oem_part_no: 'OEM-P2' })).status).toBe(201);
+      expect((await call('post', `/budgets/items/${(await part('ZZ-P2')).id}/alternates`, admin, { alternate_id: p.id })).status).toBe(400);
+    });
+
+    it('keeps its project when edited', async () => {
+      const p = await part('ZZ-P1');
+      expect((await call('put', `/budgets/items/${p.id}`, admin, { part_no: 'ZZ-P1', name: 'One-off 2', sourcing: 'BUY', standard_price: 55, uom: 'nos', oem_part_no: 'OEM-P1', project_id: null })).status).toBe(200);
+      expect((await part('ZZ-P1')).project_id).toBe(JOB_PROJECT);
     });
   });
 

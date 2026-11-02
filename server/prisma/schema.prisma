@@ -843,11 +843,14 @@ model Item {
   // Parts that meet the same spec share a group; one of them is the default
   alternateGroupId   Int?    @map("alternate_group_id")
   isDefaultAlternate Boolean @default(false) @map("is_default_alternate")
+  // A one-off part for a single project's job BOM; other BOMs and pickers never offer it
+  projectId         Int?     @map("project_id")
   priceLog          ItemPriceLog[]
   replacements      PartReplacement[] @relation("ReplacedPart")
   successions       PartReplacement[] @relation("Successor")
 
   @@index([alternateGroupId])
+  @@index([projectId])
 
   @@map("items")
 }

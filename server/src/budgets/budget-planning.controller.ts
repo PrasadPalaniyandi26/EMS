@@ -70,6 +70,7 @@ export class BudgetPlanningController {
   @Put('projects/:id/job-bom') @Roles('admin', 'finance') jobBomSettings(@Param('id', ParseIntPipe) id: number, @Body() b: any, @CurrentUser() u: Actor) { return this.s.saveJobBomSettings(id, b, u); }
   @Post('projects/:id/job-bom/lines') addJobLine(@Param('id', ParseIntPipe) id: number, @Body() b: any, @CurrentUser() u: Actor) { return this.s.saveBomLine({ projectId: id }, null, b, u); }
   @Put('projects/:id/job-bom/lines/:lid') editJobLine(@Param('id', ParseIntPipe) id: number, @Param('lid', ParseIntPipe) lid: number, @Body() b: any, @CurrentUser() u: Actor) { return this.s.saveBomLine({ projectId: id }, lid, b, u); }
+  @Post('projects/:id/job-bom/parts') addProjectPart(@Param('id', ParseIntPipe) id: number, @Body() b: any, @CurrentUser() u: Actor) { return this.s.addProjectPart(id, b, u); }
   @Post('job-bom/lines/:lid/refresh') refreshJobLine(@Param('lid', ParseIntPipe) lid: number) { return this.s.refreshJobSub(lid); }
   @Post('projects/:id/job-bom/operations') addJobOp(@Param('id', ParseIntPipe) id: number, @Body() b: any, @CurrentUser() u: Actor) { return this.s.saveOperation({ projectId: id }, null, b, u); }
   @Put('projects/:id/job-bom/operations/:oid') editJobOp(@Param('id', ParseIntPipe) id: number, @Param('oid', ParseIntPipe) oid: number, @Body() b: any, @CurrentUser() u: Actor) { return this.s.saveOperation({ projectId: id }, oid, b, u); }
