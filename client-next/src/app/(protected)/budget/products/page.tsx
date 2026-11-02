@@ -9,9 +9,21 @@ import { useBudgetProducts, type ProductRow } from '@/hooks/use-planning-queries
 import { useDataTable } from '@/hooks/use-data-table';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
+import { type FilterDef } from '@/components/data-table/filters';
 import { IdCell, TextCell, ToneText, headerRight } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { marginTone, plain } from '@/components/budgets/budget-ui';
+
+// Where a product stands on its standard cost: approved, due to be done again, or not yet approved
+const costStatus = (r: ProductRow): { label: string; tone: 'success' | 'warning' | 'muted' } => {
+  if (r.standard_cost != null) {
+    const newYear = r.standard_fy != null && r.standard_fy < r.fy;
+    const drifted = r.rolled_cost != null && Math.abs(r.rolled_cost - r.standard_cost) > 0.5;
+    return { label: newYear ? 'Re-cost for new year' : drifted ? 'Re-cost due' : 'Approved', tone: newYear || drifted ? 'warning' : 'success' };
+  }
+  return { label: r.bom_lines ? 'Not approved' : 'No BOM', tone: 'muted' };
+};
+const COST_STATUSES = ['Approved', 'Re-cost due', 'Re-cost for new year', 'Not approved', 'No BOM'];
 
 const Whole = ({ value, currency }: { value: number | null; currency: string }) => (
   <div className="text-right text-[13px] font-medium tabular-nums text-[var(--shell-text)]">{value == null ? '—' : plain(value, currency)}</div>
@@ -46,27 +58,28 @@ export default function ProductCostingPage() {
       },
     },
     {
-      id: 'status', header: 'Cost status', size: 170,
-      cell: ({ row }) => {
-        const r = row.original;
-        if (r.standard_cost != null) {
-          const newYear = r.standard_fy != null && r.standard_fy < r.fy;
-          const drifted = r.rolled_cost != null && Math.abs(r.rolled_cost - r.standard_cost) > 0.5;
-          return <ToneText label={newYear ? 'Re-cost for new year' : drifted ? 'Re-cost due' : 'Approved'} tone={newYear || drifted ? 'warning' : 'success'} />;
-        }
-        return <ToneText label={r.bom_lines ? 'Not approved' : 'No BOM'} tone="muted" />;
-      },
+      id: 'status', header: 'Cost status', size: 170, accessorFn: (r) => costStatus(r).label,
+      cell: ({ row }) => { const s = costStatus(row.original); return <ToneText label={s.label} tone={s.tone} />; },
     },
   ], [currency]);
 
+  const [client, setClient] = useState('ALL');
+  const [status, setStatus] = useState('ALL');
+  const clients = useMemo(() => [...new Set((data ?? []).map((r) => r.client_name).filter((x): x is string => !!x))].sort((a, b) => a.localeCompare(b)), [data]);
+  const rows = useMemo(() => (data ?? []).filter((r) => (client === 'ALL' || r.client_name === client) && (status === 'ALL' || costStatus(r).label === status)), [data, client, status]);
+  const filterDefs: FilterDef[] = [
+    { id: 'client', label: 'Client', value: client, onChange: setClient, options: [{ value: 'ALL', label: 'All clients' }, ...clients.map((c) => ({ value: c, label: c }))] },
+    { id: 'status', label: 'Cost status', value: status, onChange: setStatus, options: [{ value: 'ALL', label: 'All cost statuses' }, ...COST_STATUSES.map((s) => ({ value: s, label: s }))] },
+  ];
+
   const table = useDataTable({
-    data: data ?? [], columns, state: { sorting }, onSortingChange: setSorting,
+    data: rows, columns, state: { sorting }, onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(), getFilteredRowModel: getFilteredRowModel(), getPaginationRowModel: getPaginationRowModel(), getSortedRowModel: getSortedRowModel(),
   });
 
   return (
-    <ModuleShell searchRow={<DataTableToolbar table={table} actions={<span className="text-[13px] text-[var(--shell-text-muted)]">Open a product to build its BOM, standard cost, build plan and margin.</span>} />}>
-      <DataTable isLoading={isLoading} columns={columns} data={data ?? []} tableInstance={table} onRowClick={(r) => router.push(`/budget/products/${r.id}`)} emptyMessage="No products yet." />
+    <ModuleShell searchRow={<DataTableToolbar table={table} filterDefs={filterDefs} actions={<span className="text-[13px] text-[var(--shell-text-muted)]">Open a product to build its BOM, standard cost, build plan and margin.</span>} />}>
+      <DataTable isLoading={isLoading} columns={columns} data={rows} tableInstance={table} onRowClick={(r) => router.push(`/budget/products/${r.id}`)} emptyMessage="No products yet." />
     </ModuleShell>
   );
 }

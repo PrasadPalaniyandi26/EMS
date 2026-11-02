@@ -9,6 +9,7 @@ import { useBudgetProjects, type ProjectRow } from '@/hooks/use-planning-queries
 import { useDataTable } from '@/hooks/use-data-table';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
+import { type FilterDef } from '@/components/data-table/filters';
 import { IdCell, TextCell, ToneText, headerRight } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { marginTone, plain } from '@/components/budgets/budget-ui';
@@ -29,6 +30,7 @@ export default function ProjectBudgetsPage() {
     { accessorKey: 'code', header: 'Code', cell: ({ row }) => <IdCell value={row.original.code} />, size: 100 },
     { accessorKey: 'name', header: 'Project', cell: ({ row }) => <TextCell value={row.original.name} strong className="block max-w-[260px] truncate" /> },
     { accessorKey: 'client_name', header: 'Client', cell: ({ row }) => <TextCell value={row.original.client_name} muted /> },
+    { id: 'products', header: 'Product', accessorFn: (r) => (r.products.length ? 'Yes' : 'No'), cell: ({ row }) => <TextCell value={row.original.products.length ? 'Yes' : 'No'} muted />, size: 90 },
     { accessorKey: 'contract_value', header: headerRight('Contract value'), cell: ({ row }) => <Whole value={row.original.contract_value} currency={currency} />, size: 130 },
     { accessorKey: 'estimate_total', header: headerRight('Estimate cost'), cell: ({ row }) => <Whole value={row.original.estimate_total} currency={currency} />, size: 120 },
     { accessorKey: 'actual', header: headerRight('Spent'), cell: ({ row }) => <Whole value={row.original.actual} currency={currency} />, size: 110 },
@@ -47,14 +49,25 @@ export default function ProjectBudgetsPage() {
     },
   ], [currency]);
 
+  const [client, setClient] = useState('ALL');
+  const [product, setProduct] = useState('ALL');
+  const clients = useMemo(() => [...new Set((data ?? []).map((r) => r.client_name).filter((x): x is string => !!x))].sort((a, b) => a.localeCompare(b)), [data]);
+  const rows = useMemo(() => (data ?? []).filter((r) =>
+    (client === 'ALL' || r.client_name === client) &&
+    (product === 'ALL' || (product === 'YES') === (r.products.length > 0))), [data, client, product]);
+  const filterDefs: FilterDef[] = [
+    { id: 'client', label: 'Client', value: client, onChange: setClient, options: [{ value: 'ALL', label: 'All clients' }, ...clients.map((c) => ({ value: c, label: c }))] },
+    { id: 'product', label: 'Product', placeholder: 'Product', value: product, onChange: setProduct, options: [{ value: 'ALL', label: 'All' }, { value: 'YES', label: 'Yes' }, { value: 'NO', label: 'No' }] },
+  ];
+
   const table = useDataTable({
-    data: data ?? [], columns, state: { sorting }, onSortingChange: setSorting,
+    data: rows, columns, state: { sorting }, onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(), getFilteredRowModel: getFilteredRowModel(), getPaginationRowModel: getPaginationRowModel(), getSortedRowModel: getSortedRowModel(),
   });
 
   return (
-    <ModuleShell searchRow={<DataTableToolbar table={table} actions={<span className="text-[13px] text-[var(--shell-text-muted)]">Open a project to build its estimate, baseline, milestones and earned value.</span>} />}>
-      <DataTable isLoading={isLoading} columns={columns} data={data ?? []} tableInstance={table} onRowClick={(r) => router.push(`/budget/projects/${r.id}`)} emptyMessage="No projects yet." />
+    <ModuleShell searchRow={<DataTableToolbar table={table} filterDefs={filterDefs} actions={<span className="text-[13px] text-[var(--shell-text-muted)]">Open a project to build its estimate, baseline, milestones and earned value.</span>} />}>
+      <DataTable isLoading={isLoading} columns={columns} data={rows} tableInstance={table} onRowClick={(r) => router.push(`/budget/projects/${r.id}`)} emptyMessage="No projects yet." />
     </ModuleShell>
   );
 }

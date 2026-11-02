@@ -19,6 +19,8 @@ export interface FilterDef {
   defaultValue?: string
   /** More controls under the select in the dialog, for example the dates of a custom range */
   extra?: (value: string) => ReactNode
+  /** What the toolbar select reads while it is not filtering, so plain values such as All, Yes and No still say what they filter. Not listed in the menu */
+  placeholder?: string
 }
 
 // A screen shows up to this many filters in the toolbar; more than that go into one "Filters…" dialog so the row stays clean
@@ -35,6 +37,7 @@ export function Filters({ defs }: { defs: FilterDef[] }) {
       <>
         {defs.map((f) => (
           <NativeSelect key={f.id} aria-label={f.label} value={f.value} onChange={(e) => f.onChange(e.target.value)} className="!h-8 !w-auto">
+            {f.placeholder && <option value={f.defaultValue ?? f.options[0]?.value} hidden>{f.placeholder}</option>}
             {f.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </NativeSelect>
         ))}
