@@ -10,14 +10,14 @@ import { ConfirmDialog } from '@/components/shared/modal-primitives';
 import { toast } from 'sonner';
 import {
   Plus, Pencil, Trash2, Tags,
-  Target, ArrowUpRight
+  Target, ArrowUpRight, FolderOpen
 } from 'lucide-react';
 import { ManageTypesDialog } from '@/components/manage/manage-types-dialog';
 import { ProjectModal } from '@/components/manage/project-modals';
 import type { Project } from '@/lib/types';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
-import { columns } from './columns';
+import { columns, projectState } from './columns';
 import { 
   getCoreRowModel, 
   getFilteredRowModel, 
@@ -25,6 +25,7 @@ import {
   getSortedRowModel, 
   getFacetedRowModel,
   getFacetedUniqueValues,
+  type SortingState,
 } from "@tanstack/react-table";
 import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
@@ -54,17 +55,23 @@ export default function ProjectsPage() {
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
 
-  useEffect(() => { 
-    setHeader('Projects', 'Operations Hub • Managed Portfolios'); 
-  }, [setHeader]);
+  const list = (projects || []) as any[];
+  const real = list.filter((p) => !p.is_system);
+  useEffect(() => {
+    setHeader('Projects', projects ? `${real.length} projects, ${real.filter((p) => (p.status || 'Active') === 'Active').length} active` : 'Client projects and who leads them');
+  }, [setHeader, projects]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Overdue and on-hold first
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'status', desc: false }]);
   const table = useDataTable<Project>({
     data: projects || [],
     columns,
     state: {
       rowSelection,
       globalFilter,
+      sorting,
     },
+    onSortingChange: setSorting,
     enableRowSelection: true,
     enableMultiRowSelection: false,
     onRowSelectionChange: setRowSelection,
@@ -84,10 +91,10 @@ export default function ProjectsPage() {
     try {
       if (editingProject) {
         await api.put(`/projects/${editingProject.id}`, form);
-        toast.success('Project parameters updated');
+        toast.success('Project updated');
       } else {
         await api.post('/projects', form);
-        toast.success('New project initialized');
+        toast.success('Project added');
       }
       invalidate('projects');
       setIsModalOpen(false);
@@ -101,21 +108,40 @@ export default function ProjectsPage() {
     if (!deleteId) return;
     try {
       await api.delete(`/projects/${deleteId}`);
-      toast.success('Project entity purged');
+      toast.success('Project deleted');
       invalidate('projects');
       setDeleteId(null);
       setRowSelection({});
-    } catch {
-      toast.error('Purge failed');
+    } catch (e: any) {
+      setDeleteId(null);
+      toast.error(e?.message || 'Could not delete the project.');
     }
   };
 
   const router = useRouter();
   const itemActions: DetailActionDef[] = selectedProject ? [
-    { label: 'Edit', variant: 'primary', onClick: () => { setEditingProject(selectedProject as any); setIsModalOpen(true); } },
-    { label: 'Costing', onClick: () => router.push(`/budget/projects/${(selectedProject as any).id}`) },
+    { label: 'Edit', onClick: () => { setEditingProject(selectedProject as any); setIsModalOpen(true); } },
+    { label: 'Open costing', variant: 'primary', icon: <FolderOpen className="h-4 w-4 text-[var(--nav-slate)]" />, onClick: () => router.push(`/budget/projects/${(selectedProject as any).id}`) },
     { label: 'Delete', variant: 'danger', onClick: () => setDeleteId((selectedProject as any).id) },
   ] : [];
+
+  // What the list holds, instead of instructions. Estimates, spend and margin are on Project Costing.
+  const count = (s: string) => real.filter((p) => projectState(p) === s).length;
+  const projectSummary = (
+    <div className="space-y-4">
+      <DetailSummary title="All projects" subtitle="Client projects" figure={real.length} figureLabel="Projects" />
+      <DetailSection title="Where they stand">
+        <DetailGrid>
+          <DetailField label="Past end date" value={count('Overdue')} tone={count('Overdue') ? 'danger' : 'muted'} />
+          <DetailField label="On hold" value={count('On-Hold')} tone={count('On-Hold') ? 'warning' : 'muted'} />
+          <DetailField label="Active" value={count('Active')} />
+          <DetailField label="Proposed" value={count('Proposed')} />
+          <DetailField label="Completed or canceled" value={count('Completed') + count('Canceled')} wide />
+        </DetailGrid>
+      </DetailSection>
+      <p className="text-[12px] text-[var(--shell-text-muted)]">Estimates, spend and margin are on Project Costing.</p>
+    </div>
+  );
 
   return (
     <ModuleShell
@@ -137,17 +163,18 @@ export default function ProjectsPage() {
       }
       intelligencePanel={
           <ModuleIntelligencePanel
-            title="Project Intelligence"
+            title={selectedProject ? 'Project' : 'Summary'}
             onClose={() => setRowSelection({})}
             hasSelection={!!selectedProject}
+            idle={projectSummary}
             footer={itemActions.length > 0 ? <DetailActions actions={itemActions} /> : undefined}
           >
             {selectedProject && (() => {
               const pr: any = selectedProject;
               const tone: Record<string, string> = {
-                'Active': 'text-[var(--success)]', 'On-Hold': 'text-[var(--warning)]', 'Completed': 'text-[var(--info)]', 'Canceled': 'text-[var(--danger)]',
+                'Active': 'text-[var(--success)]', 'On-Hold': 'text-[var(--warning)]', 'Completed': 'text-[var(--info)]', 'Canceled': 'text-[var(--danger)]', 'Overdue': 'text-[var(--danger)]',
               };
-              const status = pr.status || 'Active';
+              const status = projectState(pr);
               return (
                 <>
                   <DetailSummary
@@ -159,6 +186,7 @@ export default function ProjectsPage() {
                   <DetailSection title="Details">
                     <DetailGrid>
                       <DetailField label="Type" value={pr.type_name} />
+                      <DetailField label="Category" value={pr.category_name} />
                       <DetailField label="Project lead" value={pr.lead} />
                       <DetailField label="Client" value={pr.client_name} wide />
                       <DetailField label="Start date" value={formatDate(pr.start_date)} />
@@ -181,7 +209,7 @@ export default function ProjectsPage() {
         columns={columns}
         data={projects || []}
         tableInstance={table}
-        emptyMessage="No projects found. Click Add to create one."
+        emptyMessage={globalFilter ? 'No projects match this search.' : 'No projects yet. Use Add to create the first one.'}
       />
 
       <ProjectModal 
@@ -206,9 +234,9 @@ export default function ProjectsPage() {
       {/* Simplified Delete Confirm */}
       <ConfirmDialog
         open={!!deleteId}
-        title="Delete Project"
-        message="Are you sure you want to delete this project? This action cannot be undone."
-        confirmLabel="Delete"
+        title="Delete project"
+        message={`Delete ${(list.find((p) => p.id === deleteId)?.name) ?? 'this project'}? It is removed from every list. Expenses already charged to it are kept.`}
+        confirmLabel="Delete project"
         destructive
         onConfirm={handleDelete}
         onCancel={() => setDeleteId(null)}

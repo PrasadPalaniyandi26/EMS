@@ -1,5 +1,6 @@
 'use client';
 
+import { canConfigure, isFinanceRole } from '@/lib/permissions';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { CalendarX2, Layers, Network, Plus, Replace, ShoppingCart, Tags } from 'lucide-react';
@@ -35,15 +36,21 @@ type Use = 'ALL' | 'USED' | 'UNUSED';
 type Life = 'ACTIVE' | 'ENDED' | 'ALL';
 const lifeText = (i: Item) => (i.status === 'REPLACED' ? `Replaced ${formatDate(i.status_from)}` : i.status === 'RETIRED' ? `Retired${i.status_from ? ` ${formatDate(i.status_from)}` : ''}` : i.scheduled ? `${i.scheduled.successor_id ? 'Replaced' : 'Retired'} from ${formatDate(i.scheduled.effective_from)}` : '');
 const driftOf = (i: Item) => Math.abs(i.price_drift_pct) >= 5;
+// One word for where a part stands, the ones that need a decision first. The dates are in the panel and in the hover text.
+const lifeWord = (i: Item): { label: 'Scheduled' | 'Replaced' | 'Retired' | 'Active'; rank: number; tone: 'warning' | 'muted' | 'success' } =>
+  i.status === 'REPLACED' ? { label: 'Replaced', rank: 1, tone: 'muted' } : i.status === 'RETIRED' ? { label: 'Retired', rank: 2, tone: 'muted' } : i.scheduled ? { label: 'Scheduled', rank: 0, tone: 'warning' } : { label: 'Active', rank: 3, tone: 'success' };
+const LIFE_TONE = { warning: 'text-[var(--warning)]', muted: 'text-[var(--shell-text-muted)]', success: 'text-[var(--success)]' } as const;
 const PART_HEADERS = ['part_no', 'name', 'category', 'make_or_buy', 'uom', 'standard_price', 'material_cost', 'manufacturing_cost', 'last_price', 'supplier', 'lead_time_days', 'oem_part_no'];
 
 export default function PartMasterPage() {
   const setHeader = useHeaderStore((s) => s.setHeader);
   const currency = useAuthStore((s) => s.user?.currency || 'INR');
-  const canEdit = useAuthStore((s) => ['ADMIN', 'FINANCE'].includes((s.user?.role_name || '').toUpperCase()));
+  const canEdit = useAuthStore((s) => canConfigure(s.user?.role_name));
+  const isFinance = useAuthStore((s) => isFinanceRole(s.user?.role_name)); // a purchase price changes cost, so Finance records it
   const invalidate = useInvalidate();
   const { data, isLoading } = useItems(true);
-  const [sorting, setSorting] = useState<SortingState>([]);
+  // Parts with a change coming first
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'life', desc: false }]);
   const [selection, setSelection] = useState<Record<string, boolean>>({});
   const [sourcing, setSourcing] = useState<Sourcing>('ALL'); const [price, setPrice] = useState<Price>('ALL'); const [use, setUse] = useState<Use>('ALL'); const [life, setLife] = useState<Life>('ACTIVE');
   const [replaceId, setReplaceId] = useState<number | null>(null); const [altId, setAltId] = useState<number | null>(null); const [historyFor, setHistoryFor] = useState<Item | null>(null); const [cancelRep, setCancelRep] = useState<Item | null>(null);
@@ -60,22 +67,18 @@ export default function PartMasterPage() {
 
   const columns = useMemo<ColumnDef<Item, any>[]>(() => [
     { accessorKey: 'part_no', header: 'Part', cell: ({ row }) => <IdCell value={row.original.part_no} />, size: 120 },
-    { accessorKey: 'name', header: 'Name', cell: ({ row }) => <TextCell value={row.original.name} strong className="block max-w-[280px] truncate" /> },
+    { id: 'life', header: 'Status', size: 110, accessorFn: (i) => lifeWord(i).rank, cell: ({ row }) => { const w = lifeWord(row.original); return <span title={lifeText(row.original) || undefined}><ToneText label={w.label} tone={w.tone} /></span>; } },
+    { accessorKey: 'name', header: 'Name', cell: ({ row }) => <TextCell value={row.original.name} strong className="block max-w-[220px] truncate" /> },
     { accessorKey: 'oem_part_no', header: 'OEM part number' },
-    { accessorKey: 'category_name', header: 'Category', cell: ({ row }) => <TextCell value={row.original.category_name} muted />, size: 140 },
+    { accessorKey: 'category_name', header: 'Category', cell: ({ row }) => <TextCell value={row.original.category_name} muted className="block max-w-[130px] truncate" />, size: 130 },
     { accessorKey: 'sourcing', header: 'Make / Buy', cell: ({ row }) => <TextCell value={row.original.sourcing === 'MAKE' ? 'Make' : 'Buy'} />, size: 90 },
-    { accessorKey: 'uom', header: 'Unit', cell: ({ row }) => <TextCell value={row.original.uom} muted />, size: 70 },
     { accessorKey: 'standard_price', header: headerRight('Standard'), cell: ({ row }) => <Whole value={row.original.standard_price} currency={currency} />, size: 110 },
-    { accessorKey: 'last_price', header: headerRight('Last paid'), cell: ({ row }) => <Whole value={row.original.last_price} currency={currency} />, size: 110 },
     {
       accessorKey: 'price_drift_pct', header: headerRight('Drift'), size: 90,
       cell: ({ row }) => { const d = row.original.price_drift_pct; return <div className="text-right">{d ? <ToneText label={`${d > 0 ? '+' : ''}${d.toFixed(1)}%`} tone={Math.abs(d) >= 5 ? 'warning' : 'muted'} /> : <TextCell value="" />}</div>; },
     },
-    { accessorKey: 'supplier', header: 'Supplier', cell: ({ row }) => <TextCell value={row.original.supplier} muted /> },
-    { accessorKey: 'lead_time_days', header: headerRight('Lead time'), cell: ({ row }) => <div className="text-right"><TextCell value={row.original.lead_time_days != null ? `${row.original.lead_time_days} d` : ''} muted /></div>, size: 90 },
+    { accessorKey: 'lead_time_days', header: headerRight('Lead time'), sortUndefined: 'last', accessorFn: (i) => i.lead_time_days ?? undefined, cell: ({ row }) => <div className="text-right">{row.original.lead_time_days != null ? <TextCell value={`${row.original.lead_time_days} d`} muted /> : <ToneText label="Not set" tone="warning" />}</div>, size: 90 },
     { accessorKey: 'used_in', header: headerRight('In BOMs'), cell: ({ row }) => <div className="text-right"><TextCell value={row.original.used_in || ''} /></div>, size: 80 },
-    { id: 'alternate', header: 'Alternate', cell: ({ row }) => (row.original.is_default_alternate ? <ToneText label="Default" tone="success" /> : row.original.alternates.length ? <ToneText label="Alternate" tone="muted" /> : <TextCell value="" />), size: 100 },
-    { id: 'life', header: 'Status', cell: ({ row }) => { const t = lifeText(row.original); return t ? <ToneText label={t} tone={row.original.status === 'ACTIVE' ? 'warning' : 'muted'} /> : <TextCell value="" />; }, size: 170 },
   ], [currency]);
 
   const table = useDataTable({
@@ -99,11 +102,14 @@ export default function PartMasterPage() {
     ...(canEdit && selected.status === 'ACTIVE' ? [selected.scheduled
       ? { label: 'Cancel replacement', icon: <CalendarX2 className="h-4 w-4 text-[var(--nav-indigo)]" />, onClick: () => setCancelRep(selected) }
       : { label: 'Replace', icon: <Replace className="h-4 w-4 text-[var(--nav-indigo)]" />, onClick: () => setReplaceId(selected.id) }] : []),
-    ...(canEdit && selected.status === 'ACTIVE' ? [{ label: 'Record purchase', variant: 'primary' as const, icon: <ShoppingCart className="h-4 w-4 text-[var(--nav-violet)]" />, onClick: () => setBuyFor(selected) }] : []),
+    // A made part is not bought, so Record purchase is only for bought parts
+    ...(isFinance && selected.status === 'ACTIVE' && selected.sourcing === 'BUY' ? [{ label: 'Record purchase', variant: 'primary' as const, icon: <ShoppingCart className="h-4 w-4 text-[var(--nav-violet)]" />, onClick: () => setBuyFor(selected) }] : []),
     // A part that has been on a BOM is replaced or retired, never deleted, so its history stays
     ...(canEdit && !selected.ever_used ? [{ label: 'Delete', variant: 'danger' as const, onClick: () => setDel(selected) }] : []),
   ];
-  const exportParts = () => downloadCsv('part-master.csv', toCsv(PART_HEADERS, (data ?? []).map((i) => [i.part_no, i.name, i.category_name ?? '', i.sourcing === 'MAKE' ? 'Make' : 'Buy', i.uom, i.standard_price, i.material_cost ?? '', i.manufacturing_cost ?? '', i.last_price ?? '', i.supplier ?? '', i.lead_time_days ?? '', i.oem_part_no ?? ''])));
+  // The panel footer holds the three actions that change the part; Where used and Alternates are links in the panel and buttons in the toolbar
+  const panelActions = itemActions.filter((a) => ['Edit', 'Replace', 'Cancel replacement', 'Record purchase', 'Delete'].includes(a.label)).slice(0, 3);
+  const exportParts =() => downloadCsv('part-master.csv', toCsv(PART_HEADERS, (data ?? []).map((i) => [i.part_no, i.name, i.category_name ?? '', i.sourcing === 'MAKE' ? 'Make' : 'Buy', i.uom, i.standard_price, i.material_cost ?? '', i.manufacturing_cost ?? '', i.last_price ?? '', i.supplier ?? '', i.lead_time_days ?? '', i.oem_part_no ?? ''])));
   const alwaysActions: DetailActionDef[] = [
     ...(canEdit ? [{ label: 'Add part', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setEditing(null); setOpen(true); } }, { label: 'Categories', icon: <Tags className="h-4 w-4 text-[var(--nav-cyan)]" />, onClick: () => setCatsOpen(true) }] : []),
   ];
@@ -111,22 +117,23 @@ export default function PartMasterPage() {
   const all = (data ?? []).filter((i) => i.status === 'ACTIVE');
   const summary = (
     <div className="space-y-4">
-      <DetailSummary title="Part master" subtitle="Standard prices used in every BOM" figure={all.length} figureLabel="Parts" />
-      <DetailSection title="Mix">
+      <DetailSummary title="Active parts" subtitle={`${all.filter((i) => i.sourcing === 'BUY').length} bought, ${all.filter((i) => i.sourcing === 'MAKE').length} made`} figure={all.length} figureLabel="Parts" />
+      <DetailSection title="Needs attention">
         <DetailGrid>
-          <DetailField label="Bought" value={all.filter((i) => i.sourcing === 'BUY').length} />
-          <DetailField label="Made" value={all.filter((i) => i.sourcing === 'MAKE').length} />
+          <DetailField label="Change scheduled" value={all.filter((i) => i.scheduled).length} tone={all.some((i) => i.scheduled) ? 'warning' : 'muted'} />
+          <DetailField label="Lead time not set" value={all.filter((i) => i.lead_time_days == null).length} tone={all.some((i) => i.lead_time_days == null) ? 'warning' : 'muted'} />
           <DetailField label="Price moved 5% or more" value={all.filter(driftOf).length} />
           <DetailField label="Not in any BOM" value={all.filter((i) => i.used_in === 0).length} />
         </DetailGrid>
       </DetailSection>
-      <p className="text-[12px] text-[var(--shell-text-muted)]">Changing a standard price reprices every live product cost that uses the part. Approved standard costs are not affected. Drift compares the last price paid with the standard.</p>
+      <p className="text-[12px] text-[var(--shell-text-muted)]">Changing a standard price reprices every live product cost that uses the part. Approved standard costs are not affected.</p>
     </div>
   );
 
-  const detail = !selected ? null : (
+  const sw = selected ? lifeWord(selected) : null;
+  const detail = !selected || !sw ? null : (
     <div className="space-y-4">
-      <DetailSummary title={selected.name} subtitle={`${selected.part_no} · ${selected.sourcing === 'MAKE' ? 'Made' : 'Bought'}`} figure={unitPlain(selected.standard_price, currency)} figureLabel={`Standard per ${selected.uom}`} />
+      <DetailSummary title={selected.name} subtitle={`${selected.part_no} · ${selected.sourcing === 'MAKE' ? 'Made' : 'Bought'}`} status={sw.label} statusClass={LIFE_TONE[sw.tone]} figure={money(selected.standard_price, currency)} figureLabel={`Standard per ${selected.uom}`} />
       <DetailSection title="Pricing">
         <DetailGrid>
           <DetailField label="Standard" value={money(selected.standard_price, currency)} />
@@ -204,28 +211,14 @@ export default function PartMasterPage() {
           </ul>
         )}
       </DetailSection>
-      <DetailSection title={`Where used${usage.data ? ` (${usage.data.length})` : ''}`}>
-        {usage.isLoading ? <p className="text-[12px] text-[var(--shell-text-muted)]">Loading…</p>
-          : !usage.data?.length ? <p className="text-[12px] text-[var(--shell-text-muted)]">Not in any BOM. It can be deleted.</p>
-          : (
-            <ul className="space-y-1.5">
-              {usage.data.map((u, i) => (
-                <li key={`${u.kind}-${u.id}-${i}`} className="flex items-baseline justify-between gap-3 text-[13px]">
-                  <span className="min-w-0 truncate text-[var(--shell-text)]">{[u.code, u.name].filter(Boolean).join(' ')}<span className="text-[var(--shell-text-muted)]">{u.kind === 'JOB' ? ' · job BOM' : ''}</span></span>
-                  <span className="shrink-0 tabular-nums text-[var(--shell-text-muted)]">× {u.quantity}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-      </DetailSection>
     </div>
   );
 
   const filterDefs: FilterDef[] = [
+    { id: 'life', label: 'Part status', value: life, onChange: (v) => setLife(v as Life), options: [{ value: 'ACTIVE', label: 'Active parts' }, { value: 'ENDED', label: 'Replaced or retired' }, { value: 'ALL', label: 'All parts' }] },
     { id: 'sourcing', label: 'Make or buy', value: sourcing, onChange: (v) => setSourcing(v as Sourcing), options: [{ value: 'ALL', label: 'Make and buy' }, { value: 'BUY', label: 'Bought' }, { value: 'MAKE', label: 'Made' }] },
     { id: 'price', label: 'Price', value: price, onChange: (v) => setPrice(v as Price), options: [{ value: 'ALL', label: 'Any price' }, { value: 'DRIFT', label: 'Moved 5% or more' }, { value: 'NO_LAST', label: 'No last paid' }] },
     { id: 'category', label: 'Category', value: category, onChange: setCategory, options: [{ value: 'ALL', label: 'Any category' }, { value: 'NONE', label: 'No category' }, ...(categories.data ?? []).map((c) => ({ value: String(c.id), label: c.name }))] },
-    { id: 'life', label: 'Part status', value: life, onChange: (v) => setLife(v as Life), options: [{ value: 'ACTIVE', label: 'Active parts' }, { value: 'ENDED', label: 'Replaced or retired' }, { value: 'ALL', label: 'All parts' }] },
     { id: 'use', label: 'In BOMs', value: use, onChange: (v) => setUse(v as Use), options: [{ value: 'ALL', label: 'Used or not' }, { value: 'USED', label: 'In BOMs' }, { value: 'UNUSED', label: 'Not in a BOM' }] },
   ];
 
@@ -234,8 +227,8 @@ export default function PartMasterPage() {
       showPanel={!!selected}
       searchRow={<DataTableToolbar table={table} filterDefs={filterDefs} onImport={canEdit ? () => setImpOpen(true) : undefined} onExport={exportParts} actions={<><ToolbarActions actions={alwaysActions} /><ToolbarActions actions={itemActions} /></>} />}
       intelligencePanel={
-        <ModuleIntelligencePanel title={selected ? 'Part' : 'Part master'} onClose={() => setSelection({})} hasSelection={!!selected}
-          idle={summary} footer={itemActions.length ? <DetailActions actions={itemActions} /> : undefined}>
+        <ModuleIntelligencePanel title={selected ? 'Part' : 'Summary'} onClose={() => setSelection({})} hasSelection={!!selected}
+          idle={summary} footer={panelActions.length ? <DetailActions actions={panelActions} /> : undefined}>
           {detail}
         </ModuleIntelligencePanel>
       }
@@ -254,8 +247,8 @@ export default function PartMasterPage() {
       <PartUsageModal isOpen={!!whereFor} onClose={() => setWhereFor(null)} item={whereFor} />
       <RecordPurchaseModal isOpen={!!buyFor} onClose={() => setBuyFor(null)} item={buyFor} />
       <ImportModal isOpen={impOpen} onClose={() => setImpOpen(false)} title="Import parts" endpoint="/budgets/items/import" templateName="part-master-template.csv" headers={PART_HEADERS}
-        sample={[['CONN-24', '24-pin terminal block', 'Electronics', 'Buy', 'nos', '95', '', '', '102', 'Phoenix', '10', '1757019'], ['SUB-FRAME', 'Welded frame', 'Mechanical', 'Make', 'nos', '', '4200', '1800', '', '', '', '']]}
-        notes="One row per part, matched by part_no. Category must match a name under Part categories. A new part is added and an existing one is updated. Blank cells keep the current value. Make_or_buy is Buy or Make; a bought part needs its oem_part_no (the manufacturer's number); a made part is priced from its material and manufacturing cost." />
+        sample={[['CONN-24', '24-pin terminal block', 'Electronics', 'Buy', 'nos', '95', '', '', '102', 'Phoenix', '10', '1757019'], ['SUB-FRAME', 'Welded frame', 'Mechanical', 'Make', 'nos', '', '4200', '1800', '', '', '21', '']]}
+        notes="One row per part, matched by part_no. Category must match a name under Part categories. A new part is added and an existing one is updated. Blank cells keep the current value, except lead_time_days: every part needs one (zero means on hand). Make_or_buy is Buy or Make; a bought part needs its oem_part_no (the manufacturer's number); a made part is priced from its material and manufacturing cost." />
     </ModuleShell>
   );
 }

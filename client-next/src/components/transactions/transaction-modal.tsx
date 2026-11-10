@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useCategories, useCategoryTypes, useProjects, useProducts, useDepartments, useInvalidate } from '@/hooks/use-queries';
 import { useHeadroom } from '@/hooks/use-budget-queries';
+import { useOrdersForExpense } from '@/hooks/use-build-orders';
 import { BudgetHeadroom, headroomGate } from '@/components/budgets/budget-headroom';
 import api, { getAccessToken, API_BASE } from '@/lib/api-client';
 import { CURRENCY_SYMBOL, toLocalYMD, parseApiDate, parseOcrDate } from '@/lib/currency';
@@ -56,6 +57,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
   const [clientId, setClientId] = useState('');
   const [contextType, setContextType] = useState('project');
   const [codeId, setCodeId] = useState('');
+  const [buildOrderId, setBuildOrderId] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [typeId, setTypeId] = useState('');
   const [description, setDescription] = useState('');
@@ -78,6 +80,8 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
   const { data: products } = useProducts();
   const { data: categoryTypes } = useCategoryTypes(type);
   const { data: departments } = useDepartments();
+  // A product expense can name the customer order it was spent on, so the order's real cost can be compared with its plan
+  const { data: productOrders } = useOrdersForExpense(codeId, open && isExpense && contextType === 'product');
 
   const filteredCategories = (allCategories || []).filter((c) => c.type === type);
 
@@ -100,6 +104,8 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
     projectId: contextType === 'project' ? codeId : undefined,
     productId: contextType === 'product' ? codeId : undefined,
     departmentId: contextType === 'overhead' ? codeId : undefined,
+    // An order that has its own budget line is checked against that line, so the form shows the same one
+    buildOrderId: contextType === 'product' ? buildOrderId : undefined,
     amount: headroomOn ? computeTotalAmount(Number(amount), gstRate, gstAdded) : undefined,
     excludeId: editing?.id,
   }, headroomOn);
@@ -128,6 +134,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
               : '',
       );
       setOverBudgetReason(editing.over_budget_reason || '');
+      setBuildOrderId(editing.build_order_id ? String(editing.build_order_id) : '');
       setCategoryId(editing.category_id ? String(editing.category_id) : '');
       setTypeId(String((allCategories || []).find((c) => c.id === editing.category_id)?.type_id ?? ''));
       setDescription(editing.description || '');
@@ -146,6 +153,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
       setOverBudgetReason('');
       setContextType('project');
       setCodeId('');
+      setBuildOrderId('');
       setCategoryId('');
       setTypeId('');
       setDescription('');
@@ -237,6 +245,15 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
       toast.error('Select a date');
       return;
     }
+    // An expense says what it is and where it is charged, so it finds its budget line and its costing
+    if (isExpense && !categoryId) {
+      toast.error('Choose a category');
+      return;
+    }
+    if (isExpense && (!contextType || !codeId)) {
+      toast.error('Choose the project, product or department this is charged to');
+      return;
+    }
 
     // Duplicate check — runs for both new and edit, skipped when bypassed
     if (!bypass) {
@@ -293,6 +310,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
         clientId: effectiveClientId,
         projectId: contextType === 'project' && codeId ? Number(codeId) : null,
         productId: contextType === 'product' && codeId ? Number(codeId) : null,
+        buildOrderId: isExpense && contextType === 'product' && codeId && buildOrderId ? Number(buildOrderId) : null,
         contextType: contextType || null,
         receiptPath,
         departmentId: contextType === 'overhead' && codeId ? Number(codeId) : null,
@@ -329,7 +347,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
       title={isAdd ? `Add New ${isExpense ? 'Expense' : 'Income'}` : `Edit ${isExpense ? 'Expense' : 'Income'}`}
       icon={editing ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
       onSave={() => handleSave()}
-      canSave={!!amount && !isNaN(Number(amount)) && Number(amount) > 0 && !!dateRecorded && !gate.blocked && !(gate.needsReason && !overBudgetReason.trim())}
+      canSave={!!amount && !isNaN(Number(amount)) && Number(amount) > 0 && !!dateRecorded && (!isExpense || (!!categoryId && !!contextType && !!codeId)) && !gate.blocked && !(gate.needsReason && !overBudgetReason.trim())}
       saveLabel={editing ? `Update ${isExpense ? 'Expense' : 'Income'}` : `Add ${isExpense ? 'Expense' : 'Income'}`}
       size="xl"
     >
@@ -337,10 +355,10 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
 
         {/* Column 1: what it is charged to, and how it is classified */}
         <div className="space-y-3">
-          <Field label="Charge To">
+          <Field label={isExpense ? 'Charge To' : 'Received For'}>
             <NativeSelect
               value={contextType}
-              onChange={(e) => { setContextType(e.target.value); setCodeId(''); }}
+              onChange={(e) => { setContextType(e.target.value); setCodeId(''); setBuildOrderId(''); }}
             >
               <option value="">Select...</option>
               <option value="project">Project</option>
@@ -349,10 +367,10 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
             </NativeSelect>
           </Field>
 
-          <Field label={contextType === 'product' ? 'Product' : contextType === 'project' ? 'Project' : contextType === 'overhead' ? 'Department' : 'Project / Product'} hint={chosen?.client_name ? `Client: ${chosen.client_name}` : undefined}>
+          <Field required={isExpense} label={contextType === 'product' ? 'Product' : contextType === 'project' ? 'Project' : contextType === 'overhead' ? 'Department' : 'Project / Product'} hint={chosen?.client_name ? `Client: ${chosen.client_name}` : undefined}>
             <NativeSelect
               value={codeId}
-              onChange={(e) => setCodeId(e.target.value)}
+              onChange={(e) => { setCodeId(e.target.value); setBuildOrderId(''); }}
               disabled={!contextType}
             >
               <option value="">{contextType === 'product' ? 'Select product...' : contextType === 'project' ? 'Select project...' : contextType === 'overhead' ? 'Select department...' : 'Select...'}</option>
@@ -361,6 +379,15 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
               ))}
             </NativeSelect>
           </Field>
+
+          {isExpense && contextType === 'product' && !!codeId && (productOrders?.length ?? 0) > 0 && (
+            <Field label="Order" hint="Optional. Choose the customer order this was spent on to see its real cost.">
+              <NativeSelect aria-label="Order" value={buildOrderId} onChange={(e) => setBuildOrderId(e.target.value)}>
+                <option value="">Not for a particular order</option>
+                {(productOrders ?? []).map((o) => <option key={o.id} value={o.id}>{o.code}{o.client_name ? ` · ${o.client_name}` : ''} · {o.quantity} unit{o.quantity === 1 ? '' : 's'}{o.status === 'DELIVERED' ? ' · delivered' : ''}</option>)}
+              </NativeSelect>
+            </Field>
+          )}
 
           <TypeCategoryFields
             typeLabel={isExpense ? 'Expense Type' : 'Income Type'}
@@ -371,6 +398,8 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
             category={categoryId}
             categoryBy="id"
             onChange={(v) => { setTypeId(v.typeId); setCategoryId(v.category); }}
+            typeRequired={isExpense}
+            categoryRequired={isExpense}
             typeEmptyHint="No types yet. An admin can add them with Category."
             categoryEmptyHint="No categories for this type yet. An admin can add them with Category."
             costObject={isExpense ? (contextType === 'product' ? 'PRODUCT' : contextType === 'overhead' ? 'OVERHEAD' : contextType === 'project' ? 'PROJECT' : undefined) : undefined}
@@ -381,17 +410,17 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
 
         {/* Column 2: the entry, and the proof */}
         <div className="flex flex-col gap-3">
-          <Field label="Detail">
+          <Field label="Description">
             <Input
               className={`${inp} border-input bg-transparent text-[var(--shell-text)]`}
               type="text"
-              placeholder="Enter full description and justification..."
+              placeholder={isExpense ? 'What it was for, and why' : 'What was received, for example a milestone payment'}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
           </Field>
 
-          <Field label={`Date of ${isExpense ? 'Expense' : 'Income'}`} required>
+          <Field label={`Date of ${isExpense ? 'Expense' : 'Income'}`} required error={!dateRecorded ? 'Select a date.' : undefined}>
             <Input
               className={`${inp} border-input bg-transparent text-[var(--shell-text)]`}
               type="date"
@@ -488,7 +517,9 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
             </div>
           </Field>
 
-          <Field label={`Amount ${amountLabel(gstRate, gstAdded)}`} required>
+          <Field label={`Amount ${amountLabel(gstRate, gstAdded)}`} required
+            hint={!amount ? 'Enter the amount to continue.' : undefined}
+            error={amount !== '' && (isNaN(Number(amount)) || Number(amount) <= 0) ? 'Enter an amount greater than 0.' : undefined}>
             <div className="flex items-center gap-2">
               <div className="min-w-0 flex-1">
                 <CurrencyInput value={amount} onChange={setAmount} symbol={currencySymbol} />
@@ -496,7 +527,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
               {isExpense && (
                 <label className="flex h-10 w-[124px] shrink-0 cursor-pointer items-center gap-2.5 text-[12px] font-semibold text-[var(--shell-text-muted)]">
                   <Switch checked={needsReimbursement} onCheckedChange={setNeedsReimbursement} aria-label="Needs reimbursement" />
-                  <span className="whitespace-nowrap">{needsReimbursement ? 'Reimburse' : 'No reimburse'}</span>
+                  <span className="whitespace-nowrap">Reimbursable</span>
                 </label>
               )}
             </div>

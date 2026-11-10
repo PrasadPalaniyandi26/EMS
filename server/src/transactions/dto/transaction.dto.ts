@@ -68,6 +68,11 @@ export class CreateTransactionDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
+  buildOrderId?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
   departmentId?: number;
 
   @IsOptional()
@@ -162,6 +167,11 @@ export class UpdateTransactionDto {
   @Type(() => Number)
   @IsInt()
   productId?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  buildOrderId?: number;
 
   @IsOptional()
   @Type(() => Number)

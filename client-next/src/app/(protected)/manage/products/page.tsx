@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useClients, useProducts, useProductTypes, useProductCategories, useUsers, useInvalidate } from '@/hooks/use-queries';
@@ -11,13 +11,15 @@ import { TypeCategoryFields } from '@/components/shared/type-category-fields';
 import { toast } from 'sonner';
 import {
   Plus, Pencil, Tags,
-  Package,
+  Package, FolderOpen,
 } from 'lucide-react';
 import { ManageTypesDialog } from '@/components/manage/manage-types-dialog';
 import type { Product } from '@/lib/types';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
-import { columns } from './columns';
+import { columns as buildColumns, PRODUCT_STATUSES, STATUS_TONE, productAttention, type CostFacts } from './columns';
+import { useBudgetProducts } from '@/hooks/use-planning-queries';
+import { money } from '@/components/budgets/budget-ui';
 import {
   getCoreRowModel,
   getFilteredRowModel,
@@ -25,6 +27,7 @@ import {
   getSortedRowModel,
   getFacetedRowModel,
   getFacetedUniqueValues,
+  type SortingState,
 } from "@tanstack/react-table";
 import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
@@ -53,7 +56,6 @@ export default function ProductsPage() {
   const user = useAuthStore((s) => s.user);
   // Managing types and categories is admin-only; the API checks the active role the same way
   const isAdmin = (user?.role_name || '').toUpperCase() === 'ADMIN';
-  const currencySymbol = CURRENCY_SYMBOL[user?.currency || 'INR'] || '₹';
   const { data: clients } = useClients();
   const { data: usersData } = useUsers();
   const allUsers = Array.isArray(usersData) ? usersData : [];
@@ -75,12 +77,23 @@ export default function ProductsPage() {
   const [form, setForm] = useState<ProductForm>(defaultForm());
   const [editingId, setEditingId] = useState<number | null>(null);
 
-  useEffect(() => { setHeader('Products', 'Product Catalog & Manufacturing Hub'); }, [setHeader]);
+  // What costing knows about each product, so this list shows whether it can be costed
+  const { data: costRows } = useBudgetProducts();
+  const costById = useMemo(() => new Map((costRows ?? []).map((r) => [r.id, { bom_lines: r.bom_lines, standard_cost: r.standard_cost } as CostFacts])), [costRows]);
+  const currency = user?.currency || 'INR';
+  const columns = useMemo(() => buildColumns(currency, (id) => costById.get(id)), [currency, costById]);
 
+  const list = (products || []) as any[];
+  const real = list.filter((p) => !p.is_system);
+  useEffect(() => { setHeader('Products', products ? `${real.length} products` : 'What you make, for whom'); }, [setHeader, products]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Products that cannot be costed yet first
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'status', desc: false }]);
   const table = useDataTable<Product>({
     data: products || [],
     columns,
-    state: { rowSelection, globalFilter },
+    state: { rowSelection, globalFilter, sorting },
+    onSortingChange: setSorting,
     enableRowSelection: true,
     enableMultiRowSelection: false,
     onRowSelectionChange: setRowSelection,
@@ -120,16 +133,20 @@ export default function ProductsPage() {
   };
 
   // ── Save ──
+  const [touched, setTouched] = useState(false);
+  useEffect(() => { if (addOpen || editOpen) setTouched(false); }, [addOpen, editOpen]);
+  const dateBad = !!form.startDate && !!form.endDate && form.endDate < form.startDate;
+  const dmy = (v: string) => (v ? new Date(v + 'T00:00:00').toLocaleDateString('en-GB') : undefined);
+  const leadOptions = [...allUsers].filter((u: any) => (u.user_status || 'ACTIVE') === 'ACTIVE').sort((a: any, b: any) => String(a.username).localeCompare(String(b.username)));
   const handleSave = async (isEdit: boolean) => {
-    if (!form.name.trim()) { toast.error('Product name is required'); return; }
-    if (!form.clientId) { toast.error('Client is required'); return; }
-    if (!form.typeId) { toast.error('Product type is required'); return; }
+    setTouched(true);
+    if (!form.name.trim() || !form.clientId || !form.typeId || dateBad) return;
     try {
       const payload = { name: form.name, description: form.description, client_id: Number(form.clientId) || undefined, type_id: Number(form.typeId), lead_id: Number(form.leadEngineer) || undefined, category: form.category || undefined, model: form.model || undefined, status: form.status, start_date: form.startDate || null, end_date: form.endDate || null };
       if (isEdit && editingId) { await api.put(`/products/${editingId}`, payload); toast.success('Product updated'); setEditOpen(false); }
-      else { await api.post('/products', payload); toast.success('Product created'); setAddOpen(false); }
+      else { await api.post('/products', payload); toast.success('Product added'); setAddOpen(false); }
       invalidate('products'); setRowSelection({});
-    } catch { toast.error('Failed to save product'); }
+    } catch (e: any) { toast.error(e?.message || 'Could not save the product.'); }
   };
 
   // ── Delete ──
@@ -140,15 +157,36 @@ export default function ProductsPage() {
       toast.success('Product deleted');
       invalidate('products');
       setDeleteId(null); setRowSelection({});
-    } catch { toast.error('Failed to delete'); }
+    } catch (e: any) { setDeleteId(null); toast.error(e?.message || 'Could not delete the product.'); }
   };
 
   const router = useRouter();
   const itemActions: DetailActionDef[] = selectedProduct ? [
-    { label: 'Edit', variant: 'primary', onClick: openEdit },
-    { label: 'Costing', onClick: () => router.push(`/budget/products/${selectedProduct.id}`) },
+    { label: 'Edit', onClick: openEdit },
+    { label: 'Open costing', variant: 'primary', icon: <FolderOpen className="h-4 w-4 text-[var(--nav-slate)]" />, onClick: () => router.push(`/budget/products/${selectedProduct.id}`) },
     { label: 'Delete', variant: 'danger', onClick: () => setDeleteId(selectedProduct.id) },
   ] : [];
+
+  // What the list holds, instead of instructions. Margin and the cost verdict are on Product Costing.
+  const noBom = real.filter((p) => costById.get(p.id) && !costById.get(p.id)!.bom_lines).length;
+  const noStd = real.filter((p) => costById.get(p.id) && costById.get(p.id)!.bom_lines && costById.get(p.id)!.standard_cost == null).length;
+  const productSummary = (
+    <div className="space-y-4">
+      <DetailSummary title="All products" subtitle="What you make" figure={real.length} figureLabel="Products" />
+      <DetailSection title="Costing">
+        <DetailGrid>
+          <DetailField label="No BOM yet" value={noBom} tone={noBom ? 'warning' : 'muted'} />
+          <DetailField label="No standard cost" value={noStd} tone={noStd ? 'warning' : 'muted'} />
+        </DetailGrid>
+      </DetailSection>
+      <DetailSection title="By stage">
+        <DetailGrid>
+          {PRODUCT_STATUSES.filter((s) => real.some((p) => (p.status || '') === s)).map((s) => <DetailField key={s} label={s} value={real.filter((p) => (p.status || '') === s).length} />)}
+        </DetailGrid>
+      </DetailSection>
+      <p className="text-[12px] text-[var(--shell-text-muted)]">Margin and the cost verdict are on Product Costing.</p>
+    </div>
+  );
 
   return (
     <ModuleShell
@@ -170,9 +208,10 @@ export default function ProductsPage() {
       }
       intelligencePanel={
           <ModuleIntelligencePanel
-            title="Product Intelligence"
+            title={selectedProduct ? 'Product' : 'Summary'}
             onClose={() => setRowSelection({})}
             hasSelection={!!selectedProduct}
+            idle={productSummary}
             footer={itemActions.length > 0 ? <DetailActions actions={itemActions} /> : undefined}
           >
             {selectedProduct && (() => {
@@ -182,11 +221,11 @@ export default function ProductsPage() {
                 <>
                   <DetailSummary
                     title={pd.name}
-                    subtitle={pd.code || `PRD-${String(pd.id).padStart(3, '0')}`}
+                    subtitle={pd.code || undefined}
                     status={status}
-                    statusClass="text-[var(--shell-text-muted)]"
-                    figure={pd.standard_cost != null ? `${currencySymbol}${Number(pd.standard_cost).toLocaleString()}` : undefined}
-                    figureLabel="Standard cost"
+                    statusClass={{ success: 'text-[var(--success)]', warning: 'text-[var(--warning)]', info: 'text-[var(--info)]', danger: 'text-[var(--danger)]', muted: 'text-[var(--shell-text-muted)]' }[STATUS_TONE[status] || 'muted']}
+                    figure={costById.get(pd.id)?.standard_cost != null ? money(costById.get(pd.id)!.standard_cost, currency) : undefined}
+                    figureLabel={costById.get(pd.id)?.standard_cost != null ? 'Standard cost' : undefined}
                   />
                   <DetailSection title="Details">
                     <DetailGrid>
@@ -197,6 +236,12 @@ export default function ProductsPage() {
                       <DetailField label="Model / version" value={pd.model} wide />
                       <DetailField label="Start date" value={formatDate(pd.start_date)} />
                       <DetailField label="End date" value={formatDate(pd.end_date)} />
+                    </DetailGrid>
+                  </DetailSection>
+                  <DetailSection title="Costing">
+                    <DetailGrid>
+                      <DetailField label="BOM" value={costById.get(pd.id) ? (costById.get(pd.id)!.bom_lines ? `${costById.get(pd.id)!.bom_lines} lines` : 'No BOM yet') : undefined} tone={costById.get(pd.id) && !costById.get(pd.id)!.bom_lines ? 'warning' : 'muted'} />
+                      <DetailField label="Standard cost" value={costById.get(pd.id)?.standard_cost != null ? money(costById.get(pd.id)!.standard_cost, currency) : 'None yet'} />
                     </DetailGrid>
                   </DetailSection>
                   {pd.description && (
@@ -210,7 +255,7 @@ export default function ProductsPage() {
           </ModuleIntelligencePanel>
       }
     >
-      <DataTable isLoading={isLoading} columns={columns} data={products || []} tableInstance={table} emptyMessage="No products found. Click Add to create one." />
+      <DataTable isLoading={isLoading} columns={columns} data={products || []} tableInstance={table} emptyMessage={globalFilter ? 'No products match this search.' : 'No products yet. Use Add to create the first one.'} />
 
       {/* ══ ADD / EDIT PRODUCT (shared layout) ══ */}
       {[
@@ -221,30 +266,20 @@ export default function ProductsPage() {
           key={isEdit ? 'edit' : 'add'}
           isOpen={open}
           onClose={onClose}
-          title={isEdit ? 'Edit Product' : 'Add New Product'}
+          title={isEdit ? 'Edit Product' : 'Add Product'}
           icon={isEdit ? <Pencil className="h-4 w-4" /> : <Package className="h-4 w-4" />}
           onSave={() => handleSave(isEdit)}
-          canSave={!!form.name.trim() && !!form.clientId && !!form.typeId}
-          saveLabel={isEdit ? 'Save Changes' : 'Create Product'}
-          size="xl"
+          canSave={!!form.name.trim() && !!form.clientId && !!form.typeId && !dateBad}
+          saveLabel={isEdit ? 'Save product' : 'Add product'}
+          size="lg"
         >
-          <div className="grid grid-cols-1 items-start gap-x-6 gap-y-3 md:grid-cols-3">
-            {/* Column 1: the product and its schedule */}
+          <div className="grid grid-cols-1 items-start gap-x-6 gap-y-3 md:grid-cols-2">
+            {/* Left: what the product is, and who it is for */}
             <div className="space-y-3">
-              <Field label="Product Name" required>
+              <Field label="Product Name" required error={touched && !form.name.trim() ? 'Enter a product name.' : undefined}>
                 <input className={inp} placeholder="e.g. Heavy-Duty Industrial Robot" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
               </Field>
-              <Field label="Start Date">
-                <input className={inp} type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} />
-              </Field>
-              <Field label="End Date">
-                <input className={inp} type="date" min={form.startDate || undefined} value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })} />
-              </Field>
-            </div>
-
-            {/* Column 2: classification, top to bottom: client, type, then the type's categories */}
-            <div className="space-y-3">
-              <Field label="Client" required>
+              <Field label="Client" required error={touched && !form.clientId ? 'Choose a client.' : undefined}>
                 <NativeSelect value={form.clientId} onChange={e => setForm({ ...form, clientId: e.target.value })}>
                   <option value="">Select client</option>
                   {(clients || []).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -263,34 +298,41 @@ export default function ProductsPage() {
                 typeEmptyHint="No types yet. An admin can add them with Types."
                 categoryEmptyHint="No categories for this type yet. An admin can add them with Types."
               />
+              {touched && !form.typeId && <p role="alert" className="text-[12px] text-[var(--danger)]">Choose a product type.</p>}
             </div>
 
-            {/* Column 3: who leads it, model and cost */}
+            {/* Right: who leads it, version and dates */}
             <div className="space-y-3">
-              <Field label="Lead / Manager">
+              <Field label="Product Lead">
                 <NativeSelect value={form.leadEngineer} onChange={e => setForm({ ...form, leadEngineer: e.target.value })}>
                   <option value="">Assign lead</option>
-                  {allUsers.map((u: any) => <option key={u.id} value={String(u.id)}>{u.username}</option>)}
+                  {leadOptions.map((u: any) => <option key={u.id} value={String(u.id)}>{u.username}</option>)}
                 </NativeSelect>
               </Field>
               <Field label="Model / Version">
                 <input className={inp} placeholder="e.g. v2.1.0" value={form.model} onChange={e => setForm({ ...form, model: e.target.value })} />
               </Field>
+              <Field label="Start Date" hint={dmy(form.startDate)}>
+                <input className={inp} type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} />
+              </Field>
+              <Field label="End Date" hint={dmy(form.endDate)} error={dateBad ? 'The end date is before the start date.' : undefined}>
+                <input className={inp} type="date" min={form.startDate || undefined} value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })} />
+              </Field>
             </div>
 
-            <div className="md:col-span-3">
+            <div className="md:col-span-2">
               <p id="product-status-label" className="mb-2 block text-[13px] font-medium" style={{ color: 'var(--shell-text)' }}>Production Status</p>
               <SegmentedControl
                 wrap
                 labelledBy="product-status-label"
                 value={form.status}
                 onChange={(v) => setForm({ ...form, status: v })}
-                options={['R&D', 'Prototype', 'Assembly', 'Quality', 'Market Ready'].map((opt) => ({ value: opt, label: opt }))}
+                options={[...PRODUCT_STATUSES, ...(form.status && !PRODUCT_STATUSES.includes(form.status) ? [form.status] : [])].map((opt) => ({ value: opt, label: opt }))}
               />
             </div>
-            <div className="md:col-span-3">
+            <div className="md:col-span-2">
               <Field label="Description">
-                <textarea className={`${inp} h-auto resize-none py-2`} rows={3} placeholder="Describe the manufacturing process..." value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+                <textarea className={`${inp} h-auto resize-none py-2`} rows={3} placeholder="Optional notes" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
               </Field>
             </div>
           </div>
@@ -307,9 +349,9 @@ export default function ProductsPage() {
 
       <ConfirmDialog
         open={!!deleteId}
-        title="Delete Product"
-        message="Are you sure you want to permanently delete this product? This action cannot be undone."
-        confirmLabel="Yes, Delete"
+        title="Delete product"
+        message={`Delete ${(list.find((p) => p.id === deleteId)?.name) ?? 'this product'}? A product with a BOM or orders cannot be deleted. This cannot be undone.`}
+        confirmLabel="Delete product"
         destructive
         onConfirm={handleDelete}
         onCancel={() => setDeleteId(null)}

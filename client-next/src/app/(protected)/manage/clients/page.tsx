@@ -19,6 +19,7 @@ import {
   getSortedRowModel, 
   getFacetedRowModel,
   getFacetedUniqueValues,
+  type SortingState,
 } from "@tanstack/react-table";
 import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
@@ -44,17 +45,22 @@ export default function ClientsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  const [activitySummary, setActivitySummary] = useState<{ projects: number; products: number; transactions: number; totalSpend: number } | null>(null);
+  const [activitySummary, setActivitySummary] = useState<{ projects: number; products: number } | null>(null);
+  const [activityFailed, setActivityFailed] = useState(false);
   
-  useEffect(() => { setHeader('Clients', 'Customer Relationship & Contract Management'); }, [setHeader]);
+  useEffect(() => { setHeader('Clients', 'Customers you work for and charge spend to'); }, [setHeader]);
 
+  // Active clients first, then by name
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'is_active', desc: true }, { id: 'name', desc: false }]);
   const table = useDataTable<Client>({
     data: clients || [],
     columns,
     state: {
       rowSelection,
       globalFilter,
+      sorting,
     },
+    onSortingChange: setSorting,
     enableRowSelection: true,
     enableMultiRowSelection: false,
     onRowSelectionChange: setRowSelection,
@@ -76,32 +82,22 @@ export default function ClientsPage() {
   }, [rowSelection]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    setActivityFailed(false);
     if (!selectedClient) { setActivitySummary(null); return; }
+    setActivitySummary(null);
     (async () => {
       try {
-        const [projects, products, transactions] = await Promise.all([
+        const [projects, products] = await Promise.all([
           api.get(`/projects?clientId=${selectedClient.id}`),
           api.get(`/products?clientId=${selectedClient.id}`),
-          api.get(`/transactions?clientId=${selectedClient.id}&limit=100`),
         ]);
         const pData = (projects as { data: unknown }).data;
         const prData = (products as { data: unknown }).data;
-        const tRaw = (transactions as { data: unknown }).data;
-        const txnArr: Array<Record<string, unknown>> = Array.isArray(tRaw)
-          ? tRaw
-          : (tRaw as Record<string, unknown>)?.rows
-            ? ((tRaw as Record<string, unknown>).rows as Array<Record<string, unknown>>)
-            : [];
-        
-        const totalSpend = txnArr.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount || 0), 0);
-
         setActivitySummary({
           projects: Array.isArray(pData) ? pData.length : 0,
           products: Array.isArray(prData) ? prData.length : 0,
-          transactions: txnArr.length,
-          totalSpend,
         });
-      } catch { setActivitySummary(null); }
+      } catch { setActivitySummary(null); setActivityFailed(true); }
     })();
   }, [selectedClient]);
 
@@ -123,26 +119,43 @@ export default function ClientsPage() {
       if (editing) { await api.put(`/clients/${editing.id}`, form); toast.success('Client updated'); }
       else { await api.post('/clients', form); toast.success('Client created'); }
       invalidate('clients'); setDialogOpen(false); setRowSelection({});
-    } catch { toast.error('Failed to save client'); }
+    } catch (e: any) { toast.error(e?.message || 'Could not save the client.'); }
   };
 
   const handleDelete = async () => {
-    const ids = selectedRows.map(r => r.original.id);
-    if (ids.length === 0) return;
-    const ok = await confirmDialog('Delete Client', `Permanently delete ${ids.length} client record(s)? This cannot be undone.`, { confirmLabel: 'Delete', destructive: true });
+    if (!selectedClient) return;
+    const ok = await confirmDialog('Delete client', `Delete ${selectedClient.name}? Projects and products linked to it lose their client. This cannot be undone.`, { confirmLabel: 'Delete client', destructive: true });
     if (!ok) return;
     try {
-      for (const id of ids) await api.delete(`/clients/${id}`);
-      toast.success('Client entity purged'); 
-      invalidate('clients'); 
+      await api.delete(`/clients/${selectedClient.id}`);
+      toast.success('Client deleted');
+      invalidate('clients');
       setRowSelection({});
-    } catch { toast.error('Purge failed'); }
+    } catch (e: any) { toast.error(e?.message || 'Could not delete the client.'); }
   };
 
-  const itemActions: DetailActionDef[] = selectedClient ? [
+  // The built-in Internal client cannot be changed, so it offers no actions
+  const itemActions: DetailActionDef[] = selectedClient && !selectedClient.is_system ? [
     { label: 'Edit', variant: 'primary', onClick: openEdit },
     { label: 'Delete', variant: 'danger', onClick: handleDelete },
   ] : [];
+
+  // What the list holds, instead of instructions
+  const real = (clients || []).filter((c) => !c.is_system);
+  const isOn = (c: any) => c.is_active === 1 || c.is_active === true;
+  const clientSummary = (
+    <div className="space-y-4">
+      <DetailSummary title="All clients" subtitle="Customers you work for" figure={real.length} figureLabel="Clients" />
+      <DetailSection title="Where they stand">
+        <DetailGrid>
+          <DetailField label="Active" value={real.filter(isOn).length} />
+          <DetailField label="Inactive" value={real.filter((c) => !isOn(c)).length} />
+          <DetailField label="Industries" value={new Set(real.map((c: any) => c.business_type).filter(Boolean)).size} />
+          <DetailField label="Without a contact" value={real.filter((c: any) => !c.contact_name).length} tone={real.some((c: any) => !c.contact_name) ? 'warning' : 'muted'} />
+        </DetailGrid>
+      </DetailSection>
+    </div>
+  );
 
   return (
     <ModuleShell
@@ -164,9 +177,10 @@ export default function ClientsPage() {
       }
       intelligencePanel={
           <ModuleIntelligencePanel
-            title="Client Details"
+            title={selectedClient ? 'Client' : 'Summary'}
             onClose={() => setRowSelection({})}
             hasSelection={!!selectedClient}
+            idle={clientSummary}
             footer={itemActions.length > 0 ? <DetailActions actions={itemActions} /> : undefined}
           >
             {selectedClient && (() => {
@@ -184,7 +198,13 @@ export default function ClientsPage() {
                     <DetailGrid>
                       <DetailField label="Contact name" value={c.contact_name} />
                       <DetailField label="Phone" value={c.contact_phone} />
-                      <DetailField label="Email" value={c.contact_email} wide />
+                      <DetailField label="Email" value={c.contact_email ? <a className="text-[var(--shell-accent)] hover:underline" href={`mailto:${c.contact_email}`}>{c.contact_email}</a> : undefined} wide />
+                    </DetailGrid>
+                  </DetailSection>
+                  <DetailSection title="Billing">
+                    <DetailGrid>
+                      <DetailField label="Payment terms" value={c.payment_terms} />
+                      <DetailField label="Tax ID" value={c.tax_id} />
                     </DetailGrid>
                   </DetailSection>
                   <DetailSection title="Location">
@@ -199,10 +219,10 @@ export default function ClientsPage() {
                       <DetailGrid>
                         <DetailField label="Projects" value={activitySummary.projects} />
                         <DetailField label="Products" value={activitySummary.products} />
-                        <DetailField label="Transactions" value={activitySummary.transactions} />
                       </DetailGrid>
                     </DetailSection>
                   )}
+                  {activityFailed && <p className="text-[12px] text-[var(--shell-text-muted)]">Projects and products could not be loaded.</p>}
                 </>
               );
             })()}
@@ -214,7 +234,7 @@ export default function ClientsPage() {
         columns={columns}
         data={clients || []}
         tableInstance={table}
-        emptyMessage="No clients found. Click Add to create one."
+        emptyMessage={globalFilter ? 'No clients match this search.' : 'No clients yet. Use Add to create the first one.'}
       />
 
       {confirmDialogEl}

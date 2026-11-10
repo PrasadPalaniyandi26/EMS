@@ -11,8 +11,9 @@ import { formatCurrency, formatDate, parseApiDate, CURRENCY_SYMBOL } from '@/lib
 import { toast } from 'sonner';
 import {
   Plus, Pencil, Split, Send, Trash2,
-  FileText, ShieldCheck, LayoutGrid, Layers, UploadCloud, Clock, Copy, Ban, PauseCircle
+  FileText, ShieldCheck, LayoutGrid, Layers, UploadCloud, Clock, Copy, Ban, PauseCircle, Banknote
 } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { ModuleModal } from '@/components/shared/module/module-modal';
 import { Input } from '@/components/ui/input';
@@ -40,7 +41,7 @@ import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { TransactionDetail } from '@/components/transactions/transaction-detail';
-import { DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
+import { DetailActions, DetailSummary, DetailSection, DetailGrid, DetailField, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import { CurrencyInput, useConfirm } from '@/components/shared/modal-primitives';
 
 export default function ExpensePage() {
@@ -61,9 +62,10 @@ export default function ExpensePage() {
   // live in Approvals history), so the row count is naturally bounded. Request a high
   // limit instead of the default 20 so the full active set is available to the
   // client-side table + faceted filters rather than just the latest 20 records.
-  const { data: txnData, isLoading } = useAllTransactions({ type: 'expense', excludeStatus: 'APPROVED,REJECTED' });
-  // Data — exclude APPROVED/REJECTED (those belong to Approvals history)
-  const EXCLUDED_STATUSES = ['APPROVED', 'REJECTED'];
+  // Rejected and sent-back expenses stay here, because the employee has to act on them (read the reason, then
+  // copy and resubmit or delete). Only approved ones leave the list; they are in Approvals history.
+  const { data: txnData, isLoading } = useAllTransactions({ type: 'expense', excludeStatus: 'APPROVED' });
+  const EXCLUDED_STATUSES = ['APPROVED'];
   const rawTransactions = useMemo(() => {
     if (!txnData) return [];
     const rows = Array.isArray(txnData) ? txnData : (txnData as any).rows || [];
@@ -105,17 +107,6 @@ export default function ExpensePage() {
   const [voidOpen, setVoidOpen] = useState(false);
   const [voidReason, setVoidReason] = useState('');
   const [voidSaving, setVoidSaving] = useState(false);
-
-  const handleDuplicate = async () => {
-    if (!selectedTxn) return;
-    try {
-      await api.post(`/transactions/${selectedTxn.id}/duplicate`);
-      toast.success('Duplicate created as DRAFT');
-      invalidate('transactions');
-    } catch (err: any) {
-      toast.error(err?.message || 'Failed to duplicate');
-    }
-  };
 
   const handleVoid = async () => {
     if (!selectedTxn || voidSaving) return;
@@ -184,7 +175,7 @@ export default function ExpensePage() {
   };
 
   useEffect(() => {
-    setHeader('Expense Manager', 'Manage and track your organization\'s expense');
+    setHeader('Expenses', 'Your expenses and where each one is waiting');
   }, [setHeader]);
 
   const filteredCategories = (categories || []).filter((c: any) => c.type === 'expense');
@@ -320,7 +311,8 @@ export default function ExpensePage() {
 
   const expenseColumns = useMemo(() => columns(currency), [currency]);
 
-  const [sorting, setSorting] = useState<SortingState>([]);
+  // Sent back, rejected and draft first: what the employee has to act on
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'status', desc: false }]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
@@ -424,14 +416,42 @@ export default function ExpensePage() {
     if (['DRAFT', 'SENT_BACK'].includes(st)) {
       return [
         { label: 'Submit', variant: 'primary', onClick: handleSubmit },
+        { label: selectedTxn.is_split === 1 ? 'Re-split' : 'Split', icon: <Split className="h-4 w-4 text-[var(--warning)]" />, onClick: openSplit },
         { label: 'Edit', onClick: openEdit },
         { label: 'Delete', variant: 'danger', onClick: handleDelete },
       ];
     }
-    if (st === 'APPROVED' && (user?.roles || []).some((r: any) => ['FINANCE', 'ADMIN'].includes((r.role_name || '').toUpperCase()))) {
-      return [{ label: 'Void', variant: 'danger', onClick: () => { setVoidReason(''); setVoidOpen(true); } }];
+    const isFinance = (user?.roles || []).some((r: any) => ['FINANCE', 'ADMIN'].includes((r.role_name || '').toUpperCase()));
+    if (st === 'APPROVED' && isFinance) {
+      const owed = selectedTxn.needs_reimbursement && selectedTxn.reimbursement_status !== 'PAID';
+      return [
+        ...(owed ? [{ label: 'Process reimbursement', variant: 'primary' as const, icon: <Banknote className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setProcessTxnId(selectedTxn.id); setProcessOpen(true); } }] : []),
+        { label: 'Void', variant: 'danger', onClick: () => { setVoidReason(''); setVoidOpen(true); } },
+      ];
     }
     return [];
+  })();
+
+  // Where the employee's expenses stand, instead of instructions
+  const expenseSummary = (() => {
+    const by = (s: string) => rawTransactions.filter((t: any) => (t.status || '').toUpperCase() === s);
+    const sum = (rows: any[]) => rows.reduce((a, t) => a + Number(t.total_amount ?? t.amount ?? 0), 0);
+    const waiting = [...by('PENDING_MANAGER'), ...by('PENDING_FINANCE')];
+    return (
+      <div className="space-y-4">
+        <DetailSummary title="Your expenses" subtitle="Not yet approved" figure={rawTransactions.length} figureLabel="Expenses" />
+        <DetailSection title="Where they are">
+          <DetailGrid>
+            <DetailField label="Sent back" value={by('SENT_BACK').length} tone={by('SENT_BACK').length ? 'warning' : 'muted'} />
+            <DetailField label="Rejected" value={by('REJECTED').length} tone={by('REJECTED').length ? 'danger' : 'muted'} />
+            <DetailField label="Draft" value={by('DRAFT').length} />
+            <DetailField label="Waiting for approval" value={waiting.length} />
+            <DetailField label="Amount waiting" value={formatCurrency(sum(waiting), currency)} wide />
+          </DetailGrid>
+        </DetailSection>
+        <p className="text-[12px] text-[var(--shell-text-muted)]">Sent back and rejected expenses stay here until you fix or delete them.</p>
+      </div>
+    );
   })();
 
   return (
@@ -454,9 +474,10 @@ export default function ExpensePage() {
       }
       intelligencePanel={
           <ModuleIntelligencePanel
-            title="Transaction Detail"
+            title={selectedTxn ? 'Expense' : 'Summary'}
             onClose={() => setRowSelection({})}
             hasSelection={!!selectedTxn}
+            idle={expenseSummary}
             footer={itemActions.length > 0 ? <DetailActions actions={itemActions} /> : undefined}
           >
             {selectedTxn && (
@@ -465,7 +486,7 @@ export default function ExpensePage() {
                   ref={panelFileRef}
                   type="file"
                   className="hidden"
-                  accept=".pdf,.jpg,.jpeg,.png"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp"
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePanelFileUpload(f); e.target.value = ''; }}
                 />
                 <TransactionDetail
@@ -473,11 +494,9 @@ export default function ExpensePage() {
                   txn={selectedTxn}
                   currency={currency}
                   approvalTrail={approvalTrail}
-                  split={{ details: splitDetails, loading: splitDetailsLoading, onSplit: openSplit }}
+                  split={{ details: splitDetails, loading: splitDetailsLoading }}
                   notes={{ items: notes, loading: notesLoading, value: newNote, onChange: setNewNote, onAdd: handleAddNote, saving: noteSaving, onDelete: handleDeleteNote, currentUserId: user?.id }}
                   upload={{ uploading: panelUploading, onPick: () => panelFileRef.current?.click() }}
-                  onDuplicate={handleDuplicate}
-                onProcessReimbursement={(user?.roles || []).some((r: any) => ['FINANCE', 'ADMIN'].includes((r.role_name || '').toUpperCase())) ? () => { setProcessTxnId(selectedTxn.id); setProcessOpen(true); } : undefined}
                 />
               </>
             )}

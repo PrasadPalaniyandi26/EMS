@@ -33,9 +33,10 @@ export function RequestSummary({ request, refId }: { request: any; refId?: strin
             <tr className="border-t" style={{ borderColor: 'var(--shell-border)' }}>
               <td colSpan={3} className="px-4 py-2.5">
                 <p className="mb-1 flex items-center gap-1.5 text-[13px] font-medium" style={{ color: 'var(--shell-text)' }}>
-                  <FileText aria-hidden size={12} /> Internal notes
+                  <FileText aria-hidden size={12} /> Description
                 </p>
                 <p className="text-[12px]" style={{ color: 'var(--shell-text)' }}>{request.description}</p>
+                {request.category_name && <p className="mt-1 text-[12px]" style={{ color: 'var(--shell-text-muted)' }}>Category: {request.category_name}</p>}
               </td>
             </tr>
           )}

@@ -1,5 +1,6 @@
 'use client';
 
+import { canConfigure, canPropose, isFinanceRole } from '@/lib/permissions';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { toast } from 'sonner';
@@ -20,8 +21,9 @@ import { ModuleIntelligencePanel } from '@/components/shared/module/module-intel
 import { ConfirmDialog } from '@/components/shared/modal-primitives';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAllocation, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import { BomLineModal, BuildPlanModal, BuildStepModal, ProductPricingModal, RejectCostModal, StandardCostModal, StepTypesModal } from '@/components/budgets/planning-modals';
-import { TabBar, marginTone, money, unitPrice } from '@/components/budgets/budget-ui';
+import { TabBar, TONE_CLASS, marginTone, money, productVerdict, unitPrice, useTabParam } from '@/components/budgets/budget-ui';
 import { formatDate } from '@/lib/currency';
+import { ORDER_STATUS, type BuildOrderStatus } from '@/hooks/use-build-orders';
 import { cn } from '@/lib/utils';
 
 type Tab = 'bom' | 'operations' | 'plan' | 'standard' | 'variances';
@@ -32,6 +34,7 @@ const TABS: { value: Tab; label: string }[] = [
   { value: 'bom', label: 'Bill of materials' }, { value: 'operations', label: 'Build operations' }, { value: 'standard', label: 'Standard cost' },
   { value: 'plan', label: 'Build plan' }, { value: 'variances', label: 'Variances' },
 ];
+const TAB_VALUES = TABS.map((t) => t.value);
 const EMPTY: Record<Tab, string> = {
   bom: 'No parts yet. Click Add part to pick parts from the Part master.',
   operations: 'No build operations yet. Click Add build operation for final assembly, testing, packing or outsourced work.',
@@ -46,7 +49,6 @@ const Num = ({ children, strong }: { children: React.ReactNode; strong?: boolean
 const fyText = (fy: number) => `${fy}-${String(fy + 1).slice(2)}`;
 const sourcingText = (s?: string) => (s === 'MAKE' ? 'Make' : 'Buy');
 const advice = (l: BomLineRow, pct: number | null) => {
-  if (!l.item_id) return 'Sub-assembly. Its cost comes from its own BOM, so review its variance on that product.';
   if (pct == null || Math.abs(pct) <= 0.05) return 'Price is in line with standard. No action needed.';
   if (pct < 0) return 'Last price is below standard. If it holds, the standard may be set too high; review it at the next proposal.';
   return l.sourcing === 'MAKE'
@@ -59,10 +61,12 @@ export default function ProductCostingDetailPage() {
   const setHeader = useHeaderStore((s) => s.setHeader);
   const user = useAuthStore((s) => s.user);
   const currency = user?.currency || 'INR';
-  const isFinance = ['ADMIN', 'FINANCE'].includes((user?.role_name || '').toUpperCase());
+  const isFinance = isFinanceRole(user?.role_name);
+  const canCfg = canConfigure(user?.role_name); // parts and operations on the product BOM
+  const canProp = canPropose(user?.role_name); // standard cost proposals and the budget plan
   const invalidate = useInvalidate();
   const { data, isLoading } = useProductCosting(id);
-  const [tab, setTab] = useState<Tab>('bom');
+  const [tab, setTab] = useTabParam<Tab>(TAB_VALUES, 'bom');
   const [sourcing, setSourcing] = useState('ALL');
   const [sorting, setSorting] = useState<SortingState>([]);
   const [selection, setSelection] = useState<Record<string, boolean>>({});
@@ -73,19 +77,22 @@ export default function ProductCostingDetailPage() {
   const [planConfirm, setPlanConfirm] = useState(false); const [pricingOpen, setPricingOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(false); const [editPlan, setEditPlan] = useState<PlanMonth | null>(null);
 
-  useEffect(() => { setHeader(data ? `${data.product.code ?? ''} ${data.product.name}`.trim() : 'Product costing', data?.product.client_name ?? 'Bill of materials, standard cost and margin'); }, [setHeader, data]);
-
   const act = async (job: () => Promise<unknown>, ok: string) => {
     try { await job(); toast.success(ok); invalidate('budgets'); } catch (err: any) { toast.error(err?.message || 'Could not complete that.'); }
   };
 
   const c = data?.cost ?? null; const a = data?.annual; const v = data?.variances; const pr = data?.pricing;
   const std = data?.product.standard_cost ?? null;
+  // The same one-word verdict as the product list, so the page says where the product stands
+  const verdict = data && pr ? productVerdict({ bom_lines: data.lines.length, selling_price: pr.price, standard_cost: std, rolled_cost: pr.rolled_cost, margin_pct: pr.margin_pct, target_margin_pct: pr.target_margin_pct, min_margin_pct: pr.min_margin_pct }) : null;
+  useEffect(() => {
+    setHeader(data ? `${data.product.code ?? ''} ${data.product.name}`.trim() : 'Product costing', data ? [data.product.client_name, verdict?.label].filter(Boolean).join(' · ') : 'Bill of materials, standard cost and margin');
+  }, [setHeader, data, verdict?.label]);
   // Variance per part: the standard allowance for the units built, and the price effect (last price against standard)
   const units = a?.actual_units ?? 0;
-  const priceChange = (l: BomLineRow) => (l.item_id && l.quantity * l.unit_cost > 0 ? (l.item_drift / (l.quantity * l.unit_cost)) * 100 : null);
+  const priceChange = (l: BomLineRow) => (l.quantity * l.unit_cost > 0 ? (l.item_drift / (l.quantity * l.unit_cost)) * 100 : null);
   const lineVar = (l: BomLineRow) => ({ allow: l.quantity * (1 + l.scrap_pct / 100) * l.unit_cost * units, price: l.item_drift * units });
-  const driftOf = (l: BomLineRow) => { const p = priceChange(l); return !l.item_id ? 'Sub-assembly' : p == null || Math.abs(p) <= 0.05 ? 'In line' : p > 0 ? 'Above standard' : 'Below standard'; };
+  const driftOf = (l: BomLineRow) => { const p = priceChange(l); return p == null || Math.abs(p) <= 0.05 ? 'In line' : p > 0 ? 'Above standard' : 'Below standard'; };
   const driftTone = (l: BomLineRow): 'warning' | 'success' | 'muted' => { const p = priceChange(l) ?? 0; return p > 0.05 ? 'warning' : p < -0.05 ? 'success' : 'muted'; };
   const signed = (x: number) => `${x > 0 ? '+' : x < 0 ? '-' : ''}${money(Math.abs(x), currency)}`;
   const toneOf = (x: number): 'warning' | 'success' | 'muted' => (x > 0 ? 'warning' : x < 0 ? 'success' : 'muted');
@@ -103,6 +110,7 @@ export default function ProductCostingDetailPage() {
     achieved: m.planned > 0 ? (m.actual / m.planned) * 100 : null,
   });
 
+  const newestStandardId = Math.max(0, ...(data?.standards.map((s) => s.id) ?? []));
   const rows = useMemo<any[]>(() => {
     if (!data) return [];
     if (tab === 'bom') return data.lines.filter((l) => sourcing === 'ALL' || l.sourcing === sourcing);
@@ -114,20 +122,20 @@ export default function ProductCostingDetailPage() {
 
   const columns = useMemo<ColumnDef<any, any>[]>(() => {
     if (tab === 'bom') return [
+      { accessorKey: 'sequence', header: headerRight('Seq'), cell: ({ row }) => <Num>{row.original.sequence}</Num>, size: 48 },
+      { accessorKey: 'group_name', header: 'Group', cell: ({ row }) => <TextCell value={row.original.group_name} muted className="block max-w-[110px] truncate" />, size: 110 },
       { accessorKey: 'part_no', header: 'Part', cell: ({ row }) => <IdCell value={row.original.part_no} />, size: 110 },
-      { accessorKey: 'name', header: 'Name', cell: ({ row }) => <TextCell value={row.original.name} strong className="block max-w-[320px] truncate" /> },
+      { accessorKey: 'name', header: 'Name', cell: ({ row }) => <TextCell value={row.original.name} strong className="block max-w-[220px] truncate" /> },
       { accessorKey: 'sourcing', header: 'Make / Buy', cell: ({ row }) => <TextCell value={sourcingText(row.original.sourcing)} />, size: 90 },
       { accessorKey: 'quantity', header: headerRight('Qty'), cell: ({ row }) => <Num>{row.original.quantity}</Num>, size: 80 },
-      { accessorKey: 'scrap_pct', header: headerRight('Scrap'), cell: ({ row }) => <Num>{row.original.scrap_pct}%</Num>, size: 80 },
       { accessorKey: 'unit_cost', header: headerRight('Unit cost'), cell: ({ row }) => <Num>{unitPrice(row.original.unit_cost, currency)}</Num>, size: 110 },
       { accessorKey: 'amount', header: headerRight('Amount'), cell: ({ row }) => <Num strong>{unitPrice(row.original.amount, currency)}</Num>, size: 120 },
     ];
     if (tab === 'operations') return [
+      { accessorKey: 'sequence', header: headerRight('Seq'), cell: ({ row }) => <Num>{row.original.sequence}</Num>, size: 60 },
       { accessorKey: 'type_name', header: 'Operation', cell: ({ row }) => <TextCell value={row.original.type_name} strong /> },
-      { accessorKey: 'role', header: 'Role', cell: ({ row }) => <TextCell value={row.original.role} muted />, size: 170 },
-      { id: 'labour', header: headerRight('Labour'), cell: ({ row }) => <Num>{(row.original.is_outsourced || row.original.is_fixed) ? '—' : money(row.original.hours * row.original.rate, currency)}</Num>, size: 110 },
-      { accessorKey: 'outsourced_cost', header: headerRight('Outsourced'), cell: ({ row }) => <Num>{row.original.outsourced_cost != null ? money(row.original.outsourced_cost, currency) : '—'}</Num>, size: 120 },
-      { accessorKey: 'fixed_cost', header: headerRight('Fixed'), cell: ({ row }) => <Num>{row.original.fixed_cost != null ? money(row.original.fixed_cost, currency) : '—'}</Num>, size: 110 },
+      { id: 'costed_as', header: 'Costed as', accessorFn: (r) => (r.is_fixed ? 'Fixed' : r.is_outsourced ? 'Outsourced' : 'Labour'), cell: ({ row }) => <TextCell value={row.original.is_fixed ? 'Fixed' : row.original.is_outsourced ? 'Outsourced' : 'Labour'} muted />, size: 110 },
+      { accessorKey: 'role', header: 'Role', cell: ({ row }) => <TextCell value={row.original.role} muted />, size: 160 },
       { accessorKey: 'amount', header: headerRight('Direct cost'), cell: ({ row }) => <Num>{money(row.original.amount, currency)}</Num>, size: 120 },
       { id: 'overhead', header: headerRight('Overhead'), cell: ({ row }) => <Num>{(row.original.is_outsourced || row.original.is_fixed) ? '—' : money(row.original.hours * (data?.cost?.overhead_rate ?? 0), currency)}</Num>, size: 110 },
       { id: 'total', header: headerRight('Total'), cell: ({ row }) => <Num strong>{money(row.original.amount + ((row.original.is_outsourced || row.original.is_fixed) ? 0 : row.original.hours * (data?.cost?.overhead_rate ?? 0)), currency)}</Num>, size: 120 },
@@ -135,38 +143,37 @@ export default function ProductCostingDetailPage() {
     if (tab === 'plan') return [
       { accessorKey: 'label', header: 'Month', cell: ({ row }) => <TextCell value={`${row.original.label} ${row.original.year}`} strong /> },
       { accessorKey: 'planned', header: headerRight('Planned units'), cell: ({ row }) => <Num>{row.original.planned}</Num>, size: 120 },
+      { accessorKey: 'taken', header: headerRight('On orders'), cell: ({ row }) => <Num>{row.original.taken || '—'}</Num>, size: 100 },
+      { accessorKey: 'open', header: headerRight('Left to take'), size: 110, cell: ({ row }) => { const m = row.original; if (!m.planned && !m.taken) return <Num>—</Num>; return <div className="text-right"><ToneText label={String(m.open)} tone={m.open < 0 ? 'danger' : 'muted'} /></div>; } },
       { accessorKey: 'actual', header: headerRight('Built units'), cell: ({ row }) => <Num>{row.original.actual}</Num>, size: 110 },
       { id: 'achieved', header: headerRight('Achieved'), size: 100, cell: ({ row }) => { const st = planStatus(row.original).label; const p = st === 'Planned' ? null : planMath(row.original).achieved; return <div className="text-right"><ToneText label={p == null ? '—' : `${Math.round(p)}%`} tone={p == null || st === 'In progress' ? 'muted' : p >= 100 ? 'success' : p < 90 ? 'warning' : 'muted'} /></div>; } },
       { id: 'cost', header: headerRight('Planned cost'), cell: ({ row }) => <Num strong>{a ? money(planMath(row.original).plannedCost, currency) : '—'}</Num>, size: 130 },
-      { id: 'built', header: headerRight('Built cost'), cell: ({ row }) => <Num>{row.original.actual ? money(planMath(row.original).builtCost, currency) : '—'}</Num>, size: 120 },
-      { id: 'budget', header: headerRight('Material budget'), cell: ({ row }) => <Num>{a?.plan_unit_cost ? money(planMath(row.original).budget, currency) : '—'}</Num>, size: 130 },
-      { id: 'spent', header: headerRight('Material spend'), cell: ({ row }) => <Num>{row.original.spend ? money(row.original.spend, currency) : '—'}</Num>, size: 120 },
       { id: 'status', header: 'Status', size: 110, cell: ({ row }) => { const s = planStatus(row.original); return <ToneText label={s.label} tone={s.tone} />; } },
     ];
     if (tab === 'standard') return [
       { accessorKey: 'created_at', header: 'Proposed', cell: ({ row }) => <DateCell value={row.original.created_at} />, size: 110 },
-      { accessorKey: 'fy', header: 'Year', cell: ({ row }) => <TextCell value={fyText(row.original.fy)} />, size: 90 },
-      { id: 'bom', header: headerRight('BOM (parts and scrap)'), cell: ({ row }) => <Num>{money(row.original.material + row.original.scrap, currency)}</Num>, size: 170 },
+      // Only the newest proposal can be approved, so an older one that is still open reads as superseded
+      { accessorKey: 'status', header: 'Status', size: 110, cell: ({ row }) => { const s = row.original.status; const old = s === 'PROPOSED' && row.original.id < newestStandardId; return <ToneText label={old ? 'Superseded' : s === 'APPROVED' ? 'Approved' : s === 'PROPOSED' ? 'Proposed' : s === 'REJECTED' ? 'Rejected' : 'Replaced'} tone={old ? 'muted' : s === 'APPROVED' ? 'success' : s === 'PROPOSED' ? 'warning' : s === 'REJECTED' ? 'danger' : 'muted'} />; } },
+      { accessorKey: 'total', header: headerRight('Unit cost'), cell: ({ row }) => <Num strong>{money(row.original.total, currency)}</Num>, size: 120 },
+      { id: 'bom', header: headerRight('Parts and scrap'), cell: ({ row }) => <Num>{money(row.original.material + row.original.scrap, currency)}</Num>, size: 170 },
       { id: 'steps', header: headerRight('Build operations'), cell: ({ row }) => <Num>{money(row.original.conversion + row.original.fixed, currency)}</Num>, size: 120 },
       { accessorKey: 'overhead', header: headerRight('Overhead'), cell: ({ row }) => <Num>{money(row.original.overhead, currency)}</Num>, size: 120 },
-      { accessorKey: 'freight', header: headerRight('Freight'), cell: ({ row }) => <Num>{money(row.original.freight, currency)}</Num>, size: 110 },
-      { accessorKey: 'warranty', header: headerRight('Warranty'), cell: ({ row }) => <Num>{money(row.original.warranty, currency)}</Num>, size: 110 },
-      { accessorKey: 'total', header: headerRight('Unit cost'), cell: ({ row }) => <Num strong>{money(row.original.total, currency)}</Num>, size: 120 },
-      { accessorKey: 'status', header: 'Status', size: 110, cell: ({ row }) => { const s = row.original.status; return <ToneText label={s === 'APPROVED' ? 'Approved' : s === 'PROPOSED' ? 'Proposed' : s === 'REJECTED' ? 'Rejected' : 'Replaced'} tone={s === 'APPROVED' ? 'success' : s === 'PROPOSED' ? 'warning' : s === 'REJECTED' ? 'danger' : 'muted'} />; } },
-      { accessorKey: 'approved_by_name', header: 'Approved by', cell: ({ row }) => <TextCell value={row.original.approved_by_name} muted /> },
+      { id: 'fw', header: headerRight('Freight and warranty'), accessorFn: (r) => r.freight + r.warranty, cell: ({ row }) => <Num>{money(row.original.freight + row.original.warranty, currency)}</Num>, size: 150 },
     ];
     return [
       { accessorKey: 'part_no', header: 'Part', cell: ({ row }) => <IdCell value={row.original.part_no} />, size: 110 },
       { accessorKey: 'name', header: 'Name', cell: ({ row }) => <TextCell value={row.original.name} strong className="block max-w-[300px] truncate" /> },
-      { accessorKey: 'sourcing', header: 'Make / Buy', cell: ({ row }) => <TextCell value={sourcingText(row.original.sourcing)} />, size: 90 },
-      { id: 'allow', header: headerRight('Standard allowance'), cell: ({ row }) => <Num>{money(lineVar(row.original).allow, currency)}</Num>, size: 150 },
-      { id: 'pct', header: headerRight('Price change'), size: 120,
+      { id: 'pct', header: headerRight('Price change'), size: 120, accessorFn: (r) => priceChange(r) ?? undefined, sortUndefined: 'last',
         cell: ({ row }) => { const p = priceChange(row.original); return <div className="text-right"><ToneText label={p == null ? '—' : `${p > 0 ? '+' : ''}${p.toFixed(1)}%`} tone={driftTone(row.original)} /></div>; } },
-      { id: 'price', header: headerRight('Price variance'), size: 140,
-        cell: ({ row }) => { const x = lineVar(row.original).price; return <div className="text-right"><ToneText label={signed(x)} tone={toneOf(x)} /></div>; } },
+      // With no units built the allowance and price variance are all zero, so they are left out until there is something to measure
+      ...(units > 0 ? [
+        { id: 'allow', header: headerRight('Standard allowance'), cell: ({ row }: any) => <Num>{money(lineVar(row.original).allow, currency)}</Num>, size: 130 },
+        { id: 'price', header: headerRight('Price variance'), size: 130,
+          cell: ({ row }: any) => { const x = lineVar(row.original).price; return <div className="text-right"><ToneText label={signed(x)} tone={toneOf(x)} /></div>; } },
+      ] : []),
       { id: 'status', header: 'Status', size: 130, cell: ({ row }) => <ToneText label={driftOf(row.original)} tone={driftTone(row.original)} /> },
     ];
-  }, [tab, currency, c, units, a?.unit_cost, a?.plan_unit_cost]);
+  }, [tab, currency, c, units, a?.unit_cost, a?.plan_unit_cost, newestStandardId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const table = useDataTable({
     data: rows, columns, state: { sorting, rowSelection: selection }, onSortingChange: setSorting, getRowId: (r) => String(r.id),
@@ -176,11 +183,10 @@ export default function ProductCostingDetailPage() {
   });
   const selected: any = rows.find((r) => String(r.id) === Object.keys(selection)[0]) ?? null;
   const switchTab = (t: Tab) => { setTab(t); setSelection({}); };
-  const newestStandardId = Math.max(0, ...(data?.standards.map((s) => s.id) ?? []));
 
   const itemActions: DetailActionDef[] = !selected ? [] :
-    tab === 'bom' ? (isFinance ? [{ label: 'Edit', onClick: () => { setEditBom(selected); setBomOpen(true); } }, { label: 'Delete', variant: 'danger', onClick: () => setDelBom(selected) }] : []) :
-    tab === 'operations' ? (isFinance ? [{ label: 'Edit', onClick: () => { setEditOp(selected); setOpOpen(true); } }, { label: 'Delete', variant: 'danger', onClick: () => setDelOp(selected) }] : []) :
+    tab === 'bom' ? (canCfg ? [{ label: 'Edit', onClick: () => { setEditBom(selected); setBomOpen(true); } }, { label: 'Delete', variant: 'danger', onClick: () => setDelBom(selected) }] : []) :
+    tab === 'operations' ? (canCfg ? [{ label: 'Edit', onClick: () => { setEditOp(selected); setOpOpen(true); } }, { label: 'Delete', variant: 'danger', onClick: () => setDelOp(selected) }] : []) :
     tab === 'plan' ? [{ label: 'Edit', onClick: () => { setEditPlan(selected); setPlanOpen(true); } }] :
     tab === 'standard' && selected.status === 'PROPOSED' && selected.id === newestStandardId && isFinance ? [{ label: 'Approve', variant: 'primary', onClick: () => setApprove(selected.id) }, { label: 'Reject', variant: 'danger', onClick: () => setReject(selected.id) }] : [];
 
@@ -188,10 +194,31 @@ export default function ProductCostingDetailPage() {
   const standardToReject = data?.standards.find((s) => s.id === reject) ?? null;
   const staleYear = data?.approved != null && data.approved.fy < data.fy;
 
-  const costSummary = (
+  const groupTotals = [...(data?.lines ?? []).reduce((m, l) => m.set(l.group_name || 'No group', (m.get(l.group_name || 'No group') ?? 0) + l.amount), new Map<string, number>())];
+  // On the Build plan tab the year block comes first, right after the summary
+  const proposedNow = data?.standards.find((s) => s.id === newestStandardId && s.status === 'PROPOSED') ?? null;
+  const standardSummary = (
     <div className="space-y-4">
-      <DetailSummary title={data?.product.name ?? 'Product'} subtitle={data?.product.code ?? undefined} status={std != null ? `Standard cost ${money(std, currency)}` : 'No approved standard cost'}
-        statusClass={std != null && c && c.total > std * 1.05 ? 'text-[var(--warning)]' : 'text-[var(--shell-text-muted)]'} figure={money(c?.total, currency)} figureLabel="Unit cost" />
+      <DetailSummary title={data?.product.name ?? 'Product'} subtitle="Standard cost" status={std != null ? (staleYear ? 'Approved for an earlier year' : 'Approved') : 'No approved standard cost'}
+        statusClass={std != null && !staleYear ? 'text-[var(--success)]' : 'text-[var(--warning)]'} figure={std != null ? money(std, currency) : undefined} figureLabel="Approved standard" />
+      <DetailSection title="Against today's cost">
+        <DetailGrid>
+          <DetailField label="Rolled-up cost now" value={money(c?.total, currency)} />
+          <DetailField label="Difference from standard" value={std != null && c ? `${c.total >= std ? '+' : '−'}${money(Math.abs(c.total - std), currency)}` : undefined} tone={std != null && c && Math.abs(c.total - std) > 0.5 ? 'warning' : 'muted'} />
+          <DetailField label="Proposed, waiting" value={proposedNow ? money(proposedNow.total, currency) : 'None'} />
+          <DetailField label="Change if approved" value={proposedNow && std ? `${proposedNow.total >= std ? '+' : '−'}${(Math.abs(proposedNow.total - std) / std * 100).toFixed(1)}%` : undefined} tone={proposedNow && std && Math.abs(proposedNow.total - std) > 0.5 ? 'warning' : 'muted'} />
+        </DetailGrid>
+      </DetailSection>
+      <p className="text-[12px] text-[var(--shell-text-muted)]">{proposedNow ? 'Select the newest proposal to approve or reject it. Older proposals are superseded.' : 'Use Propose standard cost to freeze the current roll-up for approval.'}</p>
+    </div>
+  );
+  const costSummary = (
+    <div className="flex flex-col gap-4">
+      <div className="order-[-2]">
+        <DetailSummary title={data?.product.name ?? 'Product'} subtitle={data?.product.code ?? undefined} status={verdict?.label ?? 'No selling price'}
+          statusClass={verdict ? TONE_CLASS[verdict.tone] : 'text-[var(--shell-text-muted)]'} figure={money(c?.total, currency)} figureLabel="Unit cost" />
+      </div>
+      {verdict && <p className="text-[13px] text-[var(--shell-text-muted)]">{verdict.reason}</p>}
       <DetailSection title="Cost per unit">
         <DetailGrid>
           <DetailField label="Material" value={money(c?.material, currency)} />
@@ -205,6 +232,14 @@ export default function ProductCostingDetailPage() {
         {c?.pool_missing && !data?.bom?.overhead_rate_override && <p role="alert" className="text-[12px] text-[var(--warning)]">There are no overhead pools for {fyText(c.fy)}, so this cost carries no overhead. Add them under Cost rates.</p>}
         {staleYear && data?.approved && <p role="alert" className="text-[12px] text-[var(--warning)]">The approved standard cost is for {fyText(data.approved.fy)}. Propose a new one for {fyText(data.fy)}.</p>}
       </DetailSection>
+      {groupTotals.some(([name]) => name !== 'No group') && (
+        <DetailSection title="Parts by group">
+          <DetailGrid>
+            {groupTotals.map(([name, amount]) => <DetailField key={name} label={name} value={money(amount, currency)} />)}
+          </DetailGrid>
+          <p className="text-[12px] text-[var(--shell-text-muted)]">Parts and scrap only. Freight, build operations and overhead are not split by group.</p>
+        </DetailSection>
+      )}
       {pr && (
         <DetailSection title={`Price and margin, ${fyText(pr.fy)}`}>
           {pr.price == null && pr.target_margin_pct == null && pr.min_margin_pct == null ? (
@@ -241,10 +276,13 @@ export default function ProductCostingDetailPage() {
         </DetailSection>
       )}
       {tab === 'plan' && a && (
-        <DetailSection title="Year">
+        <div className="order-[-1]"><DetailSection title="Year">
           <DetailGrid>
             <DetailField label="Planned units" value={a.planned_units} />
             <DetailField label="Built units" value={a.actual_units} />
+            <DetailField label="On orders" value={a.taken_units} />
+            <DetailField label="Left to take" value={a.open_units} tone={a.open_units < 0 ? 'danger' : 'muted'} />
+            <DetailField label="Delivered" value={a.delivered_units} wide />
             <DetailField label="Year cost at standard" value={money(a.budget, currency)} />
             <DetailField label="For the budget plan (E200)" value={money(a.plan_budget, currency)} />
             {pr?.planned_revenue != null && <DetailField label="Planned sales" value={money(pr.planned_revenue, currency)} />}
@@ -255,7 +293,7 @@ export default function ProductCostingDetailPage() {
           <p className="text-[12px] text-[var(--shell-text-muted)]">{a.basis === 'STANDARD' ? 'Year cost uses the approved standard cost.' : 'There is no approved standard yet, so year cost uses the current rolled-up cost.'} The budget plan gets the bought part only: material, scrap, freight and outsourced work. Labour and overhead are not product expenses.</p>
           {data?.plan_status !== 'DRAFT' && <p className="text-[12px] text-[var(--warning)]">{data?.plan_status ? `The current plan is ${data.plan_status.toLowerCase()}, so its lines are locked. Ask Finance to raise a budget change for this product.` : 'There is no budget plan for the current year yet.'}</p>}
           {data && data.plan_status && !data.budget_line && <p className="text-[12px] text-[var(--warning)]">This product has no E200 budget line in the current plan, so its purchases are not checked against a budget. Add to budget plan creates one while the plan is a draft; otherwise ask Finance to raise a budget change.</p>}
-        </DetailSection>
+        </DetailSection></div>
       )}
     </div>
   );
@@ -332,6 +370,8 @@ export default function ProductCostingDetailPage() {
               <DetailField label="Scrap" value={`${l.scrap_pct}%`} />
               <DetailField label="Unit cost" value={unitPrice(l.unit_cost, currency)} />
               <DetailField label="Sourcing" value={sourcingText(l.sourcing)} />
+              <DetailField label="Group" value={l.group_name ?? '—'} />
+              <DetailField label="Sequence" value={l.sequence} />
               {Math.abs(l.item_drift) > 0.005 && <DetailField label="Price drift per unit" value={`${l.item_drift > 0 ? '+' : ''}${money(l.item_drift, currency)}`} tone={l.item_drift > 0 ? 'warning' : 'success'} wide />}
             </DetailGrid>
           </DetailSection>
@@ -382,7 +422,24 @@ export default function ProductCostingDetailPage() {
             <DetailGrid>
               <DetailField label="Planned" value={m.planned} />
               <DetailField label="Built" value={m.actual} />
+              <DetailField label="On orders" value={m.taken} />
+              <DetailField label="Left to take" value={m.open} tone={m.open < 0 ? 'danger' : 'muted'} />
+              <DetailField label="Delivered" value={m.delivered} wide />
             </DetailGrid>
+            {m.open < 0 && <p className="text-[12px] text-[var(--warning)]">Orders starting this month take {-m.open} more unit{m.open === -1 ? '' : 's'} than the plan allows. Raise the plan with Edit, or move a start date.</p>}
+            <p className="text-[12px] text-[var(--shell-text-muted)]">An order counts against the month it starts in. Delivering an order adds its units to Built.</p>
+          </DetailSection>
+          <DetailSection title={`Orders${m.orders.length ? ` (${m.orders.length})` : ''}`}>
+            {!m.orders.length ? <p className="text-[12px] text-[var(--shell-text-muted)]">No orders start this month.</p> : (
+              <ul className="space-y-1.5">
+                {m.orders.map((o) => (
+                  <li key={o.id} className="flex items-baseline justify-between gap-3 text-[13px]">
+                    <span className="min-w-0 truncate text-[var(--shell-text)]">{o.code}{o.client_name ? <span className="text-[var(--shell-text-muted)]"> · {o.client_name}</span> : null}</span>
+                    <span className="shrink-0 tabular-nums text-[var(--shell-text-muted)]">{o.quantity} · {ORDER_STATUS[o.status as BuildOrderStatus]?.label ?? o.status}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </DetailSection>
           <DetailSection title="Cost at standard">
             <DetailGrid>
@@ -459,18 +516,18 @@ export default function ProductCostingDetailPage() {
   })();
 
   const alwaysActions: DetailActionDef[] = [
-    ...(tab === 'bom' && isFinance ? [{ label: 'Add part', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setEditBom(null); setBomOpen(true); } }] : []),
-    ...(tab === 'operations' && isFinance ? [{ label: 'Add build operation', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setEditOp(null); setOpOpen(true); } }] : []),
-    ...(tab === 'operations' && isFinance ? [{ label: 'Manage operation types', icon: <Settings2 className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setTypesOpen(true) }] : []),
-    ...(tab === 'plan' && isFinance ? [{ label: 'Add to budget plan', icon: <CalendarPlus className="h-4 w-4 text-[var(--nav-cyan)]" />, disabled: data?.plan_status !== 'DRAFT', onClick: () => setPlanConfirm(true) }] : []),
-    ...(tab === 'standard' && isFinance && data && data.lines.length > 0 ? [{ label: 'Propose standard cost', icon: <Calculator className="h-4 w-4 text-[var(--info)]" />, onClick: () => act(() => api.post(`/budgets/products/${id}/standard-cost`, {}), 'Standard cost proposed. Approve it on the Standard cost tab.') }] : []),
+    ...(tab === 'bom' && canCfg ? [{ label: 'Add part', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setEditBom(null); setBomOpen(true); } }] : []),
+    ...(tab === 'operations' && canCfg ? [{ label: 'Add build operation', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setEditOp(null); setOpOpen(true); } }] : []),
+    ...(tab === 'operations' && canCfg ? [{ label: 'Manage operation types', icon: <Settings2 className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setTypesOpen(true) }] : []),
+    ...(tab === 'plan' && canProp ? [{ label: 'Add to budget plan', icon: <CalendarPlus className="h-4 w-4 text-[var(--nav-cyan)]" />, disabled: data?.plan_status !== 'DRAFT', onClick: () => setPlanConfirm(true) }] : []),
+    ...(tab === 'standard' && canProp && data && data.lines.length > 0 ? [{ label: 'Propose standard cost', icon: <Calculator className="h-4 w-4 text-[var(--info)]" />, onClick: () => act(() => api.post(`/budgets/products/${id}/standard-cost`, {}), 'Standard cost proposed. Approve it on the Standard cost tab.') }] : []),
     ...(isFinance && data ? [{ label: 'Price and costing', icon: <Tag className="h-4 w-4 text-[var(--nav-violet)]" />, onClick: () => setPricingOpen(true) }] : []),
   ];
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--shell-surface)]">
       <TabBar<Tab> value={tab} onChange={switchTab} tabs={TABS} />
-      <div className="min-h-0 flex-1">
+      <div role="tabpanel" id="tabpanel" aria-labelledby={`tab-${tab}`} className="min-h-0 flex-1">
         <ModuleShell
           showPanel={!!selected}
           searchRow={
@@ -483,8 +540,8 @@ export default function ProductCostingDetailPage() {
             />
           }
           intelligencePanel={
-            <ModuleIntelligencePanel title={selected ? (tab === 'operations' ? 'Build operation' : tab === 'standard' ? 'Standard cost' : tab === 'plan' ? 'Month' : 'Part') : 'Product cost'} onClose={() => setSelection({})} hasSelection={!!selected}
-              idle={tab === 'variances' ? varianceSummary : costSummary} footer={itemActions.length ? <DetailActions actions={itemActions} /> : undefined}>
+            <ModuleIntelligencePanel title={selected ? (tab === 'operations' ? 'Build operation' : tab === 'standard' ? 'Standard cost' : tab === 'plan' ? 'Month' : 'Part') : 'Summary'} onClose={() => setSelection({})} hasSelection={!!selected}
+              idle={tab === 'variances' ? varianceSummary : tab === 'standard' ? standardSummary : costSummary} footer={itemActions.length ? <DetailActions actions={itemActions} /> : undefined}>
               {detail}
             </ModuleIntelligencePanel>
           }

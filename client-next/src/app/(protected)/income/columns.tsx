@@ -1,37 +1,35 @@
 "use client"
 
 import { ColumnDef } from "@tanstack/react-table"
+import { Paperclip } from "lucide-react"
 import { IdCell, TextCell, DateCell, MoneyCell, StatusText, headerRight } from "@/components/data-table/cells"
 
 export const columns = (currency: string): ColumnDef<any>[] => [
   {
     accessorKey: "reference_id",
     header: "ID",
-    cell: ({ row }) => <IdCell value={row.getValue("reference_id") || `#${row.original.id}`} />,
+    cell: ({ row }) => (
+      <span className="inline-flex items-center gap-1.5">
+        <IdCell value={row.getValue("reference_id") || `#${row.original.id}`} />
+        {row.original.receipt_path && <Paperclip aria-label="Invoice attached" className="h-3 w-3 shrink-0 text-[var(--shell-text-muted)]" />}
+      </span>
+    ),
     size: 110,
   },
   {
-    accessorKey: "receipt_number",
-    header: "Invoice",
-    cell: ({ row }) => <TextCell value={row.getValue("receipt_number")} />,
+    accessorKey: "description",
+    header: "Description",
+    cell: ({ row }) => <TextCell value={row.getValue("description")} strong className="block max-w-[130px] truncate" />,
   },
   {
-    id: "code",
-    header: "Code",
-    cell: ({ row }) => {
-      const o = row.original
-      const code = o.project_name
-        ? (o.context_code || o.project_name)
-        : o.product_name
-        ? (o.context_code || o.product_name)
-        : ""
-      return <IdCell value={code} />
-    },
+    accessorKey: "client_name",
+    header: "Client",
+    cell: ({ row }) => <TextCell value={row.getValue("client_name")} muted className="block max-w-[120px] truncate" />,
   },
   {
     accessorKey: "category_name",
     header: "Category",
-    cell: ({ row }) => <TextCell value={row.getValue("category_name")} />,
+    cell: ({ row }) => <TextCell value={row.getValue("category_name")} muted className="block max-w-[100px] truncate" />,
   },
   {
     accessorKey: "date_recorded",

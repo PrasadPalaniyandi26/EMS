@@ -97,7 +97,7 @@ export function RecurringModal({
       title={isEdit ? 'Edit Recurring Transaction' : 'Add Recurring Transaction'}
       icon={isEdit ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
       onSave={onSave}
-      canSave={!!form.description?.trim() && !!form.amount && Number(form.amount) > 0 && !!form.category_id && !!form.frequency && !!form.next_run && !blocked}
+      canSave={!!form.description?.trim() && !!form.amount && Number(form.amount) > 0 && !!form.category_id && (form.type !== 'expense' || !!form.object_id) && !!form.frequency && !!form.next_run && !blocked}
       saveLabel={isEdit ? 'Update Schedule' : 'Schedule Transaction'}
       size="xl"
     >
@@ -124,7 +124,7 @@ export function RecurringModal({
               {form.type === 'expense' && <option value="overhead">Overhead</option>}
             </NativeSelect>
           </Field>
-          <Field label={contextType === 'product' ? 'Product' : contextType === 'overhead' ? 'Department' : 'Project'}>
+          <Field required={form.type === 'expense'} label={contextType === 'product' ? 'Product' : contextType === 'overhead' ? 'Department' : 'Project'}>
             <NativeSelect value={form.object_id || ''} onChange={(e) => setForm({ ...form, object_id: e.target.value })}>
               <option value="">{contextType === 'product' ? 'Select product...' : contextType === 'overhead' ? 'Select department...' : 'Select project...'}</option>
               {objectOptions.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
@@ -170,13 +170,13 @@ export function RecurringModal({
               <option value="">Select frequency</option>
               <option value="daily">Daily</option>
               <option value="weekly">Weekly</option>
-              <option value="biweekly">Bi-Weekly</option>
+              <option value="biweekly">Every 2 weeks</option>
               <option value="monthly">Monthly</option>
-              <option value="quarterly">Quarterly</option>
+              <option value="quarterly">Every 3 months</option>
               <option value="yearly">Yearly</option>
             </NativeSelect>
           </Field>
-          <Field label="Start Date" required>
+          <Field label={editing ? 'Next Run' : 'First Run'} required hint={form.next_run ? `Posts on ${new Date(form.next_run + 'T00:00:00').toLocaleDateString('en-GB')}` : undefined}>
             <Input
               type="date"
               className={ctl}
@@ -279,6 +279,8 @@ interface PauseRecurringModalProps {
   onClose: () => void;
   onConfirm: () => void;
   targetName: string;
+  /** What will not post while it is paused: the next run date and amount, already formatted */
+  nextRun?: string;
 }
 
 interface ResumeRecurringModalProps {
@@ -293,6 +295,7 @@ export function PauseRecurringModal({
   onClose,
   onConfirm,
   targetName,
+  nextRun,
 }: PauseRecurringModalProps) {
   return (
     <ModuleModal
@@ -323,7 +326,7 @@ export function PauseRecurringModal({
       <div className="p-4 bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] rounded-lg border border-[color-mix(in_srgb,var(--warning)_20%,transparent)] flex gap-3">
         <Pause className="w-5 h-5 text-[var(--warning)] shrink-0 mt-0.5" />
         <p className="text-[12px] text-[var(--warning)] leading-relaxed">
-          Are you sure you want to pause <span className="font-semibold underline">{targetName}</span>? No new transactions will be auto-generated until resumed.
+          <span className="font-semibold">{targetName}</span> stops posting until you resume it.{nextRun ? ` The next run, ${nextRun}, will not post.` : ''} Transactions it already created stay as they are.
         </p>
       </div>
     </ModuleModal>
@@ -395,7 +398,7 @@ export function ResumeRecurringModal({
           <div className="text-right">
             <p className="text-[12px] text-[var(--info)] font-semibold">Last Run</p>
             <p className="text-[14px] font-semibold" style={{ color: 'var(--shell-text)' }}>
-              {target.last_run ? new Date(target.last_run).toLocaleDateString() : 'None'}
+              {target.last_run_date ? new Date(String(target.last_run_date).slice(0, 10) + 'T00:00:00').toLocaleDateString('en-GB') : 'None'}
             </p>
           </div>
         </div>
@@ -425,9 +428,9 @@ export function ResumeRecurringModal({
             <SelectContent>
               <SelectItem value="daily">Daily</SelectItem>
               <SelectItem value="weekly">Weekly</SelectItem>
-              <SelectItem value="biweekly">Bi-Weekly</SelectItem>
+              <SelectItem value="biweekly">Every 2 weeks</SelectItem>
               <SelectItem value="monthly">Monthly</SelectItem>
-              <SelectItem value="quarterly">Quarterly</SelectItem>
+              <SelectItem value="quarterly">Every 3 months</SelectItem>
               <SelectItem value="yearly">Yearly</SelectItem>
             </SelectContent>
           </Select>
@@ -437,7 +440,7 @@ export function ResumeRecurringModal({
   );
 }
 
-export function DeleteRecurringModal({ isOpen, onClose, onConfirm, count }: any) {
+export function DeleteRecurringModal({ isOpen, onClose, onConfirm, count, name }: any) {
   return (
     <ModuleModal
       isOpen={isOpen}
@@ -460,7 +463,7 @@ export function DeleteRecurringModal({ isOpen, onClose, onConfirm, count }: any)
             onClick={onConfirm}
             className="px-6 py-2.5 bg-[var(--danger)] text-[var(--danger-foreground)] rounded-lg text-[12px] font-semibold transition-all flex items-center gap-2"
           >
-            <Trash2 className="w-4 h-4" /> Delete Permanently
+            <Trash2 className="w-4 h-4" /> Delete schedule
           </button>
         </>
       }
@@ -469,7 +472,7 @@ export function DeleteRecurringModal({ isOpen, onClose, onConfirm, count }: any)
         <div className="p-4 bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] rounded-lg border border-[color-mix(in_srgb,var(--danger)_20%,transparent)] flex gap-3">
           <Trash2 className="w-5 h-5 text-[var(--danger)] shrink-0 mt-0.5" />
           <p className="text-[12px] text-[var(--danger)] leading-relaxed">
-            Are you sure you want to delete <span className="font-semibold text-[var(--danger)]">{count} recurring schedule(s)</span>? Future transactions will no longer be generated. This action cannot be undone.
+            Delete <span className="font-semibold">{count > 1 ? `${count} schedules` : (name || 'this schedule')}</span>? It stops posting for good. Transactions it already created stay. To stop it for a while, pause it instead.
           </p>
         </div>
       </div>

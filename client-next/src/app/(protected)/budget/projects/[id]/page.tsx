@@ -1,9 +1,10 @@
 'use client';
 
+import { canConfigure, canPropose } from '@/lib/permissions';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { Plus, Flag, Settings2, CheckCheck, RefreshCw, XCircle, Tag, TrendingUp } from 'lucide-react';
+import { Plus, Flag, Settings2, CheckCheck, XCircle, Tag, TrendingUp, PackageOpen } from 'lucide-react';
 import { ColumnDef, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, getSortedRowModel, SortingState } from '@tanstack/react-table';
 import api from '@/lib/api-client';
 import { useHeaderStore } from '@/stores/header-store';
@@ -18,8 +19,9 @@ import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { ConfirmDialog } from '@/components/shared/modal-primitives';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
+import { JobBomImportModal } from '@/components/budgets/job-bom-import-modal';
 import { BomLineModal, BomSettingsModal, BuildStepModal, EstimateLineModal, EstimatePhasesModal, MilestoneModal, ProjectSettingsModal, RejectBaselineModal, StepTypesModal } from '@/components/budgets/planning-modals';
-import { TabBar, money } from '@/components/budgets/budget-ui';
+import { TabBar, money, projectVerdict, TONE_CLASS } from '@/components/budgets/budget-ui';
 import { EvmModal } from '@/components/budgets/evm-panel';
 import { formatDate } from '@/lib/currency';
 import { cn } from '@/lib/utils';
@@ -30,7 +32,7 @@ type Measure = { id: string; name: string; value: string; tone?: 'warning' | 'da
 const JOB_TABS: { value: Tab; label: string }[] = [{ value: 'jobbom', label: 'Job BOM' }, { value: 'jobsteps', label: 'Job build operations' }];
 const TABS: { value: Tab; label: string }[] = [{ value: 'estimate', label: 'Estimate' }, { value: 'baselines', label: 'Baselines' }, { value: 'milestones', label: 'Milestones' }, { value: 'evm', label: 'Earned value' }];
 const EMPTY: Record<Tab, string> = {
-  jobbom: 'No parts yet. Click Add part to build the job: parts from the Part master and standard products as sub-assemblies.',
+  jobbom: 'No parts yet. Click Add part to build the job from the Part master, or Import BOM to start from a product.',
   jobsteps: 'No build operations yet. Click Add build operation for the work done in house or outsourced.',
   estimate: 'No estimate lines yet. Click Add line to enter what the project will cost, phase by phase. Labour can use the rate card.',
   baselines: 'No baseline proposed yet. Click Propose baseline to send the estimate for approval. The approved baseline is what earned value is measured against.',
@@ -50,12 +52,21 @@ export default function ProjectBudgetPage() {
   const currency = user?.currency || 'INR';
   const role = (user?.role_name || '').toUpperCase();
   const isFinance = role === 'ADMIN' || role === 'FINANCE';
+  const canCfg = canConfigure(role);
+  const canProp = canPropose(role);
+  const planEstimate = role !== 'CONFIGURATOR'; // estimates and milestones are Operations and Finance work
   const invalidate = useInvalidate();
   const { data, isLoading } = useProjectBudget(id);
   const hasJob = !!data?.project.has_job_bom;
   const { data: job } = useJobBom(id, hasJob);
   const tabs = useMemo(() => (hasJob ? [TABS[0], ...JOB_TABS, ...TABS.slice(1)] : TABS), [hasJob]);
   const [tab, setTab] = useState<Tab>('estimate');
+  // The tab is in the address (?tab=), so a reload or a shared link opens the same one
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get('tab') as Tab | null;
+    if (q && tabs.some((x) => x.value === q)) setTab(q);
+  }, [tabs]);
+  const [importOpen, setImportOpen] = useState(false);
   const [partOpen, setPartOpen] = useState(false); const [editPart, setEditPart] = useState<BomLineRow | null>(null); const [delPart, setDelPart] = useState<BomLineRow | null>(null);
   const [stepOpen, setStepOpen] = useState(false); const [editStep, setEditStep] = useState<OperationRow | null>(null); const [delStep, setDelStep] = useState<OperationRow | null>(null);
   const [typesOpen, setTypesOpen] = useState(false); const [freightOpen, setFreightOpen] = useState(false);
@@ -67,8 +78,6 @@ export default function ProjectBudgetPage() {
   const [delLine, setDelLine] = useState<EstimateLineRow | null>(null); const [delMs, setDelMs] = useState<Milestone | null>(null);
   const [baselineOpen, setBaselineOpen] = useState(false); const [phasesOpen, setPhasesOpen] = useState(false);
   const [evmOpen, setEvmOpen] = useState(false); const [apprBase, setApprBase] = useState<BaselineRow | null>(null); const [rejBase, setRejBase] = useState<BaselineRow | null>(null);
-
-  useEffect(() => { setHeader(data ? `${data.project.code ?? ''} ${data.project.name}`.trim() : 'Project costing', data?.project.client_name ?? 'Estimate, margin and progress'); }, [setHeader, data]);
 
   const act = async (job: () => Promise<unknown>, ok: string) => {
     try { await job(); toast.success(ok); invalidate('budgets'); } catch (err: any) { toast.error(err?.message || 'Could not complete that.'); }
@@ -82,9 +91,18 @@ export default function ProjectBudgetPage() {
   const marginTone = toneOf(m?.estimate_margin_pct);
   const weightLeft = e ? Math.max(0, Math.round((100 - e.weight_total) * 100) / 100) : 100;
 
+  // The same one-word verdict as the project list, so the page says where the project stands
+  const verdict = m && t && e ? projectVerdict({ estimate: est ? t.total : null, spent: e.ac, margin: m.projected_margin_pct, target: m.target_pct, min: m.min_pct }, currency) : null;
+  useEffect(() => {
+    const client = data?.project.client_name ?? '';
+    setHeader(data ? `${data.project.code ?? ''} ${data.project.name}`.trim() : 'Project costing', data ? [client, verdict?.label].filter(Boolean).join(' · ') : 'Estimate, margin and progress');
+  }, [setHeader, data, verdict?.label]);
+
   const measures = useMemo<Measure[]>(() => {
     if (!e || !est) return [];
+    const bacBase = t && Math.abs(e.bac - t.direct) < 0.5 ? 'The direct cost of the estimate, before contingency and warranty.' : baseline && Math.abs(e.bac - baseline.direct) < 0.5 ? 'The direct cost of the approved baseline.' : 'The budget.';
     return [
+      { id: 'bac', name: 'Budget at completion', value: money(e.bac, currency), meaning: `${bacBase} The measures below compare against it` },
       { id: 'pv', name: 'Planned value', value: money(e.pv, currency), meaning: `${e.percent_planned}% of the budget planned by today. From milestone weights and planned dates (Milestones tab)` },
       { id: 'ev', name: 'Earned value', value: money(e.ev, currency), meaning: `${e.percent_complete}% of the budget done. From milestones marked done (Milestones tab)` },
       { id: 'ac', name: 'Actual cost', value: money(e.ac, currency), tone: e.ac > e.ev ? 'warning' : undefined, meaning: e.last_spend ? `Approved expenses booked to the project, latest in ${e.last_spend}` : 'Approved expenses booked to the project: none yet' },
@@ -94,37 +112,35 @@ export default function ProjectBudgetPage() {
       { id: 'etc', name: 'ETC', value: money(e.etc, currency), meaning: 'Still to spend: forecast at completion less actual cost' },
       { id: 'vac', name: 'VAC', value: money(e.vac, currency), tone: e.vac < 0 ? 'danger' : undefined, meaning: 'Budget less forecast at completion. Negative means the forecast overruns the budget' },
     ];
-  }, [e, est, currency]);
+  }, [e, est, currency, t?.direct, baseline?.direct]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const rows = useMemo<any[]>(() => (!data ? [] : tab === 'estimate' ? (est ? data.lines : []) : tab === 'baselines' ? data.baselines : tab === 'jobbom' ? job?.lines ?? [] : tab === 'jobsteps' ? job?.operations ?? [] : tab === 'milestones' ? data.milestones : measures), [data, est, job, tab, measures]);
 
   const columns = useMemo<ColumnDef<any, any>[]>(() => {
     if (tab === 'jobbom') return [
+      { accessorKey: 'sequence', header: headerRight('Seq'), cell: ({ row }) => <Num>{row.original.sequence}</Num>, size: 60 },
+      { accessorKey: 'group_name', header: 'Group', cell: ({ row }) => <TextCell value={row.original.group_name} muted className="block max-w-[120px] truncate" />, size: 120 },
       { accessorKey: 'part_no', header: 'Part', cell: ({ row }) => <TextCell value={row.original.part_no} muted />, size: 110 },
-      { accessorKey: 'name', header: 'Name', cell: ({ row }) => <TextCell value={row.original.name} strong className="block max-w-[320px] truncate" /> },
-      { id: 'source', header: 'Source', cell: ({ row }) => <TextCell value={row.original.sub_product_id ? 'Standard product' : row.original.sourcing === 'MAKE' ? 'Make' : 'Buy'} muted />, size: 130 },
+      { accessorKey: 'name', header: 'Name', cell: ({ row }) => <TextCell value={row.original.name} strong className="block max-w-[220px] truncate" /> },
+      { id: 'source', header: 'Make / Buy', cell: ({ row }) => <TextCell value={row.original.sourcing === 'MAKE' ? 'Make' : 'Buy'} muted />, size: 100 },
       { accessorKey: 'quantity', header: headerRight('Qty'), cell: ({ row }) => <Num>{row.original.quantity}</Num>, size: 80 },
-      { accessorKey: 'scrap_pct', header: headerRight('Scrap'), cell: ({ row }) => <Num>{row.original.scrap_pct}%</Num>, size: 80 },
       { accessorKey: 'unit_cost', header: headerRight('Unit cost'), cell: ({ row }) => <Num>{money(row.original.unit_cost, currency)}</Num>, size: 120 },
       { accessorKey: 'amount', header: headerRight('Amount'), cell: ({ row }) => <Num strong>{money(row.original.amount, currency)}</Num>, size: 120 },
-      { id: 'standard', header: 'Standard', size: 120, cell: ({ row }) => row.original.sub_drift ? <ToneText label="Changed" tone="warning" /> : <TextCell value={row.original.sub_product_id ? 'Current' : ''} muted /> },
     ];
     if (tab === 'jobsteps') return [
+      { accessorKey: 'sequence', header: headerRight('Seq'), cell: ({ row }) => <Num>{row.original.sequence}</Num>, size: 60 },
       { accessorKey: 'type_name', header: 'Operation', cell: ({ row }) => <TextCell value={row.original.type_name} strong />, size: 200 },
-      { accessorKey: 'role', header: 'Role', cell: ({ row }) => <TextCell value={row.original.role ?? '—'} muted />, size: 180 },
-      { id: 'labour', header: headerRight('Labour'), cell: ({ row }) => <Num>{(row.original.is_outsourced || row.original.is_fixed) ? '—' : money(row.original.hours * row.original.rate, currency)}</Num>, size: 110 },
-      { accessorKey: 'outsourced_cost', header: headerRight('Outsourced'), cell: ({ row }) => <Num>{row.original.outsourced_cost != null ? money(row.original.outsourced_cost, currency) : '—'}</Num>, size: 120 },
-      { accessorKey: 'fixed_cost', header: headerRight('Fixed'), cell: ({ row }) => <Num>{row.original.fixed_cost != null ? money(row.original.fixed_cost, currency) : '—'}</Num>, size: 110 },
+      { id: 'costed_as', header: 'Costed as', accessorFn: (r) => (r.is_fixed ? 'Fixed' : r.is_outsourced ? 'Outsourced' : 'Labour'), cell: ({ row }) => <TextCell value={row.original.is_fixed ? 'Fixed' : row.original.is_outsourced ? 'Outsourced' : 'Labour'} muted />, size: 110 },
+      { accessorKey: 'role', header: 'Role', cell: ({ row }) => <TextCell value={row.original.role ?? '—'} muted />, size: 160 },
       { accessorKey: 'amount', header: headerRight('Direct cost'), cell: ({ row }) => <Num>{money(row.original.amount, currency)}</Num>, size: 120 },
       { id: 'overhead', header: headerRight('Overhead'), cell: ({ row }) => <Num>{(row.original.is_outsourced || row.original.is_fixed) ? '—' : money(row.original.hours * (job?.cost?.overhead_rate ?? 0), currency)}</Num>, size: 110 },
       { id: 'total', header: headerRight('Total'), cell: ({ row }) => <Num strong>{money(row.original.amount + ((row.original.is_outsourced || row.original.is_fixed) ? 0 : row.original.hours * (job?.cost?.overhead_rate ?? 0)), currency)}</Num>, size: 120 },
     ];
     if (tab === 'estimate') return [
       { accessorKey: 'phase', header: 'Phase', cell: ({ row }) => <TextCell value={row.original.phase} muted />, size: 130 },
-      { accessorKey: 'description', header: 'Description', cell: ({ row }) => <TextCell value={row.original.description} strong className="block max-w-[360px] truncate" /> },
+      { accessorKey: 'description', header: 'Description', cell: ({ row }) => <TextCell value={row.original.description} strong className="block max-w-[300px] truncate" /> },
       { accessorKey: 'type_label', header: 'Type', cell: ({ row }) => <TextCell value={row.original.type_label} muted />, size: 160 },
       { accessorKey: 'quantity', header: headerRight('Qty'), cell: ({ row }) => <Num>{row.original.quantity} {row.original.unit}</Num>, size: 100 },
-      { accessorKey: 'rate', header: headerRight('Rate'), cell: ({ row }) => <Num>{money(row.original.rate, currency)}</Num>, size: 110 },
       { accessorKey: 'amount', header: headerRight('Amount'), cell: ({ row }) => <Num strong>{money(row.original.amount, currency)}</Num>, size: 120 },
     ];
     if (tab === 'baselines') return [
@@ -156,21 +172,20 @@ export default function ProjectBudgetPage() {
     getCoreRowModel: getCoreRowModel(), getFilteredRowModel: getFilteredRowModel(), getPaginationRowModel: getPaginationRowModel(), getSortedRowModel: getSortedRowModel(),
   });
   const selected: any = rows.find((r) => String(r.id) === Object.keys(selection)[0]) ?? null;
-  const switchTab = (x: Tab) => { setTab(x); setSelection({}); };
+  const switchTab = (x: Tab) => { setTab(x); setSelection({}); window.history.replaceState(null, '', `?tab=${x}`); };
 
   const itemActions: DetailActionDef[] = !selected ? [] :
-    tab === 'estimate' ? (selected.managed ? [] : [{ label: 'Edit', onClick: () => { setEditLine(selected); setLineOpen(true); } }, { label: 'Delete', variant: 'danger', onClick: () => setDelLine(selected) }]) :
+    tab === 'estimate' ? (selected.managed || !planEstimate ? [] : [{ label: 'Edit', onClick: () => { setEditLine(selected); setLineOpen(true); } }, { label: 'Delete', variant: 'danger', onClick: () => setDelLine(selected) }]) :
     tab === 'baselines' ? (selected.status === 'PROPOSED' && isFinance ? [
       { label: 'Approve baseline', variant: 'primary' as const, icon: <CheckCheck className="h-4 w-4 text-[var(--success)]" />, onClick: () => setApprBase(selected) },
       { label: 'Reject', variant: 'danger' as const, icon: <XCircle className="h-4 w-4 text-[var(--danger)]" />, onClick: () => setRejBase(selected) },
     ] : []) :
     tab === 'jobbom' ? [
-      ...(selected.sub_drift ? [{ label: 'Update to current standard', variant: 'primary' as const, icon: <RefreshCw className="h-4 w-4 text-[var(--nav-cyan)]" />, onClick: () => act(() => api.post(`/budgets/job-bom/lines/${selected.id}/refresh`, {}), 'Priced at the current standard.') }] : []),
       { label: 'Edit', onClick: () => { setEditPart(selected); setPartOpen(true); } },
       { label: 'Delete', variant: 'danger', onClick: () => setDelPart(selected) },
     ] :
     tab === 'jobsteps' ? [{ label: 'Edit', onClick: () => { setEditStep(selected); setStepOpen(true); } }, { label: 'Delete', variant: 'danger', onClick: () => setDelStep(selected) }] :
-    tab === 'milestones' ? [
+    tab === 'milestones' && planEstimate ? [
       ...(!selected.done_date ? [{ label: 'Mark done', variant: 'primary' as const, icon: <CheckCheck className="h-4 w-4 text-[var(--nav-cyan)]" />, onClick: () => act(() => api.put(`/budgets/projects/${id}/milestones/${selected.id}`, { name: selected.name, weight_pct: selected.weight_pct, planned_date: selected.planned_date.slice(0, 10), done_date: new Date().toISOString().slice(0, 10) }), 'Milestone marked done.') }] : []),
       { label: 'Edit', onClick: () => { setEditMs(selected); setMsOpen(true); } },
       { label: 'Delete', variant: 'danger', onClick: () => setDelMs(selected) },
@@ -178,21 +193,85 @@ export default function ProjectBudgetPage() {
 
   const alwaysActions: DetailActionDef[] = [
     ...(tab === 'jobbom' ? [{ label: 'Add part', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setEditPart(null); setPartOpen(true); } }] : []),
+    ...(tab === 'jobbom' ? [{ label: job && (job.lines.length > 0 || job.operations.length > 0) ? 'Reimport BOM' : 'Import BOM', icon: <PackageOpen className="h-4 w-4 text-[var(--nav-cyan)]" />, onClick: () => setImportOpen(true) }] : []),
     ...(tab === 'jobbom' && isFinance ? [{ label: 'Freight', icon: <Settings2 className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setFreightOpen(true) }] : []),
     ...(tab === 'jobsteps' ? [{ label: 'Add build operation', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setEditStep(null); setStepOpen(true); } }] : []),
-    ...(tab === 'jobsteps' && isFinance ? [{ label: 'Manage operation types', icon: <Settings2 className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setTypesOpen(true) }] : []),
-    ...(tab === 'estimate' ? [{ label: 'Add line', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setEditLine(null); setLineOpen(true); } }] : []),
-    ...(tab === 'estimate' && isFinance ? [{ label: 'Manage phases', icon: <Settings2 className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setPhasesOpen(true) }] : []),
-    ...(tab === 'baselines' && est && isFinance ? [{ label: 'Propose baseline', icon: <Flag className="h-4 w-4 text-[var(--shell-accent)]" />, onClick: () => setBaselineOpen(true) }] : []),
-    ...(tab === 'milestones' ? [{ label: 'Add milestone', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setEditMs(null); setMsOpen(true); } }] : []),
-    ...(tab === 'evm' && e && est ? [{ label: 'Chart', icon: <TrendingUp className="h-4 w-4 text-[var(--info)]" />, onClick: () => setEvmOpen(true) }] : []),
+    ...(tab === 'jobsteps' && canCfg ? [{ label: 'Manage operation types', icon: <Settings2 className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setTypesOpen(true) }] : []),
+    ...(tab === 'estimate' && planEstimate ? [{ label: 'Add line', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setEditLine(null); setLineOpen(true); } }] : []),
+    ...(tab === 'estimate' && canProp ? [{ label: 'Manage phases', icon: <Settings2 className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setPhasesOpen(true) }] : []),
+    ...(tab === 'baselines' && est && canProp ? [{ label: 'Propose baseline', icon: <Flag className="h-4 w-4 text-[var(--shell-accent)]" />, onClick: () => setBaselineOpen(true) }] : []),
+    ...(tab === 'milestones' && planEstimate ? [{ label: 'Add milestone', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setEditMs(null); setMsOpen(true); } }] : []),
+    ...(tab === 'evm' && e && est && (data?.milestones.length ?? 0) > 0 ? [{ label: 'Chart', icon: <TrendingUp className="h-4 w-4 text-[var(--info)]" />, onClick: () => setEvmOpen(true) }] : []),
     { label: 'Price and costing', icon: <Tag className="h-4 w-4 text-[var(--nav-violet)]" />, onClick: () => setSetOpen(true) },
   ];
 
-  const summary = !data || !m || !t || !e ? null : (
+  const baselineLine = !est ? 'No estimate yet.' : baseline ? `Baseline ${money(baseline.total, currency)}, approved ${formatDate(baseline.approved_at)}.` : proposed ? 'A baseline is proposed and waiting for approval.' : 'No baseline yet. Propose one on the Baselines tab.';
+  const spendLowNote = e?.spend_low && m && (
+    <p className="text-[12px] text-[var(--warning)]">Projected margin is not shown: the work done is worth {money(e.ev, currency)} but only {money(e.ac, currency)} is booked as spent. Book the spend, or check the milestones marked done.</p>
+  );
+
+  const baselinesSummary = !data || !t ? null : (
     <div className="space-y-4">
-      <DetailSummary title={data.project.name} subtitle={data.project.code ?? undefined} status={!est ? 'No estimate yet' : baseline ? `Baseline ${money(baseline.total, currency)}, approved ${formatDate(baseline.approved_at)}` : proposed ? 'Baseline proposed, waiting for approval' : 'No baseline yet'}
-        statusClass="text-[var(--shell-text-muted)]" figure={money(t.total, currency)} figureLabel="Estimate" />
+      <DetailSummary title={data.project.name} subtitle="Baselines" status={baseline ? 'Approved baseline' : proposed ? 'Waiting for approval' : 'No baseline'} statusClass={baseline ? 'text-[var(--success)]' : proposed ? 'text-[var(--warning)]' : 'text-[var(--shell-text-muted)]'}
+        figure={baseline ? money(baseline.total, currency) : undefined} figureLabel="Approved baseline" />
+      <DetailSection title="Against the estimate">
+        <DetailGrid>
+          <DetailField label="Estimate now" value={money(t.total, currency)} />
+          <DetailField label="Approved baseline" value={baseline ? money(baseline.total, currency) : 'None'} />
+          <DetailField label="Difference" value={baseline ? `${t.total >= baseline.total ? '+' : '−'}${money(Math.abs(t.total - baseline.total), currency)}` : undefined} tone={baseline && Math.abs(t.total - baseline.total) > 0.005 ? 'warning' : 'muted'} />
+          <DetailField label="Waiting for approval" value={data.baselines.filter((b) => b.status === 'PROPOSED').length} />
+        </DetailGrid>
+      </DetailSection>
+      <p className="text-[12px] text-[var(--shell-text-muted)]">{proposed ? 'Select the proposed baseline in the table to approve or reject it.' : est ? 'Propose a baseline to fix the estimate as the reference that earned value is measured against.' : 'Build an estimate first.'}</p>
+    </div>
+  );
+
+  const doneCount = data?.milestones.filter((x) => x.done_date).length ?? 0;
+  const lateCount = data?.milestones.filter(late).length ?? 0;
+  const milestonesSummary = !data || !e ? null : (
+    <div className="space-y-4">
+      <DetailSummary title={data.project.name} subtitle="Milestones" status={data.milestones.length === 0 ? 'No milestones yet' : lateCount ? `${lateCount} late` : 'None late'} statusClass={lateCount ? 'text-[var(--warning)]' : 'text-[var(--shell-text-muted)]'}
+        figure={`${e.percent_complete}%`} figureLabel="Complete" />
+      <DetailSection title="Progress">
+        <DetailGrid>
+          <DetailField label="Milestones" value={data.milestones.length} />
+          <DetailField label="Done" value={doneCount} />
+          <DetailField label="Late" value={lateCount} tone={lateCount ? 'warning' : 'muted'} />
+          <DetailField label="Weight left to assign" value={`${weightLeft}%`} tone={data.milestones.length > 0 && weightLeft > 0 ? 'warning' : 'muted'} />
+        </DetailGrid>
+      </DetailSection>
+      {data.milestones.length > 0 && (
+        <p className={cn('text-[12px]', Math.abs(e.weight_total - 100) < 0.01 ? 'text-[var(--shell-text-muted)]' : 'text-[var(--warning)]')}>Weights add up to {e.weight_total}%{Math.abs(e.weight_total - 100) < 0.01 ? '.' : ', and earned value is only exact at 100%.'}</p>
+      )}
+      {data.milestones.length === 0 && <p className="text-[12px] text-[var(--shell-text-muted)]">Milestone weights add up to 100% and drive the earned value. Click Add milestone to start.</p>}
+    </div>
+  );
+
+  const costWord = !e || e.cpi == null ? null : e.cpi < 0.9 ? 'Over cost' : e.cpi < 0.95 ? 'Slightly over cost' : 'On cost';
+  const scheduleWord = !e || e.spi == null ? null : e.spi < 0.9 ? 'Behind schedule' : e.spi < 1 ? 'Slightly behind' : 'On schedule';
+  const evmSummary = !data || !e || !est ? null : (
+    <div className="space-y-4">
+      <DetailSummary title={data.project.name} subtitle="Earned value" status={[costWord, scheduleWord?.toLowerCase()].filter(Boolean).join(', ') || 'No progress measured yet'}
+        statusClass={e.cpi != null && e.cpi < 0.9 ? 'text-[var(--danger)]' : (e.cpi != null && e.cpi < 0.95) || (e.spi != null && e.spi < 0.9) ? 'text-[var(--warning)]' : 'text-[var(--shell-text-muted)]'}
+        figure={`${e.percent_complete}%`} figureLabel="Complete" />
+      <DetailSection title="Budget and forecast">
+        <DetailGrid>
+          <DetailField label="Budget at completion" value={money(e.bac, currency)} />
+          <DetailField label="Actual cost" value={money(e.ac, currency)} />
+          <DetailField label="Forecast at completion" value={money(e.eac, currency)} />
+          <DetailField label="Variance at completion" value={money(e.vac, currency)} tone={e.vac < 0 ? 'danger' : 'muted'} />
+        </DetailGrid>
+      </DetailSection>
+      {spendLowNote}
+      {e.tcpi != null && <p className="text-[12px] text-[var(--shell-text)]">To finish within budget the remaining work has to be done at a cost efficiency of {e.tcpi.toFixed(2)}.</p>}
+      {data.milestones.length === 0 && <p className="text-[12px] text-[var(--warning)]">Add milestones so progress can be measured.</p>}
+    </div>
+  );
+
+  const estimateSummary = !data || !m || !t || !e || !verdict ? null : (
+    <div className="space-y-4">
+      <DetailSummary title={data.project.name} subtitle={data.project.code ?? undefined} status={verdict.label} statusClass={TONE_CLASS[verdict.tone]} figure={money(t.total, currency)} figureLabel="Estimate" />
+      <p className="text-[13px] text-[var(--shell-text-muted)]">{verdict.reason} {baselineLine}</p>
       <DetailSection title="Estimate">
         <DetailGrid>
           <DetailField label="Direct cost" value={money(t.direct, currency)} />
@@ -224,22 +303,16 @@ export default function ProjectBudgetPage() {
           </p>
         )}
       </DetailSection>
-      {e.spend_low && (
-        <p className="text-[12px] text-[var(--warning)]">Projected margin is not shown: the work done is worth {money(e.ev, currency)} but only {money(e.ac, currency)} is booked as spent. Book the spend, or check the milestones marked done.</p>
-      )}
-      {tab === 'milestones' && (
-        <p className={cn('text-[12px]', Math.abs(e.weight_total - 100) < 0.01 ? 'text-[var(--shell-text-muted)]' : 'text-[var(--warning)]')}>Weights add up to {e.weight_total}%{Math.abs(e.weight_total - 100) < 0.01 ? '.' : ', and earned value is only exact at 100%.'}</p>
-      )}
-      {tab === 'evm' && e.tcpi != null && <p className="text-[12px] text-[var(--shell-text)]">To finish within budget the remaining work has to be done at a cost efficiency of {e.tcpi.toFixed(2)}.</p>}
-      {tab === 'evm' && data.milestones.length === 0 && <p className="text-[12px] text-[var(--warning)]">Add milestones so progress can be measured.</p>}
+      {spendLowNote}
     </div>
   );
+  const summary = tab === 'baselines' ? baselinesSummary : tab === 'milestones' ? milestonesSummary : tab === 'evm' ? evmSummary : estimateSummary;
 
   const jc = job?.cost;
-  const driftCount = (job?.lines ?? []).filter((l) => l.sub_drift !== 0).length;
+  const groupTotals = [...(job?.lines ?? []).reduce((m, l) => m.set(l.group_name || 'No group', (m.get(l.group_name || 'No group') ?? 0) + l.amount), new Map<string, number>())];
   const jobSummary = !data || !job ? null : (
     <div className="space-y-4">
-      <DetailSummary title={data.project.name} subtitle="Job BOM" status="Open to change" statusClass="text-[var(--shell-text-muted)]"
+      <DetailSummary title={data.project.name} subtitle="Job BOM"
         figure={money(jc?.total ?? 0, currency)} figureLabel="Job build cost" />
       <DetailSection title="Cost of the job">
         <DetailGrid>
@@ -252,6 +325,14 @@ export default function ProjectBudgetPage() {
           <DetailField label={jc ? `Overhead (${money(jc.overhead_rate, currency)}/h)` : 'Overhead'} value={money(jc?.overhead, currency)} />
         </DetailGrid>
       </DetailSection>
+      {groupTotals.some(([name]) => name !== 'No group') && (
+        <DetailSection title="Parts by group">
+          <DetailGrid>
+            {groupTotals.map(([name, amount]) => <DetailField key={name} label={name} value={money(amount, currency)} />)}
+          </DetailGrid>
+          <p className="text-[12px] text-[var(--shell-text-muted)]">Parts and scrap only. Freight, build operations and overhead are not split by group.</p>
+        </DetailSection>
+      )}
       <DetailSection title="Against spend">
         <DetailGrid>
           <DetailField label="Job build cost" value={money(jc?.total ?? 0, currency)} />
@@ -259,7 +340,6 @@ export default function ProjectBudgetPage() {
         </DetailGrid>
         <p className="text-[12px] text-[var(--shell-text-muted)]">The job cost sits in the Estimate as two lines from this BOM. Contingency and warranty are added by the estimate, not here.</p>
       </DetailSection>
-      {driftCount > 0 && <p className="text-[12px] text-[var(--warning)]">{driftCount} sub-assembl{driftCount === 1 ? 'y has' : 'ies have'} a newer approved standard. The job keeps the cost it was priced at until you update the line.</p>}
     </div>
   );
 
@@ -272,13 +352,15 @@ export default function ProjectBudgetPage() {
           <DetailSummary title={l.name} subtitle={l.part_no} figure={money(l.amount, currency)} figureLabel="Line cost" />
           <DetailSection title="Line">
             <DetailGrid>
-              <DetailField label="Source" value={l.sub_product_id ? 'Standard product' : l.sourcing === 'MAKE' ? 'Make' : 'Buy'} />
+              <DetailField label="Make or buy" value={l.sourcing === 'MAKE' ? 'Make' : 'Buy'} />
+              <DetailField label="Group" value={l.group_name ?? '—'} />
+              <DetailField label="Sequence" value={l.sequence} />
               <DetailField label="Quantity" value={l.quantity} />
               <DetailField label="Scrap" value={`${l.scrap_pct}%`} />
-              <DetailField label={l.sub_product_id ? 'Standard when costed' : 'Unit cost'} value={money(l.unit_cost, currency)} />
+              <DetailField label="Unit cost" value={money(l.unit_cost, currency)} />
+              {!!job?.cost?.total && <DetailField label="Share of job cost" value={`${((l.amount / job.cost.total) * 100).toFixed(1)}%`} wide />}
             </DetailGrid>
           </DetailSection>
-          {l.sub_drift !== 0 && <p className="text-[12px] text-[var(--warning)]">The approved standard has since moved {l.sub_drift > 0 ? 'up' : 'down'} by {money(Math.abs(l.sub_drift), currency)} a unit. This job keeps the cost it was priced at. Use Update to current standard to reprice it.</p>}
         </div>
       );
     }
@@ -300,6 +382,7 @@ export default function ProjectBudgetPage() {
                   <DetailField label={`Overhead (${money(ohRate, currency)}/h)`} value={money(oh, currency)} />
                 </>
               )}
+              {!!job?.cost?.total && <DetailField label="Share of job cost" value={`${(((s.amount + oh) / job.cost.total) * 100).toFixed(1)}%`} wide />}
             </DetailGrid>
           </DetailSection>
         </div>
@@ -314,8 +397,8 @@ export default function ProjectBudgetPage() {
             <DetailGrid>
               <DetailField label="Quantity" value={`${l.quantity} ${l.unit}`} />
               <DetailField label="Rate" value={money(l.rate, currency)} />
-              <DetailField label="Type" value={l.type_label} wide />
-              <DetailField label="Basis" value={l.basis} wide />
+              {l.type_label && <DetailField label="Type" value={l.type_label} wide />}
+              {l.basis && <DetailField label="Basis" value={l.basis} wide />}
             </DetailGrid>
           </DetailSection>
           {l.managed && <p className="text-[12px] text-[var(--shell-text-muted)]">This line comes from the job BOM. Change the job BOM instead.</p>}
@@ -363,12 +446,12 @@ export default function ProjectBudgetPage() {
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--shell-surface)]">
       <TabBar<Tab> value={tab} onChange={switchTab} tabs={tabs} />
-      <div className="min-h-0 flex-1">
+      <div role="tabpanel" id="tabpanel" aria-labelledby={`tab-${tab}`} className="min-h-0 flex-1">
         <ModuleShell
           showPanel={!!selected}
           searchRow={<DataTableToolbar table={table} actions={<><ToolbarActions actions={alwaysActions} /><ToolbarActions actions={itemActions} /></>} />}
           intelligencePanel={
-            <ModuleIntelligencePanel title={selected ? (tab === 'estimate' ? 'Estimate line' : tab === 'baselines' ? 'Baseline' : tab === 'jobbom' ? 'Part' : tab === 'jobsteps' ? 'Build operation' : 'Milestone') : (tab === 'jobbom' || tab === 'jobsteps') ? 'Job BOM' : 'Project costing'} onClose={() => setSelection({})} hasSelection={!!selected}
+            <ModuleIntelligencePanel title={selected ? (tab === 'estimate' ? 'Estimate line' : tab === 'baselines' ? 'Baseline' : tab === 'jobbom' ? 'Part' : tab === 'jobsteps' ? 'Build operation' : 'Milestone') : (tab === 'jobbom' || tab === 'jobsteps') ? 'Job BOM' : 'Summary'} onClose={() => setSelection({})} hasSelection={!!selected}
               idle={((tab === 'jobbom' || tab === 'jobsteps') ? jobSummary : summary) ?? undefined} footer={itemActions.length ? <DetailActions actions={itemActions} /> : undefined}>
               {detail}
             </ModuleIntelligencePanel>
@@ -382,6 +465,7 @@ export default function ProjectBudgetPage() {
       <EstimateLineModal isOpen={lineOpen} onClose={() => setLineOpen(false)} data={data} editing={editLine} />
       <EstimatePhasesModal isOpen={phasesOpen} onClose={() => setPhasesOpen(false)} />
       <BomLineModal isOpen={partOpen} onClose={() => setPartOpen(false)} job={job} editing={editPart} />
+      <JobBomImportModal isOpen={importOpen} onClose={() => setImportOpen(false)} job={job} />
       <BuildStepModal isOpen={stepOpen} onClose={() => setStepOpen(false)} job={job} editing={editStep} />
       <StepTypesModal isOpen={typesOpen} onClose={() => setTypesOpen(false)} types={job?.operation_types ?? []} />
       <BomSettingsModal isOpen={freightOpen} onClose={() => setFreightOpen(false)} url={`/budgets/projects/${id}/job-bom`} freight={job?.bom?.freight_pct ?? 2} />

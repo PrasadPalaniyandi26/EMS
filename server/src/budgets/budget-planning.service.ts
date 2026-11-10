@@ -13,7 +13,6 @@ const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct
 // Estimate lines written by the job BOM; the basis marks them as managed
 const DEFAULT_FREIGHT_PCT = 2;
 const DEFAULT_WARRANTY_PCT = 1.5;
-const SUB_LEVELS = 4;
 const JOB_BASIS = 'JOB_BOM';
 const JOB_BOUGHT = 'Parts, freight and outsourced work (job BOM)';
 const JOB_LABOUR = 'Build labour and overhead (job BOM)';
@@ -215,7 +214,9 @@ export class BudgetPlanningService {
     if (!(standard >= 0)) throw bad('Enter the standard price.');
     const hasLast = !(b.last_price === '' || b.last_price == null);
     if (hasLast && !(Number(b.last_price) >= 0)) throw bad('Last paid price must be a number, zero or more.');
-    if (b.lead_time_days !== '' && b.lead_time_days != null && !(Number.isInteger(Number(b.lead_time_days)) && Number(b.lead_time_days) >= 0)) throw bad('Lead time must be a whole number of days, zero or more.');
+    // Every part carries the days it takes to arrive (or to make), so a build order can be checked against its dates
+    if (b.lead_time_days === '' || b.lead_time_days == null) throw bad('Enter the lead time in days. Zero means it is on hand.');
+    if (!(Number.isInteger(Number(b.lead_time_days)) && Number(b.lead_time_days) >= 0 && Number(b.lead_time_days) <= 3650)) throw bad('Lead time must be a whole number of days, zero or more.');
     if (make && (!(material >= 0) || !(manufacturing >= 0))) throw bad('Material and manufacturing costs must be zero or more.');
     const clash = await this.prisma.item.findFirst({ where: { partNo, ...(id ? { NOT: { id } } : {}) } });
     if (clash) throw bad(clash.status === 'ACTIVE' ? 'Another item already has that part number.' : 'That part number belongs to a replaced or retired part. Part numbers are not reused, so use a new one.', HttpStatus.CONFLICT);
@@ -230,7 +231,7 @@ export class BudgetPlanningService {
       partNo, name, categoryId: await this.checkCategory(b.category_id), uom: String(b.uom || 'nos').slice(0, 12),
       ...(current ? {} : { projectId: ownerId }),
       standardPrice: standard, materialCost: make ? material : null, manufacturingCost: make ? manufacturing : null, lastPrice: b.last_price === '' || b.last_price == null ? null : Number(b.last_price),
-      supplier: b.supplier?.trim() || null, leadTimeDays: b.lead_time_days ? Number(b.lead_time_days) : null,
+      supplier: b.supplier?.trim() || null, leadTimeDays: Number(b.lead_time_days),
       sourcing: make ? 'MAKE' : 'BUY', oemPartNo: make ? null : oem,
     };
     const target = id;
@@ -271,7 +272,7 @@ export class BudgetPlanningService {
 
   // The BOM version in force for each product and each job: the latest one (a new version only exists once it is due)
   private async currentBoms() {
-    const all = await this.prisma.bom.findMany({ select: { id: true, productId: true, projectId: true, version: true } });
+    const all = await this.prisma.bom.findMany({ where: { buildOrderId: null }, select: { id: true, productId: true, projectId: true, version: true } });
     const best = new Map<string, (typeof all)[number]>();
     for (const b of all) {
       const key = b.productId != null ? `P${b.productId}` : `J${b.projectId}`;
@@ -369,13 +370,11 @@ export class BudgetPlanningService {
         } });
         const keep = old.lines.filter((l) => l.itemId !== rep.itemId || rep.successorId != null);
         if (keep.length) await tx.bomLine.createMany({ data: keep.map((l) => ({
-          bomId: next.id, itemId: l.itemId === rep.itemId ? rep.successorId : l.itemId, subBomId: l.subBomId, subProductId: l.subProductId, subStandardId: l.subStandardId, subUnitCost: l.subUnitCost, quantity: l.quantity, scrapPct: l.scrapPct,
+          bomId: next.id, itemId: l.itemId === rep.itemId ? (rep.successorId as number) : l.itemId, groupName: l.groupName, sequence: l.sequence, quantity: l.quantity, scrapPct: l.scrapPct,
         })) });
         if (old.operations.length) await tx.bomOperation.createMany({ data: old.operations.map((o) => ({
-          bomId: next.id, name: o.name, hours: o.hours, rateCardId: o.rateCardId, outsourcedCost: o.outsourcedCost, fixedCost: o.fixedCost, operationTypeId: o.operationTypeId,
+          bomId: next.id, name: o.name, hours: o.hours, rateCardId: o.rateCardId, outsourcedCost: o.outsourcedCost, fixedCost: o.fixedCost, operationTypeId: o.operationTypeId, sequence: o.sequence,
         })) });
-        // A product used as a sub-assembly elsewhere follows its new version
-        await tx.bomLine.updateMany({ where: { subBomId: old.id, bomId: { not: next.id } }, data: { subBomId: next.id } });
         if (old.projectId != null) jobs.push(old.projectId);
         changed++;
       }
@@ -619,7 +618,7 @@ export class BudgetPlanningService {
       productIds.length ? this.prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true, code: true, name: true, client: { select: { name: true } } } }) : [],
       projectIds.length ? this.prisma.project.findMany({ where: { id: { in: projectIds } }, select: { id: true, code: true, name: true, client: { select: { name: true } } } }) : [],
     ]);
-    return lines.map((l) => {
+    const used = lines.map((l) => {
       const prod = l.bom.productId != null ? products.find((x) => x.id === l.bom.productId) : null;
       const proj = l.bom.projectId != null ? projects.find((x) => x.id === l.bom.projectId) : null;
       const o = prod ?? proj;
@@ -627,6 +626,14 @@ export class BudgetPlanningService {
       // What the line adds to one unit of the product (or one job), at the part's standard price and with scrap
       return { kind: prod ? 'PRODUCT' : 'JOB', id: o?.id ?? 0, code: o?.code ?? null, name: o?.name ?? 'Unknown', client_name: o?.client?.name ?? null, quantity, scrap_pct: scrap, line_cost: r2(quantity * (1 + scrap / 100) * price) };
     });
+    // Open build orders hold their own copy of the part; they are listed so nobody is surprised that a replacement does not reach them
+    const orderLines = await this.prisma.bomLine.findMany({ where: { itemId: id, bom: { buildOrder: { status: { in: ['COMMITTED', 'RELEASED', 'IN_BUILD'] } } } }, include: { bom: { include: { buildOrder: { include: { client: { select: { name: true } } } } } } }, orderBy: { id: 'asc' } });
+    const onOrders = orderLines.map((l) => {
+      const o = l.bom.buildOrder!;
+      const quantity = n(l.quantity); const scrap = n(l.scrapPct);
+      return { kind: 'ORDER', id: o.id, code: o.code, name: `${o.quantity} unit${o.quantity === 1 ? '' : 's'}`, client_name: o.client?.name ?? null, quantity, scrap_pct: scrap, line_cost: r2(quantity * (1 + scrap / 100) * price) };
+    });
+    return [...used, ...onOrders];
   }
 
   // ── Projects: estimate, milestones, earned value ─────────────────────────
@@ -647,10 +654,10 @@ export class BudgetPlanningService {
     ]);
     const ac = new Map<number, number>();
     for (const p of spend) if (p.projectId) ac.set(p.projectId, (ac.get(p.projectId) ?? 0) + p.amount);
-    // The standard products on a project's current job BOM, if it has one
-    const jobBoms = await this.prisma.bom.findMany({ where: { projectId: { not: null } }, orderBy: { version: 'desc' }, select: { projectId: true, lines: { where: { subProductId: { not: null } }, select: { subProductId: true } } } });
+    // The standard product a project's current job BOM was started from, if it has one
+    const jobBoms = await this.prisma.bom.findMany({ where: { projectId: { not: null } }, orderBy: { version: 'desc' }, select: { projectId: true, sourceProductId: true } });
     const productsOf = new Map<number, number[]>();
-    for (const b of jobBoms) if (b.projectId != null && !productsOf.has(b.projectId)) productsOf.set(b.projectId, [...new Set(b.lines.map((l) => l.subProductId as number))]);
+    for (const b of jobBoms) if (b.projectId != null && !productsOf.has(b.projectId)) productsOf.set(b.projectId, b.sourceProductId != null ? [b.sourceProductId] : []);
     const named = new Map((await this.prisma.product.findMany({ where: { id: { in: [...productsOf.values()].flat() } }, select: { id: true, code: true, name: true } })).map((x) => [x.id, x]));
     return projects.map((p) => {
       const est = ests.find((e) => e.projectId === p.id);
@@ -934,9 +941,7 @@ export class BudgetPlanningService {
 
   // ── Products: BOM, standard cost, build plan ─────────────────────────────
 
-  private async rollup(bomId: number, depth = 0, trail: number[] = []): Promise<any> {
-    if (trail.includes(bomId)) throw bad('A sub-assembly contains itself, so the cost cannot be worked out.', HttpStatus.CONFLICT);
-    if (depth > SUB_LEVELS) throw bad(`Sub-assemblies are nested more than ${SUB_LEVELS} levels deep, so the cost cannot be worked out.`, HttpStatus.CONFLICT);
+  async rollup(bomId: number): Promise<any> {
     const bom = await this.prisma.bom.findUnique({ where: { id: bomId }, include: { lines: true, operations: { include: { operationType: true } } } });
     if (!bom) throw bad('BOM not found.', HttpStatus.NOT_FOUND);
     const s = await this.budgets.getSettings();
@@ -948,64 +953,39 @@ export class BudgetPlanningService {
       this.prisma.rateCardHistory.findMany(),
     ]);
     const rateOf = this.currentRates(cards, rateHistory);
-    const subIds = bom.lines.map((l) => l.subProductId).filter((x): x is number => x != null);
-    const subProducts = subIds.length ? await this.prisma.product.findMany({ where: { id: { in: subIds } }, select: { id: true, code: true, name: true } }) : [];
-    const subStds = subIds.length ? await this.prisma.standardCost.findMany({ where: { productId: { in: subIds }, status: 'APPROVED' }, orderBy: { id: 'desc' } }) : [];
     const pool = overheads.reduce((a, o) => a + n(o.poolAmount), 0);
     const hrs = n((await this.prisma.overheadBase.findUnique({ where: { fy } }))?.baseHours);
     const ohRate = hrs > 0 ? pool / hrs : 0;
     let material = 0; let scrap = 0;
-    // What a built sub-assembly already carries: its freight, labour and overhead are added as they are, not charged again
-    let freightBase = 0; let subFreight = 0; let subConversion = 0; let subOutsourced = 0; let subOverhead = 0; let subFixed = 0;
+    let freightBase = 0;
     const lines: any[] = [];
-    for (const l of bom.lines) {
-      let unit = 0; let label = ''; let part = ''; let sourcing = 'BUY'; let subDrift = 0;
-      if (l.itemId) { const it = items.find((i) => i.id === l.itemId); unit = n(it?.standardPrice); label = it?.name ?? 'Item'; part = it?.partNo ?? ''; sourcing = it?.sourcing ?? 'BUY'; }
-      else if (l.subStandardId) {
-        // Job BOM sub-assembly: priced at the approved standard saved with the line, not at today's standard
-        const sp = subProducts.find((x) => x.id === l.subProductId);
-        const cur = subStds.find((x) => x.productId === l.subProductId);
-        unit = n(l.subUnitCost); label = sp?.name ?? 'Sub-assembly'; part = sp?.code ?? 'SUB'; sourcing = 'MAKE';
-        subDrift = cur ? r2(n(cur.total) - unit) : 0;
-      }
-      let base = 0; let sc = 0;
-      if (l.subBomId) {
-        const sub = await this.rollup(l.subBomId, depth + 1, [...trail, bomId]);
-        const sp = sub.bom.product_id ? await this.prisma.product.findUnique({ where: { id: sub.bom.product_id }, select: { code: true, name: true } }) : null;
-        const c = sub.cost; const q = n(l.quantity); const pct = n(l.scrapPct) / 100;
-        unit = c.total - c.warranty; label = sp?.name ?? `Sub-assembly v${sub.bom.version}`; part = sp?.code ?? 'SUB'; sourcing = 'MAKE';
-        material += q * c.material; scrap += q * c.scrap + q * unit * pct;
-        subFreight += q * c.freight * (1 + pct); subConversion += q * c.conversion * (1 + pct); subOutsourced += q * c.outsourced * (1 + pct); subOverhead += q * c.overhead * (1 + pct); subFixed += q * c.fixed * (1 + pct);
-        base = q * unit; sc = base * pct;
-      } else {
-        base = n(l.quantity) * unit; sc = base * (n(l.scrapPct) / 100);
-        material += base; scrap += sc;
-        // Only parts bought in carry freight; a product built in house does not
-        if (l.itemId) freightBase += base + sc;
-      }
-      lines.push({ id: l.id, sourcing, item_id: l.itemId, sub_bom_id: l.subBomId, sub_product_id: l.subProductId, sub_standard_id: l.subStandardId, sub_drift: subDrift, part_no: part, name: label, quantity: n(l.quantity), scrap_pct: n(l.scrapPct), unit_cost: r2(unit), amount: r2(base + sc), item_drift: l.itemId ? r2(n(l.quantity) * (n(items.find((i) => i.id === l.itemId)?.lastPrice ?? items.find((i) => i.id === l.itemId)?.standardPrice) - unit)) : 0 });
+    // Every line is a part from the Part master, bought or made; the group and sequence only organise the list
+    for (const l of [...bom.lines].sort((a, b) => a.sequence - b.sequence || (a.groupName ?? '').localeCompare(b.groupName ?? '') || a.id - b.id)) {
+      const it = items.find((i) => i.id === l.itemId);
+      const unit = n(it?.standardPrice);
+      const base = n(l.quantity) * unit; const sc = base * (n(l.scrapPct) / 100);
+      material += base; scrap += sc;
+      freightBase += base + sc;
+      lines.push({ id: l.id, sourcing: it?.sourcing ?? 'BUY', item_id: l.itemId, group_name: l.groupName, sequence: l.sequence, part_no: it?.partNo ?? '', name: it?.name ?? 'Part', quantity: n(l.quantity), scrap_pct: n(l.scrapPct), unit_cost: r2(unit), amount: r2(base + sc), item_drift: r2(n(l.quantity) * (n(it?.lastPrice ?? it?.standardPrice) - unit)) });
     }
     let conversion = 0; let hours = 0; let outsourced = 0; let fixed = 0;
     const ops = bom.operations.map((o) => {
       const rate = o.rateCardId != null ? rateOf.get(o.rateCardId)?.rate ?? 0 : 0;
       const labour = n(o.hours) * rate + n(o.outsourcedCost);
       conversion += labour; hours += n(o.hours); outsourced += n(o.outsourcedCost); fixed += n(o.fixedCost);
-      return { id: o.id, name: o.name, type_id: o.operationTypeId, type_name: o.operationType?.name ?? o.name, is_outsourced: o.operationType?.isOutsourced ?? false, is_fixed: o.operationType?.isFixed ?? false, fixed_cost: o.fixedCost == null ? null : n(o.fixedCost), role: cards.find((c) => c.id === o.rateCardId)?.role ?? null, hours: n(o.hours), rate_card_id: o.rateCardId, rate: rate, outsourced_cost: o.outsourcedCost == null ? null : n(o.outsourcedCost), amount: r2(labour + n(o.fixedCost)) };
-    });
-    const ownFreight = freightBase * (n(bom.freightPct) / 100);
-    const freight = ownFreight + subFreight;
+      return { id: o.id, name: o.name, type_id: o.operationTypeId, type_name: o.operationType?.name ?? o.name, is_outsourced: o.operationType?.isOutsourced ?? false, is_fixed: o.operationType?.isFixed ?? false, fixed_cost: o.fixedCost == null ? null : n(o.fixedCost), role: cards.find((c) => c.id === o.rateCardId)?.role ?? null, hours: n(o.hours), rate_card_id: o.rateCardId, rate: rate, outsourced_cost: o.outsourcedCost == null ? null : n(o.outsourcedCost), amount: r2(labour + n(o.fixedCost)), sequence: o.sequence };
+    }).sort((a, b) => a.sequence - b.sequence || a.id - b.id);
+    const freight = freightBase * (n(bom.freightPct) / 100);
     const override = bom.overheadRateOverride == null ? null : n(bom.overheadRateOverride);
     const appliedRate = override ?? ohRate;
-    conversion += subConversion; outsourced += subOutsourced; fixed += subFixed;
-    const ownOverhead = hours * appliedRate;
-    const overhead = ownOverhead + subOverhead;
+    const overhead = hours * appliedRate;
     const subtotal = material + scrap + freight + conversion + overhead + fixed;
     // A job's warranty comes from its project estimate, so the job BOM adds none
     const warranty = bom.projectId != null ? 0 : subtotal * (n(bom.warrantyPct) / 100);
     return {
       bom: { id: bom.id, product_id: bom.productId, project_id: bom.projectId, version: bom.version, status: bom.status, freight_pct: n(bom.freightPct), warranty_pct: n(bom.warrantyPct), overhead_rate_override: override, adjust_reason: bom.adjustReason ?? null },
       lines, operations: ops,
-      cost: { material: r2(material), scrap: r2(scrap), freight: r2(freight), conversion: r2(conversion), outsourced: r2(outsourced), fixed: r2(fixed), overhead: r2(overhead), warranty: r2(warranty), total: r2(subtotal + warranty), overhead_rate: r2(appliedRate), default_overhead_rate: r2(ohRate), default_freight_pct: DEFAULT_FREIGHT_PCT, default_warranty_pct: DEFAULT_WARRANTY_PCT, hours: r2(hours), pool_missing: hrs <= 0, fy, freight_base: r2(freightBase), base_cost: r2(material + scrap + subFreight + conversion + subOverhead + fixed) },
+      cost: { material: r2(material), scrap: r2(scrap), freight: r2(freight), conversion: r2(conversion), outsourced: r2(outsourced), fixed: r2(fixed), overhead: r2(overhead), warranty: r2(warranty), total: r2(subtotal + warranty), overhead_rate: r2(appliedRate), default_overhead_rate: r2(ohRate), default_freight_pct: DEFAULT_FREIGHT_PCT, default_warranty_pct: DEFAULT_WARRANTY_PCT, hours: r2(hours), pool_missing: hrs <= 0, fy, freight_base: r2(freightBase), base_cost: r2(material + scrap + conversion + fixed) },
     };
   }
 
@@ -1046,21 +1026,28 @@ export class BudgetPlanningService {
     const fy = this.budgets.fyOf(new Date(), s.fyStartMonth);
     const months = this.budgets.fyMonths(fy, s.fyStartMonth);
     const bom = await this.prisma.bom.findFirst({ where: { productId: id }, orderBy: { version: 'desc' } });
-    const [roll, plans, stds, items, cards, otherBoms] = await Promise.all([
+    const [roll, plans, stds, items, cards] = await Promise.all([
       bom ? this.rollup(bom.id) : Promise.resolve(null),
       this.prisma.productionPlan.findMany({ where: { productId: id } }),
       this.prisma.standardCost.findMany({ where: { productId: id }, orderBy: { id: 'desc' }, take: 30 }),
       this.items(),
       this.prisma.rateCard.findMany({ where: { isActive: true }, orderBy: { role: 'asc' } }),
-      this.prisma.bom.findMany({ where: { productId: { not: null }, NOT: { productId: id } }, select: { id: true, productId: true, version: true } }),
     ]);
     const approved = await this.prisma.standardCost.findFirst({ where: { productId: id, status: 'APPROVED' }, orderBy: { id: 'desc' } });
     const fyPlan = await this.prisma.budgetPlan.findUnique({ where: { fy } });
     const e200 = await this.prisma.categoryType.findFirst({ where: { code: 'E200' } });
     const budgetLine = fyPlan && e200 ? await this.prisma.budgetLine.findFirst({ where: { planId: fyPlan.id, productId: id, typeId: e200.id, isActive: true } }) : null;
+    // Build orders count against the plan of the month they start in. Taken is every order not cancelled; delivered is the part of it that has been handed over.
+    const orders = await this.prisma.buildOrder.findMany({ where: { productId: id, status: { not: 'CANCELLED' } }, orderBy: [{ startDate: 'asc' }, { id: 'asc' }], include: { client: { select: { name: true } } } });
     const build = months.map((m) => {
       const pl = plans.find((x) => x.year === m.year && x.month === m.month);
-      return { year: m.year, month: m.month, label: MON[m.month - 1], planned: pl?.plannedUnits ?? 0, actual: pl?.actualUnits ?? 0 };
+      const inMonth = orders.filter((o) => o.startDate.getUTCFullYear() === m.year && o.startDate.getUTCMonth() + 1 === m.month);
+      const taken = inMonth.reduce((a, o) => a + o.quantity, 0);
+      return {
+        year: m.year, month: m.month, label: MON[m.month - 1], planned: pl?.plannedUnits ?? 0, actual: pl?.actualUnits ?? 0,
+        taken, delivered: inMonth.filter((o) => o.status === 'DELIVERED').reduce((a, o) => a + o.quantity, 0), open: (pl?.plannedUnits ?? 0) - taken,
+        orders: inMonth.map((o) => ({ id: o.id, code: o.code, client_name: o.client?.name ?? null, quantity: o.quantity, status: o.status, delivery_date: o.deliveryDate })),
+      };
     });
     // Budget and variances are measured on the approved standard; the live roll-up is only a fallback until one is approved
     const standardUnit = approved ? n(approved.total) : null;
@@ -1102,14 +1089,13 @@ export class BudgetPlanningService {
       fy, plan_status: fyPlan?.status ?? null, budget_line: !!budgetLine, pricing,
       approved: approved ? { id: approved.id, fy: approved.fy, fixed: n(approved.fixed), total: n(approved.total), material: n(approved.material), scrap: n(approved.scrap), freight: n(approved.freight), conversion: n(approved.conversion), outsourced: n(approved.outsourced), overhead: n(approved.overhead), warranty: n(approved.warranty) } : null,
       bom: roll?.bom ?? null, lines: roll?.lines ?? [], operations: roll?.operations ?? [], cost: roll?.cost ?? null,
-      build_plan: build.map((b) => ({ ...b, spend: r2(spendByMonth.get(`${b.year}-${b.month}`) ?? 0) })), annual: { planned_units: plannedUnits, actual_units: actualUnits, budget: r2(unit * plannedUnits), actual_standard: r2(unit * actualUnits), unit_cost: unit, basis: standardUnit != null ? 'STANDARD' : 'ROLLED', plan_unit_cost: purchasedUnit, plan_budget: r2(purchasedUnit * plannedUnits) },
+      build_plan: build.map((b) => ({ ...b, spend: r2(spendByMonth.get(`${b.year}-${b.month}`) ?? 0) })), annual: { planned_units: plannedUnits, actual_units: actualUnits, taken_units: build.reduce((a, b) => a + b.taken, 0), delivered_units: build.reduce((a, b) => a + b.delivered, 0), open_units: build.reduce((a, b) => a + b.open, 0), budget: r2(unit * plannedUnits), actual_standard: r2(unit * actualUnits), unit_cost: unit, basis: standardUnit != null ? 'STANDARD' : 'ROLLED', plan_unit_cost: purchasedUnit, plan_budget: r2(purchasedUnit * plannedUnits) },
       standards: stds.map((x) => ({ id: x.id, fy: x.fy, total: n(x.total), material: n(x.material), scrap: n(x.scrap), freight: n(x.freight), conversion: n(x.conversion), overhead: n(x.overhead), warranty: n(x.warranty), outsourced: n(x.outsourced), fixed: n(x.fixed), status: x.status, approved_by_name: x.approvedByName, approved_at: x.approvedAt, created_at: x.createdAt,
         overhead_rate: x.overheadRate == null ? null : n(x.overheadRate), freight_pct: x.freightPct == null ? null : n(x.freightPct), warranty_pct: x.warrantyPct == null ? null : n(x.warrantyPct), adjust_reason: x.adjustReason,
         proposed_by_id: x.proposedById, proposed_by_name: x.proposedByName, rejected_by_name: x.rejectedByName, rejected_at: x.rejectedAt, reject_reason: x.rejectReason })),
       variances: { actual_spend: matSpend, standard_material_for_units: r2(stdMaterial), spend_variance: r2(matSpend - stdMaterial), price_variance: priceVariance, units_built: actualUnits, basis: approved ? 'STANDARD' : 'ROLLED', bom_changed: bomChanged },
       operation_types: (await this.operationTypes()).filter((t) => t.is_active),
       items, rate_cards: await this.rateNow(cards).then((rm) => cards.map((c) => ({ id: c.id, role: c.role, rate_per_hour: rm.get(c.id)?.rate ?? n(c.ratePerHour) }))),
-      sub_boms: otherBoms,
     };
   }
 
@@ -1142,51 +1128,48 @@ export class BudgetPlanningService {
     return { id: bom.id };
   }
 
-  // A sub-assembly may not contain the BOM it is added to, and the nesting must stay within SUB_LEVELS
-  private async assertSubAssemblyFits(parentBomId: number, subBomId: number) {
-    const height = async (id: number, trail: number[]): Promise<number> => {
-      if (id === parentBomId || trail.includes(id)) throw bad('That sub-assembly already contains this product, which would make a loop.', HttpStatus.CONFLICT);
-      const kids = await this.prisma.bomLine.findMany({ where: { bomId: id, subBomId: { not: null } }, select: { subBomId: true } });
-      let h = 0;
-      for (const k of kids) h = Math.max(h, 1 + (await height(k.subBomId as number, [...trail, id])));
-      return h;
-    };
-    if ((await height(subBomId, [])) + 1 > SUB_LEVELS) throw bad(`Sub-assemblies can be nested ${SUB_LEVELS} levels deep at most.`);
+  // A sequence is a whole number from 1: step 2 starts when step 1 is built
+  private sequenceOf(v: any, fallback: number) {
+    if (v === undefined || v === null || v === '') return fallback;
+    const x = Number(v);
+    if (!(Number.isInteger(x) && x >= 1 && x <= 99)) throw bad('Sequence is a whole number from 1 to 99.');
+    return x;
   }
 
   async saveBomLine(owner: Owner, lineId: number | null, b: any, user?: Actor) {
     const jobId = typeof owner === 'number' ? null : owner.projectId;
     if (jobId != null) await this.assertJobEditable(jobId);
+    if (lineId) await this.assertOwnsRow(await this.prisma.bomLine.findUnique({ where: { id: lineId }, select: { bom: { select: { id: true, productId: true, projectId: true, buildOrderId: true } } } }), owner, 'line');
     const bom = await this.bomFor(owner);
     if (!(Number(b.quantity) > 0)) throw bad('Enter a quantity above zero.');
-    if (jobId == null && b.sub_product_id) throw bad('A standard product can be a sub-assembly on a job BOM only.');
-    if (!b.item_id && !b.sub_bom_id && !b.sub_product_id) throw bad('Choose an item or a sub-assembly.');
+    if (!b.item_id) throw bad('Choose the part.');
     if (b.scrap_pct !== undefined && b.scrap_pct !== '' && b.scrap_pct !== null && !(Number(b.scrap_pct) >= 0 && Number(b.scrap_pct) <= 100)) throw bad('Scrap % must be between 0 and 100.');
-    if (b.item_id) {
-      const owner = await this.prisma.item.findUnique({ where: { id: Number(b.item_id) }, select: { projectId: true } });
-      if (owner?.projectId != null && owner.projectId !== jobId) throw bad('That part is for one project only. It can go on that project\'s job BOM and nowhere else.', HttpStatus.CONFLICT);
-    }
-    if (b.sub_bom_id && Number(b.sub_bom_id) === bom.id) throw bad('A BOM cannot contain itself.');
-    if (b.sub_bom_id && !b.item_id) await this.assertSubAssemblyFits(bom.id, Number(b.sub_bom_id));
-    // A job's sub-assembly keeps the approved standard it was priced at; it only moves when the line is refreshed
-    let sub: { subProductId: number | null; subStandardId: number | null; subUnitCost: number | null } = { subProductId: null, subStandardId: null, subUnitCost: null };
-    if (jobId != null && !b.item_id && b.sub_product_id) {
-      const pid = Number(b.sub_product_id);
-      const prev = lineId ? await this.prisma.bomLine.findUnique({ where: { id: lineId } }) : null;
-      if (prev && prev.subProductId === pid && prev.subStandardId) {
-        sub = { subProductId: pid, subStandardId: prev.subStandardId, subUnitCost: prev.subUnitCost == null ? null : n(prev.subUnitCost) };
-      } else {
-        const std = await this.prisma.standardCost.findFirst({ where: { productId: pid, status: 'APPROVED' }, orderBy: { id: 'desc' } });
-        if (!std) throw bad('That product has no approved standard cost yet.');
-        sub = { subProductId: pid, subStandardId: std.id, subUnitCost: n(std.total) };
-      }
-    }
-    const data = { itemId: b.item_id ? Number(b.item_id) : null, subBomId: jobId == null && !b.item_id && b.sub_bom_id ? Number(b.sub_bom_id) : null, ...sub, quantity: Number(b.quantity), scrapPct: Number(b.scrap_pct) || 0 };
+    const part = await this.prisma.item.findUnique({ where: { id: Number(b.item_id) }, select: { projectId: true } });
+    if (!part) throw bad('Part not found.', HttpStatus.NOT_FOUND);
+    if (part.projectId != null && part.projectId !== jobId) throw bad('That part is for one project only. It can go on that project\'s job BOM and nowhere else.', HttpStatus.CONFLICT);
     const before = lineId ? await this.prisma.bomLine.findUnique({ where: { id: lineId } }) : null;
+    const group = b.group_name === undefined ? (before?.groupName ?? null) : String(b.group_name ?? '').trim() || null;
+    if (group && group.length > 60) throw bad('Keep the group to 60 characters or fewer.');
+    const data = { itemId: Number(b.item_id), groupName: group, sequence: this.sequenceOf(b.sequence, before?.sequence ?? 1), quantity: Number(b.quantity), scrapPct: Number(b.scrap_pct) || 0 };
     const row = lineId ? await this.prisma.bomLine.update({ where: { id: lineId }, data }) : await this.prisma.bomLine.create({ data: { ...data, bomId: bom.id } });
     if (jobId != null) await this.syncJobEstimate(jobId);
-    this.log('bom_lines', row.id, lineId ? 'UPDATE' : 'INSERT', user?.id, { bom_id: bom.id, item_id: data.itemId, sub_bom_id: data.subBomId, sub_product_id: data.subProductId, quantity: data.quantity, scrap_pct: data.scrapPct }, before ? { item_id: before.itemId, quantity: n(before.quantity), scrap_pct: n(before.scrapPct) } : undefined);
+    this.log('bom_lines', row.id, lineId ? 'UPDATE' : 'INSERT', user?.id, { bom_id: bom.id, item_id: data.itemId, group_name: data.groupName, sequence: data.sequence, quantity: data.quantity, scrap_pct: data.scrapPct }, before ? { item_id: before.itemId, group_name: before.groupName, sequence: before.sequence, quantity: n(before.quantity), scrap_pct: n(before.scrapPct) } : undefined);
     return { id: row.id };
+  }
+
+  // A line or operation is changed through the product or project that owns it, never through another one, and never on a build order's locked copy
+  private async assertOwnsRow(row: { bom: { id: number; productId: number | null; projectId: number | null; buildOrderId: number | null } } | null, owner: Owner, what: string) {
+    if (!row) throw bad(`That ${what} was not found.`, HttpStatus.NOT_FOUND);
+    await this.assertNotOrderBom(row.bom.id);
+    const mine = typeof owner === 'number' ? row.bom.productId === owner : row.bom.projectId === owner.projectId;
+    if (!mine) throw bad(`That ${what} belongs to a different ${typeof owner === 'number' ? 'product' : 'project'}.`, HttpStatus.NOT_FOUND);
+  }
+
+  // A build order's BOM is a locked copy; its only change is swapping a part for an alternate, done on the build order
+  private async assertNotOrderBom(bomId?: number | null) {
+    if (bomId == null) return;
+    const b = await this.prisma.bom.findUnique({ where: { id: bomId }, select: { buildOrderId: true } });
+    if (b?.buildOrderId != null) throw bad('A build order\'s BOM is locked. The only change allowed is swapping a part for one of its alternates.', HttpStatus.CONFLICT);
   }
 
   // A product's costing data is changed by Finance and Admin only; job BOMs follow the project
@@ -1197,6 +1180,7 @@ export class BudgetPlanningService {
   async removeBomLine(id: number, user?: Actor) {
     const line = await this.prisma.bomLine.findUnique({ where: { id }, include: { bom: true } });
     if (!line) return { deleted: true };
+    await this.assertNotOrderBom(line.bomId);
     this.assertCostingRole(line.bom.productId, user);
     const jobId = line.bom.projectId;
     if (jobId != null) await this.assertJobEditable(jobId);
@@ -1209,6 +1193,7 @@ export class BudgetPlanningService {
   async saveOperation(owner: Owner, id: number | null, b: any, user?: Actor) {
     const jobId = typeof owner === 'number' ? null : owner.projectId;
     if (jobId != null) await this.assertJobEditable(jobId);
+    if (id) await this.assertOwnsRow(await this.prisma.bomOperation.findUnique({ where: { id }, select: { bom: { select: { id: true, productId: true, projectId: true, buildOrderId: true } } } }), owner, 'operation');
     const bom = await this.bomFor(owner);
     const type = b.operation_type_id ? await this.prisma.operationType.findUnique({ where: { id: Number(b.operation_type_id) } }) : null;
     if (!type) throw bad('Choose the operation type.');
@@ -1224,8 +1209,8 @@ export class BudgetPlanningService {
       if (!(Number(b.hours) >= 0)) throw bad('Enter the hours.');
       hours = Number(b.hours) || 0; rateCardId = Number(b.rate_card_id);
     }
-    const data = { name: type.name, operationTypeId: type.id, hours, rateCardId, outsourcedCost, fixedCost };
     const before = id ? await this.prisma.bomOperation.findUnique({ where: { id } }) : null;
+    const data = { name: type.name, operationTypeId: type.id, hours, rateCardId, outsourcedCost, fixedCost, sequence: this.sequenceOf(b.sequence, before?.sequence ?? 1) };
     const row = id ? await this.prisma.bomOperation.update({ where: { id }, data }) : await this.prisma.bomOperation.create({ data: { ...data, bomId: bom.id } });
     if (jobId != null) await this.syncJobEstimate(jobId);
     this.log('bom_operations', row.id, id ? 'UPDATE' : 'INSERT', user?.id, { bom_id: bom.id, name: data.name, hours, rate_card_id: rateCardId, outsourced_cost: outsourcedCost, fixed_cost: fixedCost }, before ? { name: before.name, hours: n(before.hours), rate_card_id: before.rateCardId, outsourced_cost: before.outsourcedCost == null ? null : n(before.outsourcedCost) } : undefined);
@@ -1322,6 +1307,7 @@ export class BudgetPlanningService {
   async removeOperation(id: number, user?: Actor) {
     const op = await this.prisma.bomOperation.findUnique({ where: { id }, include: { bom: true } });
     if (!op) return { deleted: true };
+    await this.assertNotOrderBom(op.bomId);
     this.assertCostingRole(op.bom.productId, user);
     const jobId = op.bom.projectId;
     if (jobId != null) await this.assertJobEditable(jobId);
@@ -1347,25 +1333,52 @@ export class BudgetPlanningService {
   async jobBom(projectId: number) {
     const p = await this.jobProject(projectId);
     const bom = await this.prisma.bom.findFirst({ where: { projectId }, orderBy: { version: 'desc' } });
-    const [roll, items, cards, stds, products, types] = await Promise.all([
+    const [roll, items, cards, products, types] = await Promise.all([
       bom ? this.rollup(bom.id) : Promise.resolve(null),
       this.items(false, projectId),
       this.prisma.rateCard.findMany({ where: { isActive: true }, orderBy: { role: 'asc' } }),
-      this.prisma.standardCost.findMany({ where: { status: 'APPROVED' }, orderBy: { id: 'desc' } }),
       this.prisma.product.findMany({ where: { isActive: true, isSystem: false }, orderBy: { name: 'asc' }, select: { id: true, code: true, name: true } }),
       this.operationTypes(),
     ]);
-    const subProducts = products.flatMap((pr) => {
-      const std = stds.find((x) => x.productId === pr.id);
-      return std ? [{ id: pr.id, code: pr.code, name: pr.name, standard_id: std.id, standard_cost: n(std.total), approved_at: std.approvedAt }] : [];
+    // Products whose BOM in force can start this job BOM
+    const productBoms = await this.prisma.bom.findMany({ where: { productId: { not: null } }, orderBy: { version: 'desc' }, include: { _count: { select: { lines: true, operations: true } } } });
+    const importSources = products.flatMap((pr) => {
+      const b = productBoms.find((x) => x.productId === pr.id);
+      return b && b._count.lines > 0 ? [{ id: pr.id, code: pr.code, name: pr.name, version: b.version, lines: b._count.lines, operations: b._count.operations }] : [];
     });
+    const source = bom?.sourceProductId != null ? products.find((pr) => pr.id === bom.sourceProductId) : null;
     return {
       project: { id: p.id, code: p.code, name: p.name, client_name: p.client?.name ?? null, type_code: p.type?.code ?? null, type_name: p.type?.name ?? null },
       bom: roll?.bom ?? null, lines: roll?.lines ?? [], operations: roll?.operations ?? [], cost: roll?.cost ?? null,
+      import_sources: importSources, source: source ? { product_id: source.id, code: source.code, name: source.name, version: bom?.sourceVersion ?? null } : null,
       operation_types: types.filter((t) => t.is_active), items,
       rate_cards: await this.rateNow(cards).then((rm) => cards.map((c) => ({ id: c.id, role: c.role, rate_per_hour: rm.get(c.id)?.rate ?? n(c.ratePerHour) }))),
-      sub_products: subProducts,
     };
+  }
+
+  // Start a job BOM from a standard product: its parts and build operations are copied and stay editable, unlike a build order's locked copy.
+  // Replace swaps everything now on the job BOM; add puts the product's parts and operations after what is there.
+  async importJobBom(projectId: number, b: any, user?: Actor) {
+    await this.assertJobEditable(projectId);
+    const productId = Number(b.product_id);
+    const mode = String(b.mode ?? 'replace').toLowerCase();
+    if (mode !== 'replace' && mode !== 'add') throw bad('Choose whether to replace the current BOM or add to it.');
+    const product = Number.isInteger(productId) ? await this.prisma.product.findUnique({ where: { id: productId }, select: { id: true, code: true, name: true } }) : null;
+    if (!product) throw bad('Choose the product to start from.');
+    await this.applyDueReplacements();
+    const src = await this.prisma.bom.findFirst({ where: { productId }, orderBy: { version: 'desc' }, include: { lines: true, operations: true } });
+    if (!src || src.lines.length === 0) throw bad('That product has no BOM to import yet.', HttpStatus.CONFLICT);
+    const bom = await this.bomFor({ projectId });
+    const had = { parts: await this.prisma.bomLine.count({ where: { bomId: bom.id } }), operations: await this.prisma.bomOperation.count({ where: { bomId: bom.id } }) };
+    await this.prisma.$transaction(async (tx) => {
+      if (mode === 'replace') { await tx.bomLine.deleteMany({ where: { bomId: bom.id } }); await tx.bomOperation.deleteMany({ where: { bomId: bom.id } }); }
+      await tx.bomLine.createMany({ data: src.lines.map((l) => ({ bomId: bom.id, itemId: l.itemId, groupName: l.groupName, sequence: l.sequence, quantity: l.quantity, scrapPct: l.scrapPct })) });
+      if (src.operations.length) await tx.bomOperation.createMany({ data: src.operations.map((o) => ({ bomId: bom.id, name: o.name, hours: o.hours, rateCardId: o.rateCardId, outsourcedCost: o.outsourcedCost, fixedCost: o.fixedCost, operationTypeId: o.operationTypeId, sequence: o.sequence })) });
+      await tx.bom.update({ where: { id: bom.id }, data: { sourceProductId: productId, sourceVersion: src.version } });
+    });
+    await this.syncJobEstimate(projectId);
+    this.log('boms', bom.id, mode === 'replace' ? 'IMPORT_REPLACE' : 'IMPORT_ADD', user?.id, { product: product.code ?? product.name, source_version: src.version, parts: src.lines.length, operations: src.operations.length }, { parts: had.parts, operations: had.operations });
+    return { id: bom.id, parts: src.lines.length, operations: src.operations.length, replaced: mode === 'replace' ? had : null };
   }
 
   // A one-off part for this project's job BOM, added by whoever can edit the job BOM
@@ -1387,19 +1400,6 @@ export class BudgetPlanningService {
     return { id: bom.id };
   }
 
-  // Price a sub-assembly again at the standard that is approved now
-  async refreshJobSub(lineId: number) {
-    const line = await this.prisma.bomLine.findUnique({ where: { id: lineId }, include: { bom: true } });
-    if (!line || line.bom.projectId == null || line.subProductId == null) throw bad('Only a sub-assembly on a job BOM can be updated.');
-    await this.assertJobEditable(line.bom.projectId);
-    const std = await this.prisma.standardCost.findFirst({ where: { productId: line.subProductId, status: 'APPROVED' }, orderBy: { id: 'desc' } });
-    if (!std) throw bad('That product has no approved standard cost.');
-    await this.prisma.bomLine.update({ where: { id: lineId }, data: { subStandardId: std.id, subUnitCost: n(std.total) } });
-    await this.syncJobEstimate(line.bom.projectId);
-    return { id: lineId };
-  }
-
-  // Keep two managed lines on the current estimate in step with the job BOM:
   // what is bought (parts, freight, outsourced work, booked to E200) and the in-house labour and overhead
   private async syncJobEstimate(projectId: number) {
     const bom = await this.prisma.bom.findFirst({ where: { projectId }, orderBy: { version: 'desc' } });
@@ -1612,6 +1612,11 @@ export class BudgetPlanningService {
     const ch = await this.prisma.budgetChange.findUnique({ where: { id } });
     if (!ch) throw bad('Change not found.', HttpStatus.NOT_FOUND);
     if (ch.status !== 'PENDING') throw bad('This change has already been decided.', HttpStatus.CONFLICT);
+    // Whoever asked for the change does not approve it, unless nobody else can
+    if (b.decision === 'approve' && ch.requestedById != null && ch.requestedById === user.id && !financeSelfApprovalAllowed()) {
+      const other = await this.prisma.user.findFirst({ where: { isActive: true, id: { not: user.id }, userRoles: { some: { role: { name: { in: [ROLES.FINANCE, ROLES.ADMIN] } } } } } });
+      if (other) throw bad('You raised this change. Another Finance or Admin user needs to approve it.', HttpStatus.FORBIDDEN);
+    }
     if (b.decision === 'reject') {
       if (!b.note?.trim()) throw bad('Say why it is rejected.');
       await this.prisma.budgetChange.update({ where: { id }, data: { status: 'REJECTED', decidedByName: user.username ?? null, decidedAt: new Date(), decisionNote: b.note.trim() } });

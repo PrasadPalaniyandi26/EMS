@@ -147,6 +147,8 @@ model Transaction {
   productId              Int?                  @map("product_id")
   departmentId           Int?                  @map("department_id")
   budgetLineId           Int?                  @map("budget_line_id")
+  // Product expenses only: the customer order the money was spent on, so its actual cost can be compared with the plan
+  buildOrderId           Int?                  @map("build_order_id")
   overBudgetReason       String?               @map("over_budget_reason") @db.VarChar(500)
   contextType            String?               @default("project") @map("context_type") @db.VarChar(10)
   currency               String?               @default("INR") @db.VarChar(3)
@@ -193,7 +195,9 @@ model Transaction {
   user                   User                  @relation(fields: [userId], references: [id])
   recurringTransaction   RecurringTransaction? @relation(fields: [recurringTransactionId], references: [id])
   department             Department?           @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  buildOrder             BuildOrder?           @relation(fields: [buildOrderId], references: [id], onDelete: SetNull)
 
+  @@index([buildOrderId])
   @@index([userId])
   @@index([dateRecorded])
   @@index([categoryId])
@@ -267,6 +271,7 @@ model Client {
   transactions Transaction[]
   allocations  UserAllocation[]
   splitLines   TransactionSplit[]
+  buildOrders  BuildOrder[]
 
   @@map("clients")
 }
@@ -401,6 +406,7 @@ model Product {
   transactions                  Transaction[]
   splitLines                    TransactionSplit[]
   prices                        ProductPrice[]
+  buildOrders                   BuildOrder[]
 
   @@unique([clientId, name])
   @@index([clientId])
@@ -616,6 +622,7 @@ model BudgetLine {
   costObject    String             @map("cost_object") @db.VarChar(12)
   projectId     Int?               @map("project_id")
   productId     Int?               @map("product_id")
+  buildOrderId  Int?               @map("build_order_id")
   departmentId  Int?               @map("department_id")
   typeId        Int?               @map("type_id")
   categoryId    Int?               @map("category_id")
@@ -628,11 +635,13 @@ model BudgetLine {
   createdAt     DateTime           @default(now()) @map("created_at")
   updatedAt     DateTime           @default(now()) @updatedAt @map("updated_at")
   plan          BudgetPlan         @relation(fields: [planId], references: [id], onDelete: Cascade)
+  buildOrder    BuildOrder?        @relation(fields: [buildOrderId], references: [id], onDelete: Cascade)
   periods       BudgetLinePeriod[]
 
   @@index([planId])
   @@index([projectId])
   @@index([productId])
+  @@index([buildOrderId])
   @@index([departmentId])
   @@index([typeId])
   @@map("budget_lines")
@@ -891,26 +900,73 @@ model Bom {
   // From when this version is in force, and why it was made (for example a part replaced)
   effectiveFrom        DateTime? @map("effective_from") @db.Date
   changeNote           String?  @map("change_note") @db.VarChar(300)
+  // A build order's own copy of a product's BOM; locked apart from swapping a part for one of its alternates
+  buildOrderId Int?           @map("build_order_id")
+  // Job BOMs: the product BOM it was last started from, so a reimport can offer the same product again
+  sourceProductId Int?        @map("source_product_id")
+  sourceVersion   Int?        @map("source_version")
   createdAt   DateTime       @default(now()) @map("created_at")
   project     Project?       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  buildOrder  BuildOrder?    @relation(fields: [buildOrderId], references: [id], onDelete: Cascade)
   lines       BomLine[]
   operations  BomOperation[]
 
   @@unique([productId, version])
   @@unique([projectId, version])
+  @@unique([buildOrderId, version])
   @@index([projectId])
   @@map("boms")
+}
+
+// A customer's commitment to have units of a standard product built and delivered. Built from an imported, locked copy of the product BOM.
+model BuildOrder {
+  id                 Int       @id @default(autoincrement())
+  code               String    @unique @db.VarChar(20)
+  productId          Int       @map("product_id")
+  clientId           Int       @map("client_id")
+  quantity           Int
+  customerPo         String?   @map("customer_po") @db.VarChar(60)
+  // COMMITTED, RELEASED, IN_BUILD, DELIVERED or CANCELLED
+  status             String    @default("COMMITTED") @db.VarChar(10)
+  startDate          DateTime  @map("start_date") @db.Date
+  deliveryDate       DateTime  @map("delivery_date") @db.Date
+  deliveredOn        DateTime? @map("delivered_on") @db.Date
+  unitPrice          Decimal?  @map("unit_price") @db.Decimal(14, 2)
+  notes              String?   @db.VarChar(500)
+  // What the BOM was copied from, and the approved standard cost of the product at that time
+  sourceBomId        Int?      @map("source_bom_id")
+  sourceBomVersion   Int?      @map("source_bom_version")
+  sourceStandardCost Decimal?  @map("source_standard_cost") @db.Decimal(14, 2)
+  importedAt         DateTime? @map("imported_at")
+  // Cost of one unit from the order's own BOM, refreshed on import, on a swap and on request
+  unitCost           Decimal?  @map("unit_cost") @db.Decimal(14, 2)
+  costedAt           DateTime? @map("costed_at")
+  cancelReason       String?   @map("cancel_reason") @db.VarChar(300)
+  createdBy          Int?      @map("created_by")
+  createdByName      String?   @map("created_by_name") @db.VarChar(100)
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at")
+  product            Product   @relation(fields: [productId], references: [id])
+  client             Client    @relation(fields: [clientId], references: [id])
+  boms               Bom[]
+  transactions       Transaction[]
+  budgetLines        BudgetLine[]
+
+  @@index([productId, startDate])
+  @@index([status])
+  @@map("build_orders")
 }
 
 model BomLine {
   id       Int     @id @default(autoincrement())
   bomId    Int     @map("bom_id")
-  itemId   Int?    @map("item_id")
-  subBomId Int?    @map("sub_bom_id")
-  // Job BOMs only: a standard product used as a sub-assembly, priced at the approved standard when the line was saved
-  subProductId  Int?     @map("sub_product_id")
-  subStandardId Int?     @map("sub_standard_id")
-  subUnitCost   Decimal? @map("sub_unit_cost") @db.Decimal(12, 2)
+  itemId   Int     @map("item_id")
+  // Build orders only: the part this line had when the standard BOM was copied, so a swap to an alternate can be shown and undone
+  sourceItemId  Int?     @map("source_item_id")
+  // A label that groups parts for a subtotal (for example the arm or the base); it is not a level of the BOM
+  groupName String? @map("group_name") @db.VarChar(60)
+  // The step of the build the part is needed for. Step 2 starts when step 1 is built; the default of 1 puts everything in one step.
+  sequence  Int     @default(1)
   quantity Decimal @db.Decimal(12, 3)
   scrapPct Decimal @default(0) @map("scrap_pct") @db.Decimal(5, 2)
   bom      Bom     @relation(fields: [bomId], references: [id], onDelete: Cascade)
@@ -929,6 +985,8 @@ model BomOperation {
   // A fixed amount per unit for an operation costed as a fixed cost (no role or hours)
   fixedCost       Decimal?       @map("fixed_cost") @db.Decimal(12, 2)
   operationTypeId Int?           @map("operation_type_id")
+  // The step of the build the work belongs to, matching the sequence of the parts it uses
+  sequence        Int            @default(1)
   operationType   OperationType? @relation(fields: [operationTypeId], references: [id], onDelete: SetNull)
   bom             Bom            @relation(fields: [bomId], references: [id], onDelete: Cascade)
 

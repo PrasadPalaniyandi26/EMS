@@ -49,29 +49,29 @@ export interface ProjectBudget {
   evm: Evm; milestones: Milestone[]; rate_cards: RateCard[]; suggested_contingency_pct: number;
 }
 
-export interface ItemUse { kind: 'PRODUCT' | 'JOB'; id: number; code: string | null; name: string; client_name: string | null; quantity: number; scrap_pct: number; line_cost: number }
+export interface ItemUse { kind: 'PRODUCT' | 'JOB' | 'ORDER'; id: number; code: string | null; name: string; client_name: string | null; quantity: number; scrap_pct: number; line_cost: number }
 export interface ProductPricing {
   fy: number; price: number | null; updated_by_name: string | null; updated_at: string | null; unit_cost: number; basis: 'STANDARD' | 'ROLLED';
   target_margin_pct: number | null; min_margin_pct: number | null; price_for_target: number | null; price_for_min: number | null; rolled_cost: number | null; margin_at_rolled_pct: number | null;
   profit_unit: number | null; margin_pct: number | null; planned_revenue: number | null; planned_profit: number | null; built_revenue: number | null; built_profit: number | null;
 }
 export interface ProductRow { selling_price: number | null; target_margin_pct: number | null; min_margin_pct: number | null; margin_pct: number | null; standard_fy: number | null; fy: number; id: number; code: string | null; name: string; client_name: string | null; bom_status: string | null; bom_lines: number; rolled_cost: number | null; standard_cost: number | null; standard_approved_at: string | null; plan_status: string | null; budget_line: boolean }
-export interface BomLineRow { id: number; sourcing: 'MAKE' | 'BUY'; item_id: number | null; sub_bom_id: number | null; sub_product_id: number | null; sub_standard_id: number | null; sub_drift: number; part_no: string; name: string; quantity: number; scrap_pct: number; unit_cost: number; amount: number; item_drift: number }
+export interface BomLineRow { id: number; sourcing: 'MAKE' | 'BUY'; item_id: number | null; group_name: string | null; sequence: number; part_no: string; name: string; quantity: number; scrap_pct: number; unit_cost: number; amount: number; item_drift: number }
 export interface OperationType { id: number; name: string; is_outsourced: boolean; is_fixed: boolean; is_active: boolean; used_in: number }
-export interface OperationRow { id: number; name: string; type_id: number | null; type_name: string; is_outsourced: boolean; is_fixed: boolean; fixed_cost: number | null; role: string | null; hours: number; rate_card_id: number | null; rate: number; outsourced_cost: number | null; amount: number }
+export interface OperationRow { id: number; name: string; type_id: number | null; type_name: string; is_outsourced: boolean; is_fixed: boolean; fixed_cost: number | null; role: string | null; hours: number; rate_card_id: number | null; rate: number; outsourced_cost: number | null; amount: number; sequence: number }
 export interface CostBreakdown { material: number; scrap: number; freight: number; conversion: number; outsourced: number; fixed: number; overhead: number; warranty: number; total: number; overhead_rate: number; default_overhead_rate: number; default_freight_pct: number; default_warranty_pct: number; hours: number; freight_base: number; base_cost: number; pool_missing: boolean; fy: number }
 
 export interface ProductCosting {
   product: { id: number; code: string | null; name: string; client_name: string | null; standard_cost: number | null };
   fy: number; plan_status: string | null; budget_line: boolean; pricing: ProductPricing; approved: { id: number; fy: number; fixed: number; total: number; material: number; scrap: number; freight: number; conversion: number; outsourced: number; overhead: number; warranty: number } | null; bom: { id: number; version: number; status: string; freight_pct: number; warranty_pct: number; overhead_rate_override: number | null; adjust_reason: string | null } | null;
   lines: BomLineRow[]; operations: OperationRow[]; cost: CostBreakdown | null;
-  build_plan: { year: number; month: number; label: string; planned: number; actual: number; spend: number }[];
-  annual: { planned_units: number; actual_units: number; budget: number; actual_standard: number; unit_cost: number; basis: 'STANDARD' | 'ROLLED'; plan_unit_cost: number; plan_budget: number };
+  build_plan: { year: number; month: number; label: string; planned: number; actual: number; spend: number; taken: number; delivered: number; open: number; orders: { id: number; code: string; client_name: string | null; quantity: number; status: string; delivery_date: string }[] }[];
+  annual: { taken_units: number; delivered_units: number; open_units: number; planned_units: number; actual_units: number; budget: number; actual_standard: number; unit_cost: number; basis: 'STANDARD' | 'ROLLED'; plan_unit_cost: number; plan_budget: number };
   standards: { id: number; fy: number; total: number; material: number; scrap: number; freight: number; conversion: number; overhead: number; warranty: number; outsourced: number; fixed: number; status: string; approved_by_name: string | null; approved_at: string | null; created_at: string;
     overhead_rate: number | null; freight_pct: number | null; warranty_pct: number | null; adjust_reason: string | null; proposed_by_id: number | null; proposed_by_name: string | null; rejected_by_name: string | null; rejected_at: string | null; reject_reason: string | null }[];
   variances: { actual_spend: number; standard_material_for_units: number; spend_variance: number; price_variance: number; units_built: number; basis: 'STANDARD' | 'ROLLED'; bom_changed: boolean };
   operation_types: OperationType[];
-  items: Item[]; rate_cards: { id: number; role: string; rate_per_hour: number }[]; sub_boms: { id: number; productId: number; version: number }[];
+  items: Item[]; rate_cards: { id: number; role: string; rate_per_hour: number }[];
 }
 
 // The build behind a bespoke (J100) project: parts and build operations priced like a product, with no standard cost of its own
@@ -80,7 +80,9 @@ export interface JobBom {
   bom: { id: number; project_id: number | null; version: number; status: string; freight_pct: number; warranty_pct: number } | null;
   lines: BomLineRow[]; operations: OperationRow[]; cost: CostBreakdown | null;
   operation_types: OperationType[]; items: Item[]; rate_cards: { id: number; role: string; rate_per_hour: number }[];
-  sub_products: { id: number; code: string | null; name: string; standard_id: number; standard_cost: number; approved_at: string | null }[];
+  // Products whose BOM can start this job BOM, and the one it was last started from
+  import_sources: { id: number; code: string | null; name: string; version: number; lines: number; operations: number }[];
+  source: { product_id: number; code: string | null; name: string; version: number | null } | null;
 }
 
 export interface BudgetChangeRow {

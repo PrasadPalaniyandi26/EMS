@@ -6,7 +6,7 @@ import api from '@/lib/api-client';
 const KEY = 'budgets';
 const LIVE = 0;
 
-export type CostObject = 'PROJECT' | 'PRODUCT' | 'DEPARTMENT' | 'RESERVE';
+export type CostObject = 'PROJECT' | 'PRODUCT' | 'ORDER' | 'DEPARTMENT' | 'RESERVE';
 export type PlanStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'ACTIVE' | 'CLOSED';
 export type AlertLevel = 'INFO' | 'CAUTION' | 'WARNING' | 'CRITICAL';
 export type LineStatus = 'On track' | 'Caution' | 'Warning' | 'Critical' | 'Held';
@@ -18,7 +18,7 @@ export interface BudgetPlanInfo {
 }
 
 export interface BudgetLine {
-  id: number; plan_id: number; cost_object: CostObject; project_id: number | null; product_id: number | null; department_id: number | null;
+  id: number; plan_id: number; cost_object: CostObject; project_id: number | null; product_id: number | null; build_order_id: number | null; department_id: number | null;
   type_id: number | null; category_id: number | null; control_level: 'TYPE' | 'CATEGORY'; strict: boolean; is_contingency: boolean;
   owner_id: number | null; owner_name: string | null; note: string | null;
   object_name: string; object_code: string; type_label: string; category_label: string | null; label: string;
@@ -132,7 +132,7 @@ export function useBudgetSettings(enabled = true) {
 }
 
 export interface HeadroomParams {
-  date?: string; contextType?: string; projectId?: string | number; productId?: string | number; departmentId?: string | number;
+  date?: string; contextType?: string; projectId?: string | number; productId?: string | number; departmentId?: string | number; buildOrderId?: string | number;
   categoryId?: string | number; amount?: string | number; excludeId?: number; gstClaimable?: boolean; netAmount?: number;
 }
 

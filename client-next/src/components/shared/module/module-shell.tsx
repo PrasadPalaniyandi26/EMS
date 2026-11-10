@@ -54,8 +54,10 @@ export function ModuleShell({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !document.querySelector('[role="dialog"]')) closeAll();
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    // Capture phase, so the check runs before a dialog's own Escape handler removes it: one Escape closes the
+    // dialog and leaves the selection and the panel as they were
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, [showPanel, panelOpen, closeAll]);
 
   const panel = intelligencePanel

@@ -123,6 +123,7 @@ export interface Transaction {
   project_id?: number;
   project_name?: string;
   product_id?: number;
+  build_order_id?: number | null;
   product_name?: string;
   payment_method?: string;
   reference_id?: string;
@@ -269,6 +270,7 @@ export interface DashboardSummary {
   totalIncome: number;
   totalExpenses: number;
   balance: number;
+  previous?: { totalIncome: number; totalExpenses: number; balance: number } | null;
   transactionCount: number;
   recentTransactions: Transaction[];
 }

@@ -6,15 +6,19 @@ import { IdCell, TextCell, ToneText } from "@/components/data-table/cells"
 
 const ROLE_LABEL = (name?: string) => (name ? name.charAt(0).toUpperCase() + name.slice(1).toLowerCase() : 'Staff')
 
-const STATUS: Record<string, { label: string; tone: 'success' | 'warning' | 'danger' | 'muted' }> = {
-  ACTIVE: { label: 'Active', tone: 'success' },
-  ON_HOLD: { label: 'On hold', tone: 'warning' },
-  INACTIVE: { label: 'Inactive', tone: 'danger' },
+const STATUS: Record<string, { label: string; tone: 'success' | 'warning' | 'danger' | 'muted'; rank: number }> = {
+  ON_HOLD: { label: 'On hold', tone: 'warning', rank: 0 },
+  INACTIVE: { label: 'Inactive', tone: 'danger', rank: 1 },
+  ACTIVE: { label: 'Active', tone: 'success', rank: 2 },
 }
+// The same three values wherever a user's status is read
+export const userStatus = (u: any): string => String(u.user_status || (u.is_active !== 0 ? 'ACTIVE' : 'INACTIVE')).toUpperCase()
+export const USER_STATUS = STATUS
 
 export const columns = (users: User[]): ColumnDef<User>[] => [
   {
-    accessorKey: "id",
+    id: "employee_id",
+    accessorFn: (row) => `NT${10000 + row.id}`,
     header: "ID",
     cell: ({ row }) => <IdCell value={`NT${10000 + row.original.id}`} />,
     size: 110,
@@ -27,12 +31,21 @@ export const columns = (users: User[]): ColumnDef<User>[] => [
   {
     accessorKey: "department",
     header: "Department",
-    cell: ({ row }) => <TextCell value={row.getValue("department") as string} />,
+    cell: ({ row }) => <TextCell value={row.getValue("department") as string} muted />,
   },
   {
     accessorKey: "role_name",
     header: "Role",
-    cell: ({ row }) => <TextCell value={ROLE_LABEL(row.getValue("role_name") as string)} />,
+    // The active role, with how many others the person holds under it
+    cell: ({ row }) => {
+      const extra = Math.max(0, ((row.original as any).roles?.length ?? 1) - 1)
+      return (
+        <div>
+          <TextCell value={ROLE_LABEL(row.getValue("role_name") as string)} className="block" />
+          {extra > 0 && <TextCell value={`+${extra} more`} muted className="block text-[12px]" />}
+        </div>
+      )
+    },
   },
   {
     accessorKey: "manager_id",
@@ -40,15 +53,15 @@ export const columns = (users: User[]): ColumnDef<User>[] => [
     cell: ({ row }) => {
       const managerId = row.getValue("manager_id") as number
       const managerName = row.original.manager_name || users.find(u => u.id === managerId)?.username
-      return <TextCell value={managerName} />
+      return <TextCell value={managerName} muted />
     },
   },
   {
-    accessorKey: "is_active",
+    id: "status",
+    accessorFn: (row) => (STATUS[userStatus(row)] ?? { rank: 9 }).rank,
     header: "Status",
     cell: ({ row }) => {
-      const status = String(row.original.user_status || (row.getValue("is_active") !== 0 ? 'ACTIVE' : 'INACTIVE')).toUpperCase()
-      const cfg = STATUS[status] || { label: status, tone: 'muted' as const }
+      const cfg = STATUS[userStatus(row.original)] || { label: userStatus(row.original), tone: 'muted' as const }
       return <ToneText label={cfg.label} tone={cfg.tone} />
     },
   },

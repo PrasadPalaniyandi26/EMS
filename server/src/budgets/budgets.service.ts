@@ -4,17 +4,18 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { TXN_STATUS } from '../common/constants/transaction-status';
+import { financeSelfApprovalAllowed } from '../common/config/approval-policy';
 
 const PENDING = [TXN_STATUS.PENDING_MANAGER, TXN_STATUS.PENDING_FINANCE] as string[];
 const COUNTED = [TXN_STATUS.APPROVED, ...PENDING];
 const CONTROLLING = ['APPROVED', 'ACTIVE'];
-const KIND: Record<string, string> = { PROJECT: 'PROJECT', PRODUCT: 'PRODUCT', DEPARTMENT: 'OVERHEAD' };
+const KIND: Record<string, string> = { PROJECT: 'PROJECT', PRODUCT: 'PRODUCT', ORDER: 'PRODUCT', DEPARTMENT: 'OVERHEAD' };
 const LEVEL_RANK: Record<string, number> = { INFO: 1, CAUTION: 2, WARNING: 3, CRITICAL: 4 };
 
 type Settings = { fyStartMonth: number; overBudgetMode: string; controlLevel: string; netOfClaimableGst: boolean; approvalThreshold: number; contingencyPct: number };
 export type Part = {
   txnId: number; ref: string | null; status: string; year: number; month: number; amount: number;
-  costObject: string; projectId: number | null; productId: number | null; departmentId: number | null;
+  costObject: string; projectId: number | null; productId: number | null; departmentId: number | null; buildOrderId?: number | null;
   typeId: number | null; categoryId: number | null; submitterName?: string | null; submittedAt?: Date | null;
 };
 
@@ -134,9 +135,10 @@ export class BudgetsService {
   // ── Names for cost objects, types and owners ─────────────────────────────
 
   private async lookups() {
-    const [projects, products, departments, types, categories, users] = await Promise.all([
+    const [projects, products, orders, departments, types, categories, users] = await Promise.all([
       this.prisma.project.findMany({ select: { id: true, name: true, code: true } }),
       this.prisma.product.findMany({ select: { id: true, name: true, code: true } }),
+      this.prisma.buildOrder.findMany({ select: { id: true, code: true, quantity: true, product: { select: { name: true } } } }),
       this.prisma.department.findMany({ select: { id: true, name: true, ownerId: true } }),
       this.prisma.categoryType.findMany({ select: { id: true, name: true, code: true, appliesTo: true } }),
       this.prisma.category.findMany({ select: { id: true, name: true, code: true, typeId: true } }),
@@ -145,6 +147,7 @@ export class BudgetsService {
     return {
       projects: new Map(projects.map((p) => [p.id, p])),
       products: new Map(products.map((p) => [p.id, p])),
+      orders: new Map(orders.map((o) => [o.id, o])),
       departments: new Map(departments.map((d) => [d.id, d])),
       types: new Map(types.map((t) => [t.id, t])),
       categories: new Map(categories.map((c) => [c.id, c])),
@@ -161,6 +164,9 @@ export class BudgetsService {
     } else if (l.costObject === 'PRODUCT') {
       const p = lk.products.get(l.productId);
       object = p?.name ?? 'Product'; objectCode = p?.code || p?.name || 'Product';
+    } else if (l.costObject === 'ORDER') {
+      const o = lk.orders.get(l.buildOrderId);
+      object = o ? `${o.product?.name ?? 'Order'} × ${o.quantity}` : 'Order'; objectCode = o?.code ?? 'Order';
     } else if (l.costObject === 'DEPARTMENT') {
       const d = lk.departments.get(l.departmentId);
       object = d?.name ?? 'Department'; objectCode = d?.name ?? 'Department';
@@ -196,7 +202,7 @@ export class BudgetsService {
     const cost = s.netOfClaimableGst && t.isClaimable ? n(t.netAmount ?? t.amount) : total;
     const ratio = total > 0 ? cost / total : 1;
     const d = new Date(t.dateRecorded);
-    const base = { txnId: t.id, ref: t.referenceId, status: t.status, year: d.getFullYear(), month: d.getMonth() + 1, submitterName: t.submittedByName, submittedAt: t.submittedAt };
+    const base = { txnId: t.id, ref: t.referenceId, status: t.status, year: d.getFullYear(), month: d.getMonth() + 1, submitterName: t.submittedByName, submittedAt: t.submittedAt, buildOrderId: (t.buildOrderId ?? null) as number | null };
     const kind = (t.contextType || 'project') === 'product' ? 'PRODUCT' : t.contextType === 'overhead' ? 'DEPARTMENT' : 'PROJECT';
     const mk = (amount: number, projectId: any, productId: any, categoryId: any, typeId: any): Part => ({
       ...base, amount: amount * ratio, costObject: kind,
@@ -223,15 +229,18 @@ export class BudgetsService {
     return parts;
   }
 
-  private objectIdOf(x: { costObject: string; projectId: number | null; productId: number | null; departmentId: number | null }) {
-    return x.costObject === 'PROJECT' ? x.projectId : x.costObject === 'PRODUCT' ? x.productId : x.costObject === 'DEPARTMENT' ? x.departmentId : null;
+  private objectIdOf(x: { costObject: string; projectId: number | null; productId: number | null; departmentId: number | null; buildOrderId?: number | null }) {
+    return x.costObject === 'PROJECT' ? x.projectId : x.costObject === 'PRODUCT' ? x.productId : x.costObject === 'ORDER' ? x.buildOrderId ?? null : x.costObject === 'DEPARTMENT' ? x.departmentId : null;
   }
 
-  // The line an expense part is charged to: a category-level line first, then the type-level line
-  private matchLine(part: Pick<Part, 'costObject' | 'projectId' | 'productId' | 'departmentId' | 'typeId' | 'categoryId'>, lines: any[]) {
-    const oid = this.objectIdOf(part);
-    const cands = lines.filter((l) => l.isActive && !l.isContingency && l.costObject === part.costObject && this.objectIdOf(l) === oid && l.typeId === part.typeId);
-    return cands.find((l) => l.controlLevel === 'CATEGORY' && l.categoryId === part.categoryId) ?? cands.find((l) => l.controlLevel === 'TYPE') ?? null;
+  // The line an expense part is charged to: a category-level line first, then the type-level line.
+  // An expense charged to a build order goes to that order's own line when it has one for the type, otherwise to the product's line.
+  private matchLine(part: Pick<Part, 'costObject' | 'projectId' | 'productId' | 'departmentId' | 'typeId' | 'categoryId'> & { buildOrderId?: number | null }, lines: any[]) {
+    const pick = (costObject: string, oid: number | null) => {
+      const cands = lines.filter((l) => l.isActive && !l.isContingency && l.costObject === costObject && this.objectIdOf(l) === oid && l.typeId === part.typeId);
+      return cands.find((l) => l.controlLevel === 'CATEGORY' && l.categoryId === part.categoryId) ?? cands.find((l) => l.controlLevel === 'TYPE') ?? null;
+    };
+    return (part.buildOrderId != null ? pick('ORDER', part.buildOrderId) : null) ?? pick(part.costObject, this.objectIdOf(part));
   }
 
   private lineTotals(line: any) {
@@ -285,7 +294,7 @@ export class BudgetsService {
       if (src) {
         const shift = fy - src.fy;
         for (const l of src.lines) {
-          if (l.costObject === 'PROJECT' || l.costObject === 'PRODUCT') {
+          if (l.costObject === 'PROJECT' || l.costObject === 'PRODUCT' || l.costObject === 'ORDER') {
             // only recurring cost objects carry over: overhead and reserve lines
             continue;
           }
@@ -351,6 +360,11 @@ export class BudgetsService {
     const s = await this.getSettings();
     const plan = await this.planOrThrow(fy);
     if (plan.status !== 'SUBMITTED') throw new HttpException('Only a submitted plan can be approved or sent back.', HttpStatus.CONFLICT);
+    // Whoever submitted the plan does not approve it, unless nobody else can
+    if (body.decision === 'approve' && plan.submittedByName && plan.submittedByName === user.username && !financeSelfApprovalAllowed()) {
+      const other = await this.prisma.user.findFirst({ where: { isActive: true, id: { not: user.id }, userRoles: { some: { role: { name: { in: ['FINANCE', 'ADMIN'] } } } } } });
+      if (other) throw new HttpException('You submitted this plan. Another Finance or Admin user needs to approve it.', HttpStatus.FORBIDDEN);
+    }
     let row;
     if (body.decision === 'approve') {
       const started = new Date() >= this.fyRange(fy, s.fyStartMonth).from;
@@ -396,7 +410,7 @@ export class BudgetsService {
     let actual = 0; let committed = 0;
     for (const v of usage.values()) { actual += v.actual; committed += v.committed; }
     return {
-      id: l.id, plan_id: l.planId, cost_object: l.costObject, project_id: l.projectId, product_id: l.productId, department_id: l.departmentId,
+      id: l.id, plan_id: l.planId, cost_object: l.costObject, project_id: l.projectId, product_id: l.productId, build_order_id: l.buildOrderId ?? null, department_id: l.departmentId,
       type_id: l.typeId, category_id: l.categoryId, control_level: l.controlLevel, strict: l.strict, is_contingency: l.isContingency,
       owner_id: l.ownerId, owner_name: names.ownerName, note: l.note,
       object_name: names.object, object_code: names.objectCode, type_label: names.typeLabel, category_label: names.catLabel, label: names.label,
@@ -419,16 +433,18 @@ export class BudgetsService {
 
   private async validateLine(body: any, planId: number, excludeId?: number) {
     const costObject = String(body.cost_object || '');
-    if (!['PROJECT', 'PRODUCT', 'DEPARTMENT', 'RESERVE'].includes(costObject)) throw new HttpException('Choose what the budget is for.', HttpStatus.BAD_REQUEST);
+    if (!['PROJECT', 'PRODUCT', 'ORDER', 'DEPARTMENT', 'RESERVE'].includes(costObject)) throw new HttpException('Choose what the budget is for.', HttpStatus.BAD_REQUEST);
     const data: any = {
-      costObject, projectId: null, productId: null, departmentId: null, typeId: null, categoryId: null,
+      costObject, projectId: null, productId: null, buildOrderId: null, departmentId: null, typeId: null, categoryId: null,
       controlLevel: body.control_level === 'CATEGORY' ? 'CATEGORY' : 'TYPE', strict: !!body.strict, isContingency: !!body.is_contingency,
       ownerId: body.owner_id ? Number(body.owner_id) : null, note: body.note?.trim() || null,
     };
     if (costObject === 'PROJECT') data.projectId = Number(body.project_id) || null;
     if (costObject === 'PRODUCT') data.productId = Number(body.product_id) || null;
+    if (costObject === 'ORDER') data.buildOrderId = Number(body.build_order_id) || null;
     if (costObject === 'DEPARTMENT') data.departmentId = Number(body.department_id) || null;
-    if (costObject !== 'RESERVE' && !this.objectIdOf(data)) throw new HttpException('Choose the project, product or department.', HttpStatus.BAD_REQUEST);
+    if (costObject !== 'RESERVE' && !this.objectIdOf(data)) throw new HttpException('Choose the project, product, order or department.', HttpStatus.BAD_REQUEST);
+    if (costObject === 'ORDER' && !(await this.prisma.buildOrder.findUnique({ where: { id: data.buildOrderId }, select: { id: true } }))) throw new HttpException('Build order not found.', HttpStatus.NOT_FOUND);
     if (costObject === 'RESERVE') { data.isContingency = false; data.strict = false; }
     const needsType = costObject !== 'RESERVE' && !data.isContingency;
     if (needsType) {
@@ -448,7 +464,7 @@ export class BudgetsService {
     } else { data.controlLevel = 'TYPE'; }
     const dup = await this.prisma.budgetLine.findFirst({
       where: {
-        planId, isActive: true, costObject, projectId: data.projectId, productId: data.productId, departmentId: data.departmentId,
+        planId, isActive: true, costObject, projectId: data.projectId, productId: data.productId, buildOrderId: data.buildOrderId, departmentId: data.departmentId,
         typeId: data.typeId, categoryId: data.categoryId, isContingency: data.isContingency, ...(excludeId ? { NOT: { id: excludeId } } : {}),
       },
     });
@@ -475,24 +491,52 @@ export class BudgetsService {
     });
   }
 
-  async createLine(body: any, user: { id: number }, isFinance: boolean) {
+  // A manager only changes lines they own; Finance and Admin change any line
+  // Operations prepares the plan, so it changes any draft line like Finance does (an approved plan still needs Finance)
+  private changesAnyLine(user: { role_name?: string }, isFinance: boolean) {
+    return isFinance || (user.role_name || '').toUpperCase() === 'OPERATIONS';
+  }
+
+  private assertCanChange(line: { ownerId: number | null }, user: { id: number; role_name?: string }, isFinance: boolean) {
+    if (!this.changesAnyLine(user, isFinance) && line.ownerId !== user.id) throw new HttpException('Only the line owner, Finance or Admin can change this line.', HttpStatus.FORBIDDEN);
+  }
+
+  // Money in a closed month cannot move: any change to a locked month is refused
+  private async assertOpenMonths(changes: { year: number; month: number; before: number; after: number }[]) {
+    const moved = changes.filter((c) => r2(c.before) !== r2(c.after));
+    if (!moved.length) return;
+    const locks = await this.prisma.periodLock.findMany({ select: { year: true, month: true } });
+    const closed = moved.find((c) => locks.some((l) => l.year === c.year && l.month === c.month));
+    if (closed) throw new HttpException(`${MON[closed.month - 1]} ${closed.year} is closed. Ask Finance to reopen it before changing its budget.`, HttpStatus.BAD_REQUEST);
+  }
+
+  async createLine(body: any, user: { id: number; role_name?: string }, isFinance: boolean) {
     const s = await this.getSettings();
     const plan = await this.editablePlan(Number(body.plan_id), body.reason, user.id, isFinance);
+    if (!this.changesAnyLine(user, isFinance)) body = { ...body, owner_id: user.id };
     const data = await this.validateLine(body, plan.id);
     const periods = this.buildPeriods(plan.fy, s, body);
+    await this.assertOpenMonths(periods.map((p) => ({ year: p.year, month: p.month, before: 0, after: p.amount })));
     const line = await this.prisma.budgetLine.create({ data: { planId: plan.id, ...data, periods: { create: periods } }, include: { periods: true } });
     this.audit.log({ tableName: 'budget_lines', recordId: line.id, action: 'INSERT', changedBy: user.id, newValues: { ...line, reason: body.reason ?? null } }).catch(() => undefined);
     this.lastEvaluated = 0;
     return { id: line.id };
   }
 
-  async updateLine(id: number, body: any, user: { id: number }, isFinance: boolean) {
+  async updateLine(id: number, body: any, user: { id: number; role_name?: string }, isFinance: boolean) {
     const s = await this.getSettings();
     const line = await this.prisma.budgetLine.findUnique({ where: { id }, include: { periods: true } });
     if (!line || !line.isActive) throw new HttpException('Budget line not found.', HttpStatus.NOT_FOUND);
+    this.assertCanChange(line, user, isFinance);
     const plan = await this.editablePlan(line.planId, body.reason, user.id, isFinance);
+    if (!this.changesAnyLine(user, isFinance)) body = { ...body, owner_id: user.id };
     const data = await this.validateLine(body, plan.id, id);
     const hasAmounts = Array.isArray(body.periods) || body.total != null;
+    if (hasAmounts) {
+      const next = this.buildPeriods(plan.fy, s, body);
+      const before = (y: number, m: number) => n(line.periods.find((o) => o.year === y && o.month === m)?.amount);
+      await this.assertOpenMonths(next.map((p) => ({ year: p.year, month: p.month, before: before(p.year, p.month), after: p.amount })));
+    }
     await this.prisma.$transaction(async (tx) => {
       await tx.budgetLine.update({ where: { id }, data });
       if (hasAmounts) {
@@ -506,11 +550,14 @@ export class BudgetsService {
   }
 
   // Edit a single month of a line (planner grid cell)
-  async setPeriod(id: number, body: { year: number; month: number; amount: number; reason?: string }, user: { id: number }, isFinance: boolean) {
+  async setPeriod(id: number, body: { year: number; month: number; amount: number; reason?: string }, user: { id: number; role_name?: string }, isFinance: boolean) {
     const line = await this.prisma.budgetLine.findUnique({ where: { id } });
     if (!line || !line.isActive) throw new HttpException('Budget line not found.', HttpStatus.NOT_FOUND);
+    this.assertCanChange(line, user, isFinance);
     await this.editablePlan(line.planId, body.reason, user.id, isFinance);
     const amount = r2(Math.max(0, Number(body.amount) || 0));
+    const existing = await this.prisma.budgetLinePeriod.findUnique({ where: { lineId_year_month: { lineId: id, year: Number(body.year), month: Number(body.month) } } });
+    await this.assertOpenMonths([{ year: Number(body.year), month: Number(body.month), before: n(existing?.amount), after: amount }]);
     await this.prisma.budgetLinePeriod.upsert({
       where: { lineId_year_month: { lineId: id, year: Number(body.year), month: Number(body.month) } },
       update: { amount }, create: { lineId: id, year: Number(body.year), month: Number(body.month), amount },
@@ -520,10 +567,12 @@ export class BudgetsService {
     return { id };
   }
 
-  async deleteLine(id: number, reason: string | undefined, user: { id: number }, isFinance: boolean) {
-    const line = await this.prisma.budgetLine.findUnique({ where: { id } });
+  async deleteLine(id: number, reason: string | undefined, user: { id: number; role_name?: string }, isFinance: boolean) {
+    const line = await this.prisma.budgetLine.findUnique({ where: { id }, include: { periods: true } });
     if (!line || !line.isActive) throw new HttpException('Budget line not found.', HttpStatus.NOT_FOUND);
+    this.assertCanChange(line, user, isFinance);
     await this.editablePlan(line.planId, reason, user.id, isFinance);
+    await this.assertOpenMonths(line.periods.map((p) => ({ year: p.year, month: p.month, before: n(p.amount), after: 0 })));
     await this.prisma.$transaction([
       this.prisma.transaction.updateMany({ where: { budgetLineId: id }, data: { budgetLineId: null } }),
       this.prisma.budgetLine.delete({ where: { id } }),
@@ -607,10 +656,10 @@ export class BudgetsService {
   }
 
   // Month-by-month budget, actual and committed for one line (monitor detail panel)
-  async lineDetail(id: number) {
+  async lineDetail(id: number, scope: { ownerId?: number } = {}) {
     const s = await this.getSettings();
     const line = await this.prisma.budgetLine.findUnique({ where: { id }, include: { periods: true, plan: true } });
-    if (!line) throw new HttpException('Budget line not found.', HttpStatus.NOT_FOUND);
+    if (!line || (scope.ownerId != null && line.ownerId !== scope.ownerId)) throw new HttpException('Budget line not found.', HttpStatus.NOT_FOUND);
     const [lk, parts, alerts] = await Promise.all([this.lookups(), this.loadParts(line.plan.fy, s), this.prisma.budgetAlert.findMany({ where: { lineId: id, status: 'OPEN' }, orderBy: { openedAt: 'desc' } })]);
     const months = this.fyMonths(line.plan.fy, s.fyStartMonth);
     const { usage } = this.computeUsage([line], parts);
@@ -632,7 +681,7 @@ export class BudgetsService {
   // ── Headroom and the check at submit ─────────────────────────────────────
 
   // What a single expense (or one split part) would do to its budget line
-  async headroom(q: { date?: string; contextType?: string; projectId?: number; productId?: number; departmentId?: number; categoryId?: number; amount?: number; excludeId?: number; gstClaimable?: boolean; netAmount?: number }) {
+  async headroom(q: { date?: string; contextType?: string; projectId?: number; productId?: number; departmentId?: number; buildOrderId?: number; categoryId?: number; amount?: number; excludeId?: number; gstClaimable?: boolean; netAmount?: number }) {
     const s = await this.getSettings();
     const date = q.date ? new Date(q.date) : new Date();
     const out = (state: string, extra: any = {}) => ({ state, message: null as string | null, ...extra });
@@ -651,7 +700,7 @@ export class BudgetsService {
     const lines = await this.prisma.budgetLine.findMany({ where: { planId: plan.id, isActive: true }, include: { periods: true } });
     const part = {
       costObject: ct, projectId: ct === 'PROJECT' ? q.projectId ?? null : null, productId: ct === 'PRODUCT' ? q.productId ?? null : null,
-      departmentId: ct === 'DEPARTMENT' ? q.departmentId ?? null : null, typeId: type.id, categoryId: category.id,
+      departmentId: ct === 'DEPARTMENT' ? q.departmentId ?? null : null, buildOrderId: q.buildOrderId ?? null, typeId: type.id, categoryId: category.id,
     };
     if (!this.objectIdOf(part)) return out('NONE');
     const line = this.matchLine(part, lines);
@@ -678,13 +727,14 @@ export class BudgetsService {
 
   // Run when an expense is submitted: blocks, or demands a reason, and records the line it was charged to
   async checkExpense(txn: any, reason?: string | null) {
-    if (txn.type !== 'expense' || !txn.categoryId) return;
+    if (txn.type !== 'expense') return;
     const s = await this.getSettings();
     const full = await this.prisma.transaction.findUnique({
       where: { id: txn.id },
       include: { category: { include: { categoryType: true } }, splits: { include: { category: { include: { categoryType: true } } } } },
     });
     if (!full) return;
+    if (!full.categoryId && !full.isSplit) throw new HttpException('Choose a category before submitting. Budgets are checked by category.', HttpStatus.BAD_REQUEST);
     const parts = this.partsOf(full, s);
     const typeOf = (p: Part) => (full.isSplit ? (full.splits as any[]).find((x) => x.categoryId === p.categoryId)?.category?.categoryType : (full as any).category?.categoryType);
     const d0 = new Date(full.dateRecorded);
@@ -702,6 +752,10 @@ export class BudgetsService {
     for (const p of parts) {
       const type = typeOf(p);
       const kind = KIND[p.costObject];
+      // Every expense says where it is charged: that is how it finds its budget line and its costing
+      if (!this.objectIdOf(p)) {
+        throw new HttpException(`Choose the ${p.costObject === 'PRODUCT' ? 'product' : p.costObject === 'DEPARTMENT' ? 'department' : 'project'} this expense is charged to before submitting.`, HttpStatus.BAD_REQUEST);
+      }
       if (type?.appliesTo && !type.appliesTo.split(',').includes(kind)) {
         throw new HttpException(`${[type.code, type.name].filter(Boolean).join(' ')} cannot be charged to ${p.costObject === 'DEPARTMENT' ? 'overheads' : p.costObject.toLowerCase() + 's'}.`, HttpStatus.BAD_REQUEST);
       }

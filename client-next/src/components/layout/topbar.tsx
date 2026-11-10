@@ -8,7 +8,7 @@ import { useSidebarStore } from '@/stores/sidebar-store';
 import { useThemeStore } from '@/stores/theme-store';
 import { useUnreadCount, useNotifications, useInvalidate } from '@/hooks/use-queries';
 import api from '@/lib/api-client';
-import { Bell, Settings, LogOut, UserCircle, RefreshCw, Check, Menu, Sun, Moon, CheckCheck, ArrowRight, ShieldCheck, Info, AlertTriangle, XCircle } from 'lucide-react';
+import { Bell, Settings, LogOut, UserCircle, RefreshCw, Check, Menu, Sun, Moon, ShieldCheck, Info, AlertTriangle, XCircle } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,8 +33,11 @@ const notifConfig: Record<string, { icon: React.ElementType; color: string; dot:
   budget:   { icon: AlertTriangle,  color: 'text-[var(--warning)]', dot: 'bg-[var(--warning)]' },
 };
 const getNotifCfg = (type: string) => notifConfig[type] ?? notifConfig.info;
+const sentenceCase = (s: string) => s.toLowerCase().replace(/^./, (c) => c.toUpperCase());
 
 // ─── Bell Dropdown ────────────────────────────────
+const iconBtn = 'relative flex h-9 w-9 items-center justify-center rounded-md text-[var(--shell-text-muted)] transition-colors hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)] focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)] lg:h-8 lg:w-8';
+
 function BellDropdown() {
   const router = useRouter();
   const invalidate = useInvalidate();
@@ -45,16 +48,14 @@ function BellDropdown() {
   const { data: notifData } = useNotifications({ limit: '8' });
   const notifications: any[] = (notifData as any)?.rows ?? [];
 
-  const handleMarkAllRead = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleMarkAllRead = async () => {
     try {
       await api.patch('/notifications/mark-all-read', {});
       invalidate('notifications');
     } catch { /* best-effort: UI will still update on next poll */ }
   };
 
-  const handleMarkOne = async (e: React.MouseEvent, id: number) => {
-    e.stopPropagation();
+  const handleMarkOne = async (id: number) => {
     try {
       await api.patch('/notifications/mark-read', { ids: [id] });
       invalidate('notifications');
@@ -64,14 +65,10 @@ function BellDropdown() {
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <button
-          className="relative w-9 h-9 lg:w-7 lg:h-7 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]"
-          style={{ color: 'var(--shell-text-muted)' }}
-          title="Notifications"
-        >
-          <Bell className="h-3.5 w-3.5" />
+        <button className={iconBtn} aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'} title="Notifications">
+          <Bell className="h-4 w-4" />
           {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] rounded-full bg-[var(--danger)] text-[var(--danger-foreground)] text-[12px] font-semibold flex items-center justify-center px-[3px] leading-none">
+            <span aria-hidden className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--danger)] px-1 text-[12px] font-semibold leading-none text-[var(--danger-foreground)]">
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}
@@ -80,86 +77,55 @@ function BellDropdown() {
 
       <DropdownMenuContent
         align="end"
-        className="w-[340px] mt-1 rounded-lg p-0 overflow-hidden"
+        className="mt-1 w-[340px] overflow-hidden rounded-lg p-0"
         style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--shell-border)' }}>
-          <div className="flex items-center gap-2">
-            <Bell className="w-3.5 h-3.5" style={{ color: 'var(--shell-accent)' }} />
-            <span className="text-[13px] font-semibold" style={{ color: 'var(--shell-text)' }}>
-              Notifications
-            </span>
-            {unreadCount > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] text-[var(--danger)] text-[12px] font-semibold">
-                {unreadCount} new
-              </span>
-            )}
+        <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: 'var(--shell-border)' }}>
+          <div className="flex items-baseline gap-2">
+            <span className="text-[15px] font-semibold text-[var(--shell-text)]">Notifications</span>
+            {unreadCount > 0 && <span className="text-[13px] text-[var(--shell-text-muted)]">{unreadCount} unread</span>}
           </div>
           {unreadCount > 0 && (
-            <button
-              onClick={handleMarkAllRead}
-              className="flex items-center gap-1 text-[12px] font-semibold transition-colors hover:text-[var(--shell-accent)]"
-              style={{ color: 'var(--shell-text-muted)' }}
-            >
-              <CheckCheck className="w-3 h-3" /> Mark all read
+            <button type="button" onClick={handleMarkAllRead} className="rounded-md px-1 text-[13px] font-medium text-[var(--shell-accent)] hover:underline focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]">
+              Mark all read
             </button>
           )}
         </div>
 
-        {/* Notification list */}
         <div className="max-h-[340px] overflow-y-auto custom-scrollbar">
           {notifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 gap-2">
-              <Bell className="w-8 h-8" style={{ color: 'var(--shell-text-muted)', opacity: 0.3 }} />
-              <p className="text-[12px] font-semibold" style={{ color: 'var(--shell-text-muted)' }}>All caught up!</p>
-            </div>
+            <p className="px-4 py-10 text-center text-[13px] text-[var(--shell-text-muted)]">No notifications.</p>
           ) : (
             notifications.map((n: any) => {
               const cfg = getNotifCfg(n.type);
               const Icon = cfg.icon;
               return (
-                <div
+                <DropdownMenuItem
                   key={n.id}
-                  className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-all border-b ${!n.is_read ? 'bg-[var(--shell-accent)]/5' : ''}`}
+                  onSelect={(e) => { e.preventDefault(); if (!n.is_read) handleMarkOne(n.id); }}
+                  className="flex cursor-pointer items-start gap-3 rounded-none border-b px-4 py-3"
                   style={{ borderColor: 'var(--shell-border)' }}
-                  onClick={(e) => { if (!n.is_read) handleMarkOne(e, n.id); }}
                 >
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${cfg.color} bg-current/10`}
-                    style={{ background: `color-mix(in srgb, currentColor 12%, transparent)` }}>
-                    <Icon className={`w-3.5 h-3.5 ${cfg.color}`} />
+                  <Icon aria-hidden className={`mt-0.5 h-4 w-4 shrink-0 ${cfg.color}`} />
+                  <div className="min-w-0 flex-1">
+                    <p className={`truncate text-[13px] leading-tight ${n.is_read ? 'text-[var(--shell-text-muted)]' : 'font-semibold text-[var(--shell-text)]'}`}>{n.title}</p>
+                    {n.message && <p className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-[var(--shell-text-muted)]">{n.message}</p>}
+                    <p className="mt-1 text-[12px] text-[var(--shell-text-muted)]">{formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}</p>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className={`text-[12px] font-semibold leading-tight truncate ${!n.is_read ? 'text-black dark:text-white' : ''}`}
-                        style={n.is_read ? { color: 'var(--shell-text-muted)' } : {}}>
-                        {n.title}
-                      </p>
-                      {!n.is_read && <div className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1 ${cfg.dot}`} />}
-                    </div>
-                    {n.message && (
-                      <p className="text-[12px] mt-0.5 leading-snug line-clamp-2" style={{ color: 'var(--shell-text-muted)' }}>
-                        {n.message}
-                      </p>
-                    )}
-                    <p className="text-[12px] font-medium mt-1" style={{ color: 'var(--shell-text-muted)', opacity: 0.7 }}>
-                      {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
-                    </p>
-                  </div>
-                </div>
+                  {!n.is_read && <span role="img" aria-label="Unread" className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${cfg.dot}`} />}
+                </DropdownMenuItem>
               );
             })
           )}
         </div>
 
-        {/* Footer */}
-        <div className="px-4 py-2.5 border-t" style={{ borderColor: 'var(--shell-border)' }}>
+        <div className="border-t px-4 py-2.5 text-center" style={{ borderColor: 'var(--shell-border)' }}>
           <button
+            type="button"
             onClick={() => { setOpen(false); router.push('/notifications'); }}
-            className="flex items-center gap-1.5 text-[12px] font-semibold w-full justify-center py-1 rounded-lg transition-colors hover:bg-[var(--shell-hover)]"
-            style={{ color: 'var(--shell-accent)' }}
+            className="rounded-md px-2 py-1 text-[13px] font-medium text-[var(--shell-accent)] hover:underline focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]"
           >
-            View all notifications <ArrowRight className="w-3 h-3" />
+            View all notifications
           </button>
         </div>
       </DropdownMenuContent>
@@ -187,35 +153,35 @@ export function TopBar() {
   return (
     <header className="fixed-top">
       {/* Left: hamburger (mobile) + page title */}
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 items-center gap-3">
         <button
-          className="lg:hidden w-9 h-9 flex items-center justify-center rounded-lg hover:bg-[var(--shell-hover)] text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] transition-colors"
+          className={`${iconBtn} lg:hidden`}
           onClick={toggleMobile}
           aria-label="Open menu"
         >
           <Menu className="h-4 w-4" />
         </button>
-        <h1 className="text-[15px] font-semibold leading-none" style={{ color: 'var(--shell-text)' }}>
-          {title || 'Dashboard'}
-        </h1>
-        {subtitle && (
-          <span className="hidden sm:inline text-[12px] font-normal" style={{ color: 'var(--shell-text-muted)' }}>{subtitle}</span>
-        )}
+        <div className="flex min-w-0 items-baseline gap-3">
+          <h1 className="truncate text-[15px] font-semibold leading-none capitalize" style={{ color: 'var(--shell-text)' }}>
+            {title || 'Dashboard'}
+          </h1>
+          {subtitle && (
+            <span className="hidden shrink-0 text-[12px] font-normal sm:inline" style={{ color: 'var(--shell-text-muted)' }}>{subtitle}</span>
+          )}
+        </div>
       </div>
 
       {/* Right: icons + avatar */}
-      <div className="flex items-center gap-1">
-        <div className="w-px h-4 mx-1" style={{ background: 'var(--shell-border)' }} />
+      <div className="flex shrink-0 items-center gap-1">
 
         {/* Theme toggle */}
         <button
-          className="w-9 h-9 lg:w-7 lg:h-7 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]"
-          style={{ color: 'var(--shell-text-muted)' }}
+          className={iconBtn}
           onClick={toggleTheme}
           aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
           title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
         >
-          {theme === 'dark' ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+          {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </button>
 
         {/* Bell with dropdown */}
@@ -223,21 +189,19 @@ export function TopBar() {
 
         {/* Settings */}
         <button
-          className="w-9 h-9 lg:w-7 lg:h-7 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]"
-          style={{ color: 'var(--shell-text-muted)' }}
+          className={iconBtn}
           onClick={() => router.push('/settings')}
           title="Settings"
           aria-label="Settings"
         >
-          <Settings className="h-3.5 w-3.5" />
+          <Settings className="h-4 w-4" />
         </button>
 
-        <div className="w-px h-4 mx-1" style={{ background: 'var(--shell-border)' }} />
 
         {/* Avatar dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-2 px-2 py-1 rounded-lg outline-none focus:outline-none focus-visible:ring-0 transition-colors hover:bg-[var(--shell-hover)]"
+            <button className="ml-2 flex items-center gap-2 rounded-md px-2 py-1 outline-none transition-colors hover:bg-[var(--shell-hover)] focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]"
               style={{ color: 'var(--shell-text)' }}
             >
               <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[12px] font-semibold"
@@ -249,7 +213,7 @@ export function TopBar() {
                   {user?.username || 'Admin'}
                 </p>
                 <p className="text-[12px] mt-0.5" style={{ color: 'var(--shell-text-muted)' }}>
-                  {user?.role_name || user?.role || 'System Admin'}
+                  {sentenceCase(String(user?.role_name || user?.role || 'System admin'))}
                 </p>
               </div>
             </button>
@@ -280,7 +244,7 @@ export function TopBar() {
                   <DropdownMenuSubTrigger className="cursor-pointer gap-2.5 px-3 py-2 rounded-lg mx-1"
                     style={{ color: 'var(--shell-text)' }}>
                     <RefreshCw className="w-3.5 h-3.5" style={{ color: 'var(--shell-text-muted)' }} />
-                    <span className="text-[13px]">Switch Role</span>
+                    <span className="text-[13px]">Switch role</span>
                   </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent className="rounded-lg min-w-[160px]"
                     style={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' }}>
@@ -308,7 +272,7 @@ export function TopBar() {
               onClick={() => logout()}
             >
               <LogOut className="w-3.5 h-3.5" />
-              <span className="text-[13px] font-medium">Sign Out</span>
+              <span className="text-[13px] font-medium">Sign out</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

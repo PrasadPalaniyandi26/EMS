@@ -14,6 +14,10 @@ const nextConfig: NextConfig = {
   }),
   // Proxy API requests to NestJS backend (web dev only — not used in Capacitor builds)
   ...(!isCapacitor && {
+    // Build orders became Order costing; keep old bookmarks working
+    async redirects() {
+      return [{ source: '/budget/build-orders/:path*', destination: '/budget/order-costing/:path*', permanent: true }];
+    },
     async rewrites() {
       return [
         {

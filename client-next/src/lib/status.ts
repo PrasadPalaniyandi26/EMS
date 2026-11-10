@@ -9,13 +9,13 @@ export const STATUS_CONFIG: Record<string, { label: string; color: string; dot: 
     bg: 'bg-[color-mix(in_srgb,var(--status-draft)_12%,transparent)] border-[color-mix(in_srgb,var(--status-draft)_30%,transparent)]',
   },
   PENDING_MANAGER: {
-    label: 'Awaiting Manager',
+    label: 'Waiting for manager',
     color: 'text-[var(--status-pending-manager)]',
     dot: 'bg-[var(--status-pending-manager)]',
     bg: 'bg-[color-mix(in_srgb,var(--status-pending-manager)_12%,transparent)] border-[color-mix(in_srgb,var(--status-pending-manager)_30%,transparent)]',
   },
   PENDING_FINANCE: {
-    label: 'Awaiting Finance',
+    label: 'Waiting for finance',
     color: 'text-[var(--status-pending-finance)]',
     dot: 'bg-[var(--status-pending-finance)]',
     bg: 'bg-[color-mix(in_srgb,var(--status-pending-finance)_12%,transparent)] border-[color-mix(in_srgb,var(--status-pending-finance)_30%,transparent)]',

@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ColumnDef, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, getSortedRowModel, SortingState } from '@tanstack/react-table';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
-import { useBudgetLine, useBudgetMonitor, useBudgetPlans, useBudgetSettings, type MonitorLine } from '@/hooks/use-budget-queries';
+import { useBudgetAlertCount, useBudgetLine, useBudgetMonitor, useBudgetPlans, useBudgetSettings, type MonitorLine } from '@/hooks/use-budget-queries';
 import { useDataTable } from '@/hooks/use-data-table';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
@@ -15,10 +15,13 @@ import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 
 import { DetailSummary, DetailSection, DetailGrid, DetailField } from '@/components/shared/detail/detail-kit';
-import { Kpi, KpiStrip, LevelText, LineStatusText, STATUS_TEXT, UtilBar, fyOptions, money, plain } from '@/components/budgets/budget-ui';
+import { Kpi, KpiStrip, LevelText, LineStatusText, STATUS_TEXT, TabBar, UtilBar, fyOptions, money, plain, useTabParam } from '@/components/budgets/budget-ui';
+import { AlertsPane } from '@/components/budgets/alerts-pane';
+import { MonthClosePane } from '@/components/budgets/month-close-pane';
+import { detailHref, kindOfLine, objectIdOf } from '@/components/budgets/planner-objects';
 import { formatDate } from '@/lib/currency';
-import { ChangeRequestModal } from '@/components/budgets/planning-modals';
-import { DetailActions } from '@/components/shared/detail/detail-kit';
+import { DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
+import { FolderOpen } from 'lucide-react';
 import { StatusText } from '@/components/data-table/cells';
 
 // Whole-rupee amount, right-aligned like MoneyCell
@@ -26,8 +29,30 @@ const Whole = ({ value, currency }: { value: number; currency: string }) => <div
 
 const STATUS_FILTERS = ['All', 'Needs attention', 'On track'] as const;
 
+type Tab = 'lines' | 'alerts' | 'close';
+
 export default function BudgetMonitorPage() {
   const setHeader = useHeaderStore((s) => s.setHeader);
+  const [tab, setTab] = useTabParam<Tab>(['lines', 'alerts', 'close'], 'lines');
+  const { data: count } = useBudgetAlertCount(true);
+  useEffect(() => { setHeader('Budget monitor', 'What has been spent, what is committed, where it needs attention and the month close'); }, [setHeader]);
+  const tabs: { value: Tab; label: string }[] = [
+    { value: 'lines', label: 'Lines' },
+    { value: 'alerts', label: count?.open ? `Alerts (${count.open})` : 'Alerts' },
+    { value: 'close', label: 'Month close' },
+  ];
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-[var(--shell-surface)]">
+      <TabBar<Tab> value={tab} onChange={setTab} tabs={tabs} />
+      <div role="tabpanel" id="tabpanel" aria-labelledby={`tab-${tab}`} className="min-h-0 flex-1">
+        {tab === 'alerts' ? <AlertsPane /> : tab === 'close' ? <MonthClosePane /> : <MonitorLines onOpenAlerts={() => setTab('alerts')} />}
+      </div>
+    </div>
+  );
+}
+
+function MonitorLines({ onOpenAlerts }: { onOpenAlerts: () => void }) {
+  const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const currency = user?.currency || 'INR';
   const { data: plansData } = useBudgetPlans();
@@ -41,9 +66,7 @@ export default function BudgetMonitorPage() {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'pct', desc: true }]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [rowSelection, setRowSelection] = useState({});
-  const [changeFor, setChangeFor] = useState<number | null>(null);
 
-  useEffect(() => { setHeader('Budget monitor', 'What has been spent, what is committed and what is left'); }, [setHeader]);
   useEffect(() => { setSelectedId(null); setRowSelection({}); }, [fy]);
 
   const rows = useMemo(() => (data?.lines ?? []).filter((l) => {
@@ -58,29 +81,27 @@ export default function BudgetMonitorPage() {
       id: 'label', accessorKey: 'label', header: 'Line',
       cell: ({ row }) => (
         <div className="min-w-0">
-          <TextCell value={row.original.label} strong className="block max-w-[320px] truncate" />
-          <span className="block max-w-[320px] truncate text-[12px] text-[var(--shell-text-muted)]">{row.original.object_name}{row.original.strict ? ' · strict' : ''}</span>
+          <TextCell value={row.original.label} strong className="block max-w-[200px] truncate" />
+          <span className="block max-w-[200px] truncate text-[12px] text-[var(--shell-text-muted)]">{row.original.object_name}{row.original.strict ? ' · strict' : ''}</span>
         </div>
       ),
+      size: 210,
     },
-    { accessorKey: 'owner_name', header: 'Owner', cell: ({ row }) => <TextCell value={row.original.owner_name} muted />, size: 100 },
-    { accessorKey: 'total', header: headerRight('Budget'), cell: ({ row }) => <Whole value={row.original.total} currency={currency} />, size: 120 },
-    { accessorKey: 'used', header: headerRight('Used'), cell: ({ row }) => <Whole value={row.original.used} currency={currency} />, size: 120 },
+    { accessorKey: 'owner_name', header: 'Owner', cell: ({ row }) => <TextCell value={row.original.owner_name} muted />, size: 80 },
+    { accessorKey: 'total', header: headerRight('Budget'), cell: ({ row }) => <Whole value={row.original.total} currency={currency} />, size: 100 },
+    { accessorKey: 'used', header: headerRight('Used'), cell: ({ row }) => <Whole value={row.original.used} currency={currency} />, size: 100 },
     {
-      accessorKey: 'pct', header: 'Utilisation', size: 150,
+      accessorKey: 'pct', header: 'Used %', size: 120,
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
-          <UtilBar pct={row.original.pct} className="w-16" />
-          <span className="w-12 text-right text-[13px] tabular-nums">{row.original.pct >= 999 ? '—' : `${Math.round(row.original.pct)}%`}</span>
+          <UtilBar pct={row.original.pct} className="w-12" />
+          <span className="w-10 text-right text-[13px] tabular-nums">{row.original.pct >= 999 ? '—' : `${Math.round(row.original.pct)}%`}</span>
         </div>
       ),
     },
-    { accessorKey: 'forecast', header: headerRight('Forecast'), cell: ({ row }) => (row.original.forecast != null ? <Whole value={row.original.forecast} currency={currency} /> : <div className="text-right"><TextCell value="" /></div>), size: 120 },
-    { accessorKey: 'runs_out', header: 'Runs out', cell: ({ row }) => <TextCell value={row.original.runs_out} muted />, size: 90 },
-    {
-      accessorKey: 'status', header: 'Status', size: 100,
-      cell: ({ row }) => (row.original.forecast_over ? <span className="text-[13px] font-medium text-[var(--warning)]">Forecast over</span> : <LineStatusText status={row.original.status} />),
-    },
+    { accessorKey: 'forecast', header: headerRight('Forecast'), cell: ({ row }) => (row.original.forecast != null ? <Whole value={row.original.forecast} currency={currency} /> : <div className="text-right"><TextCell value="" /></div>), size: 100 },
+    // One word here; whether the forecast runs over, and when the line runs out, are in the panel
+    { accessorKey: 'status', header: 'Status', size: 90, cell: ({ row }) => <LineStatusText status={row.original.status} /> },
   ], [currency]);
 
   const table = useDataTable({
@@ -100,6 +121,7 @@ export default function BudgetMonitorPage() {
   const selected = rows.find((r) => r.id === selectedId) ?? null;
   const { data: detail } = useBudgetLine(selected ? selected.id : null);
   const k = data?.kpis;
+  const openActions: DetailActionDef[] = selected ? [{ label: 'Open', variant: 'primary', icon: <FolderOpen className="h-4 w-4 text-[var(--nav-slate)]" />, onClick: () => router.push(detailHref(kindOfLine(selected), objectIdOf(selected) ?? 0, fy)) }] : [];
 
   return (
     <ModuleShell
@@ -108,15 +130,16 @@ export default function BudgetMonitorPage() {
       searchRow={
         <DataTableToolbar
           table={table}
+          actions={<ToolbarActions actions={openActions} />}
           filterDefs={[
             { id: 'fy', label: 'Financial year', value: fy == null ? '' : String(fy), onChange: (v) => setFy(Number(v)), defaultValue: plansData?.current_fy != null ? String(plansData.current_fy) : undefined, options: fyOptions(plansData?.plans ?? [], plansData?.current_fy, settings?.fy_start_month ?? 4) },
-            { id: 'object', label: 'Cost object', value: object, onChange: setObject, options: [{ value: 'ALL', label: 'All cost objects' }, { value: 'PROJECT', label: 'Projects' }, { value: 'PRODUCT', label: 'Products' }, { value: 'DEPARTMENT', label: 'Overheads' }, { value: 'RESERVE', label: 'Reserve' }] },
+            { id: 'object', label: 'Cost object', value: object, onChange: setObject, options: [{ value: 'ALL', label: 'All cost objects' }, { value: 'PROJECT', label: 'Projects' }, { value: 'PRODUCT', label: 'Products' }, { value: 'ORDER', label: 'Orders' }, { value: 'DEPARTMENT', label: 'Overheads' }, { value: 'RESERVE', label: 'Reserve' }] },
             { id: 'status', label: 'Status', value: status, onChange: (v) => setStatus(v as (typeof STATUS_FILTERS)[number]), options: STATUS_FILTERS.map((s) => ({ value: s, label: s === 'All' ? 'Any status' : s })) },
           ]}
         />
       }
       intelligencePanel={
-        <ModuleIntelligencePanel title="Budget line" onClose={() => { setSelectedId(null); setRowSelection({}); }} hasSelection={!!selected} footer={selected ? <DetailActions actions={[{ label: 'Request transfer', variant: 'primary', onClick: () => setChangeFor(selected.id) }]} /> : undefined}>
+        <ModuleIntelligencePanel title="Budget line" onClose={() => { setSelectedId(null); setRowSelection({}); }} hasSelection={!!selected} footer={openActions.length ? <DetailActions actions={openActions} /> : undefined}>
           {selected && (
             <>
               <DetailSummary title={selected.label} subtitle={selected.object_name} status={selected.status} statusClass={STATUS_TEXT[selected.status]} figure={money(selected.available, currency)} figureLabel="Left" />
@@ -125,7 +148,8 @@ export default function BudgetMonitorPage() {
                   <DetailField label="Budget" value={money(selected.total, currency)} />
                   <DetailField label="Actual" value={money(selected.actual, currency)} />
                   <DetailField label="Committed" value={money(selected.committed, currency)} />
-                  <DetailField label="Run-rate forecast" value={selected.forecast != null ? money(selected.forecast, currency) : '–'} />
+                  <DetailField label="Run-rate forecast" value={selected.forecast != null ? money(selected.forecast, currency) : '–'} tone={selected.forecast_over ? 'warning' : undefined} />
+                  <DetailField label="Runs out" value={selected.runs_out ?? '–'} tone={selected.forecast_over ? 'warning' : undefined} />
                 </DetailGrid>
               </DetailSection>
               <DetailSection title="Month by month">
@@ -183,7 +207,7 @@ export default function BudgetMonitorPage() {
             <Kpi label="Actual" value={money(k?.actual, currency)} sub={k && k.approved > 0 ? `${Math.round((k.actual / k.approved) * 100)}% of budget` : undefined} />
             <Kpi label="Committed" value={money(k?.committed, currency)} sub="Submitted, not yet approved" />
             <Kpi label="Year-end forecast" value={money(k?.forecast, currency)} sub="At the current run-rate" tone={k && k.forecast > k.approved ? 'warning' : undefined} />
-            <Kpi label="Open alerts" value={<Link href="/budget/alerts" className="hover:underline">{k?.open_alerts ?? 0}</Link>} />
+            <Kpi label="Open alerts" value={k?.open_alerts ? <button type="button" onClick={onOpenAlerts} className="hover:underline">{k.open_alerts}</button> : 0} />
           </KpiStrip>
         ) : null}
         {k && k.unbudgeted_count > 0 && (
@@ -198,7 +222,6 @@ export default function BudgetMonitorPage() {
           />
         </div>
       </div>
-      <ChangeRequestModal isOpen={changeFor != null} onClose={() => setChangeFor(null)} prefill={changeFor != null ? { kind: 'TRANSFER', to_line_id: changeFor } : null} />
     </ModuleShell>
   );
 }

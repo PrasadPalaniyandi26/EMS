@@ -26,6 +26,18 @@ const ROLE_STYLES: Record<string, { label: string; dot: string; text: string; ba
     text: 'text-[var(--role-employee)]',
     badge: 'bg-[color-mix(in_srgb,var(--role-employee)_12%,transparent)] text-[var(--role-employee)] border-[color-mix(in_srgb,var(--role-employee)_30%,transparent)]',
   },
+  configurator: {
+    label: 'Configurator',
+    dot: 'bg-[var(--role-configurator)]',
+    text: 'text-[var(--role-configurator)]',
+    badge: 'bg-[color-mix(in_srgb,var(--role-configurator)_12%,transparent)] text-[var(--role-configurator)] border-[color-mix(in_srgb,var(--role-configurator)_30%,transparent)]',
+  },
+  operations: {
+    label: 'Operations',
+    dot: 'bg-[var(--role-operations)]',
+    text: 'text-[var(--role-operations)]',
+    badge: 'bg-[color-mix(in_srgb,var(--role-operations)_12%,transparent)] text-[var(--role-operations)] border-[color-mix(in_srgb,var(--role-operations)_30%,transparent)]',
+  },
 };
 
 const FALLBACK = {

@@ -14,46 +14,47 @@ const BOTTOM_NAV_ITEMS = [
   { name: 'Approvals', href: '/approvals', icon: ClipboardCheck },
 ];
 
+const item = 'relative flex flex-1 flex-col items-center justify-center gap-1 transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--shell-accent)]';
+
 export function BottomNav() {
   const pathname = usePathname();
   const { toggleMobile } = useSidebarStore();
   const { user } = useAuthStore();
 
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 flex items-stretch"
+    <nav aria-label="Quick pages" className="lg:hidden fixed bottom-0 left-0 right-0 z-40 flex items-stretch"
       style={{
         height: '56px',
         background: 'var(--shell-surface)',
         borderTop: '1px solid var(--shell-border)',
       }}
     >
-      {BOTTOM_NAV_ITEMS.filter((item) => canAccessRoute(item.href, user?.role_name)).map((item) => {
-        const isActive = pathname === item.href;
+      {BOTTOM_NAV_ITEMS.filter((it) => canAccessRoute(it.href, user?.role_name)).map((it) => {
+        const isActive = pathname === it.href;
         return (
           <Link
-            key={item.href}
-            href={item.href}
-            className="flex-1 flex flex-col items-center justify-center gap-1 transition-colors"
+            key={it.href}
+            href={it.href}
+            aria-current={isActive ? 'page' : undefined}
+            className={item}
             style={{ color: isActive ? 'var(--shell-accent)' : 'var(--shell-text-muted)' }}
           >
-            <item.icon className="w-5 h-5" strokeWidth={isActive ? 2.2 : 1.8} />
-            <span className="text-[12px] font-semibold">{item.name}</span>
-            {isActive && (
-              <span className="absolute bottom-1 w-1 h-1 rounded-full" style={{ background: 'var(--shell-accent)' }} />
-            )}
+            <it.icon className="w-5 h-5" strokeWidth={isActive ? 2.2 : 1.8} />
+            <span className={`text-[12px] capitalize ${isActive ? 'font-semibold' : 'font-medium'}`}>{it.name}</span>
           </Link>
         );
       })}
 
-      {/* More — opens the full slide-over sidebar */}
+      {/* More: opens the full slide-over sidebar */}
       <button
-        className="flex-1 flex flex-col items-center justify-center gap-1 transition-colors"
+        type="button"
+        className={item}
         style={{ color: 'var(--shell-text-muted)' }}
         onClick={toggleMobile}
-        aria-label="More navigation"
+        aria-label="More pages"
       >
         <Menu className="w-5 h-5" strokeWidth={1.8} />
-        <span className="text-[12px] font-semibold">More</span>
+        <span className="text-[12px] font-medium">More</span>
       </button>
     </nav>
   );

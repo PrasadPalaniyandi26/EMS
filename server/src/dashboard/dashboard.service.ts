@@ -29,8 +29,27 @@ export class DashboardService {
     const totalIncome = parseFloat((Number(incomeAgg._sum.amount) || 0).toFixed(2));
     const totalExpenses = parseFloat((Number(expenseAgg._sum.amount) || 0).toFixed(2));
 
+    // The period of the same length that ends the day before this one starts, so a figure can say what it compares to
+    let previous: { totalIncome: number; totalExpenses: number; balance: number } | null = null;
+    if (dateFrom && dateTo) {
+      const from = new Date(dateFrom);
+      const to = new Date(dateTo);
+      const days = Math.round((to.getTime() - from.getTime()) / 86400000) + 1;
+      const prevTo = new Date(from.getTime() - 86400000);
+      const prevFrom = new Date(prevTo.getTime() - (days - 1) * 86400000);
+      const prevWhere = { userId, status: { in: COMMITTED_STATUSES }, dateRecorded: { gte: prevFrom, lte: prevTo } };
+      const [pi, pe] = await Promise.all([
+        this.prisma.transaction.aggregate({ where: { ...prevWhere, type: 'income' }, _sum: { amount: true } }),
+        this.prisma.transaction.aggregate({ where: { ...prevWhere, type: 'expense' }, _sum: { amount: true } }),
+      ]);
+      const prevIncome = parseFloat((Number(pi._sum.amount) || 0).toFixed(2));
+      const prevExpenses = parseFloat((Number(pe._sum.amount) || 0).toFixed(2));
+      previous = { totalIncome: prevIncome, totalExpenses: prevExpenses, balance: parseFloat((prevIncome - prevExpenses).toFixed(2)) };
+    }
+
     return {
       totalIncome, totalExpenses, balance: parseFloat((totalIncome - totalExpenses).toFixed(2)),
+      previous,
       transactionCount,
       recentTransactions: recentTransactions.map((t) => ({
         id: t.id, type: t.type, amount: t.amount, date_recorded: t.dateRecorded,

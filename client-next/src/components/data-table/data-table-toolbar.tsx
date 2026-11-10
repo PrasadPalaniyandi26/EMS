@@ -57,6 +57,7 @@ export function DataTableToolbar<TData>({
         {filterDefs && <Filters defs={filterDefs} />}
         <div className="relative w-full sm:w-[220px] min-w-[140px]">
           <Input
+            aria-label="Search"
             placeholder="Search..."
             value={(table.getState().globalFilter as string) ?? ""}
             onChange={(event) => table.setGlobalFilter(event.target.value)}

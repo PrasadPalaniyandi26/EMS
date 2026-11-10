@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { inputStyle } from '@/components/shared/modal-primitives';
-import { StatCard, StatStrip } from '@/components/shared/stat-card';
+import { Panel, PanelLink } from '@/components/shared/panel';
+import { PeriodBar } from '@/components/shared/period-bar';
 import { ChartFrame } from '@/components/shared/chart-frame';
+import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
@@ -11,35 +12,64 @@ import {
   useDashboardSummary, useDashboardByCategory, useMonthlyTrend,
   useRecentTransactions, useBudgetUtilization, useApprovalCounts, useProjectSpend,
 } from '@/hooks/use-queries';
-import { formatCurrency, getDateRange, parseApiDate } from '@/lib/currency';
+import { formatCurrency, formatDate, getDateRange, parseApiDate } from '@/lib/currency';
+import { cn } from '@/lib/utils';
+import { Plus, BarChart3 } from 'lucide-react';
 import {
-  TrendingUp, TrendingDown, Wallet, ArrowLeftRight,
-  ClipboardCheck, Target, Plus, BarChart3, CheckCircle2,
-} from 'lucide-react';
-import {
-  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Legend,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer,
 } from 'recharts';
 
-const COLORS = ['var(--chart-1)', 'var(--chart-4)', 'var(--chart-3)', 'var(--warning)', 'var(--chart-2)', 'var(--chart-5)', 'var(--info)', 'var(--success)'];
+// Colour is a role: income is the success colour, spending is the series blue (red is kept for things that are wrong), and each figure carries the same colour as its series in the charts
+const INCOME = 'var(--success)';
+const SPEND = 'var(--chart-1)';
 
 const presets = [
-  { label: 'This Week', key: 'thisWeek' as const },
-  { label: 'Last Week', key: 'lastWeek' as const },
-  { label: 'This Month', key: 'thisMonth' as const },
-  { label: 'Last Month', key: 'lastMonth' as const },
-  { label: 'Calendar Year', key: 'calYear' as const },
-  { label: 'Financial Year', key: 'finYear' as const },
-  { label: 'All Time', key: 'allTime' as const },
+  { label: 'This week', key: 'thisWeek' as const },
+  { label: 'Last week', key: 'lastWeek' as const },
+  { label: 'This month', key: 'thisMonth' as const },
+  { label: 'Last month', key: 'lastMonth' as const },
+  { label: 'Calendar year', key: 'calYear' as const },
+  { label: 'Financial year', key: 'finYear' as const },
+  { label: 'All time', key: 'allTime' as const },
 ];
+
+const tooltipStyle = { background: 'var(--shell-surface)', border: '1px solid var(--shell-border)', borderRadius: 6, fontSize: 12, color: 'var(--shell-text)' };
+const axisTick = { fontSize: 12, fill: 'var(--shell-text-muted)' };
+const compact = (v: number) => new Intl.NumberFormat('en-IN', { notation: 'compact', maximumFractionDigits: 1 }).format(v);
+
+// Where a budget stands: the colour and the words say the same thing
+const budgetState = (pct: number) =>
+  pct >= 100 ? { label: 'Over budget', color: 'var(--danger)' }
+    : pct >= 80 ? { label: 'Near the limit', color: 'var(--warning)' }
+      : { label: 'On track', color: 'var(--success)' };
 
 function SkeletonRect({ w, h, className = '' }: { w?: string; h?: string; className?: string }) {
   return (
     <div
-      className={`animate-pulse rounded-lg ${className}`}
+      className={`rounded-md motion-safe:animate-pulse ${className}`}
       style={{ width: w, height: h ?? '1rem', background: 'var(--shell-hover)' }}
     />
   );
+}
+
+// One of the three figures the page is for. The number leads; the caption says what it means or what to do.
+function KeyFigure({ label, value, valueColor, loading, onClick, className, children }: {
+  label: string; value: React.ReactNode; valueColor?: string; loading?: boolean; onClick?: () => void; className?: string; children?: React.ReactNode;
+}) {
+  const body = (
+    <div className="min-w-0 text-left">
+      <p className="text-[13px] font-medium text-[var(--shell-text-muted)]">{label}</p>
+      {loading
+        ? <SkeletonRect w="7rem" h="1.75rem" className="mt-2" />
+        : <p className="mt-1.5 truncate text-[28px] font-semibold leading-none tracking-[-0.01em] tabular-nums" style={{ color: valueColor ?? 'var(--shell-text)' }}>{value}</p>}
+      {children}
+    </div>
+  );
+  const base = cn('block w-full bg-[var(--shell-surface)] p-4', className);
+  return onClick
+    ? <button type="button" onClick={onClick} className={cn(base, 'cursor-pointer transition-colors hover:bg-[var(--shell-hover)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--shell-accent)]')}>{body}</button>
+    : <div className={base}>{body}</div>;
 }
 
 export default function DashboardPage() {
@@ -50,7 +80,7 @@ export default function DashboardPage() {
 
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [activePreset, setActivePreset] = useState<string>('This Month');
+  const [activePreset, setActivePreset] = useState<string>('This month');
 
   useEffect(() => {
     const r = getDateRange('thisMonth');
@@ -58,9 +88,10 @@ export default function DashboardPage() {
     setDateTo(r.to);
   }, []);
 
+  // The header says which period the figures cover, instead of a greeting
   useEffect(() => {
-    setHeader('Dashboard', `Welcome back, ${user?.username || 'User'}`);
-  }, [setHeader, user]);
+    setHeader('Dashboard', dateFrom && dateTo ? `${formatDate(dateFrom)} to ${formatDate(dateTo)}` : 'All time');
+  }, [setHeader, dateFrom, dateTo]);
 
   useEffect(() => {
     if ((user?.role_name || '').toUpperCase() === 'EMPLOYEE') {
@@ -73,7 +104,7 @@ export default function DashboardPage() {
   const { data: monthlyTrend, isLoading: trendLoading } = useMonthlyTrend();
   const { data: recentTxns, isLoading: txnsLoading } = useRecentTransactions();
   const { data: budgetUtil, isLoading: budgetLoading } = useBudgetUtilization();
-  const { data: approvalCounts } = useApprovalCounts();
+  const { data: approvalCounts, isLoading: approvalsLoading } = useApprovalCounts();
   const { data: projectSpend, isLoading: projectLoading } = useProjectSpend(dateFrom, dateTo);
 
   const fmt = (n: number) => formatCurrency(n, currency);
@@ -88,15 +119,25 @@ export default function DashboardPage() {
     setActivePreset(label);
   };
 
-  const categoryData = useMemo(() =>
-    (byCategory || []).filter((c: any) => c.type === 'expense').map((c: any) => ({ name: c.category_name, value: c.total })),
-    [byCategory]
-  );
+  // Spending by category, largest first: the top six, and the rest together so the list stays short
+  const categories = useMemo(() => {
+    const all = (byCategory || []).filter((c: any) => c.type === 'expense').map((c: any) => ({ name: c.category_name as string, value: Number(c.total) || 0 })).sort((a, b) => b.value - a.value);
+    const top = all.length > 7 ? all.slice(0, 6) : all;
+    const rest = all.length > 7 ? all.slice(6) : [];
+    if (rest.length) top.push({ name: `${rest.length} other categories`, value: rest.reduce((s, c) => s + c.value, 0) });
+    const total = all.reduce((s, c) => s + c.value, 0);
+    return { rows: top, total, max: top.reduce((m, c) => Math.max(m, c.value), 0) };
+  }, [byCategory]);
 
-  const trendData = useMemo(() =>
-    (monthlyTrend || []).map((m: any) => ({ month: m.month, income: m.income, expenses: m.expense })),
-    [monthlyTrend]
-  );
+  // The chart starts at the first month with a transaction, so the empty months before it do not use up its width
+  const trendData = useMemo(() => {
+    const all = (monthlyTrend || []).map((m: any) => ({ month: m.month, income: m.income, expenses: m.expense }));
+    const first = all.findIndex((d: any) => d.income > 0 || d.expenses > 0);
+    return first > 0 ? all.slice(first) : all;
+  }, [monthlyTrend]);
+
+  // Only budgets that have spend belong in "nearest their limit"; the API already sorts them by percent used
+  const nearestBudgets = useMemo(() => ((budgetUtil || []) as any[]).filter((b) => b.pct > 0).slice(0, 5), [budgetUtil]);
 
   const pendingApprovals = (approvalCounts as any)?.pendingMyAction ?? 0;
   const budgetPct = useMemo(() => {
@@ -106,275 +147,241 @@ export default function DashboardPage() {
     const spent = items.reduce((s: number, b: any) => s + b.spent, 0);
     return total > 0 ? Math.round((spent / total) * 100) : 0;
   }, [budgetUtil]);
-
-  const kpis = [
-    { tone: 'success' as const, label: 'Total Income', value: fmt(summary?.totalIncome || 0), icon: TrendingUp, color: 'text-[var(--success)]', bg: 'bg-[color-mix(in_srgb,var(--success)_10%,transparent)]', loading: summaryLoading },
-    { tone: 'danger' as const, label: 'Total Expenses', value: fmt(summary?.totalExpenses || 0), icon: TrendingDown, color: 'text-[var(--danger)]', bg: 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)]', loading: summaryLoading },
-    { tone: 'info' as const, label: 'Net Balance', value: fmt(summary?.balance || 0), icon: Wallet, color: 'text-[var(--info)]', bg: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]', loading: summaryLoading },
-    { tone: 'warning' as const, label: 'Transactions', value: String(summary?.transactionCount || 0), icon: ArrowLeftRight, color: 'text-[var(--warning)]', bg: 'bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]', loading: summaryLoading },
-    { tone: 'info' as const, label: 'Pending Approvals', value: String(pendingApprovals), icon: ClipboardCheck, color: 'text-[var(--info)]', bg: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]', loading: false, link: '/approvals' },
-    { tone: (budgetPct !== null && budgetPct > 90 ? 'danger' : 'info') as 'danger' | 'info', label: 'Budget Used', value: budgetPct !== null ? `${budgetPct}%` : '—', icon: Target, color: budgetPct !== null && budgetPct > 90 ? 'text-[var(--danger)]' : 'text-[var(--info)]', bg: budgetPct !== null && budgetPct > 90 ? 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)]' : 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]', loading: budgetLoading, link: '/budget/monitor' },
-  ];
+  const overall = budgetPct === null ? null : budgetState(budgetPct);
+  const balance = summary?.balance || 0;
+  // What the balance is compared to: the period just before the chosen one
+  const compareTo = ({ 'This week': 'last week', 'Last week': 'the week before', 'This month': 'last month', 'Last month': 'the month before' } as Record<string, string>)[activePreset] ?? 'the previous period';
+  const balanceChange = summary?.previous ? balance - summary.previous.balance : null;
+  const balanceColor = balance > 0 ? 'var(--success)' : balance < 0 ? 'var(--danger)' : undefined;
 
   const approvalStages = [
     { label: 'Draft', count: (approvalCounts as any)?.draft ?? 0, color: 'var(--status-draft)' },
-    { label: 'Pending Manager', count: (approvalCounts as any)?.pendingManager ?? 0, color: 'var(--status-pending-manager)' },
-    { label: 'Pending Finance', count: (approvalCounts as any)?.pendingFinance ?? 0, color: 'var(--status-pending-finance)' },
+    { label: 'Pending manager', count: (approvalCounts as any)?.pendingManager ?? 0, color: 'var(--status-pending-manager)' },
+    { label: 'Pending finance', count: (approvalCounts as any)?.pendingFinance ?? 0, color: 'var(--status-pending-finance)' },
     { label: 'Approved', count: (approvalCounts as any)?.approved ?? 0, color: 'var(--status-approved)' },
     { label: 'Rejected', count: (approvalCounts as any)?.rejected ?? 0, color: 'var(--status-rejected)' },
   ];
 
-  const quickActions = [
-    { label: '+ Expense', href: '/expense', color: 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_20%,transparent)]' },
-    { label: '+ Income', href: '/income', color: 'bg-[color-mix(in_srgb,var(--success)_10%,transparent)] text-[var(--success)] hover:bg-[color-mix(in_srgb,var(--success)_20%,transparent)]' },
-    { label: 'Approvals', href: '/approvals', color: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)] text-[var(--info)] hover:bg-[color-mix(in_srgb,var(--info)_20%,transparent)]' },
-    { label: 'Reports', href: '/reporting', color: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)] text-[var(--info)] hover:bg-[color-mix(in_srgb,var(--info)_20%,transparent)]' },
-    { label: 'Transactions', href: '/transactions', color: 'bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] text-[var(--warning)] hover:bg-[color-mix(in_srgb,var(--warning)_20%,transparent)]' },
-    { label: 'Budgets', href: '/budget/monitor', color: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)] text-[var(--info)] hover:bg-[color-mix(in_srgb,var(--info)_20%,transparent)]' },
-  ];
 
-  const surface = { background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' };
+  const empty = 'px-4 py-10 text-pretty text-center text-[13px] text-[var(--shell-text-muted)]';
 
   return (
-    <div className="h-full overflow-y-auto custom-scrollbar px-4 py-4 space-y-4">
+    <div className="h-full overflow-y-auto custom-scrollbar space-y-6 px-4 py-4">
 
-      {/* Period selector */}
-      <div className="rounded-lg px-4 py-3 flex flex-wrap items-center gap-3" style={surface}>
-        <div className="flex flex-wrap gap-1.5">
-          {presets.map((p) => (
-            <button
-              key={p.label}
-              type="button"
-              aria-pressed={activePreset === p.label}
-              onClick={() => handlePreset(p.key, p.label)}
-              className="px-2.5 py-1.5 rounded-md text-[12px] font-semibold transition-all"
-              style={activePreset === p.label
-                ? { background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' }
-                : { background: 'var(--shell-hover)', color: 'var(--shell-text-muted)' }
-              }
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-2 ml-auto">
-          <input type="date" aria-label="From date" value={dateFrom}
-            onChange={(e) => { setDateFrom(e.target.value); setActivePreset('Custom'); }}
-            className="rounded-lg px-3 py-1.5 text-[12px] border outline-none"
-            style={inputStyle} />
-          <span className="text-[12px]" style={{ color: 'var(--shell-text-muted)' }}>—</span>
-          <input type="date" aria-label="To date" value={dateTo}
-            onChange={(e) => { setDateTo(e.target.value); setActivePreset('Custom'); }}
-            className="rounded-lg px-3 py-1.5 text-[12px] border outline-none"
-            style={inputStyle} />
-        </div>
-      </div>
+      <PeriodBar
+        presets={presets}
+        active={activePreset}
+        onPreset={handlePreset}
+        from={dateFrom}
+        to={dateTo}
+        onFrom={(v) => { setDateFrom(v); setActivePreset('Custom'); }}
+        onTo={(v) => { setDateTo(v); setActivePreset('Custom'); }}
+      />
 
-      {/* Row 1: KPI strip */}
-      <StatStrip cols={6}>
-        {kpis.map((k) => {
-          const Icon = k.icon;
-          return (
-            <StatCard
-              key={k.label}
-              label={k.label}
-              value={k.value}
-              loading={k.loading}
-              tone={k.tone}
-              icon={<Icon className="h-4 w-4" />}
-              onClick={k.link ? () => router.push(k.link as string) : undefined}
-            />
-          );
-        })}
-      </StatStrip>
+      {/* The three figures the page is for: what needs you, how the budget stands, and the balance for the period with what it is made of */}
+      <section aria-label="Key figures" className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-[var(--shell-border)] bg-[var(--shell-border)] lg:grid-cols-[1fr_1fr_1.8fr]">
+        <KeyFigure label="Pending approvals" value={pendingApprovals} loading={approvalsLoading} onClick={() => router.push('/approvals')}>
+          <p className="mt-2 text-[13px] font-medium" style={{ color: pendingApprovals > 0 ? 'var(--shell-accent)' : 'var(--shell-text-muted)' }}>
+            {pendingApprovals > 0 ? 'Waiting for you' : 'Nothing waiting'}
+          </p>
+        </KeyFigure>
 
-      {/* Row 2 — Monthly Trend + Category Pie */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 rounded-lg overflow-hidden" style={surface}>
-          <div className="dialog-header px-4 py-2.5">Monthly Income vs Expenses</div>
+        <KeyFigure label="Budget used" value={budgetPct !== null ? `${budgetPct}%` : '—'} valueColor={overall && overall.label !== 'On track' ? overall.color : undefined} loading={budgetLoading} onClick={() => router.push('/budget/monitor')}>
+          {budgetPct !== null && overall ? (
+            <>
+              <div role="progressbar" aria-label="Budget used" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(budgetPct, 100)} className="mt-3 h-1.5 overflow-hidden rounded-md bg-[var(--shell-hover)]">
+                <div className="h-full rounded-md" style={{ width: `${Math.min(budgetPct, 100)}%`, background: overall.color }} />
+              </div>
+              <p className="mt-2 text-[13px] font-medium" style={{ color: overall.color }}>{overall.label}</p>
+            </>
+          ) : (
+            !budgetLoading && <p className="mt-2 text-[13px] text-[var(--shell-text-muted)]">No active budget plan</p>
+          )}
+        </KeyFigure>
+
+        <KeyFigure className="col-span-2 lg:col-span-1" label="Net balance" value={fmt(balance)} valueColor={balanceColor} loading={summaryLoading}>
+          {!summaryLoading && (
+            <>
+              {/* The balance is income less expenses, so it is shown as that sum */}
+              <dl className="mt-3 flex flex-wrap items-end gap-x-3 gap-y-2 text-[13px]">
+                <div>
+                  <dt className="flex items-center gap-1.5 text-[var(--shell-text-muted)]"><span aria-hidden className="h-2 w-2 rounded-full" style={{ background: INCOME }} />Income</dt>
+                  <dd className="mt-0.5 text-[18px] font-semibold tabular-nums text-[var(--shell-text)]">{fmt(summary?.totalIncome || 0)}</dd>
+                </div>
+                <span aria-hidden className="pb-0.5 text-[18px] text-[var(--shell-text-muted)]">−</span>
+                <div>
+                  <dt className="flex items-center gap-1.5 text-[var(--shell-text-muted)]"><span aria-hidden className="h-2 w-2 rounded-full" style={{ background: SPEND }} />Expenses</dt>
+                  <dd className="mt-0.5 text-[18px] font-semibold tabular-nums text-[var(--shell-text)]">{fmt(summary?.totalExpenses || 0)}</dd>
+                </div>
+              </dl>
+              <p className="mt-2 text-[12px] tabular-nums text-[var(--shell-text-muted)]">
+                {balanceChange !== null && <>{balanceChange === 0 ? 'No change' : `${balanceChange > 0 ? '+' : '−'}${fmt(Math.abs(balanceChange))}`} vs {compareTo}<br /></>}
+                {summary?.transactionCount || 0} {(summary?.transactionCount || 0) === 1 ? 'transaction' : 'transactions'} in this period
+              </p>
+            </>
+          )}
+        </KeyFigure>
+      </section>
+
+      {/* Trend, and the budgets closest to their limit */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <Panel title="Monthly income vs expenses" className="lg:col-span-2" action={
+          <ul className="flex items-center gap-4 text-[12px] text-[var(--shell-text-muted)]">
+            <li className="flex items-center gap-1.5"><span aria-hidden className="h-2 w-2 rounded-full" style={{ background: INCOME }} />Income</li>
+            <li className="flex items-center gap-1.5"><span aria-hidden className="h-2 w-2 rounded-full" style={{ background: SPEND }} />Expenses</li>
+          </ul>
+        }>
           <div className="p-4">
             {trendLoading ? <SkeletonRect h="260px" /> : trendData.length > 0 ? (
               <ChartFrame label="Monthly income and expenses by month" columns={['Month', 'Income', 'Expenses']} rows={trendData.map((d: any) => [d.month, fmt(d.income || 0), fmt(d.expenses || 0)])}>
-<ResponsiveContainer width="100%" height={260}>
-                <BarChart data={trendData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--shell-border)" strokeOpacity={0.5} />
-                  <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'var(--shell-text-muted)' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 12, fill: 'var(--shell-text-muted)' }} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    contentStyle={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)', borderRadius: 8, fontSize: 12, color: 'var(--shell-text)' }}
-                    cursor={{ fill: 'var(--shell-hover)' }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 12, color: 'var(--shell-text-muted)' }} />
-                  <Bar dataKey="income" fill="var(--success)" radius={[4, 4, 0, 0]} name="Income" />
-                  <Bar dataKey="expenses" fill="var(--danger)" radius={[4, 4, 0, 0]} name="Expenses" />
-                </BarChart>
-              </ResponsiveContainer>
+                <ResponsiveContainer width="100%" height={330}>
+                  <BarChart data={trendData} barGap={2}>
+                    <CartesianGrid stroke="var(--shell-border)" vertical={false} />
+                    <XAxis dataKey="month" tick={axisTick} axisLine={false} tickLine={false} />
+                    <YAxis tick={axisTick} axisLine={false} tickLine={false} width={44} tickFormatter={(v) => compact(Number(v))} />
+                    <Tooltip formatter={(val) => fmt(typeof val === 'number' ? val : 0)} contentStyle={tooltipStyle} cursor={{ fill: 'var(--shell-hover)' }} />
+                    <Bar dataKey="income" fill={INCOME} radius={[4, 4, 0, 0]} name="Income" />
+                    <Bar dataKey="expenses" fill={SPEND} radius={[4, 4, 0, 0]} name="Expenses" />
+                  </BarChart>
+                </ResponsiveContainer>
               </ChartFrame>
             ) : (
-              <p className="py-16 text-center text-[12px] italic" style={{ color: 'var(--shell-text-muted)' }}>No data yet. Add transactions to see trends.</p>
+              <p className={empty}>No transactions yet. Add an expense or an income to see the monthly trend.</p>
             )}
           </div>
-        </div>
+        </Panel>
 
-        <div className="rounded-lg overflow-hidden" style={surface}>
-          <div className="dialog-header px-4 py-2.5">Expenses by Category</div>
-          <div className="p-4">
-            {categoryLoading ? <SkeletonRect h="260px" /> : categoryData.length > 0 ? (
-              <ChartFrame label="Expenses by category" columns={['Category', 'Amount']} rows={categoryData.map((d: any) => [d.name, fmt(Number(d.value) || 0)])}>
-<ResponsiveContainer width="100%" height={260}>
-                <PieChart>
-                  <Pie data={categoryData} cx="50%" cy="45%" outerRadius={90} innerRadius={48} paddingAngle={3} dataKey="value">
-                    {categoryData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip formatter={(val) => fmt(typeof val === 'number' ? val : 0)} contentStyle={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)', borderRadius: 8, fontSize: 12, color: 'var(--shell-text)' }} />
-                  <Legend wrapperStyle={{ fontSize: 12, color: 'var(--shell-text-muted)' }} />
-                </PieChart>
-              </ResponsiveContainer>
-              </ChartFrame>
-            ) : (
-              <p className="py-16 text-center text-[12px] italic" style={{ color: 'var(--shell-text-muted)' }}>No expense data yet.</p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Row 3 — Budget Utilization + Project Spend */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Budget Utilization */}
-        <div className="rounded-lg overflow-hidden" style={surface}>
-          <div className="dialog-header px-4 py-2.5 flex items-center justify-between">
-            <span>Budgets nearest their limit</span>
-            <button onClick={() => router.push('/budget/monitor')} className="text-[12px] font-semibold hover:underline" style={{ color: 'var(--shell-accent)' }}>Manage</button>
-          </div>
-          <div className="p-4 space-y-3">
-            {budgetLoading ? (
-              [...Array(4)].map((_, i) => <SkeletonRect key={i} h="36px" />)
-            ) : (budgetUtil || []).length > 0 ? (
-              (budgetUtil as any[]).map((b) => {
-                const pct = Math.min(b.pct, 100);
-                const color = b.pct >= 100 ? 'var(--danger)' : b.pct >= 80 ? 'var(--warning)' : 'var(--success)';
+        <Panel title="Budgets nearest their limit" action={<PanelLink onClick={() => router.push('/budget/monitor')}>Manage</PanelLink>}>
+          {budgetLoading ? (
+            <div className="space-y-3 p-4">{[...Array(4)].map((_, i) => <SkeletonRect key={i} h="40px" />)}</div>
+          ) : nearestBudgets.length > 0 ? (
+            <ul className="divide-y divide-[var(--shell-border)]">
+              {nearestBudgets.map((b) => {
+                const st = budgetState(b.pct);
                 return (
-                  <div key={b.category_id}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[12px] font-semibold truncate" style={{ color: 'var(--shell-text)' }}>{b.category_name}</span>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-[12px]" style={{ color: 'var(--shell-text-muted)' }}>{fmt(b.spent)} / {fmt(b.budget)}</span>
-                        <span className="text-[12px] font-semibold w-10 text-right" style={{ color }}>{b.pct}%</span>
-                      </div>
+                  <li key={b.category_id} className="px-4 py-3">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span title={b.category_name} className="truncate text-[13px] text-[var(--shell-text)]">{b.category_name}</span>
+                      <span className="shrink-0 text-[13px] font-semibold tabular-nums" style={{ color: b.pct >= 80 ? st.color : 'var(--shell-text)' }}>{b.pct}%</span>
                     </div>
-                    <div className="h-1.5 rounded-md overflow-hidden" style={{ background: 'var(--shell-hover)' }}>
-                      <div className="h-full rounded-md transition-all" style={{ width: `${pct}%`, background: color }} />
+                    <div role="progressbar" aria-label={`${b.category_name} budget used`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(b.pct, 100)} className="mt-1.5 h-1.5 overflow-hidden rounded-md bg-[var(--shell-hover)]">
+                      <div className="h-full rounded-md" style={{ width: `${Math.min(b.pct, 100)}%`, background: st.color }} />
                     </div>
-                  </div>
+                    <p className="mt-1.5 truncate text-[12px] tabular-nums text-[var(--shell-text-muted)]">{fmt(b.spent)} of {fmt(b.budget)}</p>
+                  </li>
                 );
-              })
-            ) : (
-              <p className="py-8 text-center text-[12px] italic" style={{ color: 'var(--shell-text-muted)' }}>No active budget plan yet.</p>
-            )}
-          </div>
-        </div>
+              })}
+            </ul>
+          ) : (
+            <p className={empty}>{(budgetUtil || []).length > 0 ? 'Nothing has been spent against a budget yet.' : 'No active budget plan. Create one in the Planner to track spend against it here.'}</p>
+          )}
+        </Panel>
+      </div>
 
-        {/* Project Spend */}
-        <div className="rounded-lg overflow-hidden" style={surface}>
-          <div className="dialog-header px-4 py-2.5">Top Project Spend</div>
-          <div className="p-4">
-            {projectLoading ? <SkeletonRect h="200px" /> : (projectSpend || []).length > 0 ? (
-              <ChartFrame label="Top project spend" columns={['Project', 'Spent']} rows={(projectSpend as any[]).map((d: any) => [d.project_name, fmt(Number(d.spent) || 0)])}>
-<ResponsiveContainer width="100%" height={Math.max(160, (projectSpend as any[]).length * 42)}>
+      {/* Activity on the left; on the right where the approvals stand and where the spend goes */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <Panel title="Recent transactions" className="lg:col-span-2 lg:self-start" action={<PanelLink onClick={() => router.push('/transactions')}>View all</PanelLink>}>
+          {txnsLoading ? (
+            <div className="space-y-2 p-4">{[...Array(5)].map((_, i) => <SkeletonRect key={i} h="40px" />)}</div>
+          ) : (recentTxns || []).length > 0 ? (
+            <ul className="divide-y divide-[var(--shell-border)]">
+              {(recentTxns || []).map((txn: any) => (
+                <li key={txn.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] text-[var(--shell-text)]">{txn.description || txn.category_name}</p>
+                    <p className="text-[12px] text-[var(--shell-text-muted)]">
+                      {parseApiDate(txn.date_recorded)?.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-[13px] font-semibold tabular-nums" style={{ color: txn.type === 'income' ? INCOME : 'var(--shell-text)' }}>
+                    {txn.type === 'income' ? '+' : '-'}{formatCurrency(txn.amount, currency)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className={empty}>No transactions yet. They appear here as soon as one is recorded.</p>
+          )}
+        </Panel>
+
+        <div className="flex flex-col gap-6">
+          <Panel title="Approval pipeline" action={<PanelLink onClick={() => router.push('/approvals')}>View all</PanelLink>}>
+            <ul className="divide-y divide-[var(--shell-border)]">
+              {approvalStages.map((s) => (
+                <li key={s.label} className="flex items-center justify-between px-4 py-2.5">
+                  <span className="flex items-center gap-2 text-[13px] text-[var(--shell-text)]">
+                    <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: s.color }} />
+                    {s.label}
+                  </span>
+                  <span className="text-[13px] font-semibold tabular-nums" style={{ color: s.count > 0 ? 'var(--shell-text)' : 'var(--shell-text-muted)' }}>{s.count}</span>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+
+          {/* Where the spend goes: a ranked list reads faster than a donut, and every row says its amount and its share */}
+          <Panel title="Expenses by category">
+            {categoryLoading ? (
+              <div className="space-y-3 p-4">{[...Array(4)].map((_, i) => <SkeletonRect key={i} h="36px" />)}</div>
+            ) : categories.rows.length > 0 ? (
+              <ul className="divide-y divide-[var(--shell-border)]">
+                {categories.rows.map((c) => (
+                  <li key={c.name} className="px-4 py-2.5">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span title={c.name} className="truncate text-[13px] text-[var(--shell-text)]">{c.name}</span>
+                      <span className="shrink-0 text-[13px] font-semibold tabular-nums text-[var(--shell-text)]">{fmt(c.value)}</span>
+                    </div>
+                    <div className="mt-1.5 flex items-center gap-3">
+                      <div aria-hidden className="h-1.5 flex-1 overflow-hidden rounded-md bg-[var(--shell-hover)]">
+                        <div className="h-full rounded-md" style={{ width: `${categories.max > 0 ? (c.value / categories.max) * 100 : 0}%`, background: SPEND }} />
+                      </div>
+                      <span className="w-10 shrink-0 text-right text-[12px] tabular-nums text-[var(--shell-text-muted)]">{categories.total > 0 ? Math.round((c.value / categories.total) * 100) : 0}%</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className={empty}>No expenses in this period. Pick a longer period to see how spending splits by category.</p>
+            )}
+          </Panel>
+        </div>
+      </div>
+
+      <Panel title="Top project spend">
+        <div className="p-4">
+          {projectLoading ? <SkeletonRect h="120px" /> : (projectSpend || []).length > 0 ? (
+            <ChartFrame label="Top project spend" columns={['Project', 'Spent']} rows={(projectSpend as any[]).map((d: any) => [d.project_name, fmt(Number(d.spent) || 0)])}>
+              <ResponsiveContainer width="100%" height={Math.max(160, (projectSpend as any[]).length * 42)}>
                 <BarChart data={projectSpend as any[]} layout="vertical" margin={{ left: 0, right: 16 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--shell-border)" strokeOpacity={0.5} horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 12, fill: 'var(--shell-text-muted)' }} axisLine={false} tickLine={false} />
-                  <YAxis type="category" dataKey="project_name" tick={{ fontSize: 12, fill: 'var(--shell-text-muted)' }} axisLine={false} tickLine={false} width={100} />
-                  <Tooltip
-                    formatter={(val) => fmt(typeof val === 'number' ? val : 0)}
-                    contentStyle={{ background: 'var(--shell-surface)', border: '1px solid var(--shell-border)', borderRadius: 8, fontSize: 12, color: 'var(--shell-text)' }}
-                  />
-                  <Bar dataKey="spent" fill="var(--info)" radius={[0, 4, 4, 0]} name="Spent" />
+                  <CartesianGrid stroke="var(--shell-border)" horizontal={false} />
+                  <XAxis type="number" tick={axisTick} axisLine={false} tickLine={false} tickFormatter={(v) => compact(Number(v))} />
+                  <YAxis type="category" dataKey="project_name" tick={axisTick} axisLine={false} tickLine={false} width={140} />
+                  <Tooltip formatter={(val) => fmt(typeof val === 'number' ? val : 0)} contentStyle={tooltipStyle} cursor={{ fill: 'var(--shell-hover)' }} />
+                  <Bar dataKey="spent" fill={SPEND} radius={[0, 4, 4, 0]} name="Spent" />
                 </BarChart>
               </ResponsiveContainer>
-              </ChartFrame>
-            ) : (
-              <p className="py-8 text-center text-[12px] italic" style={{ color: 'var(--shell-text-muted)' }}>No project-linked expenses yet.</p>
-            )}
-          </div>
+            </ChartFrame>
+          ) : (
+            <p className={empty}>No expenses charged to a project in this period.</p>
+          )}
         </div>
-      </div>
+      </Panel>
 
-      {/* Row 4 — Approval Pipeline + Recent Transactions */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Approval Pipeline */}
-        <div className="rounded-lg overflow-hidden" style={surface}>
-          <div className="dialog-header px-4 py-2.5 flex items-center justify-between">
-            <span>Approval Pipeline</span>
-            <button onClick={() => router.push('/approvals')} className="text-[12px] font-semibold hover:underline" style={{ color: 'var(--shell-accent)' }}>View All</button>
-          </div>
-          <div className="p-4 space-y-2">
-            {approvalStages.map((s) => (
-              <div key={s.label} className="flex items-center justify-between rounded-lg px-3 py-2.5" style={{ border: '1px solid var(--shell-border)' }}>
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
-                  <span className="text-[12px] font-medium" style={{ color: 'var(--shell-text)' }}>{s.label}</span>
-                </div>
-                <span className="text-[13px] font-semibold" style={{ color: s.color }}>{s.count}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Recent Transactions */}
-        <div className="lg:col-span-2 rounded-lg overflow-hidden" style={surface}>
-          <div className="dialog-header px-4 py-2.5 flex items-center justify-between">
-            <span>Recent Transactions</span>
-            <button onClick={() => router.push('/transactions')} className="text-[12px] font-semibold hover:underline" style={{ color: 'var(--shell-accent)' }}>View All</button>
-          </div>
-          <div className="p-4">
-            {txnsLoading ? (
-              <div className="space-y-2">
-                {[...Array(5)].map((_, i) => <SkeletonRect key={i} h="44px" />)}
-              </div>
-            ) : (recentTxns || []).length > 0 ? (
-              <div className="space-y-2">
-                {(recentTxns || []).map((txn: any) => (
-                  <div key={txn.id} className="flex items-center justify-between rounded-lg px-3 py-2.5 transition-colors" style={{ border: '1px solid var(--shell-border)' }}>
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${txn.type === 'income' ? 'bg-[color-mix(in_srgb,var(--success)_10%,transparent)]' : 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)]'}`}>
-                        {txn.type === 'income'
-                          ? <TrendingUp className="h-3.5 w-3.5 text-[var(--success)]" />
-                          : <TrendingDown className="h-3.5 w-3.5 text-[var(--danger)]" />
-                        }
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[13px] font-semibold truncate" style={{ color: 'var(--shell-text)' }}>{txn.description || txn.category_name}</p>
-                        <p className="text-[12px]" style={{ color: 'var(--shell-text-muted)' }}>
-                          {parseApiDate(txn.date_recorded)?.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                        </p>
-                      </div>
-                    </div>
-                    <span className={`text-[13px] font-semibold shrink-0 ml-3 ${txn.type === 'income' ? 'text-[var(--success)]' : 'text-[var(--danger)]'}`}>
-                      {txn.type === 'income' ? '+' : '-'}{formatCurrency(txn.amount, currency)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="py-8 text-center text-[12px] italic" style={{ color: 'var(--shell-text-muted)' }}>No transactions yet.</p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Row 5 — Quick Actions */}
-      <div className="rounded-lg px-4 py-3 flex flex-wrap gap-2 items-center" style={surface}>
-        <span className="text-[12px] font-semibold mr-2" style={{ color: 'var(--shell-text-muted)' }}>Quick Actions</span>
-        {quickActions.map((a) => (
-          <button
-            key={a.href}
-            onClick={() => router.push(a.href)}
-            className={`px-3 py-1.5 rounded-md text-[12px] font-semibold transition-all ${a.color}`}
-          >
-            {a.label}
-          </button>
-        ))}
+      {/* The two ways to add a record, and the report. Every other page is one click away in the panels above and in the menu. */}
+      <div className="flex flex-wrap items-center gap-2 pb-2">
+        <Button type="button" onClick={() => router.push('/expense')} className="h-9 gap-2 px-3 text-[13px] font-medium">
+          <Plus className="h-4 w-4" />Add expense
+        </Button>
+        <Button type="button" variant="outline" onClick={() => router.push('/income')} className="h-9 gap-2 px-3 text-[13px] font-medium">
+          <Plus className="h-4 w-4 text-[var(--success)]" />Add income
+        </Button>
+        <button
+          type="button"
+          onClick={() => router.push('/reporting')}
+          className="inline-flex h-9 items-center gap-2 rounded-md px-3 text-[13px] font-medium text-[var(--shell-text-muted)] transition-colors hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)] focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]"
+        >
+          <BarChart3 className="h-4 w-4" />Reports
+        </button>
       </div>
 
     </div>

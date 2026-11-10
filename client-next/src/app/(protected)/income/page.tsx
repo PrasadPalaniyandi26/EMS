@@ -7,7 +7,7 @@ import { Tags } from 'lucide-react';
 import { ManageCategoriesDialog } from '@/components/manage/manage-categories-dialog';
 import { useAllTransactions, useCategories, useClients, useProjects, useInvalidate, useApprovalTrail } from '@/hooks/use-queries';
 import api, { getAccessToken, API_BASE } from '@/lib/api-client';
-import { formatCurrency, formatDate, CURRENCY_SYMBOL } from '@/lib/currency';
+import { formatCurrency, formatDate, parseApiDate, CURRENCY_SYMBOL } from '@/lib/currency';
 import { STATUS_CONFIG } from '@/lib/status';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import {
   Plus, Pencil, Split, Send, Trash2,
-  FileText, ShieldCheck, LayoutGrid, Layers, UploadCloud, Clock, Copy, Ban
+  FileText, ShieldCheck, LayoutGrid, Layers, UploadCloud, Clock, Ban
 } from 'lucide-react';
 import { TransactionModal } from '@/components/transactions/transaction-modal';
 import { Button } from '@/components/ui/button';
@@ -39,7 +39,7 @@ import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { TransactionDetail } from '@/components/transactions/transaction-detail';
-import { DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
+import { DetailActions, DetailSummary, DetailSection, DetailGrid, DetailField, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import { CurrencyInput, useConfirm } from '@/components/shared/modal-primitives';
 
 export default function IncomePage() {
@@ -111,17 +111,6 @@ export default function IncomePage() {
   const [voidReason, setVoidReason] = useState('');
   const [voidSaving, setVoidSaving] = useState(false);
 
-  const handleDuplicate = async () => {
-    if (!selectedTxn) return;
-    try {
-      await api.post(`/transactions/${selectedTxn.id}/duplicate`);
-      toast.success('Duplicate created as DRAFT');
-      invalidate('transactions');
-    } catch (err: any) {
-      toast.error(err?.message || 'Failed to duplicate');
-    }
-  };
-
   const handleVoid = async () => {
     if (!selectedTxn || voidSaving) return;
     setVoidSaving(true);
@@ -189,7 +178,7 @@ export default function IncomePage() {
   };
 
   useEffect(() => {
-    setHeader('Income Manager', 'Manage and track your organization\'s income');
+    setHeader('Income', 'Money received, by client and period');
   }, [setHeader]);
 
   const filteredCategories = (categories || []).filter((c: any) => c.type === 'income');
@@ -311,7 +300,8 @@ export default function IncomePage() {
 
   const incomeColumns = useMemo(() => columns(currency), [currency]);
 
-  const [sorting, setSorting] = useState<SortingState>([]);
+  // Newest first, so the order never depends on how the server happens to return it
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'date_recorded', desc: true }]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
@@ -406,6 +396,30 @@ export default function IncomePage() {
     } catch { toast.error('Failed to delete note'); }
   };
 
+  // What has been received, instead of instructions
+  const incomeSummary = (() => {
+    const rows = rawTransactions as any[];
+    const counted = rows.filter((t) => !['VOIDED', 'REJECTED'].includes((t.status || '').toUpperCase()));
+    const total = (xs: any[]) => xs.reduce((a, t) => a + Number(t.total_amount ?? t.amount ?? 0), 0);
+    const now = new Date();
+    const thisMonth = counted.filter((t) => { const d = parseApiDate(t.date_recorded); return d && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth(); });
+    const gst = counted.reduce((a, t) => a + (Number(t.total_amount ?? t.amount ?? 0) - Number(t.net_amount ?? t.total_amount ?? t.amount ?? 0)), 0);
+    return (
+      <div className="space-y-4">
+        <DetailSummary title="Income" subtitle="Money received" figure={formatCurrency(total(counted), currency)} figureLabel="Total received" />
+        <DetailSection title="Where it stands">
+          <DetailGrid>
+            <DetailField label="Records" value={counted.length} />
+            <DetailField label="This month" value={formatCurrency(total(thisMonth), currency)} />
+            <DetailField label="GST in the total" value={formatCurrency(gst, currency)} />
+            <DetailField label="No invoice attached" value={counted.filter((t) => !t.receipt_path).length} tone={counted.some((t) => !t.receipt_path) ? 'warning' : 'muted'} />
+            <DetailField label="Not yet approved" value={counted.filter((t) => (t.status || '').toUpperCase() !== 'APPROVED').length} wide />
+          </DetailGrid>
+        </DetailSection>
+      </div>
+    );
+  })();
+
   // One list of actions for the selected item, shown in the toolbar and pinned in the panel (same commands, either place)
   const itemActions: DetailActionDef[] = (() => {
     if (!selectedTxn) return [];
@@ -446,7 +460,7 @@ export default function IncomePage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All statuses</SelectItem>
-                {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+                {Object.entries(STATUS_CONFIG).filter(([key]) => key !== 'PENDING_MANAGER').map(([key, cfg]) => (
                   <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
                 ))}
               </SelectContent>
@@ -456,9 +470,10 @@ export default function IncomePage() {
       }
       intelligencePanel={
           <ModuleIntelligencePanel
-            title="Transaction Detail"
+            title={selectedTxn ? 'Income' : 'Summary'}
             onClose={() => setRowSelection({})}
             hasSelection={!!selectedTxn}
+            idle={incomeSummary}
             footer={itemActions.length > 0 ? <DetailActions actions={itemActions} /> : undefined}
           >
             {selectedTxn && (
@@ -467,7 +482,7 @@ export default function IncomePage() {
                   ref={panelFileRef}
                   type="file"
                   className="hidden"
-                  accept=".pdf,.jpg,.jpeg,.png"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp"
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePanelFileUpload(f); e.target.value = ''; }}
                 />
                 <TransactionDetail
@@ -478,7 +493,6 @@ export default function IncomePage() {
                   split={{ details: splitDetails, loading: splitDetailsLoading, onSplit: openSplit }}
                   notes={{ items: notes, loading: notesLoading, value: newNote, onChange: setNewNote, onAdd: handleAddNote, saving: noteSaving, onDelete: handleDeleteNote, currentUserId: user?.id }}
                   upload={{ uploading: panelUploading, onPick: () => panelFileRef.current?.click() }}
-                  onDuplicate={handleDuplicate}
                 />
               </>
             )}
@@ -490,7 +504,7 @@ export default function IncomePage() {
         columns={incomeColumns}
         data={rawTransactions}
         tableInstance={table}
-        emptyMessage="No income records. Click Add to create one."
+        emptyMessage="No income recorded yet. Use Add to record the first one."
       />
 
       {confirmDialogEl}
@@ -626,11 +640,12 @@ export default function IncomePage() {
       >
         <div className="space-y-4">
           <div className="p-3 bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] border border-[color-mix(in_srgb,var(--danger)_20%,transparent)] rounded-lg text-[12px] text-[var(--danger)] font-medium">
-            This will permanently mark <strong>{selectedTxn?.reference_id || `#${selectedTxn?.id}`}</strong> as VOIDED. The record is kept for audit purposes but will no longer count in reports.
+            This will mark <strong>{selectedTxn?.reference_id || `#${selectedTxn?.id}`}</strong> as VOIDED. The record is kept for audit purposes but will no longer count in reports.
           </div>
           <div className="space-y-2">
-            <label className="text-[12px] font-semibold text-[var(--shell-text)] block">Void Reason (optional)</label>
+            <label htmlFor="void-reason" className="text-[13px] font-medium text-[var(--shell-text)] block">Reason for voiding (optional)</label>
             <textarea
+              id="void-reason"
               className="w-full h-20 p-3 border-input bg-transparent text-[var(--shell-text)] border border-[var(--shell-border)] rounded-lg text-[13px] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[color-mix(in_srgb,var(--danger)_50%,transparent)] focus:border-[color-mix(in_srgb,var(--danger)_50%,transparent)] resize-none outline-none"
               placeholder="Describe why this transaction is being voided..."
               value={voidReason}

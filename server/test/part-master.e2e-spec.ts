@@ -21,6 +21,9 @@ describe('Part master (e2e)', () => {
 
   const call = async (method: 'get' | 'post' | 'put' | 'delete', url: string, token: string, body?: unknown): Promise<Res> => {
     let res: Res = { status: 0, body: {} };
+    // Every part needs a lead time; tests that are not about it get a default (pass null to leave it out)
+    const b = body as Record<string, unknown> | undefined;
+    if (b && typeof b === 'object' && 'part_no' in b && b.lead_time_days === undefined && (method === 'post' || method === 'put')) body = { ...b, lead_time_days: 7 };
     for (let attempt = 0; attempt < 6; attempt++) {
       const r = request(app.getHttpServer())[method](`/api/v1${url}`).set('Authorization', `Bearer ${token}`);
       const out = body === undefined ? await r : await r.send(body as object);
@@ -77,6 +80,21 @@ describe('Part master (e2e)', () => {
       expect((await create({ part_no: 'ZZ-C', name: 'C', sourcing: 'BUY', standard_price: 9, uom: 'nos' })).status).toBe(400);
       expect((await create({ part_no: 'ZZ-C', name: 'C', sourcing: 'BUY', standard_price: 9, uom: 'nos', oem_part_no: '   ' })).status).toBe(400);
       expect((await create({ part_no: 'ZZ-C', name: 'C', sourcing: 'BUY', standard_price: 9, uom: 'nos', oem_part_no: 'X'.repeat(61) })).status).toBe(400);
+    });
+
+    it('every part needs a lead time in whole days, and zero is allowed', async () => {
+      const base = { part_no: 'ZZ-L', name: 'L', sourcing: 'BUY', standard_price: 9, uom: 'nos', oem_part_no: 'OEM-L' };
+      for (const lead of [null, '', -1, 1.5, 'soon']) {
+        const r = await create({ ...base, lead_time_days: lead });
+        expect(r.status).toBe(400);
+        expect(message(r)).toMatch(/lead time/i);
+      }
+      expect((await create({ ...base, lead_time_days: 0 })).status).toBe(201);
+      expect((await part('ZZ-L')).lead_time_days).toBe(0);
+      const id = (await part('ZZ-L')).id;
+      expect((await call('put', `/budgets/items/${id}`, admin, { ...base, lead_time_days: null })).status).toBe(400);
+      expect((await call('put', `/budgets/items/${id}`, admin, { ...base, lead_time_days: 30 })).status).toBe(200);
+      expect((await part('ZZ-L')).lead_time_days).toBe(30);
     });
 
     it('a made part keeps no OEM part number', async () => {
@@ -247,9 +265,15 @@ describe('Part master (e2e)', () => {
       const bad = data(await call('post', '/budgets/items/import', admin, { dry_run: true, rows: [{ part_no: 'ZZ-IMP1', name: 'no oem', make_or_buy: 'Buy', uom: 'nos', standard_price: '10' }] }));
       expect(bad.errors.length).toBe(1);
       expect(bad.applied).toBe(false);
-      const good = data(await call('post', '/budgets/items/import', admin, { dry_run: true, rows: [{ part_no: 'ZZ-IMP2', name: 'ok', make_or_buy: 'Buy', uom: 'nos', standard_price: '10', oem_part_no: 'I-2' }] }));
+      const good = data(await call('post', '/budgets/items/import', admin, { dry_run: true, rows: [{ part_no: 'ZZ-IMP2', name: 'ok', make_or_buy: 'Buy', uom: 'nos', standard_price: '10', oem_part_no: 'I-2', lead_time_days: '5' }] }));
       expect(good.errors.length).toBe(0);
       expect(good.created).toBe(1);
+    });
+
+    it('a new part without a lead time is an error', async () => {
+      const r = data(await call('post', '/budgets/items/import', admin, { dry_run: true, rows: [{ part_no: 'ZZ-IMP3', name: 'no lead time', make_or_buy: 'Buy', uom: 'nos', standard_price: '10', oem_part_no: 'I-3' }] }));
+      expect(r.errors.length).toBe(1);
+      expect(r.errors[0].message).toMatch(/lead time/i);
     });
 
     it('a retired part number is refused by import, not updated', async () => {

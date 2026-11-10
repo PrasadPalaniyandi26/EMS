@@ -8,20 +8,22 @@ import { Search, Eye, EyeOff, Check, Plus, Pencil, RefreshCw, Star } from 'lucid
 import { cn } from '@/lib/utils';
 import { toLocalYMD } from '@/lib/currency';
 import { roleColor } from '@/lib/roles';
-import { toast } from 'sonner';
+import { useAuthStore } from '@/stores/auth-store';
 
 import { ModuleModal } from '@/components/shared/module/module-modal';
 import { DepartmentSelect } from '@/components/shared/reference-selects';
 import { AddressFields, type AddressKey } from '@/components/shared/address-fields';
 import { Field, EmailInput, PhoneInput, SegmentedControl, isValidEmail, isValidPhone, inp } from '@/components/shared/modal-primitives';
 
-function generatePassword(firstName: string, lastName: string): string {
-  const specials = ['!', '@', '#', '$', '%', '&', '*'];
-  const digits = String(Math.floor(1000 + Math.random() * 9000));
-  const special = specials[Math.floor(Math.random() * specials.length)];
-  const fi = (firstName?.[0] || 'U').toUpperCase();
-  const li = (lastName?.[0] || 'X').toUpperCase();
-  return `${fi}${li}${digits}${special}`;
+// A random 14-character password with an upper case letter, a lower case letter, a digit and a symbol
+function generatePassword(): string {
+  const sets = ['ABCDEFGHJKLMNPQRSTUVWXYZ', 'abcdefghijkmnopqrstuvwxyz', '23456789', '!@#$%&*'];
+  const all = sets.join('');
+  const rnd = (n: number) => { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] % n; };
+  const chars = sets.map((s) => s[rnd(s.length)]);
+  while (chars.length < 14) chars.push(all[rnd(all.length)]);
+  for (let i = chars.length - 1; i > 0; i--) { const j = rnd(i + 1); [chars[i], chars[j]] = [chars[j], chars[i]]; }
+  return chars.join('');
 }
 
 function getEmployeeId(userId?: number): string {
@@ -120,16 +122,30 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
   }, [editing, isOpen]);
 
   const handleGenPassword = () => {
-    set('password', generatePassword(form.first_name, form.last_name));
+    set('password', generatePassword());
     setShowPassword(true);
   };
 
+  // Errors show under the field after the first try to save, instead of as toasts
+  const [touched, setTouched] = useState(false);
+  useEffect(() => { if (isOpen) setTouched(false); }, [isOpen]);
+  const meId = useAuthStore((s) => s.user?.id);
+  const adminRoleId = roles.find((r) => String(r.role_name).toUpperCase() === 'ADMIN')?.role_id;
+  // You cannot take the Admin role off yourself
+  const lockedRoleId = editing && editing.id === meId ? adminRoleId : undefined;
+  const errs = {
+    first_name: !form.first_name.trim() ? 'Enter a first name.' : '',
+    email: !form.email.trim() ? 'Enter an email address.' : !isValidEmail(form.email) ? 'Enter a valid email address.' : '',
+    contact_no: !isValidPhone(form.contact_no) ? 'Include the country code, for example +91 98765 43210.' : '',
+    login_name: !form.login_name.trim() ? 'Enter a user name.' : '',
+    password: !editing && !form.password ? 'Set a password, or generate one.' : '',
+    roles: selectedRoles.length === 0 ? 'Assign at least one role.' : '',
+  };
+  const shown = (k: keyof typeof errs) => (touched ? errs[k] || undefined : undefined);
+
   const handleSubmit = () => {
-    if (!form.first_name || !form.email) { toast.error('First Name and Email are required.'); return; }
-    if (!isValidEmail(form.email)) { toast.error('Enter a valid email address'); return; }
-    if (!isValidPhone(form.contact_no)) { toast.error('Invalid phone number. Include country code e.g. +91 98765 43210'); return; }
-    if (!form.login_name) { toast.error('User Name is required.'); return; }
-    if (selectedRoles.length === 0) { toast.error('Please assign at least one role.'); return; }
+    setTouched(true);
+    if (Object.values(errs).some(Boolean)) return;
     const defaultRole = selectedRoles.find((r) => r.isDefault) || selectedRoles[0];
     const statusMap: Record<string, { isActive: boolean; user_status: string }> = {
       'ACTIVE':    { isActive: true,  user_status: 'ACTIVE' },
@@ -153,11 +169,11 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
     <ModuleModal
       isOpen={isOpen}
       onClose={onClose}
-      title={editing ? 'Edit User Profile' : 'Add New User'}
+      title={editing ? 'Edit User' : 'Add User'}
       icon={editing ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
       onSave={handleSubmit}
-      canSave={!!form.first_name.trim() && isValidEmail(form.email) && isValidPhone(form.contact_no) && !!form.login_name.trim() && selectedRoles.length > 0 && (!!editing || !!form.password)}
-      saveLabel={editing ? 'Save Changes' : 'Add User'}
+      canSave={!Object.values(errs).some(Boolean)}
+      saveLabel={editing ? 'Save user' : 'Add user'}
       size="xl"
     >
       <div className="space-y-2.5">
@@ -177,7 +193,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
 
           {/* COL 1 — Personal & Contact */}
           <div className="space-y-2.5">
-            <Field label="First Name" required>
+            <Field label="First Name" required error={shown('first_name')}>
               <Input className={inp} placeholder="Jonathan" value={form.first_name}
                 onChange={(e) => set('first_name', e.target.value)}
                 onBlur={() => {
@@ -198,13 +214,13 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
             <Field label="Date of Birth">
               <Input className={inp} type="date" value={form.date_of_birth} onChange={(e) => set('date_of_birth', e.target.value)} />
             </Field>
-            <Field label="Email Address" required>
+            <Field label="Email Address" required error={shown('email')}>
               <EmailInput value={form.email} onChange={(v) => set('email', v)} placeholder="j.doe@company.com" readOnly={!!editing} required />
             </Field>
-            <Field label="Contact No">
+            <Field label="Contact No" error={shown('contact_no')}>
               <PhoneInput value={form.contact_no} onChange={(v) => set('contact_no', v)} placeholder="+91 98765 43210" />
             </Field>
-            <Field label="User Name" required>
+            <Field label="User Name" required error={shown('login_name')}>
               <Input
                 className={inp}
                 placeholder="Auto-generated"
@@ -216,15 +232,15 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
                 }}
               />
             </Field>
-            <Field label={editing ? "New Password" : "Password"} required={!editing}>
+            <Field label={editing ? "New Password" : "Password"} required={!editing} error={shown('password')}>
               <div className="flex gap-1.5">
                 <div className="relative flex-1">
                   <Input className={inp + ' pr-8'} type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={form.password} onChange={(e) => set('password', e.target.value)} />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] transition-colors">
+                  <button type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} onClick={() => setShowPassword(!showPassword)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] transition-colors">
                     {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                   </button>
                 </div>
-                <button type="button" onClick={handleGenPassword} title="Auto-generate password" className="h-8 px-2 bg-[var(--shell-border)] border border-[var(--shell-border)] rounded-lg text-[var(--shell-text)] hover:bg-[var(--shell-hover)] transition-colors shrink-0">
+                <button type="button" onClick={handleGenPassword} title="Generate password" aria-label="Generate password" className="h-8 px-2 bg-[var(--shell-border)] border border-[var(--shell-border)] rounded-lg text-[var(--shell-text)] hover:bg-[var(--shell-hover)] transition-colors shrink-0">
                   <RefreshCw className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -243,15 +259,20 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
                   const rc = roleColor(r.role_name);
                   return (
                     <div key={r.role_id} className={cn('flex items-center px-3 py-2 transition-colors', isChecked ? 'rounded-lg border' : 'hover:rounded-lg border')} style={{ borderColor: 'var(--shell-border)' }}>
-                      <div onClick={() => toggleRole(r.role_id)} className={cn('w-3.5 h-3.5 rounded-md border-2 flex items-center justify-center transition-all cursor-pointer shrink-0 mr-2.5', isChecked ? 'bg-[var(--shell-accent)] border-[var(--shell-accent)]' : 'border-[var(--shell-border)]')}>
-                        {isChecked && <Check className="w-2 h-2 text-white" />}
-                      </div>
+                      <button
+                        type="button" role="checkbox" aria-checked={isChecked} aria-label={r.role_name}
+                        disabled={lockedRoleId === r.role_id}
+                        onClick={() => toggleRole(r.role_id)}
+                        className={cn('w-3.5 h-3.5 rounded-md border-2 flex items-center justify-center transition-all cursor-pointer shrink-0 mr-2.5 focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)] disabled:cursor-not-allowed disabled:opacity-60', isChecked ? 'bg-[var(--shell-accent)] border-[var(--shell-accent)]' : 'border-[var(--shell-border)]')}
+                      >
+                        {isChecked && <Check aria-hidden className="w-2 h-2 text-white" />}
+                      </button>
                       <div className={cn('w-2 h-2 rounded-full shrink-0 mr-2', rc.dot)} />
-                      <span onClick={() => toggleRole(r.role_id)} className={cn('text-[12px] font-semibold select-none flex-1 cursor-pointer', isChecked ? 'text-[var(--shell-text)]' : 'text-[var(--shell-text-muted)]')}>
-                        {r.role_name}
+                      <span onClick={() => lockedRoleId !== r.role_id && toggleRole(r.role_id)} className={cn('text-[12px] font-semibold select-none flex-1 cursor-pointer', isChecked ? 'text-[var(--shell-text)]' : 'text-[var(--shell-text-muted)]')}>
+                        {r.role_name}{lockedRoleId === r.role_id ? ' (you)' : ''}
                       </span>
                       {isChecked && (
-                        <button type="button" onClick={() => setDefaultRole(r.role_id)} className="ml-2 transition-colors">
+                        <button type="button" aria-label={`Make ${r.role_name} the default role`} aria-pressed={isDefault} onClick={() => setDefaultRole(r.role_id)} className="ml-2 transition-colors">
                           <Star className={cn('w-3 h-3', isDefault ? 'fill-[var(--warning)] text-[var(--warning)]' : 'text-[var(--shell-text-muted)] hover:text-[var(--warning)]')} />
                         </button>
                       )}
@@ -259,6 +280,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
                   );
                 })}
               </div>
+              {shown('roles') && <p role="alert" className="text-[12px] text-[var(--danger)]">{shown('roles')}</p>}
               {defaultRoleName && (
                 <p className="text-[12px] text-[var(--shell-text-muted)] pt-0.5">
                   <span className="text-[var(--shell-accent)] font-semibold">{defaultRoleName}</span> is the default active role <span className="text-[var(--warning)]">★</span>
@@ -270,7 +292,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--shell-text-muted)] z-10 pointer-events-none" />
                 <Select value={form.reporting_manager_id} onValueChange={(v) => set('reporting_manager_id', v)}>
                   <SelectTrigger className={inp + ' pl-8'}>
-                    <SelectValue placeholder="Search manager..." />
+                    <SelectValue placeholder="Select manager" />
                   </SelectTrigger>
                   <SelectContent>
                     {managers.map((m) => <SelectItem key={m.id} value={m.id.toString()}>{m.username}</SelectItem>)}
@@ -300,7 +322,7 @@ export function UserModal({ isOpen, onClose, onSave, editing, roles, managers }:
                 value={form.status}
                 onChange={(v) => set("status", v)}
                 options={[
-                  { value: 'ACTIVE', label: 'ACTIVE', tone: 'success' },
+                  { value: 'ACTIVE', label: 'Active', tone: 'success' },
                   { value: 'On Hold', label: 'On Hold', tone: 'warning' },
                   { value: 'Inactive', label: 'Inactive', tone: 'danger' },
                 ]}

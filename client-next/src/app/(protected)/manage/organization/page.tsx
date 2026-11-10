@@ -21,6 +21,7 @@ import {
   Building2,
   ShieldCheck,
   Phone,
+  UserCheck,
 } from 'lucide-react';
 import type { User } from '@/lib/types';
 import { 
@@ -40,7 +41,7 @@ import { ModuleIntelligencePanel } from '@/components/shared/module/module-intel
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
-import { columns } from './columns';
+import { columns, userStatus } from './columns';
 import { UserModal } from '@/components/manage/user-modal';
 import { AllocationModal } from '@/components/manage/allocation-modal';
 import { PermissionsModal } from '@/components/manage/permissions-modal';
@@ -73,9 +74,10 @@ export default function OrganizationPage() {
   const [allocationModalOpen, setAllocationModalOpen] = useState(false);
   const [panelAllocations, setPanelAllocations] = useState<any[]>([]);
 
-  useEffect(() => { 
-    setHeader('Team Management', 'Active Users: ' + users.length); 
-  }, [setHeader, users.length]);
+  const activeCount = users.filter((u) => userStatus(u) === 'ACTIVE').length;
+  useEffect(() => {
+    setHeader('Organization', users.length ? `${activeCount} of ${users.length} people active` : 'Your team, their roles and managers');
+  }, [setHeader, users.length, activeCount]);
 
   const selectedUser = useMemo(() => {
     return users.find(u => u.id === selectedId);
@@ -83,7 +85,8 @@ export default function OrganizationPage() {
 
   const userColumns = useMemo(() => columns(users), [users]);
 
-  const [sorting, setSorting] = useState<SortingState>([]);
+  // People who are on hold or inactive first, then by name
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'status', desc: false }, { id: 'username', desc: false }]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
@@ -138,32 +141,78 @@ export default function OrganizationPage() {
       invalidate('users');
       setUserModalOpen(false);
       setEditingUser(null);
-    } catch {
-      toast.error('Failed to save user');
+    } catch (e: any) {
+      toast.error(e?.message || 'Could not save the user.');
     }
   };
 
+  const isAdminUser = (u: any) => (u.roles || []).some((r: any) => String(r.role_name).toUpperCase() === 'ADMIN') || String(u.role_name).toUpperCase() === 'ADMIN';
+  const onlyActiveAdmin = (u: any) => isAdminUser(u) && users.filter((x) => isAdminUser(x) && userStatus(x) === 'ACTIVE').length <= 1;
+
   const handleDeactivate = async () => {
-    if (!selectedId) return;
-    const ok = await confirmDialog('Deactivate User', `Deactivate account for user #${selectedId}? They will lose access immediately.`, { confirmLabel: 'Deactivate', destructive: true });
+    if (!selectedUser) return;
+    const name = selectedUser.username;
+    const ok = await confirmDialog('Deactivate user', `Deactivate ${name} (NT${10000 + selectedUser.id})? They lose access immediately. Their pending approvals stay with them until reassigned.`, { confirmLabel: 'Deactivate user', destructive: true });
     if (!ok) return;
     try {
-      await api.put(`/users/${selectedId}`, { isActive: false, user_status: 'INACTIVE' });
-      toast.success('Access revoked: User account set to Inactive');
+      await api.put(`/users/${selectedUser.id}`, { isActive: false, user_status: 'INACTIVE' });
+      toast.success(`${name} deactivated`);
       invalidate('users');
       setSelectedId(null);
-    } catch {
-      toast.error('Privilege error: Failed to deactivate user');
+    } catch (e: any) {
+      toast.error(e?.message || 'Could not deactivate the user.');
+    }
+  };
+
+  const handleReactivate = async () => {
+    if (!selectedUser) return;
+    try {
+      await api.put(`/users/${selectedUser.id}`, { isActive: true, user_status: 'ACTIVE' });
+      toast.success(`${selectedUser.username} is active again`);
+      invalidate('users');
+    } catch (e: any) {
+      toast.error(e?.message || 'Could not reactivate the user.');
     }
   };
 
   const managerName = (id?: number) => users.find(u => u.id === id)?.username || '—';
 
+  // You cannot deactivate yourself or the only active admin; someone who is on hold or inactive can be brought back
+  const st = selectedUser ? userStatus(selectedUser) : 'ACTIVE';
+  const canDeactivate = !!selectedUser && st !== 'INACTIVE' && selectedUser.id !== currentUser?.id && !onlyActiveAdmin(selectedUser);
   const itemActions: DetailActionDef[] = isAdmin && selectedUser ? [
-    { label: 'Edit', variant: 'primary', onClick: () => { setEditingUser(selectedUser); setUserModalOpen(true); } },
+    ...(st !== 'ACTIVE' ? [{ label: 'Reactivate', variant: 'primary' as const, icon: <UserCheck className="h-4 w-4 text-[var(--success)]" />, onClick: handleReactivate }] : []),
+    { label: 'Edit', variant: st === 'ACTIVE' ? 'primary' as const : undefined, onClick: () => { setEditingUser(selectedUser); setUserModalOpen(true); } },
     { label: 'Permissions', onClick: () => setPermissionsModalOpen(true) },
-    { label: 'Deactivate', variant: 'danger', onClick: handleDeactivate },
-  ] : [];
+    ...(canDeactivate ? [{ label: 'Deactivate', variant: 'danger' as const, onClick: handleDeactivate }] : []),
+  ].slice(0, 3) : [];
+
+  // Who is on the team and what needs a look, instead of instructions
+  const count = (s: string) => users.filter((u) => userStatus(u) === s).length;
+  const roleCount = (r: string) => users.filter((u) => String(u.role_name).toUpperCase() === r).length;
+  const noManager = users.filter((u) => String(u.role_name).toUpperCase() === 'EMPLOYEE' && !(u as any).manager_id && !(u as any).manager_name).length;
+  const orgSummary = (
+    <div className="space-y-4">
+      <DetailSummary title="Team" subtitle="People with access" figure={users.length} figureLabel="People" />
+      <DetailSection title="Needs a look">
+        <DetailGrid>
+          <DetailField label="On hold" value={count('ON_HOLD')} tone={count('ON_HOLD') ? 'warning' : 'muted'} />
+          <DetailField label="Inactive" value={count('INACTIVE')} />
+          <DetailField label="Employees without a manager" value={noManager} tone={noManager ? 'warning' : 'muted'} wide />
+        </DetailGrid>
+      </DetailSection>
+      <DetailSection title="By role">
+        <DetailGrid>
+          <DetailField label="Admin" value={roleCount('ADMIN')} />
+          <DetailField label="Finance" value={roleCount('FINANCE')} />
+          <DetailField label="Manager" value={roleCount('MANAGER')} />
+          <DetailField label="Employee" value={roleCount('EMPLOYEE')} />
+          <DetailField label="Configurator" value={roleCount('CONFIGURATOR')} />
+          <DetailField label="Operations" value={roleCount('OPERATIONS')} />
+        </DetailGrid>
+      </DetailSection>
+    </div>
+  );
 
   return (
     <ModuleShell
@@ -185,10 +234,11 @@ export default function OrganizationPage() {
       }
       intelligencePanel={
           <ModuleIntelligencePanel
-            title="User Profile"
+            title={selectedUser ? 'Person' : 'Summary'}
             icon={<UserIcon className="h-3 w-3" />}
             onClose={() => setSelectedId(null)}
             hasSelection={!!selectedUser}
+            idle={orgSummary}
             footer={itemActions.length > 0 ? <DetailActions actions={itemActions} /> : undefined}
           >
             {selectedUser && (() => {
@@ -199,7 +249,8 @@ export default function OrganizationPage() {
               const roles = (u.roles && u.roles.length > 0 ? u.roles : [{ role_name: u.role_name, is_default: true }])
                 .map((r: any) => `${r.role_name}${r.is_default ? ' (default)' : ''}`).join(', ');
               const address = [u.house_apt, u.address, [u.city, u.state].filter(Boolean).join(', '), u.postal_code, u.country].filter(Boolean).join(', ');
-              const joined = u.joining_date ? parseApiDate(u.joining_date)?.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : undefined;
+              const joined = u.joining_date ? parseApiDate(u.joining_date)?.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : undefined;
+              const isEmp = String(u.role_name).toUpperCase() === 'EMPLOYEE';
               return (
                 <>
                   <DetailSummary title={u.username} subtitle={`NT${10000 + u.id}${u.department ? ` · ${u.department}` : ''}`} status={status} statusClass={statusClass} />
@@ -207,9 +258,8 @@ export default function OrganizationPage() {
                     <DetailGrid>
                       <DetailField label="Roles" value={roles} wide />
                       <DetailField label="Department" value={u.department || 'Unassigned'} />
-                      <DetailField label="Manager" value={u.manager_name || managerName(u.manager_id ?? undefined)} />
+                      <DetailField label="Manager" value={u.manager_name || (u.manager_id ? managerName(u.manager_id) : isEmp ? 'None, any manager may approve' : undefined)} />
                       <DetailField label="Joined" value={joined} />
-                      <DetailField label="Clearance" value={u.clearance_level || 'Level 1'} />
                     </DetailGrid>
                   </DetailSection>
                   <DetailSection title="Contact">
@@ -247,7 +297,7 @@ export default function OrganizationPage() {
         onRowClick={(row) => setSelectedId(row.id)}
         selectedRowId={selectedId || undefined}
         fullHeight
-        emptyMessage="No team members found."
+        emptyMessage={globalFilter ? 'No people match this search.' : 'No team members yet. Use Add to invite the first one.'}
       />
 
       {confirmDialogEl}

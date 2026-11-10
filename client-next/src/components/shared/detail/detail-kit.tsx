@@ -186,7 +186,10 @@ export function DetailActions({ actions }: { actions: DetailActionDef[] }) {
   if (list.length === 0) return null;
   return (
     <div className={cn('grid gap-2', list.length === 1 ? 'grid-cols-1' : list.length === 2 ? 'grid-cols-2' : 'grid-cols-2 [&>*:last-child:nth-child(odd)]:col-span-2')}>
-      {list.map((a) => (
+      {list.map((a) => {
+        const meta = TOOLBAR_ICONS[a.label];
+        const icon = a.icon ?? (meta && <span className={meta.tone}>{meta.icon}</span>);
+        return (
         <button
           key={a.label}
           type="button"
@@ -199,9 +202,10 @@ export function DetailActions({ actions }: { actions: DetailActionDef[] }) {
             a.variant === 'danger' && 'border-[var(--danger)] bg-transparent text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)]',
           )}
         >
-          {a.icon && <span aria-hidden className={cn('inline-flex', a.variant === 'primary' && '[&_svg]:!text-[var(--shell-accent-fg)]', a.variant === 'danger' && '[&_svg]:!text-[var(--danger)]')}>{a.icon}</span>}{a.label}
+          {icon && <span aria-hidden className={cn('inline-flex', a.variant === 'primary' && '[&_svg]:!text-[var(--shell-accent-fg)]', a.variant === 'danger' && '[&_svg]:!text-[var(--danger)]')}>{icon}</span>}{a.label}
         </button>
-      ))}
+        );
+      })}
     </div>
   );
 }

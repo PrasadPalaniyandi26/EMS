@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useCallback, useEffect, useLayoutEffect } from 'react';
 import { X } from 'lucide-react';
 import {
   Dialog,
@@ -59,6 +59,11 @@ export function ModuleModal({
   const dragging = useRef(false);
   const origin = useRef({ mx: 0, my: 0, ox: 0, oy: 0 });
   const scrollRef = useRef<HTMLDivElement>(null);
+  // The control that opened the dialog, so focus goes back to it on close instead of falling to the page
+  const openerRef = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (isOpen) openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -104,6 +109,16 @@ export function ModuleModal({
           transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px))`,
         }}
         showCloseButton={false}
+        aria-describedby={undefined}
+        // A form dialog opens on its first field; one with no fields keeps the default
+        onOpenAutoFocus={(e) => {
+          const first = scrollRef.current?.querySelector<HTMLElement>('input:not([type=hidden]):not([disabled]):not([readonly]), select:not([disabled]), textarea:not([disabled])');
+          if (first) { e.preventDefault(); first.focus(); }
+        }}
+        onCloseAutoFocus={(e) => {
+          const opener = openerRef.current;
+          if (opener && document.contains(opener)) { e.preventDefault(); opener.focus(); }
+        }}
       >
         {/* Header — drag handle */}
         <DialogHeader
@@ -121,7 +136,7 @@ export function ModuleModal({
         >
           <div className="flex items-center gap-2.5">
             <DialogTitle
-              className="text-[15px] font-semibold"
+              className="text-[15px] font-semibold capitalize"
               style={{ color: isDestructive ? 'var(--danger)' : 'var(--shell-text)' }}
             >
               {title}
@@ -129,7 +144,7 @@ export function ModuleModal({
           </div>
           <button
             onClick={onClose}
-            className="rounded-md p-1 transition-colors"
+            className="-mr-1 rounded-md p-2 transition-colors hover:bg-[var(--shell-hover)] focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]"
             style={{ color: 'var(--shell-text-muted)', cursor: 'pointer' }}
             aria-label="Close Modal"
           >

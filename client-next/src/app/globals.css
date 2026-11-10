@@ -145,11 +145,11 @@
   --danger-foreground: #ffffff;
   --surface-raised:    #ffffff;
   --overlay:           rgba(22, 22, 22, 0.5);
-  /* Heatmap bins (spend intensity): opaque fills with their own dark text so every cell stays >= 7:1 */
+  /* Heatmap bins (spend intensity): one blue ramp that deepens with spend, opaque fills with their own text, every cell >= 4.5:1 */
   --heat-1: #dbeafe; --heat-1-text: #1e3a8a;
   --heat-2: #93c5fd; --heat-2-text: #172554;
-  --heat-3: #fcd34d; --heat-3-text: #451a03;
-  --heat-4: #fca5a5; --heat-4-text: #450a0a;
+  --heat-3: #3b82f6; --heat-3-text: #0b1220;
+  --heat-4: #1d4ed8; --heat-4-text: #ffffff;
   --table-header:      #e0e0e0;  /* table header band: clearly stronger than the white rows */
 
   /* Approval workflow states (consumed by lib/status.ts as components migrate, Phase 4) */
@@ -166,6 +166,8 @@
   --role-finance:  #066149;
   --role-manager:  #c2410c;
   --role-employee: #1d4ed8;
+  --role-configurator: #0f766e;
+  --role-operations: #6d28d9;
 
   /* Navigation icon palette: a deliberate multi-colour set so each sidebar destination is recognisable at a
      glance. Decorative (icons are never the only label) but kept >= 4.5:1 on the white sidebar. */
@@ -274,6 +276,11 @@
   --danger:            #ff8389;
   --danger-foreground: #2a0a0a;
   --surface-raised:    #393939;
+  /* Heatmap on dark: the quietest bin sits close to the surface and the highest spend is the brightest */
+  --heat-1: #2a3b57; --heat-1-text: #dbeafe;
+  --heat-2: #2858b8; --heat-2-text: #ffffff;
+  --heat-3: #78a9ff; --heat-3-text: #0b1220;
+  --heat-4: #bfdbfe; --heat-4-text: #0b1220;
   --table-header:      #393939;  /* table header band: clearly stronger than the #2f2f2f rows */
   --overlay:           rgba(0, 0, 0, 0.6);
 
@@ -289,6 +296,8 @@
   --role-finance:  #34d399;
   --role-manager:  #fb923c;
   --role-employee: #60a5fa;
+  --role-configurator: #2dd4bf;
+  --role-operations: #a78bfa;
 
   --nav-blue:   #60a5fa;
   --nav-violet: #a78bfa;
@@ -330,7 +339,7 @@
     @apply antialiased flex flex-col font-sans;
     min-height: 100dvh;
     overflow: hidden;
-    font-size: 13.5px;
+    font-size: 13px;
     font-feature-settings: 'tnum' 1, 'zero' 0, 'ss01' 0;
   }
   /* Native controls (select popups, date pickers, scrollbars, autofill) follow the theme. Without this the
@@ -382,6 +391,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    /* One gutter: the top bar and footer use the same 1rem as the page content, so the title and the controls line up with what is below them */
     padding: 0 1rem;
     color: var(--shell-text);
     border-bottom: 1px solid var(--shell-border);
@@ -396,11 +406,6 @@
     overflow-y: auto;
     transition: margin-left var(--duration-slow) var(--ease-move);
   }
-  @media (min-width: 640px) {
-    .fixed-top {
-      padding: 0 1.25rem;
-    }
-  }
   .footer-fixed {
     position: fixed;
     bottom: 0;
@@ -412,7 +417,7 @@
     z-index: var(--z-nav);
     display: flex;
     align-items: center;
-    padding: 0 1.5rem;
+    padding: 0 1rem;
     color: var(--shell-text-muted);
     transition: left var(--duration-slow) var(--ease-move), background-color var(--duration-base) var(--ease-standard), border-color var(--duration-base) var(--ease-standard);
   }
@@ -431,7 +436,6 @@
     }
     .fixed-top {
       left: var(--sidebar-w);
-      padding: 0 1.5rem;
     }
     .main-workspace {
       margin-left: var(--sidebar-w);
@@ -566,3 +570,13 @@
   left: auto !important;
   right: 0 !important;
 }
+
+/* Title Case: table headers, like menu names, dialog titles and page titles, start every word with a capital.
+   The text is written in sentence case in code; capitalize only raises the first letter of each word. */
+th { text-transform: capitalize; }
+
+/* Spend bars grow once, left to right, when a page loads. Only for people who have not asked for less motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .bar-fill { transform-origin: left center; animation: bar-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: var(--bar-delay, 0ms); }
+}
+@keyframes bar-in { from { transform: scaleX(0); } to { transform: scaleX(1); } }

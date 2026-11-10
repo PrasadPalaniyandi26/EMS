@@ -8,8 +8,12 @@ import { RolesGuard } from '../common/guards/roles.guard';
 
 type Actor = { id: number; username?: string; role_name?: string };
 const isFinance = (u: Actor) => ['ADMIN', 'FINANCE'].includes((u.role_name || '').toUpperCase());
-// Managers see the lines they own; Admin and Finance see everything
+// Managers see the lines they own; Admin, Finance, Operations and Configurator see everything
 const scopeOf = (u: Actor) => ((u.role_name || '').toUpperCase() === 'MANAGER' ? { ownerId: u.id } : {});
+
+// Who reads the budget, and who prepares it (plans, lines, requests). Approving stays with Finance and Admin.
+const READ = ['admin', 'finance', 'manager', 'operations', 'configurator'];
+const PREPARE = ['admin', 'finance', 'manager', 'operations'];
 
 @ApiTags('budgets')
 @Controller('v1/budgets')
@@ -21,12 +25,12 @@ export class BudgetsController {
   @Get('headroom')
   headroom(
     @Query('date') date?: string, @Query('contextType') contextType?: string, @Query('projectId') projectId?: string,
-    @Query('productId') productId?: string, @Query('departmentId') departmentId?: string, @Query('categoryId') categoryId?: string,
+    @Query('productId') productId?: string, @Query('departmentId') departmentId?: string, @Query('buildOrderId') buildOrderId?: string, @Query('categoryId') categoryId?: string,
     @Query('amount') amount?: string, @Query('excludeId') excludeId?: string, @Query('gstClaimable') gstClaimable?: string, @Query('netAmount') netAmount?: string,
   ) {
     return this.service.headroom({
       date, contextType, projectId: projectId ? Number(projectId) : undefined, productId: productId ? Number(productId) : undefined,
-      departmentId: departmentId ? Number(departmentId) : undefined, categoryId: categoryId ? Number(categoryId) : undefined,
+      departmentId: departmentId ? Number(departmentId) : undefined, buildOrderId: buildOrderId ? Number(buildOrderId) : undefined, categoryId: categoryId ? Number(categoryId) : undefined,
       amount: amount ? Number(amount) : undefined, excludeId: excludeId ? Number(excludeId) : undefined,
       gstClaimable: gstClaimable === 'true', netAmount: netAmount ? Number(netAmount) : undefined,
     });
@@ -39,7 +43,7 @@ export class BudgetsController {
   }
 
   @Get('settings')
-  @Roles('admin', 'finance', 'manager')
+  @Roles(...READ)
   settings() { return this.service.readSettings(); }
 
   @Put('settings')
@@ -47,19 +51,19 @@ export class BudgetsController {
   saveSettings(@Body() body: any, @CurrentUser('id') userId: number) { return this.service.saveSettings(body, userId); }
 
   @Get('plans')
-  @Roles('admin', 'finance', 'manager')
+  @Roles(...READ)
   plans() { return this.service.listPlans(); }
 
   @Post('plans')
-  @Roles('admin', 'finance')
+  @Roles('admin', 'finance', 'operations')
   createPlan(@Body() body: any, @CurrentUser('id') userId: number) { return this.service.createPlan(body, userId); }
 
   @Get('plans/:fy')
-  @Roles('admin', 'finance', 'manager')
+  @Roles(...READ)
   plan(@Param('fy', ParseIntPipe) fy: number, @CurrentUser() u: Actor) { return this.service.getPlan(fy, scopeOf(u)); }
 
   @Put('plans/:fy')
-  @Roles('admin', 'finance')
+  @Roles('admin', 'finance', 'operations')
   updatePlan(@Param('fy', ParseIntPipe) fy: number, @Body() body: any, @CurrentUser('id') userId: number) { return this.service.updatePlan(fy, body, userId); }
 
   @Delete('plans/:fy')
@@ -67,7 +71,7 @@ export class BudgetsController {
   deletePlan(@Param('fy', ParseIntPipe) fy: number, @CurrentUser('id') userId: number) { return this.service.deletePlan(fy, userId); }
 
   @Post('plans/:fy/submit')
-  @Roles('admin', 'finance', 'manager')
+  @Roles(...PREPARE)
   submit(@Param('fy', ParseIntPipe) fy: number, @CurrentUser() u: Actor) { return this.service.submitPlan(fy, u); }
 
   @Post('plans/:fy/decision')
@@ -75,38 +79,38 @@ export class BudgetsController {
   decide(@Param('fy', ParseIntPipe) fy: number, @Body() body: any, @CurrentUser() u: Actor) { return this.service.decidePlan(fy, body, u); }
 
   @Post('lines')
-  @Roles('admin', 'finance', 'manager')
+  @Roles(...PREPARE)
   createLine(@Body() body: any, @CurrentUser() u: Actor) { return this.service.createLine(body, u, isFinance(u)); }
 
   @Put('lines/:id')
-  @Roles('admin', 'finance', 'manager')
+  @Roles(...PREPARE)
   updateLine(@Param('id', ParseIntPipe) id: number, @Body() body: any, @CurrentUser() u: Actor) { return this.service.updateLine(id, body, u, isFinance(u)); }
 
   @Put('lines/:id/period')
-  @Roles('admin', 'finance', 'manager')
+  @Roles(...PREPARE)
   setPeriod(@Param('id', ParseIntPipe) id: number, @Body() body: any, @CurrentUser() u: Actor) { return this.service.setPeriod(id, body, u, isFinance(u)); }
 
   @Delete('lines/:id')
-  @Roles('admin', 'finance', 'manager')
+  @Roles(...PREPARE)
   deleteLine(@Param('id', ParseIntPipe) id: number, @Query('reason') reason: string | undefined, @CurrentUser() u: Actor) { return this.service.deleteLine(id, reason, u, isFinance(u)); }
 
   @Get('lines/:id')
-  @Roles('admin', 'finance', 'manager')
-  lineDetail(@Param('id', ParseIntPipe) id: number) { return this.service.lineDetail(id); }
+  @Roles(...READ)
+  lineDetail(@Param('id', ParseIntPipe) id: number, @CurrentUser() u: Actor) { return this.service.lineDetail(id, scopeOf(u)); }
 
   @Get('monitor')
-  @Roles('admin', 'finance', 'manager')
+  @Roles(...READ)
   monitor(@Query('fy') fy: string | undefined, @CurrentUser() u: Actor) { return this.service.monitor(fy ? Number(fy) : undefined, scopeOf(u)); }
 
   @Get('alerts')
-  @Roles('admin', 'finance', 'manager')
+  @Roles(...READ)
   alerts(@Query('status') status: string | undefined, @CurrentUser() u: Actor) { return this.service.listAlerts({ status, scope: scopeOf(u) }); }
 
   @Get('alerts/count')
-  @Roles('admin', 'finance', 'manager')
+  @Roles(...READ)
   alertCount(@CurrentUser() u: Actor) { return this.service.openAlertCount(scopeOf(u)); }
 
   @Get('dashboard')
-  @Roles('admin', 'finance', 'manager')
+  @Roles(...READ)
   dashboard() { return this.service.dashboardLines(); }
 }

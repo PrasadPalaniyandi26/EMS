@@ -49,11 +49,13 @@ import {
 import { useDataTable } from '@/hooks/use-data-table';
 import { IdCell, TextCell, DateCell, MoneyCell, StatusText, ToneText, headerRight } from '@/components/data-table/cells';
 import { useExpenseImpact, type ExpenseImpact } from '@/hooks/use-budget-queries';
-import { UtilBar, money } from '@/components/budgets/budget-ui';
+import { TabBar, UtilBar, money, useTabParam } from '@/components/budgets/budget-ui';
 
 // ─── Column definitions ─────────────────────────────────────────────────────
 
-function buildColumns(role: string, currency: string, impact: Record<number, ExpenseImpact>): ColumnDef<any>[] {
+const ageDays = (v: string | null | undefined) => (v ? Math.max(0, Math.floor((Date.now() - new Date(v).getTime()) / 86400000)) : 0);
+
+function buildColumns(role: string, currency: string, impact: Record<number, ExpenseImpact>, view: string, meId?: number): ColumnDef<any>[] {
   const isEmployee = role === 'EMPLOYEE';
   return [
     {
@@ -65,7 +67,7 @@ function buildColumns(role: string, currency: string, impact: Record<number, Exp
     {
       accessorKey: 'description',
       header: 'Description',
-      cell: ({ row }) => <TextCell value={row.getValue('description') as string} className="block max-w-xs truncate" />,
+      cell: ({ row }) => <TextCell value={row.getValue('description') as string} className="block max-w-[160px] truncate" />,
     },
     ...(isEmployee
       ? []
@@ -73,24 +75,45 @@ function buildColumns(role: string, currency: string, impact: Record<number, Exp
           {
             accessorKey: 'submitted_by_name',
             header: 'Submitted by',
-            cell: ({ row }: any) => <TextCell value={row.original.submitted_by_name || 'System'} />,
+            cell: ({ row }: any) => {
+              const own = meId != null && row.original.submitted_by_id === meId;
+              return <TextCell value={`${row.original.submitted_by_name || 'System'}${own ? ' (you)' : ''}`} className={own ? 'font-medium text-[var(--warning)]' : undefined} />;
+            },
           } as ColumnDef<any>,
         ]),
     {
       accessorKey: 'category_name',
       header: 'Category',
-      cell: ({ row }) => <TextCell value={(row.getValue('category_name') as string) || 'General'} />,
+      cell: ({ row }) => <TextCell value={(row.getValue('category_name') as string) || 'General'} muted className="block max-w-[110px] truncate" />,
     },
+    // On the pending list the date is how long it has been waiting, oldest first
     {
       accessorKey: 'created_at',
-      header: 'Submitted on',
-      cell: ({ row }) => <DateCell value={row.original.date_recorded || row.getValue('created_at')} />,
+      header: view === 'pending' ? headerRight('Waiting') : 'Date',
+      cell: ({ row }) => {
+        const v = row.original.date_recorded || row.getValue('created_at');
+        if (view !== 'pending') return <DateCell value={v} />;
+        const d = ageDays(v);
+        return <div className="text-right"><ToneText tone={d >= 14 ? 'danger' : d >= 7 ? 'warning' : 'muted'} label={`${d} d`} /></div>;
+      },
+    },
+    {
+      accessorKey: 'amount',
+      header: headerRight('Amount'),
+      cell: ({ row }) => <MoneyCell value={row.getValue('amount')} currency={currency} />,
+      size: 120,
     },
     {
       accessorKey: 'transaction_status',
-      header: 'Status',
-      cell: ({ row }) => <StatusText status={row.getValue('transaction_status') as string} />,
-      size: 150,
+      header: view === 'pending' ? 'Waiting on' : 'Status',
+      // On the pending list the stage is one word: whose turn it is
+      cell: ({ row }) => {
+        const s = String(row.getValue('transaction_status') || '').toUpperCase();
+        if (view === 'pending' && s === 'PENDING_MANAGER') return <ToneText tone="warning" label="Manager" />;
+        if (view === 'pending' && s === 'PENDING_FINANCE') return <ToneText tone="warning" label="Finance" />;
+        return <StatusText status={s} />;
+      },
+      size: 110,
     },
     ...(isEmployee
       ? []
@@ -109,12 +132,6 @@ function buildColumns(role: string, currency: string, impact: Record<number, Exp
             size: 130,
           } as ColumnDef<any>,
         ]),
-    {
-      accessorKey: 'amount',
-      header: headerRight('Amount'),
-      cell: ({ row }) => <MoneyCell value={row.getValue('amount')} currency={currency} />,
-      size: 120,
-    },
   ];
 }
 
@@ -134,10 +151,14 @@ export default function ApprovalsPage() {
   const canToggle = isManager || isFinance || isAdmin;
   const canSeeReimbursements = isFinance || isAdmin;
   // Employee: locked to 'history'; Manager + Finance + Admin: default 'pending'
-  const [view, setView] = useState<'pending' | 'history' | 'reimbursements'>(canToggle ? 'pending' : 'history');
+  type View = 'pending' | 'history' | 'reimbursements';
+  const viewValues = useMemo<View[]>(() => [...(canToggle ? ['pending' as const] : []), 'history' as const, ...(canSeeReimbursements ? ['reimbursements' as const] : [])], [canToggle, canSeeReimbursements]);
+  const [view, setView] = useTabParam<View>(viewValues, canToggle ? 'pending' : 'history');
 
-  const switchView = (v: 'pending' | 'history' | 'reimbursements') => {
+  // Pending: oldest first, so the longest wait is on top. History: newest first.
+  const switchView = (v: View) => {
     setView(v);
+    setSorting([{ id: 'created_at', desc: v === 'history' }]);
     setRowSelection({});
   };
 
@@ -154,13 +175,14 @@ export default function ApprovalsPage() {
 
   useEffect(() => {
     const roleCtx = user?.role_name ? `Acting as: ${user.role_name.toUpperCase()}` : '';
-    setHeader('Approvals Workspace', roleCtx);
+    setHeader('Approvals', roleCtx);
   }, [setHeader, user?.role_name]);
 
   // Table state
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'created_at', desc: !canToggle }]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  // Category is in the side panel; leaving it out of the table keeps the amount and budget beside the panel
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({ category_name: false });
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [globalFilter, setGlobalFilter] = useState('');
 
@@ -189,7 +211,7 @@ export default function ApprovalsPage() {
   );
   const { data: impactData } = useExpenseImpact(impactIds);
   const impact = useMemo(() => impactData ?? {}, [impactData]);
-  const cols = useMemo(() => buildColumns(colRole, currency, impact), [colRole, currency, impact]);
+  const cols = useMemo(() => buildColumns(colRole, currency, impact, view, user?.id), [colRole, currency, impact, view, user?.id]);
 
   const table = useDataTable({
     data: approvals,
@@ -264,6 +286,7 @@ export default function ApprovalsPage() {
       invalidate('approvals', 'approvals-history', 'transactions', 'recurring', 'dashboard');
     } catch (err: any) {
       toast.error(err?.message || `Failed to ${action} request`);
+      throw err;
     }
   }, [selectedId, invalidate]);
 
@@ -275,11 +298,36 @@ export default function ApprovalsPage() {
     (selectedApproval?.transaction_status || '').toUpperCase() === 'APPROVED';
 
   // Tab definitions
-  const tabs = [
+  const tabs: { label: string; value: View }[] = [
     ...(canToggle ? [{ label: 'Pending Approvals', value: 'pending' as const }] : []),
     { label: 'History', value: 'history' as const },
     ...(canSeeReimbursements ? [{ label: 'Reimbursements', value: 'reimbursements' as const }] : []),
   ];
+
+  // What the approver sees before choosing a request: how much is waiting, for how long, and what needs a closer look
+  const pendingSummary = (() => {
+    const list = view === 'pending' && canToggle ? approvals : [];
+    const ages = list.map((a) => ageDays(a.date_recorded || a.created_at));
+    const flagged = list.filter((a) => { const i = impact[a.transaction_id]; return i && (i.state === 'OVER' || i.state === 'NO_LINE'); }).length;
+    return (
+      <div className="space-y-4">
+        <DetailSummary title={view === 'pending' ? 'Waiting for you' : 'History'} subtitle={view === 'pending' ? 'Requests that need a decision' : 'Requests already decided'}
+          figure={approvals.length} figureLabel={view === 'pending' ? 'Requests' : 'Decided'} />
+        {view === 'pending' && canToggle && (
+          <DetailSection title="Needs a closer look">
+            <DetailGrid>
+              <DetailField label="Total amount" value={formatCurrency(list.reduce((s, a) => s + Number(a.amount || 0), 0), currency)} wide />
+              <DetailField label="Longest wait" value={ages.length ? `${Math.max(...ages)} days` : undefined} tone={ages.length && Math.max(...ages) >= 14 ? 'danger' : 'muted'} />
+              <DetailField label="Over or no budget line" value={flagged} tone={flagged ? 'warning' : 'muted'} />
+              <DetailField label="No receipt" value={list.filter((a) => !a.receipt_path).length} tone={list.some((a) => !a.receipt_path) ? 'warning' : 'muted'} />
+              <DetailField label="Your own" value={list.filter((a) => a.submitted_by_id === user?.id).length} />
+            </DetailGrid>
+          </DetailSection>
+        )}
+        <p className="text-[12px] text-[var(--shell-text-muted)]">Select a request to see its receipt, budget impact and trail, then approve, send back or reject it.</p>
+      </div>
+    );
+  })();
 
   const itemActions: DetailActionDef[] = canActOnSelected
     ? [
@@ -294,24 +342,7 @@ export default function ApprovalsPage() {
   return (
     <div className="flex flex-col h-full w-full" style={{ background: 'var(--shell-bg)' }}>
       {/* Tab strip */}
-      <div role="tablist" aria-label="Approval views" className="px-4 flex items-end gap-0 shrink-0" style={{ borderBottom: '1px solid var(--shell-border)' }}>
-        {tabs.map((tab) => (
-          <button role="tab" aria-selected={view === tab.value}
-            key={tab.value}
-            onClick={() => switchView(tab.value)}
-            className={`relative px-4 py-2.5 text-[13px] font-medium transition-all ${
-              view === tab.value
-                ? 'text-black dark:text-white'
-                : 'text-[var(--shell-text-muted)] hover:text-[var(--shell-text)]'
-            }`}
-          >
-            {tab.label}
-            {view === tab.value && (
-              <span className="absolute bottom-0 left-0 right-0 h-[2px] rounded-t-full" style={{ background: 'var(--shell-accent)' }} />
-            )}
-          </button>
-        ))}
-      </div>
+      <TabBar<View> value={view} onChange={switchView} tabs={tabs} />
 
       {/* Reimbursements tab — self-contained */}
       {view === 'reimbursements' ? (
@@ -330,14 +361,10 @@ export default function ApprovalsPage() {
       }
       intelligencePanel={
           <ModuleIntelligencePanel
-            title="Approval Review"
+            title={selectedApproval ? 'Approval Review' : 'Summary'}
             onClose={() => setRowSelection({})}
             hasSelection={!!selectedApproval}
-            emptyState={!canToggle ? {
-              heading: 'No Request Selected',
-              body: 'Select one of your submissions to see who reviewed it, their comments, and the outcome.',
-              tips: ['See who approved or rejected it', 'Read the reviewer\'s comments', 'Full audit trail per request'],
-            } : undefined}
+            idle={pendingSummary}
             footer={itemActions.length > 0 ? <DetailActions actions={itemActions} /> : undefined}
           >
             {selectedApproval && (() => {
@@ -462,12 +489,12 @@ export default function ApprovalsPage() {
           <div className="w-16 h-16 rounded-full bg-[var(--shell-accent)]/10 flex items-center justify-center text-[var(--shell-accent)]">
             <CheckCircle2 size={32} />
           </div>
-          <h2 className="text-xl font-semibold text-black dark:text-white">
-            {view === 'history' ? 'No History Yet' : 'All Caught Up!'}
+          <h2 className="text-[18px] font-semibold text-[var(--shell-text)]">
+            {view === 'history' ? 'No history yet' : 'Nothing waiting'}
           </h2>
-          <p className="text-muted-foreground max-w-sm text-center text-sm">
+          <p className="max-w-sm text-center text-[13px] text-[var(--shell-text-muted)]">
             {view === 'history'
-              ? 'Your approved and rejected submissions will appear here.'
+              ? (canToggle ? 'Requests you approve, reject or send back will appear here.' : 'Your approved and rejected submissions will appear here.')
               : 'There are no pending requests in the queue.'}
           </p>
         </div>
@@ -476,7 +503,7 @@ export default function ApprovalsPage() {
           columns={cols}
           data={approvals}
           tableInstance={table}
-          emptyMessage={view === 'pending' ? 'No pending approvals — all caught up!' : 'No approval history yet.'}
+          emptyMessage={view === 'pending' ? 'No pending approvals.' : 'No approval history yet.'}
         />
       )}
 
@@ -484,19 +511,19 @@ export default function ApprovalsPage() {
         isOpen={isApproveOpen}
         onClose={() => setIsApproveOpen(false)}
         selectedRequest={selectedApproval}
-        onConfirm={(data) => { handleAction('approve', data.comment, data.isClaimable); setIsApproveOpen(false); }}
+        onConfirm={async (data) => { try { await handleAction('approve', data.comment, data.isClaimable); setIsApproveOpen(false); } catch { /* the toast says why; the dialog stays open with the comment */ } }}
       />
       <RejectModal
         isOpen={isRejectOpen}
         onClose={() => setIsRejectOpen(false)}
         selectedRequest={selectedApproval}
-        onConfirm={(data) => { handleAction('reject', data.comment); setIsRejectOpen(false); }}
+        onConfirm={async (data) => { try { await handleAction('reject', data.comment); setIsRejectOpen(false); } catch { /* the toast says why; the dialog stays open with the reason */ } }}
       />
       <SendBackModal
         isOpen={isSendBackOpen}
         onClose={() => setIsSendBackOpen(false)}
         selectedRequest={selectedApproval}
-        onConfirm={(data) => { handleAction('send-back', data.comment); setIsSendBackOpen(false); }}
+        onConfirm={async (data) => { try { await handleAction('send-back', data.comment); setIsSendBackOpen(false); } catch { /* the toast says why; the dialog stays open with the reason */ } }}
       />
       <VoidModal
         isOpen={isVoidOpen}

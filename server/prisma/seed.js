@@ -17,6 +17,8 @@ async function main() {
     { id: 2, name: 'FINANCE', description: 'Finance controller with final approval rights' },
     { id: 3, name: 'MANAGER', description: 'Department supervisor' },
     { id: 4, name: 'EMPLOYEE', description: 'Standard business user' },
+    { id: 5, name: 'CONFIGURATOR', description: 'Maintains parts, BOMs, operations and costing setup' },
+    { id: 6, name: 'OPERATIONS', description: 'Prepares budget plans, project estimates, build plans and build orders' },
   ];
 
   for (const role of coreRoles) {
@@ -26,7 +28,7 @@ async function main() {
       create: role,
     });
   }
-  console.log('  ✓ Roles seeded (ADMIN, FINANCE, MANAGER, EMPLOYEE)');
+  console.log('  ✓ Roles seeded (ADMIN, FINANCE, MANAGER, EMPLOYEE, CONFIGURATOR, OPERATIONS)');
 
   // ── 2. Categories ──
   const categories = [

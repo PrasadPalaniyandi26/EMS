@@ -37,7 +37,7 @@ export class TransactionsService {
       receipt_number: t.receiptNumber, submitted_at: t.submittedAt, currency: t.currency,
       client_id: t.clientId, client_name: t.client?.name, project_id: t.projectId, project_name: t.project?.name,
       context_code: t.project?.code || t.product?.code || t.department?.name, department_name: t.department?.name ?? null, product_id: t.productId, product_name: t.product?.name,
-      department_id: t.departmentId ?? null, budget_line_id: t.budgetLineId ?? null, over_budget_reason: t.overBudgetReason ?? null,
+      build_order_id: t.buildOrderId ?? null, department_id: t.departmentId ?? null, budget_line_id: t.budgetLineId ?? null, over_budget_reason: t.overBudgetReason ?? null,
       context_type: t.contextType, is_split: t.isSplit ? 1 : 0, created_at: t.createdAt, updated_at: t.updatedAt, status: t.status,
       approved_by_id: t.approvedById ?? null,
       approved_by_name: t.approvedByName ?? null,
@@ -125,9 +125,21 @@ export class TransactionsService {
     return type === 'expense' ? `EXP-${seq}` : `INC-${seq}`;
   }
 
+  // The customer order an expense is charged to: only a product expense can name one, and it must be an order for that product
+  private async resolveBuildOrder(data: any): Promise<number | null> {
+    const id = data.buildOrderId ? Number(data.buildOrderId) : null;
+    if (!id) return null;
+    if (data.type !== 'expense' || (data.contextType || 'project') !== 'product' || !data.productId) throw new HttpException('A build order can only be chosen for a product expense.', HttpStatus.BAD_REQUEST);
+    const o = await this.prisma.buildOrder.findUnique({ where: { id }, select: { productId: true, status: true } });
+    if (!o || o.productId !== Number(data.productId)) throw new HttpException('That build order is not for the chosen product.', HttpStatus.BAD_REQUEST);
+    if (o.status === 'CANCELLED') throw new HttpException('That build order is cancelled.', HttpStatus.BAD_REQUEST);
+    return id;
+  }
+
   async create(userId: number, data: any) {
     // All users create transactions as DRAFT; Finance submits the same way as others
     const gstFields = buildGstFields(Number(data.amount), data.gstRate ?? null, !!data.gstIncluded);
+    const buildOrderId = await this.resolveBuildOrder(data);
 
     const t = await this.prisma.transaction.create({
       data: {
@@ -137,7 +149,7 @@ export class TransactionsService {
         categoryId: data.categoryId ? Number(data.categoryId) : null, description: data.description || null,
         paymentMethod: data.paymentMethod || 'cash', receiptPath: data.receiptPath || null,
         clientId: data.clientId ? Number(data.clientId) : null, projectId: data.projectId ? Number(data.projectId) : null,
-        productId: data.productId ? Number(data.productId) : null, contextType: data.contextType || 'project',
+        productId: data.productId ? Number(data.productId) : null, contextType: data.contextType || 'project', buildOrderId,
         departmentId: data.contextType === 'overhead' && data.departmentId ? Number(data.departmentId) : null,
         overBudgetReason: data.overBudgetReason?.trim() || null,
         receiptNumber: data.receiptNumber || null, currency: data.currency || 'INR',
@@ -218,7 +230,15 @@ export class TransactionsService {
   // Manager/Admin submitting expense or income → PENDING_FINANCE (skips manager level)
   // Employee submitting expense → PENDING_MANAGER
   // Employee cannot submit income
-  async submit(transactionId: number, userId: number) {
+  // Submits run one at a time, so two expenses cannot both pass the same budget headroom
+  private submitQueue: Promise<unknown> = Promise.resolve();
+  submit(transactionId: number, userId: number) {
+    const run = this.submitQueue.then(() => this.submitNow(transactionId, userId));
+    this.submitQueue = run.catch(() => undefined);
+    return run;
+  }
+
+  private async submitNow(transactionId: number, userId: number) {
     const txn = await this.prisma.transaction.findFirst({
       where: { id: transactionId, userId },
       include: { user: true },
@@ -412,6 +432,7 @@ export class TransactionsService {
     }
     const oldSnapshot = existing ? this.mapTransaction(existing) : null;
     const gstFieldsUpd = buildGstFields(Number(data.amount), data.gstRate ?? null, !!data.gstIncluded);
+    const buildOrderId = await this.resolveBuildOrder(data);
 
     await this.prisma.transaction.updateMany({
       where: { id, userId },
@@ -422,7 +443,7 @@ export class TransactionsService {
         categoryId: data.categoryId ? Number(data.categoryId) : null, description: data.description || null,
         paymentMethod: data.paymentMethod || 'cash', receiptPath: data.receiptPath || null,
         clientId: data.clientId ? Number(data.clientId) : null, projectId: data.projectId ? Number(data.projectId) : null,
-        productId: data.productId ? Number(data.productId) : null, contextType: data.contextType || 'project',
+        productId: data.productId ? Number(data.productId) : null, contextType: data.contextType || 'project', buildOrderId,
         departmentId: data.contextType === 'overhead' && data.departmentId ? Number(data.departmentId) : null,
         overBudgetReason: data.overBudgetReason?.trim() || null,
         receiptNumber: data.receiptNumber || null, currency: data.currency || 'INR',
@@ -430,6 +451,13 @@ export class TransactionsService {
         ...(data.needsReimbursement !== undefined ? { needsReimbursement: !!data.needsReimbursement } : {}),
       },
     });
+    // A split is only valid for the amount it was made for: a different amount (or an income) drops the split, so budget lines never see stale parts
+    if (existing?.isSplit && (data.type !== 'expense' || Math.abs(Number(existing.amount) - gstFieldsUpd.totalAmount) > 0.01)) {
+      await this.prisma.$transaction([
+        this.prisma.transactionSplit.deleteMany({ where: { transactionId: id } }),
+        this.prisma.transaction.update({ where: { id }, data: { isSplit: false } }),
+      ]);
+    }
     const updated = await this.findById(id, userId);
     this.audit.log({
       tableName: 'transactions', recordId: id, referenceId: updated?.reference_id as string | undefined,
@@ -535,6 +563,12 @@ export class TransactionsService {
     if (!splits || splits.length < 2) {
       throw new HttpException('At least 2 splits are required.', HttpStatus.BAD_REQUEST);
     }
+    if (splits.some((s) => !Number.isInteger(Number(s.categoryId)) || Number(s.categoryId) <= 0)) {
+      throw new HttpException('Choose a category for every split.', HttpStatus.BAD_REQUEST);
+    }
+    if (splits.some((s) => !(Number(s.amount) > 0))) {
+      throw new HttpException('Each split needs an amount above zero.', HttpStatus.BAD_REQUEST);
+    }
 
     const original = await this.prisma.transaction.findFirst({ where: { id: transactionId, userId } });
     if (!original) throw new HttpException('Transaction not found.', HttpStatus.NOT_FOUND);
@@ -566,7 +600,8 @@ export class TransactionsService {
           productId: s.productId ? Number(s.productId) : (s.product_id ? Number(s.product_id) : null),
         })),
       });
-      await tx.transaction.update({ where: { id: transactionId }, data: { isSplit: true } });
+      // A split can spread over several products, so it no longer belongs to one build order
+      await tx.transaction.update({ where: { id: transactionId }, data: { isSplit: true, buildOrderId: null } });
     });
     this.audit.log({
       tableName: 'transactions', recordId: transactionId, referenceId: original.referenceId ?? undefined,
@@ -805,7 +840,7 @@ export class TransactionsService {
         description: original.description,
         paymentMethod: original.paymentMethod,
         clientId: original.clientId, projectId: original.projectId,
-        productId: original.productId, contextType: original.contextType,
+        productId: original.productId, contextType: original.contextType, buildOrderId: original.isSplit ? null : original.buildOrderId,
         currency: original.currency, status: 'DRAFT',
       },
     });

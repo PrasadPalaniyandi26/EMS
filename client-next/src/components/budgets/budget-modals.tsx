@@ -11,11 +11,13 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useCategories, useCategoryTypes, useDepartments, useProducts, useProjects, useUsers, useInvalidate } from '@/hooks/use-queries';
+import { useBuildOrders } from '@/hooks/use-build-orders';
 import { fyLabel, type BudgetLine, type BudgetPlanInfo, type CostObject, type PlanView } from '@/hooks/use-budget-queries';
 import { money } from '@/components/budgets/budget-ui';
 import { sortByCode } from '@/lib/codes';
 
-const KIND_OF: Record<CostObject, string> = { PROJECT: 'PROJECT', PRODUCT: 'PRODUCT', DEPARTMENT: 'OVERHEAD', RESERVE: '' };
+const KIND_OF: Record<CostObject, string> = { PROJECT: 'PROJECT', PRODUCT: 'PRODUCT', ORDER: 'PRODUCT', DEPARTMENT: 'OVERHEAD', RESERVE: '' };
+const OBJECT_LABEL: Record<CostObject, string> = { PROJECT: 'Project', PRODUCT: 'Product', ORDER: 'Order', DEPARTMENT: 'Department', RESERVE: 'Company reserve' };
 const labelOf = (o: { name: string; code?: string | null }) => (o.code ? `${o.code} ${o.name}` : o.name);
 
 // ─── New plan ────────────────────────────────────────────────────────────────
@@ -188,12 +190,15 @@ export function PlanDecisionModal({ isOpen, onClose, plan, mode, planned, onDone
 
 // ─── Budget line ─────────────────────────────────────────────────────────────
 
-export function BudgetLineModal({ isOpen, onClose, view, editing, canReserve, onSaved }: {
+export function BudgetLineModal({ isOpen, onClose, view, editing, canReserve, onSaved, preset }: {
   isOpen: boolean; onClose: () => void; view: PlanView | undefined; editing: BudgetLine | null; canReserve: boolean; onSaved?: (id?: number) => void;
+  // Opened from a project, product or order: the line is for that one and the object cannot be changed
+  preset?: { cost_object: CostObject; object_id: number | null; object_name: string } | null;
 }) {
   const invalidate = useInvalidate();
   const { data: projects } = useProjects();
   const { data: products } = useProducts();
+  const { data: orders } = useBuildOrders();
   const { data: departments } = useDepartments();
   const { data: types } = useCategoryTypes('expense');
   const { data: categories } = useCategories();
@@ -226,7 +231,7 @@ export function BudgetLineModal({ isOpen, onClose, view, editing, canReserve, on
     setReason('');
     if (editing) {
       setCostObject(editing.cost_object);
-      setObjectId(String(editing.project_id ?? editing.product_id ?? editing.department_id ?? ''));
+      setObjectId(String(editing.project_id ?? editing.product_id ?? editing.build_order_id ?? editing.department_id ?? ''));
       setTypeId(editing.type_id ? String(editing.type_id) : '');
       setCategoryId(editing.category_id ? String(editing.category_id) : '');
       setControlLevel(editing.control_level);
@@ -240,18 +245,20 @@ export function BudgetLineModal({ isOpen, onClose, view, editing, canReserve, on
       setToIdx('11');
       setPeriods(editing.periods.map((p) => (p ? String(p) : '')));
     } else {
-      setCostObject('DEPARTMENT');
-      setObjectId(''); setTypeId(''); setCategoryId(''); setControlLevel('TYPE');
+      setCostObject(preset?.cost_object ?? 'DEPARTMENT');
+      setObjectId(preset?.object_id != null ? String(preset.object_id) : ''); setTypeId(''); setCategoryId(''); setControlLevel('TYPE');
       setStrict(false); setContingency(false); setOwnerId(''); setNote('');
       setMode('even'); setTotal(''); setFromIdx('0'); setToIdx('11'); setPeriods(Array(12).fill(''));
     }
-  }, [isOpen, editing]);
+  }, [isOpen, editing, preset]);
 
   const objectOptions = costObject === 'PROJECT'
     ? (projects || []).map((p) => ({ id: String(p.id), name: p.code ? `${p.code} ${p.name}` : p.name }))
     : costObject === 'PRODUCT'
       ? (products || []).map((p) => ({ id: String(p.id), name: p.code ? `${p.code} ${p.name}` : p.name }))
-      : costObject === 'DEPARTMENT' ? (departments || []).map((d) => ({ id: String(d.id), name: d.name })) : [];
+      : costObject === 'ORDER'
+        ? (orders || []).filter((o) => o.status !== 'CANCELLED').map((o) => ({ id: String(o.id), name: `${o.code} ${o.product_name ?? ''} × ${o.quantity}`.trim() }))
+        : costObject === 'DEPARTMENT' ? (departments || []).map((d) => ({ id: String(d.id), name: d.name })) : [];
 
   const typeOptions = sortByCode(types || [])
     .filter((t) => !t.applies_to?.length || t.applies_to.includes(KIND_OF[costObject]) || String(t.id) === typeId)
@@ -278,6 +285,7 @@ export function BudgetLineModal({ isOpen, onClose, view, editing, canReserve, on
         plan_id: plan.id, cost_object: costObject,
         project_id: costObject === 'PROJECT' ? Number(objectId) : null,
         product_id: costObject === 'PRODUCT' ? Number(objectId) : null,
+        build_order_id: costObject === 'ORDER' ? Number(objectId) : null,
         department_id: costObject === 'DEPARTMENT' ? Number(objectId) : null,
         type_id: needsType ? Number(typeId) : null,
         category_id: needsType && controlLevel === 'CATEGORY' ? Number(categoryId) : null,
@@ -299,7 +307,7 @@ export function BudgetLineModal({ isOpen, onClose, view, editing, canReserve, on
     }
   };
 
-  const objectLabel = costObject === 'PROJECT' ? 'Project' : costObject === 'PRODUCT' ? 'Product' : 'Department';
+  const objectLabel = OBJECT_LABEL[costObject];
   const owners = (users || []).filter((u) => u.is_active !== 0).map((u) => ({ id: String(u.id), name: u.username }));
 
   return (
@@ -312,21 +320,32 @@ export function BudgetLineModal({ isOpen, onClose, view, editing, canReserve, on
       <div className="grid grid-cols-1 items-start gap-x-6 gap-y-3 md:grid-cols-3">
         {/* Column 1: what the money is for */}
         <div className="space-y-3">
-          <div className="space-y-1.5">
-            <p id="bl-for" className="text-[13px] font-medium text-[var(--shell-text)]">Budget for</p>
-            <SegmentedControl
-              labelledBy="bl-for" value={costObject}
-              onChange={(v) => { setCostObject(v); setObjectId(''); setTypeId(''); setCategoryId(''); if (v !== 'PROJECT') setContingency(false); }}
-              options={[
-                { value: 'DEPARTMENT' as CostObject, label: 'Overhead' },
-                { value: 'PROJECT' as CostObject, label: 'Project' },
-                { value: 'PRODUCT' as CostObject, label: 'Product' },
-                ...(canReserve || costObject === 'RESERVE' ? [{ value: 'RESERVE' as CostObject, label: 'Reserve' }] : []),
-              ]}
-            />
-          </div>
-          {costObject !== 'RESERVE' && (
-            <PickSelect label={objectLabel} required placeholder={`Select ${objectLabel.toLowerCase()}`} value={objectId} onChange={setObjectId} options={objectOptions} emptyHint={`No ${objectLabel.toLowerCase()}s yet.`} />
+          {preset ? (
+            <div className="space-y-0.5">
+              <p className="text-[13px] font-medium text-[var(--shell-text)]">Budget for</p>
+              <p className="text-[13px] text-[var(--shell-text)]">{preset.object_name}</p>
+              <p className="text-[12px] text-[var(--shell-text-muted)]">{objectLabel}</p>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-1.5">
+                <p id="bl-for" className="text-[13px] font-medium text-[var(--shell-text)]">Budget for</p>
+                <SegmentedControl
+                  labelledBy="bl-for" value={costObject}
+                  onChange={(v) => { setCostObject(v); setObjectId(''); setTypeId(''); setCategoryId(''); if (v !== 'PROJECT') setContingency(false); }}
+                  options={[
+                    { value: 'DEPARTMENT' as CostObject, label: 'Overhead' },
+                    { value: 'PROJECT' as CostObject, label: 'Project' },
+                    { value: 'PRODUCT' as CostObject, label: 'Product' },
+                    { value: 'ORDER' as CostObject, label: 'Order' },
+                    ...(canReserve || costObject === 'RESERVE' ? [{ value: 'RESERVE' as CostObject, label: 'Reserve' }] : []),
+                  ]}
+                />
+              </div>
+              {costObject !== 'RESERVE' && (
+                <PickSelect label={objectLabel} required placeholder={`Select ${objectLabel.toLowerCase()}`} value={objectId} onChange={setObjectId} options={objectOptions} emptyHint={`No ${objectLabel.toLowerCase()}s yet.`} />
+              )}
+            </>
           )}
           {needsType && (
             <>

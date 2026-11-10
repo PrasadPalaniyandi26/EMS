@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { SearchX } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, SearchX } from "lucide-react";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -156,7 +156,7 @@ export function DataTable<TData, TValue>({
                   if (!label) return null;
                   return (
                     <div key={cell.id} className="min-w-0">
-                      <div className="mb-0.5 text-[12px] text-[var(--shell-text-muted)] [&_*]:!text-left">{label}</div>
+                      <div className="mb-0.5 text-[12px] capitalize text-[var(--shell-text-muted)] [&_*]:!text-left">{label}</div>
                       <div className="truncate [&_.text-right]:!text-left">{flexRender(cell.column.columnDef.cell, cell.getContext())}</div>
                     </div>
                   );
@@ -166,7 +166,7 @@ export function DataTable<TData, TValue>({
           }) : (
             <div className="flex flex-col items-center justify-center gap-2 py-12" style={{ color: 'var(--shell-text-muted)' }}>
               <SearchX className="w-6 h-6 opacity-40" />
-              <span className="text-[13px]">{emptyMessage}</span>
+              <span className="max-w-md px-4 text-pretty text-center text-[13px]">{emptyMessage}</span>
             </div>
           )}
         </div>
@@ -175,11 +175,27 @@ export function DataTable<TData, TValue>({
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup: any) => (
                 <TableRow key={headerGroup.id} className="hover:bg-transparent">
-                  {headerGroup.headers.map((header: any) => (
-                    <TableHead key={header.id} colSpan={header.colSpan}>
-                      {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                    </TableHead>
-                  ))}
+                  {headerGroup.headers.map((header: any) => {
+                    // A column sorts from its header, by mouse or keyboard, when the table has a sorted row model
+                    const canSort = !!table.options.getSortedRowModel && header.column.getCanSort();
+                    const dir = header.column.getIsSorted();
+                    return (
+                      <TableHead key={header.id} colSpan={header.colSpan} aria-sort={canSort ? (dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : 'none') : undefined}>
+                        {header.isPlaceholder ? null : canSort ? (
+                          <button
+                            type="button"
+                            onClick={header.column.getToggleSortingHandler()}
+                            className="group flex w-full items-center gap-1 rounded-sm text-left font-[inherit] hover:text-[var(--shell-accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--shell-accent)]"
+                          >
+                            <span className="min-w-0 flex-1">{flexRender(header.column.columnDef.header, header.getContext())}</span>
+                            {dir === 'asc' ? <ArrowUp aria-hidden className="h-3 w-3 shrink-0" />
+                              : dir === 'desc' ? <ArrowDown aria-hidden className="h-3 w-3 shrink-0" />
+                                : <ArrowUpDown aria-hidden className="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-60 group-focus-visible:opacity-60" />}
+                          </button>
+                        ) : flexRender(header.column.columnDef.header, header.getContext())}
+                      </TableHead>
+                    );
+                  })}
                 </TableRow>
               ))}
             </TableHeader>
@@ -206,8 +222,11 @@ export function DataTable<TData, TValue>({
                     <TableRow
                       key={row.id}
                       onClick={() => handleRowClick(row.original, row)}
+                      tabIndex={0}
+                      aria-current={isSelected ? 'true' : undefined}
+                      onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); handleRowClick(row.original, row); } }}
                       data-selected={isSelected ? 'true' : undefined}
-                      className={`cursor-pointer transition-colors ${
+                      className={`cursor-pointer transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--shell-accent)] ${
                         isSelected
                           ? ''
                           : 'hover:bg-[var(--shell-hover)]'
@@ -223,10 +242,10 @@ export function DataTable<TData, TValue>({
                 })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={columns.length} className="h-32 text-center">
+                  <TableCell colSpan={columns.length} className="h-32 whitespace-normal text-center">
                     <div className="flex flex-col items-center justify-center gap-2 py-4" style={{ color: 'var(--shell-text-muted)' }}>
                       <SearchX className="w-6 h-6 opacity-40" />
-                      <span className="text-[12px] font-medium opacity-60">{emptyMessage}</span>
+                      <span className="max-w-md text-pretty text-[13px]">{emptyMessage}</span>
                     </div>
                   </TableCell>
                 </TableRow>

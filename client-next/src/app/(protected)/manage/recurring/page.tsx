@@ -30,7 +30,7 @@ import type { RecurringTransaction } from '@/lib/types';
 import { RecurringModal, PauseRecurringModal, ResumeRecurringModal, DeleteRecurringModal } from '@/components/recurring/recurring-modals';
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
-import { columns } from "./columns";
+import { columns, frequencyLabel, recurringState, recurringTone } from "./columns";
 import {
   getCoreRowModel,
   getFacetedRowModel,
@@ -73,6 +73,7 @@ export default function RecurringPage() {
   const { data: categories } = useCategories();
   const invalidate = useInvalidate();
 
+  const recurringColumns = useMemo(() => columns(currency), [currency]);
   const [activeRow, setActiveRow] = useState<RecurringTransaction | null>(null);
   const { data: runHistory, isLoading: runHistoryLoading } = useRecurringRuns(activeRow?.id);
 
@@ -80,7 +81,8 @@ export default function RecurringPage() {
   const [rowSelection, setRowSelection] = useState({});
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [sorting, setSorting] = useState<SortingState>([]);
+  // Overdue and due soon first
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'status', desc: false }]);
 
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -115,12 +117,12 @@ export default function RecurringPage() {
   const [recurringFile, setRecurringFile] = useState<File | null>(null);
 
   useEffect(() => {
-    setHeader('Recurring', 'Automated Subscription & Periodic Expense Management');
+    setHeader('Recurring', 'What posts next, how often and for how much');
   }, [setHeader]);
 
   const table = useDataTable({
     data: recurring,
-    columns: columns(currency),
+    columns: recurringColumns,
     state: {
       sorting,
       columnVisibility,
@@ -453,6 +455,29 @@ export default function RecurringPage() {
     ] as DetailActionDef[];
   })();
 
+  // What posts next and what it costs a month, instead of instructions
+  const recurringSummary = (() => {
+    const PER_MONTH: Record<string, number> = { daily: 30, weekly: 52 / 12, biweekly: 26 / 12, monthly: 1, quarterly: 1 / 3, yearly: 1 / 12 };
+    const live = recurring.filter((r: any) => ['Overdue', 'Due soon', 'Active'].includes(recurringState(r)));
+    const monthly = live.reduce((a: number, r: any) => a + Number(r.total_amount ?? r.amount ?? 0) * (PER_MONTH[String(r.frequency || '').toLowerCase()] ?? 0), 0);
+    const count = (...s: string[]) => recurring.filter((r) => s.includes(recurringState(r))).length;
+    return (
+      <div className="space-y-4">
+        <DetailSummary title="All schedules" subtitle="Repeating transactions" figure={formatCurrency(monthly, currency)} figureLabel="Per month, running schedules" />
+        <DetailSection title="Where they stand">
+          <DetailGrid>
+            <DetailField label="Overdue" value={count('Overdue')} tone={count('Overdue') ? 'danger' : 'muted'} />
+            <DetailField label="Due in 7 days" value={count('Due soon')} tone={count('Due soon') ? 'warning' : 'muted'} />
+            <DetailField label="Active" value={count('Active')} />
+            <DetailField label="Paused" value={count('Paused')} />
+            <DetailField label="Waiting for approval" value={count('Pending', 'Draft', 'Sent back')} wide />
+          </DetailGrid>
+        </DetailSection>
+        <p className="text-[12px] text-[var(--shell-text-muted)]">Per month converts each schedule to a monthly amount. Paused and ended schedules are left out.</p>
+      </div>
+    );
+  })();
+
   return (
     <ModuleShell
       showPanel={!!activeRow}
@@ -475,24 +500,26 @@ export default function RecurringPage() {
       }
       intelligencePanel={
           <ModuleIntelligencePanel
-            title="Subscription Lifecycle"
+            title={activeRow ? 'Schedule' : 'Summary'}
             onClose={() => setRowSelection({})}
             hasSelection={!!activeRow}
+            idle={recurringSummary}
             footer={itemActions.length > 0 ? <DetailActions actions={itemActions} /> : undefined}
           >
             {activeRow && (() => {
               const r: any = activeRow;
               const st = (r.status || 'DRAFT').toUpperCase();
               const cfg = getStatusConfig(st);
-              const day = (v?: string | null) => (v ? parseApiDate(v)?.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : undefined);
-              const freq = r.frequency ? String(r.frequency).replace(/^./, (c: string) => c.toUpperCase()) : undefined;
+              const day = (v?: string | null) => (v ? formatDate(v) : undefined);
+              const freq = r.frequency ? frequencyLabel(r.frequency) : undefined;
+              const state = recurringState(r);
               return (
                 <>
                   <DetailSummary
                     title={r.description || r.code || 'Recurring transaction'}
                     subtitle={[r.code, r.category_name].filter(Boolean).join(' · ')}
-                    status={st === 'APPROVED' ? (r.is_active ? 'Approved · Active' : 'Approved · Paused') : cfg.label}
-                    statusClass={cfg.color}
+                    status={state}
+                    statusClass={{ success: 'text-[var(--success)]', warning: 'text-[var(--warning)]', danger: 'text-[var(--danger)]', muted: 'text-[var(--shell-text-muted)]' }[recurringTone(state)]}
                     figure={formatCurrency(r.total_amount ?? r.amount, currency)}
                     figureLabel={freq}
                   />
@@ -503,7 +530,7 @@ export default function RecurringPage() {
                       <DetailField label="Type" value={String(r.type || 'expense').replace(/^./, (c: string) => c.toUpperCase())} />
                       <DetailField label="Next run" value={day(r.next_run_date)} />
                       <DetailField label="Last run" value={day(r.last_run_date) || 'Not yet run'} />
-                      <DetailField label="Start date" value={day(r.start_date) || day(r.next_run_date)} />
+                      {r.start_date && <DetailField label="Start date" value={day(r.start_date)} />}
                       <DetailField label="End date" value={day(r.end_date) || 'Open-ended'} />
                       {r.client_name && <DetailField label="Client" value={r.client_name} />}
                       {r.project_name && <DetailField label="Project" value={r.project_name} />}
@@ -537,8 +564,8 @@ export default function RecurringPage() {
                     ) : (
                       <DetailTimeline items={runHistory.map((run: any) => ({
                         title: formatCurrency(run.amount, currency),
-                        meta: [day(run.date_recorded), run.status === 'APPROVED' ? 'Success' : run.status].filter(Boolean).join(' · '),
-                        tone: run.status === 'APPROVED' ? 'success' as const : 'muted' as const,
+                        meta: [day(run.date_recorded), run.status === 'APPROVED' ? 'Posted' : getStatusConfig(run.status).label].filter(Boolean).join(' · '),
+                        tone: run.status === 'APPROVED' ? 'success' as const : ['REJECTED', 'VOIDED'].includes(String(run.status).toUpperCase()) ? 'danger' as const : 'muted' as const,
                       }))} />
                     )}
                   </DetailSection>
@@ -550,10 +577,10 @@ export default function RecurringPage() {
     >
       <DataTable
         isLoading={isLoading}
-        columns={columns(currency)}
+        columns={recurringColumns}
         data={recurring || []}
         tableInstance={table}
-        emptyMessage="No recurring transactions set up."
+        emptyMessage={canManage ? 'No recurring schedules yet. Use Add to set up the first one.' : 'No recurring schedules yet.'}
       />
 
       <RecurringModal
@@ -573,6 +600,7 @@ export default function RecurringPage() {
         onClose={() => setIsPauseModalOpen(false)}
         onConfirm={onConfirmPause}
         targetName={(modalTarget as any)?.description || ''}
+        nextRun={(modalTarget as any)?.next_run_date ? `${formatDate((modalTarget as any).next_run_date)} (${formatCurrency((modalTarget as any).total_amount ?? (modalTarget as any).amount, currency)})` : undefined}
       />
 
       <ResumeRecurringModal
@@ -587,6 +615,7 @@ export default function RecurringPage() {
         onClose={() => setIsDeleteOpen(false)} 
         onConfirm={confirmDelete}
         count={selectedCount}
+        name={(activeRow as any)?.description}
       />
       <ManageCategoriesDialog isOpen={categoriesOpen} onClose={() => setCategoriesOpen(false)} kinds={['expense', 'income']} />
     </ModuleShell>

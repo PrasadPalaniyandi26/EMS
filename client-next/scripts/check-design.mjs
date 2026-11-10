@@ -14,8 +14,7 @@ const RULES = [
   { name: 'raw palette class (use a semantic token)', re: /(?<![\w-])(?:text|bg|border|ring|from|to|via|fill|stroke)-(?:red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone)-\d{2,3}/g },
   { name: 'component sets its own font family (change it in layout.tsx)', re: /font-mono|font-serif|fontFamily/g },
   { name: 'raw Dialog (use ModuleModal or ConfirmDialog)', re: /<DialogContent/g, skipFile: /module-modal\.tsx$/ },
-  { name: 'uppercase / tracked label (labels are sentence case)', re: /(?<![\w-])uppercase(?![\w-])|tracking-(wide|wider|widest)/g, skipFile: /login[\\/]page\.tsx$/ },
-];
+  { name: 'uppercase / tracked label (labels are sentence case)', re: /(?<![\w-])uppercase(?![\w-])|tracking-(wide|wider|widest)/g, skipFile: /login[\\/]page\.tsx$/ },];
 
 function* walk(dir) {
   for (const name of readdirSync(dir)) {
@@ -47,6 +46,17 @@ for (const file of walk(SRC)) {
   // Toolbar order is Import, Export, Filters, Search: Import and Export are toolbar props, and filters are `filterDefs` (three or more go into the Filters dialog)
   if (/<DataTableToolbar/.test(text) && /label: '(Import|Export)'/.test(text)) {
     console.log(`${relative(process.cwd(), file)}  Import and Export go in DataTableToolbar's onImport / onExport, not in the action list`);
+    problems++;
+  }
+  // Orders are called "Order" on screen; "build order" is the old name (comments are not screen text)
+  text.split('\n').forEach((ln, i) => {
+    if (/^\s*(\/\/|\*|\/\*)/.test(ln)) return;
+    const m = ln.match(/(?<![-\w])[Bb]uild orders?(?![-\w])/);
+    if (m) { console.log(`${relative(process.cwd(), file)}:${i + 1}  say "order", not "build order", in screen text  → ${m[0]}`); problems++; }
+  });
+  // A list row only selects it (right panel plus an Open action); it never navigates on click
+  if (/onRowClick=\{[^}]*router\.(push|replace)/.test(text)) {
+    console.log(`${relative(process.cwd(), file)}  a row click must select the row and show the panel with an Open action, not call router.push`);
     problems++;
   }
   if (/<DataTableToolbar/.test(text) && /\bfilters=\{/.test(text)) {

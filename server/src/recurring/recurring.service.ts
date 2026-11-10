@@ -198,6 +198,13 @@ export class RecurringService {
     if (!['DRAFT', 'SENT_BACK'].includes(currentStatus)) {
       throw new HttpException(`Cannot submit schedule with status '${currentStatus}'.`, HttpStatus.BAD_REQUEST);
     }
+    // An expense schedule says what it is for and where it is charged, so its runs find a budget line and a costing
+    if (((rec as any).type || 'expense') === 'expense') {
+      if (!rec.categoryId) throw new HttpException('Choose a category before submitting.', HttpStatus.BAD_REQUEST);
+      const ctx = rec.contextType || 'project';
+      const objectId = ctx === 'product' ? rec.productId : ctx === 'overhead' ? (rec as any).departmentId : rec.projectId;
+      if (!objectId) throw new HttpException(`Choose the ${ctx === 'product' ? 'product' : ctx === 'overhead' ? 'department' : 'project'} this schedule is charged to before submitting.`, HttpStatus.BAD_REQUEST);
+    }
 
     const submitter = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -492,6 +499,21 @@ export class RecurringService {
       const nextDate = this.calculateNext(r.nextRunDate, r.frequency || 'monthly');
       let lastErr: any;
 
+      // A closed month does not take new spend: a run due in one is posted today instead, and says when it was due
+      const isClosed = (d: Date) => this.prisma.periodLock.findUnique({ where: { year_month: { year: d.getFullYear(), month: d.getMonth() + 1 } } });
+      let postDate = r.nextRunDate;
+      let lateNote = '';
+      if (await isClosed(r.nextRunDate)) {
+        if (await isClosed(now)) {
+          this.logger.warn(`Recurring ${r.id} is due in a closed month and so is today's month; it will run when a month is open.`);
+          continue;
+        }
+        postDate = now;
+        lateNote = ` (due ${r.nextRunDate.toISOString().slice(0, 10)})`;
+      }
+      let createdId = 0;
+      let createdRef = '';
+
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
           await this.prisma.$transaction(async (tx) => {
@@ -505,8 +527,8 @@ export class RecurringService {
                 gstIncluded: (r as any).gstIncluded ?? false,
                 // Scheduled date, not run time — catch-up runs after downtime must land
                 // in the period the transaction was due, or monthly reports shift
-                dateRecorded: r.nextRunDate,
-                categoryId: r.categoryId, description: `[AUTO] ${r.description || ''}`,
+                dateRecorded: postDate,
+                categoryId: r.categoryId, description: `[AUTO] ${r.description || ''}${lateNote}`,
                 paymentMethod: r.paymentMethod || 'cash', clientId: r.clientId,
                 projectId: r.projectId, productId: r.productId, contextType: r.contextType || 'project', departmentId: (r as any).departmentId ?? null,
                 currency: r.currency || 'INR', status: 'APPROVED',
@@ -519,8 +541,14 @@ export class RecurringService {
             await tx.recurringTransaction.update({
               where: { id: r.id }, data: { nextRunDate: nextDate, lastRunDate: now },
             });
+            createdId = created.id;
+            createdRef = referenceId;
           });
           processed++;
+          this.audit.log({
+            tableName: 'transactions', recordId: createdId, referenceId: createdRef,
+            action: 'INSERT', changedBy: r.userId, newValues: { source: 'recurring', recurring_id: r.id, date_recorded: postDate, amount: (r as any).totalAmount ?? r.amount },
+          }).catch((e: any) => this.logger.error('audit failed', e));
           lastErr = null;
           break;
         } catch (err) {

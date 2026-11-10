@@ -8,7 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 // One typeface for the whole app (IBM Plex Sans: a humanist grotesque with a technical, ledger-like character).
 // Components must not set their own font family; change it here.
-const plexSans = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"], display: "swap", variable: "--font-plex-sans" });
+const plexSans = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500", "600"], display: "swap", variable: "--font-plex-sans" });
 
 export const metadata: Metadata = {
   title: "NTEMS — Expense Management System",

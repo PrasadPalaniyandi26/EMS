@@ -5,6 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { CheckCircle2, XCircle, CornerUpLeft, Ban, Settings } from 'lucide-react';
 import { InlineAlert } from '@/components/shared/inline-alert';
 import { DecisionModal } from './decision-modal';
+import { useAuthStore } from '@/stores/auth-store';
 
 interface ModalProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ interface ModalProps {
 
 export function ApproveModal({ isOpen, onClose, onConfirm, selectedRequest }: ModalProps) {
   const [isClaimable, setIsClaimable] = React.useState(false);
+  const meId = useAuthStore((s) => s.user?.id);
 
   // Sync whenever the dialog opens or the request changes, so a stale value never carries over
   React.useEffect(() => {
@@ -31,10 +33,24 @@ export function ApproveModal({ isOpen, onClose, onConfirm, selectedRequest }: Mo
       confirmLabel="Confirm approval"
       field={{ id: 'approve-comment', label: 'Approval comments (optional)', placeholder: 'Enter any notes or justification for this approval...' }}
       onConfirm={(comment) => onConfirm({ comment, isClaimable })}
-      top={selectedRequest?.needs_reimbursement && (
-        <InlineAlert tone="warning" title="Reimbursement required">
-          The employee paid out of pocket and needs to be reimbursed.
-        </InlineAlert>
+      top={(
+        <>
+          {selectedRequest?.submitted_by_id != null && selectedRequest.submitted_by_id === meId && (
+            <InlineAlert tone="warning" title="You submitted this expense">
+              Approving your own expense may be blocked by policy.
+            </InlineAlert>
+          )}
+          {selectedRequest && !selectedRequest.receipt_path && (
+            <InlineAlert tone="warning" title="No receipt attached">
+              Check that the amount is supported before approving.
+            </InlineAlert>
+          )}
+          {selectedRequest?.needs_reimbursement && (
+            <InlineAlert tone="warning" title="Reimbursement required">
+              The employee paid out of pocket and needs to be reimbursed.
+            </InlineAlert>
+          )}
+        </>
       )}
     >
       {selectedRequest?.gst_rate != null && (
@@ -65,6 +81,7 @@ export function RejectModal({ isOpen, onClose, onConfirm, selectedRequest }: Mod
       confirmLabel="Confirm rejection"
       field={{ id: 'reject-reason', label: 'Rejection reason', required: true, requiredMessage: 'Rejection reason is required.', placeholder: 'Provide a detailed reason for rejecting this request...' }}
       onConfirm={(comment) => onConfirm({ comment })}
+      top={<InlineAlert tone="danger">The employee is notified and the expense is closed. They can see your reason.</InlineAlert>}
     />
   );
 }
@@ -81,7 +98,7 @@ export function VoidModal({ isOpen, onClose, onConfirm, selectedRequest }: Modal
       tone="danger"
       confirmLabel="Confirm void"
       busyLabel="Voiding..."
-      field={{ id: 'void-reason', label: 'Reason for voiding (optional)', placeholder: 'Explain why this approved transaction is being voided...' }}
+      field={{ id: 'void-reason', label: 'Reason for voiding', required: true, requiredMessage: 'Say why this approved transaction is being voided.', placeholder: 'Explain why this approved transaction is being voided...' }}
       onConfirm={(reason) => onConfirm({ reason })}
     >
       <InlineAlert tone="danger">
@@ -101,7 +118,7 @@ export function SendBackModal({ isOpen, onClose, onConfirm, selectedRequest }: M
       icon={<CornerUpLeft className="h-4 w-4" />}
       tone="info"
       confirmLabel="Send back"
-      field={{ id: 'sendback-reason', label: 'Reason for sending back', placeholder: 'Explain what the employee needs to correct or provide...' }}
+      field={{ id: 'sendback-reason', label: 'Reason for sending back', required: true, requiredMessage: 'Tell the employee what to correct.', placeholder: 'Explain what the employee needs to correct or provide...' }}
       onConfirm={(comment) => onConfirm({ comment })}
     >
       <InlineAlert tone="info">

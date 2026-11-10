@@ -29,9 +29,9 @@ const textarea = 'h-20 w-full resize-none rounded-md border border-input bg-tran
 
 // Shared save wrapper: one request, a toast, a refresh of every budget query, then close
 // Today's date in the user's own time zone, as the date inputs expect it
-const localToday = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+export const localToday = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 
-function useSaver(onClose: () => void) {
+export function useSaver(onClose: () => void) {
   const invalidate = useInvalidate();
   const [saving, setSaving] = useState(false);
   const run = async (job: () => Promise<unknown>, done: string, after?: () => void) => {
@@ -167,17 +167,18 @@ export function EstimateLineModal({ isOpen, onClose, data, editing }: Base & { d
   const box = 'flex h-9 items-center rounded-md border border-[var(--input)] bg-transparent px-3 text-[13px] tabular-nums text-[var(--shell-text)]';
   const pickCosted = (v: 'LABOUR' | 'FIXED') => { setCosted(v); setCard(''); setRate(''); setUnit(v === 'LABOUR' ? 'hr' : unit === 'hr' ? 'nos' : unit); };
   return (
-    <ModuleModal isOpen={isOpen} onClose={onClose} size="xl" title={editing ? 'Edit estimate line' : 'Add estimate line'} icon={editing ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+    <ModuleModal isOpen={isOpen} onClose={onClose} size="lg" title={editing ? 'Edit estimate line' : 'Add estimate line'} icon={editing ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
       canSave={!saving && !!phase && !!desc.trim() && Number(qty) > 0 && Number(rate) >= 0 && rate !== ''} saveLabel={editing ? 'Update line' : 'Add line'}
       onSave={() => run(() => {
         const body = { phase, type_id: typeId ? Number(typeId) : null, description: desc, quantity: Number(qty), unit: labour ? 'hr' : unit, rate: Number(rate), basis };
         return editing ? api.put(`/budgets/projects/${id}/estimate-lines/${editing.id}`, body) : api.post(`/budgets/projects/${id}/estimate-lines`, body);
       }, editing ? 'Estimate line updated.' : 'Estimate line added.')}>
-      <div className="grid grid-cols-1 gap-x-6 gap-y-3 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-x-6 gap-y-3 md:grid-cols-2">
         <div className="space-y-3">
           <PickSelect label="Phase" required placeholder="Select phase" value={phase} onChange={setPhase} options={phaseOptions} emptyHint="Add phases with Manage phases." />
           <Field label="Description" required>{text(desc, setDesc, { maxLength: 200, placeholder: 'What is being bought or done' })}</Field>
           <PickSelect label="Expense type" placeholder="Select type" value={typeId} onChange={setTypeId} options={typeOptions} emptyHint="No types allowed for projects." />
+          <Field label="Basis" hint="Quote, past project or assumption.">{text(basis, setBasis, { maxLength: 200 })}</Field>
         </div>
         <div className="space-y-3">
           <div className="space-y-1.5">
@@ -194,8 +195,6 @@ export function EstimateLineModal({ isOpen, onClose, data, editing }: Base & { d
           ) : (
             <Field label="Fixed cost per unit" required hint="What one unit costs, such as a bought-in part or a vendor charge."><CurrencyInput value={rate} onChange={setRate} /></Field>
           )}
-        </div>
-        <div className="space-y-3">
           {labour ? (
             <Field label="Hours" required><Input type="number" min="0" step="0.5" className={ctl} value={qty} onChange={(e) => setQty(e.target.value)} /></Field>
           ) : (
@@ -204,7 +203,6 @@ export function EstimateLineModal({ isOpen, onClose, data, editing }: Base & { d
               <Field label="Unit">{text(unit, setUnit, { maxLength: 20 })}</Field>
             </div>
           )}
-          <Field label="Basis" hint="Quote, past project or assumption.">{text(basis, setBasis, { maxLength: 200 })}</Field>
           <div className="rounded-lg border border-[var(--shell-border)] p-3">
             <p className="text-[12px] text-[var(--shell-text-muted)]">Line amount</p>
             <p className="text-[18px] font-semibold tabular-nums text-[var(--shell-text)]">{money(amount)}</p>
@@ -287,9 +285,16 @@ export function ItemModal({ isOpen, onClose, editing, project, onSaved }: Base &
   // For a made part the standard price is the sum of its material and manufacturing cost, so it is never typed in
   const standard = make ? (Number(f.material_cost) || 0) + (Number(f.manufacturing_cost) || 0) : Number(f.standard_price);
   const priceOk = make ? f.material_cost !== '' || f.manufacturing_cost !== '' : f.standard_price !== '' && Number(f.standard_price) >= 0;
+  // Build orders are checked against how long parts take to arrive, so every part needs a lead time (zero means on hand)
+  const leadOk = f.lead_time_days !== '' && Number.isInteger(Number(f.lead_time_days)) && Number(f.lead_time_days) >= 0;
+  const leadField = (
+    <Field label="Lead time (days)" required hint="Days from order to arrival, or to make it. Update it when a closer supplier is found." error={f.lead_time_days !== '' && !leadOk ? 'Enter whole days, zero or more.' : undefined}>
+      <Input type="number" min="0" step="1" className={ctl} value={f.lead_time_days} onChange={(e) => set('lead_time_days')(e.target.value)} />
+    </Field>
+  );
   return (
     <ModuleModal isOpen={isOpen} onClose={onClose} size="lg" title={editing ? 'Edit part' : 'Add part'} icon={editing ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-      canSave={!saving && !!f.part_no.trim() && !!f.name.trim() && (make || !!f.oem_part_no.trim()) && priceOk && standard >= 0} saveLabel={editing ? 'Update part' : 'Add part'}
+      canSave={!saving && !!f.part_no.trim() && !!f.name.trim() && (make || !!f.oem_part_no.trim()) && priceOk && standard >= 0 && leadOk} saveLabel={editing ? 'Save part' : 'Add part'}
       onSave={() => { let savedId = 0; return run(async () => {
         const body = {
           part_no: f.part_no, oem_part_no: make ? null : f.oem_part_no, name: f.name, sourcing: f.sourcing, uom: f.uom, supplier: f.supplier, lead_time_days: f.lead_time_days ? Number(f.lead_time_days) : null,
@@ -301,17 +306,17 @@ export function ItemModal({ isOpen, onClose, editing, project, onSaved }: Base &
         const res: any = await api.post(project ? `/budgets/projects/${project.id}/job-bom/parts` : '/budgets/items', body);
         savedId = Number(res?.data?.id) || 0;
       }, editing ? 'Part updated.' : 'Part added.', () => { if (savedId) onSaved?.(savedId); }); }}>
-      <div className="grid grid-cols-1 gap-x-5 gap-y-3 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-x-5 gap-y-3 md:grid-cols-2">
         {project && !editing && (
-          <p className="text-[13px] text-[var(--shell-text-muted)] md:col-span-3">This part is for {project.code ?? 'this project'} only. It goes on this job BOM and is not offered on any other BOM.</p>
+          <p className="text-[13px] text-[var(--shell-text-muted)] md:col-span-2">This part is for {project.code ?? 'this project'} only. It goes on this job BOM and is not offered on any other BOM.</p>
         )}
-        <div className="space-y-1.5 md:col-span-3">
+        <div className="space-y-1.5 md:col-span-2">
           <p id="item-sourcing" className="text-[13px] font-medium text-[var(--shell-text)]">Sourcing</p>
           <SegmentedControl labelledBy="item-sourcing" value={f.sourcing} onChange={(v) => setF((x) => ({ ...x, sourcing: v }))} options={[{ value: 'BUY' as const, label: 'Buy' }, { value: 'MAKE' as const, label: 'Make' }]} />
         </div>
         <Field label="Part number" required>{text(f.part_no, set('part_no'), { maxLength: 40 })}</Field>
         <Field label="Name" required>{text(f.name, set('name'), { maxLength: 150 })}</Field>
-        <Field label="Category" hint="Manage the list in the Part master."><CategoryPicker value={f.category_id} onChange={set('category_id')} /></Field>
+        <Field label="Category" hint="Manage the list with the Categories button."><CategoryPicker value={f.category_id} onChange={set('category_id')} /></Field>
         {make ? (
           <>
             <Field label="Material cost" required hint="Raw material per unit."><CurrencyInput value={f.material_cost} onChange={set('material_cost')} /></Field>
@@ -324,7 +329,7 @@ export function ItemModal({ isOpen, onClose, editing, project, onSaved }: Base &
             <Field label="Unit of measure">{text(f.uom, set('uom'), { maxLength: 12 })}</Field>
             <Field label="Last paid price" hint="Shows the drift from standard."><CurrencyInput value={f.last_price} onChange={set('last_price')} /></Field>
             <Field label="Supplier">{text(f.supplier, set('supplier'), { maxLength: 120 })}</Field>
-            <Field label="Lead time (days)"><Input type="number" min="0" className={ctl} value={f.lead_time_days} onChange={(e) => set('lead_time_days')(e.target.value)} /></Field>
+            {leadField}
           </>
         ) : (
           <>
@@ -333,7 +338,7 @@ export function ItemModal({ isOpen, onClose, editing, project, onSaved }: Base &
             <Field label="Unit of measure">{text(f.uom, set('uom'), { maxLength: 12 })}</Field>
             <Field label="Supplier">{text(f.supplier, set('supplier'), { maxLength: 120 })}</Field>
             <Field label="Last paid price" hint="Shows the drift from standard."><CurrencyInput value={f.last_price} onChange={set('last_price')} /></Field>
-            <Field label="Lead time (days)"><Input type="number" min="0" className={ctl} value={f.lead_time_days} onChange={(e) => set('lead_time_days')(e.target.value)} /></Field>
+            {leadField}
           </>
         )}
       </div>
@@ -425,13 +430,15 @@ export function RateCardModal({ isOpen, onClose, editing }: Base & { editing: Ra
   useEffect(() => { if (isOpen) { setRole(editing?.role ?? ''); setRate(editing ? String(editing.rate_per_hour) : ''); setWhen(localToday()); } }, [isOpen, editing]);
   const later = when > localToday();
   const changed = !editing || Number(rate) !== editing.rate_per_hour;
+  const renamed = !!editing && role.trim() !== editing.role;
+  const change = editing && changed && Number(rate) > 0 ? Number(rate) - editing.rate_per_hour : null;
   return (
     <ModuleModal isOpen={isOpen} onClose={onClose} size="sm" title={editing ? 'Edit rate' : 'Add rate'} icon={editing ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-      canSave={!saving && !!role.trim() && Number(rate) > 0 && !!when} saveLabel={editing ? (later ? 'Schedule rate' : 'Update rate') : 'Add rate'}
+      canSave={!saving && !!role.trim() && Number(rate) > 0 && !!when && (!editing || changed || renamed)} saveLabel={editing ? (later ? 'Schedule rate' : 'Save rate') : 'Add rate'}
       onSave={() => run(() => (editing ? api.put(`/budgets/rate-cards/${editing.id}`, { role, rate_per_hour: Number(rate), effective_from: when }) : api.post('/budgets/rate-cards', { role, rate_per_hour: Number(rate), effective_from: when })), later ? 'Rate scheduled.' : 'Rate saved.')}>
       <div className="space-y-3">
         <Field label="Role" required>{text(role, setRole, { maxLength: 80, placeholder: 'Controls engineer' })}</Field>
-        <Field label="Cost per hour" required><CurrencyInput value={rate} onChange={setRate} /></Field>
+        <Field label="Cost per hour" required hint={editing ? `Now ${money(editing.rate_per_hour)} per hour${change != null ? `, ${change >= 0 ? '+' : '−'}${money(Math.abs(change))} (${change >= 0 ? '+' : '−'}${Math.abs((change / editing.rate_per_hour) * 100).toFixed(1)}%)` : ''}. ${editing.used_in} build operation${editing.used_in === 1 ? '' : 's'} use it.` : undefined}><CurrencyInput value={rate} onChange={setRate} /></Field>
         <Field label="Effective from" required hint={!changed ? 'The rate is unchanged, so no new dated rate is added.' : later ? 'Live costs switch to this rate on that date. Until then the current rate applies.' : 'From this date, live costs use the new rate. Approved standard costs do not change.'}>
           <Input type="date" className={ctl} value={when} onChange={(e) => setWhen(e.target.value)} />
         </Field>
@@ -477,62 +484,59 @@ export function OverheadModal({ isOpen, onClose, editing, fy }: Base & { editing
 
 // ─── BOM line and operation ──────────────────────────────────────────────────
 
-// With `job` the line goes on a bespoke project's job BOM, where a sub-assembly is a standard product priced at its approved standard
+// A BOM is one list of parts from the Part master, bought or made. The group labels parts for a subtotal;
+// the sequence is the step of the build a part is needed for, and step 2 starts when step 1 is built.
 export function BomLineModal({ isOpen, onClose, data, job, editing }: Base & { data?: ProductCosting | undefined; job?: JobBom | undefined; editing: BomLineRow | null }) {
   const { saving, run } = useSaver(onClose);
-  const [kind, setKind] = useState<'item' | 'sub'>('item');
-  const [itemId, setItemId] = useState(''); const [subId, setSubId] = useState(''); const [qty, setQty] = useState(''); const [scrap, setScrap] = useState('0');
+  const [itemId, setItemId] = useState(''); const [qty, setQty] = useState(''); const [scrap, setScrap] = useState('0'); const [group, setGroup] = useState(''); const [seq, setSeq] = useState('1');
   const [newPartOpen, setNewPartOpen] = useState(false);
+  const groupList = useId();
   // Only the dialog opening or another line resets the form; a refetch of the BOM (a new part was just added) must not
-  const isJob = !!job;
   useEffect(() => {
     if (!isOpen) return;
-    const sub = isJob ? editing?.sub_product_id : editing?.sub_bom_id;
-    setKind(sub ? 'sub' : 'item'); setItemId(editing?.item_id ? String(editing.item_id) : ''); setSubId(sub ? String(sub) : '');
-    setQty(editing ? String(editing.quantity) : ''); setScrap(editing ? String(editing.scrap_pct) : '0');
-  }, [isOpen, editing, isJob]);
-  const item = (job ?? data)?.items.find((i) => String(i.id) === itemId);
+    setItemId(editing?.item_id ? String(editing.item_id) : ''); setQty(editing ? String(editing.quantity) : ''); setScrap(editing ? String(editing.scrap_pct) : '0');
+    setGroup(editing?.group_name ?? ''); setSeq(editing ? String(editing.sequence) : '1');
+  }, [isOpen, editing]);
+  const bom = job ?? data;
+  const item = bom?.items.find((i) => String(i.id) === itemId);
+  const groups = [...new Set((bom?.lines ?? []).map((l) => l.group_name).filter((g): g is string => !!g))];
+  const seqOk = Number.isInteger(Number(seq)) && Number(seq) >= 1 && Number(seq) <= 99;
   const base = job ? `/budgets/projects/${job.project.id}/job-bom/lines` : `/budgets/products/${data?.product.id}/bom-lines`;
   return (
     <>
-    <ModuleModal isOpen={isOpen} onClose={onClose} size="xl" title={editing ? 'Edit BOM line' : 'Add BOM line'} icon={editing ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-      canSave={!saving && (kind === 'item' ? !!itemId : !!subId) && Number(qty) > 0} saveLabel={editing ? 'Update line' : 'Add line'}
+    <ModuleModal isOpen={isOpen} onClose={onClose} size="lg" title={editing ? 'Edit part' : 'Add part'} icon={editing ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+      canSave={!saving && !!itemId && Number(qty) > 0 && seqOk} saveLabel={editing ? 'Update part' : 'Add part'}
       onSave={() => run(() => {
-        const body = job
-          ? { item_id: kind === 'item' ? Number(itemId) : null, sub_product_id: kind === 'sub' ? Number(subId) : null, quantity: Number(qty), scrap_pct: Number(scrap) || 0 }
-          : { item_id: kind === 'item' ? Number(itemId) : null, sub_bom_id: kind === 'sub' ? Number(subId) : null, quantity: Number(qty), scrap_pct: Number(scrap) || 0 };
+        const body = { item_id: Number(itemId), group_name: group.trim() || null, sequence: Number(seq), quantity: Number(qty), scrap_pct: Number(scrap) || 0 };
         return editing ? api.put(`${base}/${editing.id}`, body) : api.post(base, body);
-      }, editing ? 'BOM line updated.' : 'BOM line added.')}>
-      <div className="grid grid-cols-1 items-start gap-x-6 gap-y-4 md:grid-cols-3">
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <p id="bom-kind" className="text-[13px] font-medium text-[var(--shell-text)]">Part is</p>
-            <SegmentedControl labelledBy="bom-kind" value={kind} onChange={setKind} options={[{ value: 'item' as const, label: 'An item' }, { value: 'sub' as const, label: job ? 'A standard product' : 'A sub-assembly' }]} />
+      }, editing ? 'Part updated.' : 'Part added.')}>
+      <div className="@container grid grid-cols-1 items-start gap-x-6 gap-y-1.5 md:grid-cols-2">
+        <PartPicker spread label="Part" required value={itemId} onChange={setItemId}
+          options={(bom?.items ?? []).map((i) => ({ item: i, tag: i.project_id != null ? 'this project only' : undefined }))}
+          emptyHint={job ? 'No parts yet. Add one to the Part master, or create a part for this project only.' : 'Add parts in the Part master first.'} />
+        {job && !editing && !itemId && (
+          <Button type="button" variant="outline" onClick={() => setNewPartOpen(true)} className="mt-1.5 h-9 gap-2 self-start px-3 text-[13px] font-medium md:col-start-1 md:row-start-4">
+            <Plus className="h-4 w-4 text-[var(--success)]" />New part for this project only
+          </Button>
+        )}
+        <div className={cn('mt-2 space-y-4', itemId ? 'md:col-span-2 md:row-start-3 md:grid md:grid-cols-2 md:items-start md:gap-x-6 md:space-y-0' : 'md:col-start-2 md:row-start-3 md:row-span-2')}>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Quantity" required hint={item ? `Per ${item.uom} at ${unitPrice(item.standard_price)}` : undefined}><Input type="number" min="0" step="0.01" className={ctl} value={qty} onChange={(e) => setQty(e.target.value)} /></Field>
+            <Field label="Scrap %"><Input type="number" min="0" max="100" step="0.5" className={ctl} value={scrap} onChange={(e) => setScrap(e.target.value)} /></Field>
           </div>
-          <Field label="Quantity" required hint={item ? `Per ${item.uom} at ${unitPrice(item.standard_price)}` : undefined}><Input type="number" min="0" step="0.01" className={ctl} value={qty} onChange={(e) => setQty(e.target.value)} /></Field>
-          <Field label="Scrap %"><Input type="number" min="0" max="100" step="0.5" className={ctl} value={scrap} onChange={(e) => setScrap(e.target.value)} /></Field>
-        </div>
-        <div className="space-y-3 md:col-span-2">
-          {kind === 'item' ? (
-            <>
-              <PartPicker label="Part" required value={itemId} onChange={setItemId}
-                options={((job ?? data)?.items ?? []).map((i) => ({ item: i, tag: i.project_id != null ? 'this project only' : undefined }))}
-                emptyHint={job ? 'No parts yet. Add one to the Part master, or create a part for this project only.' : 'Add parts in the Part master first.'} />
-              {job && !editing && (
-                <Button type="button" variant="outline" onClick={() => setNewPartOpen(true)} className="h-9 gap-2 px-3 text-[13px] font-medium">
-                  <Plus className="h-4 w-4 text-[var(--success)]" />New part for this project only
-                </Button>
-              )}
-            </>
-          ) : job ? (
-            <PickSelect label="Standard product" required placeholder="Select a product" value={subId} onChange={setSubId} options={job.sub_products.map((p) => ({ id: String(p.id), name: `${[p.code, p.name].filter(Boolean).join(' ')} · ${money(p.standard_cost)}` }))} emptyHint="No product has an approved standard cost yet." />
-          ) : (
-            <PickSelect label="Sub-assembly" required placeholder="Select a product's BOM" value={subId} onChange={setSubId} options={(data?.sub_boms ?? []).map((b) => ({ id: String(b.id), name: `Product ${b.productId}, BOM v${b.version}` }))} emptyHint="No other product has a BOM yet." />
-          )}
+          <div className="space-y-4">
+            <Field label="Group" hint="A label for a subtotal, such as the arm or the base. It does not change the cost.">
+              <Input className={ctl} list={groupList} maxLength={60} value={group} onChange={(e) => setGroup(e.target.value)} placeholder="Robot arm 1" />
+              <datalist id={groupList}>{groups.map((g) => <option key={g} value={g} />)}</datalist>
+            </Field>
+            <Field label="Sequence" required hint="The step of the build this part is needed for. Step 2 starts when step 1 is built; use 1 if the order does not matter.">
+              <Input type="number" min="1" max="99" step="1" className={ctl} value={seq} onChange={(e) => setSeq(e.target.value)} />
+            </Field>
+          </div>
         </div>
       </div>
     </ModuleModal>
-    {job && <ItemModal isOpen={newPartOpen} onClose={() => setNewPartOpen(false)} editing={null} project={{ id: job.project.id, code: job.project.code }} onSaved={(id) => { setKind('item'); setItemId(String(id)); }} />}
+    {job && <ItemModal isOpen={newPartOpen} onClose={() => setNewPartOpen(false)} editing={null} project={{ id: job.project.id, code: job.project.code }} onSaved={(id) => setItemId(String(id))} />}
     </>
   );
 }
@@ -541,8 +545,10 @@ export function BuildStepModal({ isOpen, onClose, data: productData, job, editin
   const data = job ?? productData;
   const { saving, run } = useSaver(onClose);
   const [typeId, setTypeId] = useState(''); const [hours, setHours] = useState(''); const [card, setCard] = useState(''); const [out, setOut] = useState(''); const [fix, setFix] = useState(''); const [costed, setCosted] = useState<'ALL' | 'LABOUR' | 'OUT' | 'FIXED'>('ALL');
+  const [seq, setSeq] = useState('1');
   useEffect(() => {
     if (!isOpen) return;
+    setSeq(editing ? String(editing.sequence) : '1');
     setTypeId(editing?.type_id ? String(editing.type_id) : ''); setHours(editing ? String(editing.hours) : ''); setCard(editing?.rate_card_id ? String(editing.rate_card_id) : '');
     setOut(editing?.outsourced_cost != null ? String(editing.outsourced_cost) : ''); setFix(editing?.fixed_cost != null ? String(editing.fixed_cost) : '');
   }, [isOpen, editing]);
@@ -552,7 +558,8 @@ export function BuildStepModal({ isOpen, onClose, data: productData, job, editin
   const outsourced = !!type?.is_outsourced;
   const isFixed = !!type?.is_fixed;
   const rate = data?.rate_cards.find((c) => String(c.id) === card)?.rate_per_hour ?? 0;
-  const ready = !!type && (isFixed ? Number(fix) > 0 : outsourced ? Number(out) > 0 : !!card && hours !== '' && Number(hours) >= 0);
+  const seqOk = Number.isInteger(Number(seq)) && Number(seq) >= 1 && Number(seq) <= 99;
+  const ready = seqOk && !!type && (isFixed ? Number(fix) > 0 : outsourced ? Number(out) > 0 : !!card && hours !== '' && Number(hours) >= 0);
   const base = job ? `/budgets/projects/${job.project.id}/job-bom/operations` : `/budgets/products/${productData?.product.id}/operations`;
   const box = 'flex h-9 items-center rounded-md border border-[var(--input)] bg-transparent px-3 text-[13px] tabular-nums text-[var(--shell-text)]';
   return (
@@ -560,7 +567,7 @@ export function BuildStepModal({ isOpen, onClose, data: productData, job, editin
       canSave={!saving && ready} saveLabel={editing ? 'Update build operation' : 'Add build operation'}
       onSave={() => run(() => {
         const noLabour = outsourced || isFixed;
-        const body = { operation_type_id: Number(typeId), rate_card_id: noLabour ? null : Number(card), hours: noLabour ? 0 : Number(hours), outsourced_cost: outsourced ? Number(out) : null, fixed_cost: isFixed ? Number(fix) : null };
+        const body = { operation_type_id: Number(typeId), rate_card_id: noLabour ? null : Number(card), hours: noLabour ? 0 : Number(hours), outsourced_cost: outsourced ? Number(out) : null, fixed_cost: isFixed ? Number(fix) : null, sequence: Number(seq) };
         return editing ? api.put(`${base}/${editing.id}`, body) : api.post(base, body);
       }, 'Build operation saved.')}>
       <div className="space-y-3">
@@ -585,6 +592,9 @@ export function BuildStepModal({ isOpen, onClose, data: productData, job, editin
             </div>
           </>
         )}
+        <Field label="Sequence" required hint="The step of the build this work belongs to. It starts when the parts with the same sequence have arrived and the step before it is built.">
+          <Input type="number" min="1" max="99" step="1" className={ctl} value={seq} onChange={(e) => setSeq(e.target.value)} />
+        </Field>
       </div>
     </ModuleModal>
   );
@@ -681,17 +691,18 @@ export function BomSettingsModal({ isOpen, onClose, url, freight, warranty }: Ba
 export function PartUsageModal({ isOpen, onClose, item }: Base & { item: Item | null }) {
   const usage = useItemUsage(isOpen && item ? item.id : null);
   const rows = useMemo(() => {
-    const byOwner = new Map<string, { key: string; kind: 'PRODUCT' | 'JOB'; code: string | null; name: string; client: string | null; quantity: number; cost: number; lines: number }>();
+    const byOwner = new Map<string, { key: string; kind: 'PRODUCT' | 'JOB' | 'ORDER'; code: string | null; name: string; client: string | null; quantity: number; cost: number; lines: number }>();
     for (const u of usage.data ?? []) {
       const key = `${u.kind}-${u.id}`;
       const r = byOwner.get(key) ?? { key, kind: u.kind, code: u.code, name: u.name, client: u.client_name, quantity: 0, cost: 0, lines: 0 };
       r.quantity += u.quantity; r.cost += u.line_cost; r.lines += 1;
       byOwner.set(key, r);
     }
-    return [...byOwner.values()].sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'PRODUCT' ? -1 : 1) || (a.code ?? a.name).localeCompare(b.code ?? b.name));
+    const rank = { PRODUCT: 0, JOB: 1, ORDER: 2 } as const;
+    return [...byOwner.values()].sort((a, b) => rank[a.kind] - rank[b.kind] || (a.code ?? a.name).localeCompare(b.code ?? b.name));
   }, [usage.data]);
   if (!item) return null;
-  const products = rows.filter((r) => r.kind === 'PRODUCT').length; const jobs = rows.length - products;
+  const products = rows.filter((r) => r.kind === 'PRODUCT').length; const jobs = rows.filter((r) => r.kind === 'JOB').length; const orders = rows.filter((r) => r.kind === 'ORDER').length;
   const qty = (v: number) => String(Math.round(v * 1000) / 1000);
   return (
     <ModuleModal isOpen={isOpen} onClose={onClose} size="lg" title={`Where used: ${item.part_no}`} icon={<Network className="h-4 w-4" />}
@@ -699,16 +710,16 @@ export function PartUsageModal({ isOpen, onClose, item }: Base & { item: Item | 
       <div className="space-y-3">
         <p className="text-[13px] text-[var(--shell-text)]">
           <strong>{item.name}</strong>{item.oem_part_no ? ` (OEM part number ${item.oem_part_no})` : ''} at a standard price of <span className="tabular-nums">{unitPrice(item.standard_price)}</span> per {item.uom}.
-          {usage.data && (rows.length ? ` It is in ${[products ? `${products} product${products === 1 ? '' : 's'}` : '', jobs ? `${jobs} job BOM${jobs === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and ')}.` : ' It is not in any BOM.')}
+          {usage.data && (rows.length ? ` It is in ${[products ? `${products} product${products === 1 ? '' : 's'}` : '', jobs ? `${jobs} job BOM${jobs === 1 ? '' : 's'}` : '', orders ? `${orders} open order${orders === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and ')}.` : ' It is not in any BOM.')}
         </p>
         {usage.isLoading ? <p className="text-[12px] text-[var(--shell-text-muted)]">Loading…</p> : rows.length > 0 && (
           <div className="max-h-[50vh] overflow-auto rounded-md border border-[var(--shell-border)]">
-            <Grid head={[{ label: 'Used in' }, { label: 'Type', w: 'w-28' }, { label: 'Client' }, { label: 'Quantity per unit', right: true, w: 'w-40' }, { label: 'Cost per unit', right: true, w: 'w-36' }]}>
+            <Grid head={[{ label: 'Part ID', w: 'w-32' }, { label: 'Name' }, { label: 'Type', w: 'w-28' }, { label: 'Quantity per unit', right: true, w: 'w-40' }, { label: 'Cost per unit', right: true, w: 'w-36' }]}>
               {rows.map((r) => (
                 <tr key={r.key}>
-                  <td className={td}><span className="text-[12px] text-[var(--shell-text-muted)]">{r.code}</span> <span className="font-medium">{r.name}</span></td>
-                  <td className={td}>{r.kind === 'PRODUCT' ? 'Product' : 'Job BOM'}</td>
-                  <td className={cn(td, 'text-[var(--shell-text-muted)]')}>{r.client ?? '—'}</td>
+                  <td className={cn(td, 'text-[12px] text-[var(--shell-text-muted)]')}>{r.code ?? '—'}</td>
+                  <td className={cn(td, 'font-medium')}>{r.name}</td>
+                  <td className={td}>{r.kind === 'PRODUCT' ? 'Product' : r.kind === 'JOB' ? 'Job BOM' : 'Order'}</td>
                   <td className={cn(td, 'text-right tabular-nums')}>{qty(r.quantity)} {item.uom}{r.lines > 1 && <span className="text-[var(--shell-text-muted)]"> ({r.lines} lines)</span>}</td>
                   <td className={cn(td, 'text-right font-medium tabular-nums')}>{unitPrice(r.cost)}</td>
                 </tr>
@@ -950,12 +961,25 @@ export function StandardCostModal({ isOpen, onClose, data, standard }: Base & { 
   const old = data.product.standard_cost;
   const diff = old != null && old > 0 ? ((standard.total - old) / old) * 100 : null;
   const live = data.cost?.total ?? null;
+  // What approving does to the margin, against the product's own price and goals
+  const pr = data.pricing;
+  const marginNow = pr?.price && old != null ? ((pr.price - old) / pr.price) * 100 : null;
+  const marginNew = pr?.price ? ((pr.price - standard.total) / pr.price) * 100 : null;
+  const marginNote = marginNew == null ? null : (() => {
+    const belowMin = pr.min_margin_pct != null && marginNew < pr.min_margin_pct;
+    const belowTarget = pr.target_margin_pct != null && marginNew < pr.target_margin_pct;
+    return {
+      text: `${marginNow != null ? `Margin goes from ${marginNow.toFixed(1)}% to ${marginNew.toFixed(1)}%` : `Margin at this cost is ${marginNew.toFixed(1)}%`}${belowMin ? `, below the minimum of ${pr.min_margin_pct}%` : belowTarget ? `, below the target of ${pr.target_margin_pct}%` : ''}.`,
+      tone: belowMin || marginNew < 0 ? 'text-[var(--danger)]' : belowTarget ? 'text-[var(--warning)]' : 'text-[var(--shell-text-muted)]',
+    };
+  })();
   return (
     <ModuleModal isOpen={isOpen} onClose={onClose} size="sm" title="Approve standard cost" icon={<CheckCircle2 className="h-4 w-4" />} canSave={!saving} saveLabel="Approve standard cost"
       onSave={() => run(() => api.post(`/budgets/standard-costs/${standard.id}/approve`, {}), 'Standard cost approved.')}>
       <div className="space-y-2 text-[13px] text-[var(--shell-text)]">
         <p>{data.product.name} will be costed at <strong className="tabular-nums">{money(standard.total)}</strong> a unit for {standard.fy}-{String(standard.fy + 1).slice(2)}.</p>
         <p className="text-[var(--shell-text-muted)]">{old != null ? `Current standard: ${money(old)}${diff != null ? ` (${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%)` : ''}.` : 'There is no approved standard yet.'} Unit cost variances are measured against the approved figure.</p>
+        {marginNote && <p className={marginNote.tone}>{marginNote.text}</p>}
         {live != null && Math.abs(live - standard.total) > 0.5 && <p className="text-[var(--warning)]">The current rolled-up cost is {money(live)}, which differs from this proposal. Propose again to approve the current cost.</p>}
       </div>
     </ModuleModal>
@@ -972,6 +996,7 @@ export function BuildPlanModal({ isOpen, onClose, productId, editing }: Base & {
       canSave={!saving && Number(planned) >= 0 && Number(built) >= 0} saveLabel="Update plan"
       onSave={() => run(() => api.put(`/budgets/products/${productId}/build-plan`, { year: editing.year, month: editing.month, planned_units: Number(planned) || 0, actual_units: Number(built) || 0 }), 'Build plan saved.')}>
       <div className="grid grid-cols-2 gap-3">
+        <p className="col-span-2 text-[13px] text-[var(--shell-text-muted)]">{editing.taken} unit{editing.taken === 1 ? '' : 's'} on orders{editing.open < 0 ? `, ${-editing.open} more than planned` : ''}. Built units normally come from delivered orders.</p>
         <Field label="Planned units"><Input type="number" min="0" step="1" className={ctl} value={planned} onChange={(e) => setPlanned(e.target.value)} /></Field>
         <Field label="Built units"><Input type="number" min="0" step="1" className={ctl} value={built} onChange={(e) => setBuilt(e.target.value)} /></Field>
       </div>
@@ -1082,12 +1107,14 @@ const PART_EVENT: Record<string, string> = { ADDED: 'Added', EDITED: 'Edited', P
 // Pick a part from a list that grows long: search by part number, name, OEM part number or supplier, and narrow by category.
 // The list shows about six rows and scrolls for the rest, so the dialog stays short however many parts there are.
 const PICKER_LIMIT = 100;
-function PartPicker({ label, required, options, value, onChange, emptyHint, afterChoice, sameCategoryAs, showAlternatesOnly }: {
+function PartPicker({ label, required, options, value, onChange, emptyHint, afterChoice, sameCategoryAs, showAlternatesOnly, spread }: {
   label: string; required?: boolean; options: { item: Item; tag?: string }[]; value: string; onChange: (id: string) => void; emptyHint?: string; afterChoice?: React.ReactNode;
   // The part being matched: the list opens on its category, so the usual choices come first
   sameCategoryAs?: Item;
   // Shows only the parts already grouped with this one as alternates
   showAlternatesOnly?: boolean;
+  // Places the pieces in the grid of the dialog around it: the search and list in its first column, the category at the top of its second
+  spread?: boolean;
 }) {
   const { data: cats } = useItemCategories();
   const [q, setQ] = useState('');
@@ -1101,11 +1128,22 @@ function PartPicker({ label, required, options, value, onChange, emptyHint, afte
     (cat === 'ALL' || (cat === 'NONE' ? i.category_id == null : String(i.category_id) === cat))
     && (!term || [i.part_no, i.name, i.oem_part_no, i.supplier].some((v) => !!v && v.toLowerCase().includes(term))));
   const detail = (i: Item) => [i.oem_part_no ? `OEM ${i.oem_part_no}` : '', i.supplier ?? '', unitPrice(i.standard_price)].filter(Boolean).join(' · ');
+  const labelClass = 'text-[13px] font-medium text-[var(--shell-text)]';
+  const hasCats = (cats?.length ?? 0) > 0;
+  const search = (
+    <Input aria-labelledby={labelId} className={cn(ctl, 'min-w-0', spread ? 'md:col-start-1 md:row-start-2' : '@md:flex-1')} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by number, name, OEM number or supplier" />
+  );
+  const categorySelect = (
+    <NativeSelect aria-label="Category" value={cat} onChange={(e) => setCat(e.target.value)}>
+      <option value="ALL">Any category</option><option value="NONE">No category</option>
+      {(cats ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+    </NativeSelect>
+  );
   return (
-    <div className="space-y-1.5">
-      <p id={labelId} className="text-[13px] font-medium text-[var(--shell-text)]">{label}{required && <span className="text-[var(--danger)]"> *</span>}</p>
+    <div className={cn('@container space-y-1.5', spread && 'contents')}>
+      <p id={labelId} className={cn(labelClass, spread && 'md:col-start-1 md:row-start-1')}>{label}{required && <span className="text-[var(--danger)]"> *</span>}</p>
       {chosen ? (
-        <div className="flex items-center gap-3 rounded-md border border-[var(--input)] px-3 py-2">
+        <div className={cn('flex items-center gap-3 rounded-md border border-[var(--input)] px-3 py-2', spread && 'md:col-span-2 md:row-start-2')}>
           <div className="min-w-0 flex-1">
             <p className="truncate text-[13px] text-[var(--shell-text)]"><span className="text-[12px] text-[var(--shell-text-muted)]">{chosen.item.part_no}</span> <span className="font-medium">{chosen.item.name}</span>{chosen.tag && <span className="text-[var(--success)]"> · {chosen.tag}</span>}</p>
             <p className="truncate text-[12px] text-[var(--shell-text-muted)]">{detail(chosen.item)}</p>
@@ -1118,32 +1156,39 @@ function PartPicker({ label, required, options, value, onChange, emptyHint, afte
           {showAlternatesOnly && (
             <label className="flex items-center gap-2 text-[13px] text-[var(--shell-text)]"><input type="checkbox" checked={altOnly} onChange={(e) => setAltOnly(e.target.checked)} className="h-4 w-4" />Alternates only</label>
           )}
-          <div className="flex gap-2">
-            <Input aria-labelledby={labelId} className={`${ctl} min-w-0 flex-1`} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by part number, name, OEM part number or supplier" />
-            {(cats?.length ?? 0) > 0 && (
-              <div className="w-56 shrink-0">
-                <NativeSelect aria-label="Category" value={cat} onChange={(e) => setCat(e.target.value)}>
-                  <option value="ALL">Any category</option><option value="NONE">No category</option>
-                  {(cats ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </NativeSelect>
-              </div>
+          {spread ? (
+            <>
+              {search}
+              {hasCats && (
+                <>
+                  <p className={cn(labelClass, 'md:col-start-2 md:row-start-1')}>Category</p>
+                  <div className="md:col-start-2 md:row-start-2">{categorySelect}</div>
+                </>
+              )}
+            </>
+          ) : (
+            <div className="flex flex-col gap-2 @md:flex-row">
+              {search}
+              {hasCats && <div className="w-full @md:w-56 @md:shrink-0">{categorySelect}</div>}
+            </div>
+          )}
+          <div className={cn('space-y-1.5', spread && 'md:col-start-1 md:row-start-3')}>
+            {options.length === 0 ? (emptyHint ? <p className="text-[12px] text-[var(--shell-text-muted)]">{emptyHint}</p> : null) : matches.length === 0 ? <p className="text-[12px] text-[var(--shell-text-muted)]">No part matches. Try another number or name.</p> : (
+              <>
+                <ul role="listbox" aria-labelledby={labelId} className="max-h-80 divide-y divide-[var(--shell-border)] overflow-y-auto rounded-md border border-[var(--shell-border)]">
+                  {matches.slice(0, PICKER_LIMIT).map(({ item: i, tag }) => (
+                    <li key={i.id} role="option" aria-selected={false}>
+                      <button type="button" onClick={() => { onChange(String(i.id)); setQ(''); }} className="block w-full px-3 py-2 text-left hover:bg-[var(--shell-hover)] focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]">
+                        <span className="block truncate text-[13px] text-[var(--shell-text)]"><span className="text-[12px] text-[var(--shell-text-muted)]">{i.part_no}</span> <span className="font-medium">{i.name}</span>{tag && <span className="text-[var(--success)]"> · {tag}</span>}</span>
+                        <span className="block truncate text-[12px] text-[var(--shell-text-muted)]">{detail(i)}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                {matches.length > PICKER_LIMIT && <p className="text-[12px] text-[var(--shell-text-muted)]">Showing the first {PICKER_LIMIT} of {matches.length}. Keep typing to narrow it down.</p>}
+              </>
             )}
           </div>
-          {options.length === 0 ? (emptyHint ? <p className="text-[12px] text-[var(--shell-text-muted)]">{emptyHint}</p> : null) : matches.length === 0 ? <p className="text-[12px] text-[var(--shell-text-muted)]">No part matches. Try another number or name.</p> : (
-            <>
-              <ul role="listbox" aria-labelledby={labelId} className="max-h-80 divide-y divide-[var(--shell-border)] overflow-y-auto rounded-md border border-[var(--shell-border)]">
-                {matches.slice(0, PICKER_LIMIT).map(({ item: i, tag }) => (
-                  <li key={i.id} role="option" aria-selected={false}>
-                    <button type="button" onClick={() => { onChange(String(i.id)); setQ(''); }} className="block w-full px-3 py-2 text-left hover:bg-[var(--shell-hover)] focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]">
-                      <span className="block truncate text-[13px] text-[var(--shell-text)]"><span className="text-[12px] text-[var(--shell-text-muted)]">{i.part_no}</span> <span className="font-medium">{i.name}</span>{tag && <span className="text-[var(--success)]"> · {tag}</span>}</span>
-                      <span className="block truncate text-[12px] text-[var(--shell-text-muted)]">{detail(i)}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              {matches.length > PICKER_LIMIT && <p className="text-[12px] text-[var(--shell-text-muted)]">Showing the first {PICKER_LIMIT} of {matches.length}. Keep typing to narrow it down.</p>}
-            </>
-          )}
         </>
       )}
     </div>
@@ -1170,13 +1215,14 @@ export function PartReplaceModal({ isOpen, onClose, item, items }: Base & { item
     .filter((i) => i.id !== item.id && i.status === 'ACTIVE' && i.uom === item.uom && !i.scheduled && (i.project_id == null || i.project_id === item.project_id))
     .sort((a, b) => Number(alt.has(b.id)) - Number(alt.has(a.id)) || Number(!!alt.get(b.id)?.is_default) - Number(!!alt.get(a.id)?.is_default) || a.part_no.localeCompare(b.part_no))
     .map((i) => ({ item: i, tag: alt.has(i.id) ? (alt.get(i.id)!.is_default ? 'default alternate' : 'alternate') : undefined }));
-  const owners = new Set((usage.data ?? []).map((u) => `${u.kind}-${u.id}`));
+  const owners = new Set((usage.data ?? []).filter((u) => u.kind !== 'ORDER').map((u) => `${u.kind}-${u.id}`));
+  const openOrders = new Set((usage.data ?? []).filter((u) => u.kind === 'ORDER').map((u) => u.code)).size;
   const jobs = [...owners].filter((k) => k.startsWith('JOB')).length; const products = owners.size - jobs;
   const where = [products ? `${products} product${products === 1 ? '' : 's'}` : '', jobs ? `${jobs} job BOM${jobs === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and ');
   const dateOk = !!when && when >= today;
   const canSave = !saving && dateOk && !!why.trim() && (mode === 'RETIRE' || !!succ);
   return (
-    <ModuleModal isOpen={isOpen} onClose={onClose} size="xl" title={`Replace ${item.part_no}`} icon={<Replace className="h-4 w-4" />} canSave={canSave} saveLabel={when > today ? 'Schedule' : mode === 'RETIRE' ? 'Retire part' : 'Replace part'}
+    <ModuleModal isOpen={isOpen} onClose={onClose} size="xl" title={`${mode === 'RETIRE' ? 'Retire' : 'Replace'} ${item.part_no}`} icon={<Replace className="h-4 w-4" />} isDestructive={mode === 'RETIRE'} canSave={canSave} saveLabel={when > today ? 'Schedule' : mode === 'RETIRE' ? 'Retire part' : 'Replace part'}
       onSave={() => run(() => api.post(`/budgets/items/${item.id}/replace`, { successor_id: mode === 'REPLACE' ? Number(succ) : null, effective_from: when, reason: why }),
         when > today ? `Scheduled for ${formatDate(when)}. It takes effect on that date.` : 'Done. BOMs that used the part now have a new version.')}>
       <div className="grid grid-cols-1 gap-x-6 gap-y-5 md:grid-cols-3">
@@ -1191,10 +1237,13 @@ export function PartReplaceModal({ isOpen, onClose, item, items }: Base & { item
           </Field>
           <Field label="Reason" required hint="Kept in the part's history."><Textarea className={ctl} rows={3} maxLength={300} value={why} onChange={(e) => setWhy(e.target.value)} /></Field>
           <div className="rounded-md border border-[var(--shell-border)] p-3 text-[13px] text-[var(--shell-text)]">
-            {usage.isLoading ? 'Checking where it is used…' : owners.size === 0 ? 'It is not on any BOM, so only the part itself changes.' : (
+            {usage.isLoading ? 'Checking where it is used…' : owners.size === 0 && openOrders === 0 ? 'It is not on any BOM, so only the part itself changes.' : owners.size === 0 ? (
+              <span className="text-[var(--warning)]">It is on no product or job BOM, but {openOrders} open order{openOrders === 1 ? ' has its own copy' : 's have their own copy'}, so {openOrders === 1 ? 'it keeps' : 'they keep'} the old part. Reimport the BOM on the order to pick up the change.</span>
+            ) : (
               <>
                 It is on {owners.size} BOM{owners.size === 1 ? '' : 's'} ({where}). From the date each gets a new version {mode === 'REPLACE' ? 'with the replacement in its place' : 'without it'}, and the version in force today is kept as it is. Approved standard costs do not change; propose new ones to use the new BOMs.
                 {mode === 'RETIRE' && <span className="mt-1 block text-[var(--warning)]">Retiring removes the part from those BOMs, which lowers their cost.</span>}
+                {openOrders > 0 && <span className="mt-1 block text-[var(--warning)]">{openOrders} open order{openOrders === 1 ? ' has' : 's have'} its own copy of the part, so {openOrders === 1 ? 'it keeps' : 'they keep'} the old one. Reimport the BOM on the order to pick up the change.</span>}
               </>
             )}
           </div>
