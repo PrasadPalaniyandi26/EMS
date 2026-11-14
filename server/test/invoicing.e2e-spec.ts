@@ -299,4 +299,52 @@ describe('Client invoicing (e2e)', () => {
       expect(r.body.data.every((i: any) => i.overdue && i.balance > 0)).toBe(true);
     });
   });
+
+  describe('reports and Home', () => {
+    const report = (t: string, type: string, q = '') => call('get', t, `/reporting/generate?type=${type}${q}`);
+
+    it('ages what each client owes by how long it has been due, for Finance and Admin only', async () => {
+      const r = await report(finance, 'receivables-ageing');
+      expect(r.status).toBe(200);
+      const row = r.body.data.rows.find((x: any) => x.Client === 'ZZ Tamil Nadu client');
+      expect(row['Over 90 Days']).toBeGreaterThan(0);
+      const parts = ['Not Due', '1-30 Days', '31-60 Days', '61-90 Days', 'Over 90 Days'].reduce((a, k) => a + row[k], 0);
+      expect(row.Outstanding).toBeCloseTo(parts, 2);
+      expect(r.body.data.totals.Outstanding).toBeGreaterThanOrEqual(row.Outstanding);
+      expect((await report(admin, 'receivables-ageing')).status).toBe(200);
+      expect((await report(manager, 'receivables-ageing')).status).toBe(403);
+      expect((await report(ops, 'receivables-ageing')).status).toBe(403);
+    });
+
+    it('lists the invoices issued in the period with the tax split, and keeps a cancelled one at no value', async () => {
+      const r = await report(finance, 'gst-sales-register', '&dateFrom=2018-06-01&dateTo=2018-06-30');
+      expect(r.status).toBe(200);
+      const rows = r.body.data.rows as any[];
+      expect(rows.length).toBeGreaterThan(0);
+      expect(rows.every((x) => /^NTIN-1806-\d{5}$/.test(x['Invoice No']))).toBe(true);
+      const live = rows.filter((x) => x.Status === 'Issued');
+      expect(r.body.data.totals.Taxable).toBeCloseTo(live.reduce((a, x) => a + x.Taxable, 0), 2);
+      expect(r.body.data.totals['Invoice Value']).toBeCloseTo(live.reduce((a, x) => a + x['Invoice Value'], 0), 2);
+      const tn = rows.find((x) => x.Client === 'ZZ Tamil Nadu client');
+      expect([tn.CGST, tn.SGST, tn.IGST]).toEqual([tn.CGST, tn.CGST, 0]);
+      const ka = rows.find((x) => x.Client === 'ZZ Karnataka client' && x.Status === 'Issued');
+      expect([ka.CGST, ka.SGST]).toEqual([0, 0]);
+      expect(ka.IGST).toBeGreaterThan(0);
+      const gone = rows.find((x) => x.Status === 'Cancelled');
+      expect(gone['Invoice Value']).toBe(0);
+      expect((await report(manager, 'gst-sales-register')).status).toBe(403);
+    });
+
+    it('shows what clients owe on Home to the roles that can see invoices, and raises an overdue item', async () => {
+      const r = await call('get', manager, '/dashboard/overview');
+      expect(r.status).toBe(200);
+      const rec = r.body.data.receivables;
+      expect(rec.overdue).toBeGreaterThan(0);
+      expect(rec.outstanding).toBeGreaterThanOrEqual(rec.overdue);
+      expect(rec.top.length).toBeGreaterThan(0);
+      expect(r.body.data.attention.some((a: any) => a.key === 'inv-overdue' && a.href === '/manage/clients?tab=invoices')).toBe(true);
+      const e = await call('get', employee, '/dashboard/overview');
+      if (e.status === 200) expect(e.body.data.receivables).toBeNull();
+    });
+  });
 });

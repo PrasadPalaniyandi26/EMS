@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { BudgetsService } from '../budgets/budgets.service';
+import { InvoicingService } from '../invoicing/invoicing.service';
 import { COUNTABLE_STATUSES, COMMITTED_STATUSES, countableStatusSql } from '../common/constants/transaction-status';
 import { parseRange, parseYear } from '../common/helpers/dates';
 
@@ -9,7 +10,7 @@ const FINANCE_ROLES = ['ADMIN', 'FINANCE'];
 
 @Injectable()
 export class ReportingService {
-  constructor(private prisma: PrismaService, private budgets: BudgetsService) {}
+  constructor(private prisma: PrismaService, private budgets: BudgetsService, private invoicing: InvoicingService) {}
 
   // null = no filter (all users); number[] = restrict to these user IDs
   private async resolveUserIds(userId: number, roleName: string): Promise<number[] | null> {
@@ -44,6 +45,8 @@ export class ReportingService {
       case 'order-costing':      this.requireRoles(roleName, FINANCE_ROLES); return this.orderCosting(dateFrom, dateTo);
       case 'product-margin':     this.requireRoles(roleName, FINANCE_ROLES); return this.productMargin(year);
       case 'project-estimate':   this.requireRoles(roleName, FINANCE_ROLES); return this.projectEstimate();
+      case 'receivables-ageing': this.requireRoles(roleName, FINANCE_ROLES); return this.invoicing.ageingReport();
+      case 'gst-sales-register': this.requireRoles(roleName, FINANCE_ROLES); return this.invoicing.salesRegister(dateFrom, dateTo);
       case 'transaction-ledger': return this.transactionLedger(userId, userIds, dateFrom, dateTo, params.txnType as any);
       case 'client-summary':     return this.clientSummary(userIds, dateFrom, dateTo, params.categoryType, params.txnType as any);
       case 'claimable-gst':            return this.claimableGst(userIds, dateFrom, dateTo);

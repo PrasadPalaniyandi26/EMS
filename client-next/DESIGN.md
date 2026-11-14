@@ -85,6 +85,7 @@ Text 4.5:1, control boundaries 3:1, focus ring on every control, every control l
 - Order of the page: period bar and "Updated" time; five headline figures in one strip (Net result, Income, Expenses, Awaiting approval, Budget used or Claims to reimburse), each with the change against the period before and, for the first three, the last twelve months as a line; the monthly chart beside **Needs attention**; Spend by category, Budget health and Projects; Order book and Recent activity.
 - Needs attention is a worst-first list of things to act on, each a link to the page that deals with it. Add an item in `DashboardOverviewService.attention`, not on the page.
 - A month in the chart is clickable and sets the period to that month. Budget and the portfolio are for the roles that can open those pages; others see Spend by category and Recent activity.
+- Roles that can see invoices (Admin, Finance, Manager, Operations) also get a **Clients owe you** figure in the strip and a **Receivables** panel beside the Order book (outstanding, overdue, drafts, and the clients who owe most). Overdue invoices, drafts and POs ending within 14 days join Needs attention.
 
 ## Clients: purchase orders and invoices
 - Clients has three tabs for the roles that can see billing (Admin, Finance, Manager, Operations): **Clients**, **Purchase orders**, **Invoices**. The Clients list gains Outstanding and Overdue columns, and the panel a Billing section.
@@ -93,3 +94,4 @@ Text 4.5:1, control boundaries 3:1, focus ring on every control, every control l
 - A payment becomes one approved Income entry for the amount received. The TDS a client deducts counts towards the invoice but is not income. Income made this way is changed on the invoice, not on the Income page.
 - The printed invoice is paper: dark ink on white in every theme. Its colours live in `lib/invoice-sheet-css.ts`, outside the design check, on purpose.
 - Company details (legal name, GSTIN, state, bank, signatory) are on **Organization > Company**.
+- A PO can cover a project, an order, or both. Reports (Admin and Finance): **Receivables Ageing** (what each client owes, by days past due) and **GST Sales Register** (issued invoices by invoice date, with the tax split; a cancelled invoice stays listed at no value so the number series has no gaps).

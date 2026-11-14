@@ -16,7 +16,7 @@ import {
   BarChart3, FileText, TrendingDown, TrendingUp, Scale, Target,
   ArrowLeftRight, Users, Download, Sheet,
   ChevronDown, Loader2, Search, Receipt, Wallet, AlertTriangle,
-  CalendarRange, FileWarning, Boxes, Percent, Ruler,
+  CalendarRange, FileWarning, Boxes, Percent, Ruler, Hourglass, BookText,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { PageFrame } from '@/components/shared/module/page-frame';
@@ -52,13 +52,15 @@ const REPORTS = [
   { id: 'order-costing', label: 'Order Costing', icon: Boxes, desc: 'Orders: planned cost, order value, budget and spend', color: 'text-[var(--warning)]', bg: '' },
   { id: 'product-margin', label: 'Product Margin', icon: Percent, desc: 'Price against standard cost, and the margin against its goals', color: 'text-[var(--success)]', bg: '' },
   { id: 'project-estimate', label: 'Project Estimate vs Actual', icon: Ruler, desc: 'Approved project estimate against spend so far', color: 'text-[var(--info)]', bg: '' },
+  { id: 'receivables-ageing', label: 'Receivables Ageing', icon: Hourglass, desc: 'What each client owes, by how long it has been due', color: 'text-[var(--danger)]', bg: '' },
+  { id: 'gst-sales-register', label: 'GST Sales Register', icon: BookText, desc: 'Invoices issued in the period, with CGST, SGST and IGST', color: 'text-[var(--success)]', bg: '' },
 ];
 
 // Reports driven by a financial year rather than a date range
 const FY_REPORTS = new Set(['budget-vs-actual', 'budget-by-month', 'unbudgeted-spend', 'product-margin']);
 // Costing figures are for Finance and Admin; a manager sees the generic reports and the budgets they own
-const FINANCE_ONLY = new Set(['unbudgeted-spend', 'order-costing', 'product-margin', 'project-estimate']);
-const NO_PERIOD = new Set(['project-estimate']);
+const FINANCE_ONLY = new Set(['unbudgeted-spend', 'order-costing', 'product-margin', 'project-estimate', 'receivables-ageing', 'gst-sales-register']);
+const NO_PERIOD = new Set(['project-estimate', 'receivables-ageing']);
 
 const DATE_PRESETS = [
   { label: 'This Month', key: 'thisMonth' },
@@ -72,6 +74,7 @@ const DATE_PRESETS = [
 const CURRENCY_COLS = new Set([
   'Amount', 'Income', 'Expenses', 'Net', 'Budget', 'Actual', 'Committed', 'Spent', 'Remaining', 'Net Amount', 'Total Amount', 'GST Amount',
   'Cumulative Budget', 'Cumulative Used', 'Unit Cost', 'Planned Cost', 'Order Value', 'Price', 'Standard Cost', 'Margin', 'Contract Value', 'Estimate',
+  'Not Due', '1-30 Days', '31-60 Days', '61-90 Days', 'Over 90 Days', 'Outstanding', 'Taxable', 'CGST', 'SGST', 'IGST', 'Round Off', 'Invoice Value',
 ]);
 const isPctCol = (c: string) => c === '% Used' || c.endsWith(' %');
 

@@ -5,6 +5,7 @@ import { BudgetsService } from '../budgets/budgets.service';
 import { BudgetPlanningService } from '../budgets/budget-planning.service';
 import { BuildOrdersService } from '../budgets/build-orders.service';
 import { ApprovalsService } from '../approvals/approvals.service';
+import { InvoicingService } from '../invoicing/invoicing.service';
 import { DashboardService } from './dashboard.service';
 import { COMMITTED_STATUSES, committedStatusSql } from '../common/constants/transaction-status';
 import { parseRange } from '../common/helpers/dates';
@@ -14,6 +15,7 @@ const r2 = (v: number) => Math.round(v * 100) / 100;
 const num = (v: unknown) => Number(v) || 0;
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const BUDGET_ROLES = ['ADMIN', 'FINANCE', 'MANAGER', 'OPERATIONS', 'CONFIGURATOR'];
+const INVOICE_ROLES = ['ADMIN', 'FINANCE', 'MANAGER', 'OPERATIONS'];
 const OPEN_ORDER = ['COMMITTED', 'RELEASED', 'IN_BUILD'];
 const TONE_RANK = { danger: 0, warning: 1, info: 2 } as const;
 
@@ -30,6 +32,7 @@ export class DashboardOverviewService {
     private planning: BudgetPlanningService,
     private orders: BuildOrdersService,
     private approvals: ApprovalsService,
+    private invoicing: InvoicingService,
   ) {}
 
   async overview(user: { id: number; role_name?: string }, dateFrom?: string, dateTo?: string) {
@@ -127,7 +130,10 @@ export class DashboardOverviewService {
       portfolio = this.portfolio(projects, projectMeta as any[], orders);
     }
 
-    const attention = this.attention({ approvalsBlock, reimbursements, budget, portfolio });
+    // What clients owe is for the roles that can open Clients and its invoices
+    const receivables = INVOICE_ROLES.includes(role) ? await this.invoicing.homeBlock() : null;
+
+    const attention = this.attention({ approvalsBlock, reimbursements, budget, portfolio, receivables });
 
     return {
       as_of: new Date().toISOString(),
@@ -135,7 +141,7 @@ export class DashboardOverviewService {
       period: { from: range.from ?? null, to: range.to ?? null },
       totals, previous, series,
       categories: { rows: catRows, total: r2(catTotal) },
-      approvals: approvalsBlock, reimbursements, budget, portfolio, attention,
+      approvals: approvalsBlock, reimbursements, budget, portfolio, receivables, attention,
       recent: recent.map((t) => ({
         id: t.id, reference: t.referenceId, type: t.type, amount: num(t.amount), status: t.status, date: t.dateRecorded,
         description: t.description, category: t.category?.name ?? null, who: t.user?.username ?? null,
@@ -229,7 +235,7 @@ export class DashboardOverviewService {
   }
 
   // What needs a look, worst first, each with the page that deals with it
-  private attention(x: { approvalsBlock: any; reimbursements: any; budget: any; portfolio: any }): Attention[] {
+  private attention(x: { approvalsBlock: any; reimbursements: any; budget: any; portfolio: any; receivables: any }): Attention[] {
     const out: Attention[] = [];
     const add = (key: string, tone: Attention['tone'], count: number, label: string, detail: string, href: string) => { if (count > 0) out.push({ key, tone, label, detail, count, href }); };
     const a = x.approvalsBlock;
@@ -245,6 +251,12 @@ export class DashboardOverviewService {
       add('risk', 'danger', p.at_risk, `${p.at_risk} ${p.at_risk === 1 ? 'project is' : 'projects are'} at risk`, 'Margin below minimum or over the estimate', '/business/projects');
       add('overdue', 'warning', p.overdue, `${p.overdue} ${p.overdue === 1 ? 'project is' : 'projects are'} past the end date`, 'Still marked Active', '/business/projects');
       add('nobom', 'info', o.no_bom, `${o.no_bom} ${o.no_bom === 1 ? 'order has' : 'orders have'} no BOM yet`, 'Import it to cost the order', '/business/orders');
+    }
+    if (x.receivables) {
+      const r = x.receivables;
+      add('inv-overdue', r.oldest_overdue_days > 30 ? 'danger' : 'warning', r.overdue_count, `${r.overdue_count} client ${r.overdue_count === 1 ? 'invoice is' : 'invoices are'} overdue`, `Oldest is ${r.oldest_overdue_days} ${r.oldest_overdue_days === 1 ? 'day' : 'days'} late`, '/manage/clients?tab=invoices');
+      add('inv-draft', 'info', r.drafts, `${r.drafts} ${r.drafts === 1 ? 'invoice is a draft' : 'invoices are drafts'}`, 'Issue them to bill the client', '/manage/clients?tab=invoices');
+      add('po-expiring', 'info', r.expiring_pos, `${r.expiring_pos} client ${r.expiring_pos === 1 ? 'PO ends' : 'POs end'} within 14 days`, 'Invoice before it lapses', '/manage/clients?tab=pos');
     }
     add('reimb', 'info', x.reimbursements.due_count, `${x.reimbursements.due_count} ${x.reimbursements.due_count === 1 ? 'claim' : 'claims'} to reimburse`, 'Approved and not yet paid', '/reimbursements');
     add('drafts', 'info', a.drafts, `${a.drafts} ${a.drafts === 1 ? 'draft' : 'drafts'} of yours to finish`, 'Draft or sent back', '/expense');

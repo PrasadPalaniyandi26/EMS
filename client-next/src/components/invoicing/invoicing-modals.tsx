@@ -94,15 +94,15 @@ export function PoModal({ isOpen, onClose, editing, clientId }: Base & { editing
         <Field label="Value before tax" required hint="The total of the PO, without GST."><CurrencyInput value={f.value} onChange={set('value')} /></Field>
         <Field label="Valid until" error={!dateOk ? 'Cannot be before the PO date.' : undefined}><Input type="date" className={inp} value={f.valid_until} onChange={(e) => set('valid_until')(e.target.value)} /></Field>
         <div />
-        <Field label="Project (optional)">
+        <Field label="Project (optional)" hint="A PO can cover a project, an order, or both.">
           <NativeSelect aria-label="Project" value={f.project_id} disabled={!cid} onChange={(e) => set('project_id')(e.target.value)}>
-            <option value="">None</option>
+            <option value="">{cid ? 'None' : 'Select a client first'}</option>
             {clientProjects.map((p: any) => <option key={p.id} value={p.id}>{p.code ? `${p.code} ` : ''}{p.name}</option>)}
           </NativeSelect>
         </Field>
         <Field label="Order (optional)">
           <NativeSelect aria-label="Order" value={f.build_order_id} disabled={!cid} onChange={(e) => set('build_order_id')(e.target.value)}>
-            <option value="">None</option>
+            <option value="">{cid ? 'None' : 'Select a client first'}</option>
             {clientOrders.map((o) => <option key={o.id} value={o.id}>{o.code} {o.product_name}</option>)}
           </NativeSelect>
         </Field>

@@ -374,6 +374,10 @@ export interface DashboardOverview {
     orders: { open: number; value: number; margin_pct: number | null; late: number; no_bom: number;
       next: { id: number; code: string; product: string | null; customer: string | null; delivery_date: string; status: string; value: number | null; days: number; late: boolean }[] };
   };
+  receivables: null | {
+    outstanding: number; overdue: number; overdue_count: number; oldest_overdue_days: number; drafts: number; expiring_pos: number; received_this_month: number; clients_owing: number;
+    top: { client_id: number; name: string; outstanding: number; overdue: number }[];
+  };
   attention: { key: string; tone: 'danger' | 'warning' | 'info'; label: string; detail: string; count: number; href: string }[];
   recent: { id: number; reference: string | null; type: string; amount: number; status: string | null; date: string; description: string | null; category: string | null; who: string | null }[];
 }

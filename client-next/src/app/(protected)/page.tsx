@@ -82,7 +82,7 @@ export default function HomePage() {
   };
   const firstActive = series.findIndex((s) => s.income > 0 || s.expense > 0);
   const chartData = firstActive > 0 ? series.slice(firstActive) : series;
-  const budget = data?.budget; const portfolio = data?.portfolio;
+  const budget = data?.budget; const portfolio = data?.portfolio; const recv = data?.receivables;
   const showBudgetFigure = !!budget;
   const empty = 'px-4 py-8 text-pretty text-center text-[13px] text-[var(--shell-text-muted)]';
 
@@ -102,7 +102,7 @@ export default function HomePage() {
       </div>
 
       {/* The headline figures: how the business did, what is waiting, and how the plan stands */}
-      <section aria-label="Key figures" className={cn('grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-[var(--shell-border)] bg-[var(--shell-border)] lg:grid-cols-5')}>
+      <section aria-label="Key figures" className={cn('grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-[var(--shell-border)] bg-[var(--shell-border)] ', recv ? 'lg:grid-cols-6' : 'lg:grid-cols-5')}>
         <Figure label="Net result" loading={loading} value={t ? money(t.net, currency) : ''} valueClass={netTone}
           spark={<Spark values={series.map((s) => s.net)} color={t && t.net < 0 ? 'var(--danger)' : INCOME} label="Net result by month, last twelve months" />}>
           <Delta now={t?.net ?? 0} before={prev?.net} versus={versus} format={(n) => plain(n, currency)} />
@@ -123,6 +123,12 @@ export default function HomePage() {
             {(data?.approvals.mine ?? 0) > 0 ? `${data!.approvals.mine} waiting for you` : 'Nothing waiting for you'}
           </p>
         </Figure>
+        {recv && (
+          <Figure label="Clients owe you" loading={loading} onClick={() => router.push('/manage/clients?tab=invoices')} value={money(recv.outstanding, currency)}>
+            <p className={cn('mt-1 text-[12px] tabular-nums', recv.overdue > 0 ? TONE_TEXT.danger : 'text-[var(--shell-text-muted)]')}>{recv.overdue > 0 ? `${money(recv.overdue, currency)} overdue` : 'Nothing overdue'}</p>
+            <p className="mt-0.5 text-[12px] tabular-nums text-[var(--shell-text-muted)]">{money(recv.received_this_month, currency)} received this month</p>
+          </Figure>
+        )}
         {showBudgetFigure ? (
           <Figure label={`Budget used, ${budget!.label}`} loading={loading} onClick={() => router.push('/budget/monitor')} value={budget!.pct != null ? `${Math.round(budget!.pct)}%` : '—'}
             valueClass={budget!.pct != null && budget!.pct >= 100 ? TONE_TEXT.danger : budget!.pct != null && budget!.pct >= 80 ? TONE_TEXT.warning : ''}>
@@ -343,8 +349,33 @@ export default function HomePage() {
           </Panel>
         )}
 
-        <Panel title="Recent activity" className="lg:col-span-2" action={<PanelLink onClick={() => router.push('/transactions')}>View all</PanelLink>}>
-          <RecentList rows={data?.recent ?? []} currency={currency} empty={empty} loading={loading} wide />
+        {recv && (
+          <Panel title="Receivables" action={<PanelLink onClick={() => router.push('/manage/clients?tab=invoices')}>Invoices</PanelLink>}>
+            <div className="border-b border-[var(--shell-border)] p-4">
+              <dl className="grid grid-cols-3 gap-3 text-[12px]">
+                <div><dt className="text-[var(--shell-text-muted)]">Outstanding</dt><dd className="mt-0.5 text-[15px] font-semibold tabular-nums text-[var(--shell-text)]">{plain(recv.outstanding, currency)}</dd></div>
+                <div><dt className="text-[var(--shell-text-muted)]">Overdue</dt><dd className={cn('mt-0.5 text-[15px] font-semibold tabular-nums', recv.overdue > 0 ? TONE_TEXT.danger : 'text-[var(--shell-text)]')}>{plain(recv.overdue, currency)}</dd></div>
+                <div><dt className="text-[var(--shell-text-muted)]">Drafts</dt><dd className="mt-0.5 text-[15px] font-semibold tabular-nums text-[var(--shell-text)]">{recv.drafts}</dd></div>
+              </dl>
+            </div>
+            {recv.top.length > 0 ? (
+              <ul className="divide-y divide-[var(--shell-border)]">
+                {recv.top.map((c) => (
+                  <li key={c.client_id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                    <span title={c.name} className="min-w-0 truncate text-[13px] text-[var(--shell-text)]">{c.name}</span>
+                    <span className="shrink-0 text-right">
+                      <span className="block text-[13px] font-semibold tabular-nums text-[var(--shell-text)]">{money(c.outstanding, currency)}</span>
+                      {c.overdue > 0 && <span className={cn('block text-[12px] tabular-nums', TONE_TEXT.danger)}>{money(c.overdue, currency)} overdue</span>}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className={empty}>No client owes you anything. Issue an invoice to bill a client.</p>}
+          </Panel>
+        )}
+
+        <Panel title="Recent activity" className={recv ? 'lg:col-span-1' : 'lg:col-span-2'} action={<PanelLink onClick={() => router.push('/transactions')}>View all</PanelLink>}>
+          <RecentList rows={data?.recent ?? []} currency={currency} empty={empty} loading={loading} wide={!recv} />
         </Panel>
       </div>
       )}

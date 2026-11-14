@@ -4,5 +4,6 @@ import { DashboardService } from './dashboard.service';
 import { DashboardOverviewService } from './dashboard-overview.service';
 import { BudgetsModule } from '../budgets/budgets.module';
 import { ApprovalsModule } from '../approvals/approvals.module';
-@Module({ imports: [BudgetsModule, ApprovalsModule], controllers: [DashboardController], providers: [DashboardService, DashboardOverviewService] })
+import { InvoicingModule } from '../invoicing/invoicing.module';
+@Module({ imports: [BudgetsModule, ApprovalsModule, InvoicingModule], controllers: [DashboardController], providers: [DashboardService, DashboardOverviewService] })
 export class DashboardModule {}

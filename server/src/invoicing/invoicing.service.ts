@@ -526,4 +526,83 @@ export class InvoicingService {
     const sum = (k: 'billed' | 'received' | 'outstanding' | 'overdue') => r2(rows.reduce((a, r) => a + r[k], 0));
     return { rows, totals: { billed: sum('billed'), received: sum('received'), outstanding: sum('outstanding'), overdue: sum('overdue'), overdue_count: rows.reduce((a, r) => a + r.overdue_count, 0) } };
   }
+
+  // ── Home and reports ───────────────────────────────────────────────────────
+
+  // What Home shows: what is owed, what is late, who owes most, and what is waiting to be issued
+  async homeBlock() {
+    const today = todayUtc(); const soon = new Date(today.getTime() + 14 * DAY); const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+    const [open, drafts, expiring, received] = await Promise.all([
+      this.prisma.invoice.findMany({ where: { status: { in: ['ISSUED', 'PART_PAID'] } }, select: { clientId: true, total: true, paid: true, tds: true, dueDate: true, client: { select: { name: true } } } }),
+      this.prisma.invoice.count({ where: { status: 'DRAFT' } }),
+      this.prisma.clientPo.count({ where: { status: 'OPEN', validUntil: { not: null, lte: soon } } }),
+      this.prisma.invoicePayment.aggregate({ where: { paidOn: { gte: monthStart } }, _sum: { amount: true } }),
+    ]);
+    let outstanding = 0; let overdue = 0; let overdueCount = 0; let oldest = 0;
+    const owed = new Map<number, { name: string; outstanding: number; overdue: number }>();
+    for (const i of open) {
+      const bal = r2(n(i.total) - n(i.paid) - n(i.tds));
+      if (bal <= 0.005) continue;
+      const late = Math.floor((today.getTime() - i.dueDate.getTime()) / DAY);
+      outstanding += bal;
+      const e = owed.get(i.clientId) ?? { name: i.client?.name ?? '', outstanding: 0, overdue: 0 };
+      e.outstanding += bal;
+      if (late > 0) { overdue += bal; overdueCount += 1; e.overdue += bal; oldest = Math.max(oldest, late); }
+      owed.set(i.clientId, e);
+    }
+    const top = [...owed.entries()].map(([client_id, e]) => ({ client_id, name: e.name, outstanding: r2(e.outstanding), overdue: r2(e.overdue) })).sort((a, b) => b.outstanding - a.outstanding).slice(0, 4);
+    return { outstanding: r2(outstanding), overdue: r2(overdue), overdue_count: overdueCount, oldest_overdue_days: oldest, drafts, expiring_pos: expiring, received_this_month: r2(n(received._sum.amount)), clients_owing: owed.size, top };
+  }
+
+  // Money owed by each client, by how long it has been due
+  async ageingReport() {
+    const today = todayUtc().getTime();
+    const invoices = await this.prisma.invoice.findMany({ where: { status: { in: ['ISSUED', 'PART_PAID'] } }, select: { clientId: true, total: true, paid: true, tds: true, dueDate: true, client: { select: { name: true } } } });
+    type Row = { Client: string; Invoices: number; 'Not Due': number; '1-30 Days': number; '31-60 Days': number; '61-90 Days': number; 'Over 90 Days': number; Outstanding: number };
+    const by = new Map<number, Row>();
+    for (const i of invoices) {
+      const bal = r2(n(i.total) - n(i.paid) - n(i.tds));
+      if (bal <= 0.005) continue;
+      const late = Math.floor((today - i.dueDate.getTime()) / DAY);
+      const col = late <= 0 ? 'Not Due' : late <= 30 ? '1-30 Days' : late <= 60 ? '31-60 Days' : late <= 90 ? '61-90 Days' : 'Over 90 Days';
+      const r = by.get(i.clientId) ?? { Client: i.client?.name ?? '', Invoices: 0, 'Not Due': 0, '1-30 Days': 0, '31-60 Days': 0, '61-90 Days': 0, 'Over 90 Days': 0, Outstanding: 0 };
+      r.Invoices += 1; r[col] = r2(r[col] + bal); r.Outstanding = r2(r.Outstanding + bal);
+      by.set(i.clientId, r);
+    }
+    const rows = [...by.values()].sort((a, b) => b.Outstanding - a.Outstanding);
+    const sum = (k: keyof Row) => r2(rows.reduce((a, r) => a + (r[k] as number), 0));
+    return {
+      title: 'Receivables Ageing',
+      columns: ['Client', 'Invoices', 'Not Due', '1-30 Days', '31-60 Days', '61-90 Days', 'Over 90 Days', 'Outstanding'],
+      rows,
+      totals: { Invoices: sum('Invoices'), 'Not Due': sum('Not Due'), '1-30 Days': sum('1-30 Days'), '31-60 Days': sum('31-60 Days'), '61-90 Days': sum('61-90 Days'), 'Over 90 Days': sum('Over 90 Days'), Outstanding: sum('Outstanding') },
+      note: 'Counted from the due date, as of today. The tax a client deducts (TDS) counts as received.',
+    };
+  }
+
+  // Every invoice issued in the period, with the tax split, for the GST return
+  async salesRegister(dateFrom?: Date, dateTo?: Date) {
+    const invoices = await this.prisma.invoice.findMany({
+      where: { status: { in: [...ISSUED, 'CANCELLED'] }, number: { not: null }, ...(dateFrom || dateTo ? { invoiceDate: { ...(dateFrom ? { gte: dateFrom } : {}), ...(dateTo ? { lte: dateTo } : {}) } } : {}) },
+      orderBy: [{ invoiceDate: 'asc' }, { number: 'asc' }], include: { client: { select: { name: true } } },
+    });
+    const live = invoices.filter((i) => i.status !== 'CANCELLED');
+    const rows = invoices.map((i) => {
+      const gone = i.status === 'CANCELLED';
+      const buyer = (i.buyer ?? {}) as { gstin?: string | null };
+      const z = (v: unknown) => (gone ? 0 : n(v));
+      return {
+        'Invoice No': i.number, Date: iso(i.invoiceDate), Client: i.client?.name ?? '', GSTIN: buyer.gstin || 'Unregistered', 'Place Of Supply': i.placeOfSupply ?? '',
+        Taxable: z(i.taxable), CGST: z(i.cgst), SGST: z(i.sgst), IGST: z(i.igst), 'Round Off': z(i.roundOff), 'Invoice Value': z(i.total), Status: gone ? 'Cancelled' : 'Issued',
+      };
+    });
+    const sum = (k: 'taxable' | 'cgst' | 'sgst' | 'igst' | 'roundOff' | 'total') => r2(live.reduce((a, i) => a + n(i[k]), 0));
+    return {
+      title: 'GST Sales Register',
+      columns: ['Invoice No', 'Date', 'Client', 'GSTIN', 'Place Of Supply', 'Taxable', 'CGST', 'SGST', 'IGST', 'Round Off', 'Invoice Value', 'Status'],
+      rows,
+      totals: { Taxable: sum('taxable'), CGST: sum('cgst'), SGST: sum('sgst'), IGST: sum('igst'), 'Round Off': sum('roundOff'), 'Invoice Value': sum('total') },
+      note: 'By invoice date. Cancelled invoices stay listed with no value so the number series has no gaps.',
+    };
+  }
 }
