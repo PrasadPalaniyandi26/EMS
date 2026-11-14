@@ -17,7 +17,7 @@ import {
 import {
   Home, ClipboardCheck, TrendingDown, TrendingUp,
   Users, Briefcase, Package, Building2, Target, RotateCcw,
-  BarChart2, Settings, Shield, FileBarChart, Gauge, SlidersHorizontal, FolderKanban, Boxes, Layers, Percent, PackageCheck, ClipboardList,
+  BarChart2, Settings, Shield, FileBarChart, Gauge, SlidersHorizontal, Layers, Percent, ClipboardList,
   ChevronDown, PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react';
 
@@ -41,18 +41,12 @@ const NAV_GROUPS = [
     ],
   },
   {
-    label: 'Budget', iconColor: 'text-nav-cyan',
+    label: 'Business', iconColor: 'text-nav-rose',
     items: [
-      { name: 'Planner', href: '/budget/planner', icon: Target },
-      { name: 'Monitor', href: '/budget/monitor', icon: Gauge },
-    ],
-  },
-  {
-    label: 'Costing', iconColor: 'text-nav-orange',
-    items: [
-      { name: 'Project costing', href: '/budget/projects', icon: FolderKanban },
-      { name: 'Product costing', href: '/budget/products', icon: Boxes },
-      { name: 'Order costing', href: '/budget/order-costing', icon: PackageCheck },
+      { name: 'Clients', href: '/manage/clients', icon: Users },
+      { name: 'Projects', href: '/business/projects', icon: Briefcase },
+      { name: 'Products', href: '/business/products', icon: Package },
+      { name: 'Orders', href: '/business/orders', icon: ClipboardList },
     ],
   },
   {
@@ -63,25 +57,23 @@ const NAV_GROUPS = [
     ],
   },
   {
-    label: 'Analytics', iconColor: 'text-nav-purple',
+    label: 'Budget', iconColor: 'text-nav-cyan',
     items: [
-      { name: 'Spend Analytics', href: '/analytics/resource-utilization', icon: BarChart2 },
-      { name: 'Transaction Reports', href: '/reporting', icon: FileBarChart },
+      { name: 'Planner', href: '/budget/planner', icon: Target },
+      { name: 'Monitor', href: '/budget/monitor', icon: Gauge },
     ],
   },
   {
-    label: 'Manage', iconColor: 'text-nav-indigo',
+    label: 'Analytics', iconColor: 'text-nav-purple',
     items: [
-      { name: 'Clients', href: '/manage/clients', icon: Users },
-      { name: 'Projects', href: '/manage/projects', icon: Briefcase },
-      { name: 'Products', href: '/manage/products', icon: Package },
-      { name: 'Orders', href: '/manage/orders', icon: ClipboardList },
-      { name: 'Organization', href: '/manage/organization', icon: Building2 },
+      { name: 'Spend Analytics', href: '/analytics/resource-utilization', icon: BarChart2 },
+      { name: 'Reports', href: '/reporting', icon: FileBarChart },
     ],
   },
   {
     label: 'System', iconColor: 'text-nav-slate',
     items: [
+      { name: 'Organization', href: '/manage/organization', icon: Building2 },
       { name: 'Budget settings', href: '/budget/settings', icon: SlidersHorizontal },
       { name: 'Audit Log', href: '/system/audit-log', icon: Shield },
       { name: 'Settings', href: '/settings', icon: Settings },

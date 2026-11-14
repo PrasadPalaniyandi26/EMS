@@ -109,9 +109,10 @@ export function ModuleShell({
               /* Mobile — bottom sheet */
               "fixed inset-x-0 bottom-[var(--bottom-nav-h)] z-40 lg:static lg:inset-auto lg:z-auto",
               "rounded-t-2xl lg:rounded-none",
+              /* The height cap is for the phone sheet only; on desktop the panel runs the full height of the page */
               panelVisible
-                ? "translate-y-0 max-h-[calc(80dvh-var(--bottom-nav-h))]"
-                : "translate-y-full max-h-[calc(80dvh-var(--bottom-nav-h))]",
+                ? "translate-y-0 max-h-[calc(80dvh-var(--bottom-nav-h))] lg:max-h-none"
+                : "translate-y-full max-h-[calc(80dvh-var(--bottom-nav-h))] lg:max-h-none",
               "flex flex-col overflow-hidden shadow-2xl lg:shadow-none",
               /* Below 1280px the empty "nothing selected" panel only wastes space (it covers the page on
                  phones and squeezes tables on laptops), so show it once a row is selected */

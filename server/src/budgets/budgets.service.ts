@@ -93,17 +93,28 @@ export class BudgetsService {
       if (isNaN(v) || v < 0 || v > 100) throw new HttpException('Contingency must be between 0 and 100.', HttpStatus.BAD_REQUEST);
       data.contingencyPct = v;
     }
-    await this.prisma.budgetSetting.upsert({ where: { id: 1 }, update: data, create: { id: 1, ...data } });
-    if (Array.isArray(body.rules)) {
+    // Check every alert rule before anything is written, so a bad one saves nothing
+    const rules: { code: string; enabled: boolean; threshold: number | null }[] = [];
+    if (body.rules !== undefined) {
+      if (!Array.isArray(body.rules)) throw new HttpException('Alert rules must be a list.', HttpStatus.BAD_REQUEST);
+      const known = new Set((await this.prisma.budgetAlertRule.findMany({ select: { code: true } })).map((r) => r.code));
       for (const r of body.rules) {
-        await this.prisma.budgetAlertRule.update({
-          where: { code: String(r.code) },
-          data: { enabled: !!r.enabled, threshold: r.threshold == null || r.threshold === '' ? null : Number(r.threshold) },
-        });
+        const code = String(r?.code ?? '');
+        if (!known.has(code)) throw new HttpException(`Unknown alert rule ${code || '(none)'}.`, HttpStatus.BAD_REQUEST);
+        const blank = r.threshold == null || r.threshold === '';
+        const t = blank ? null : Number(r.threshold);
+        if (t !== null && (!Number.isFinite(t) || t <= 0)) throw new HttpException('An alert threshold must be more than zero.', HttpStatus.BAD_REQUEST);
+        rules.push({ code, enabled: !!r.enabled, threshold: t });
       }
     }
-    this.audit.log({ tableName: 'budget_settings', recordId: 1, action: 'UPDATE', changedBy: userId, newValues: body }).catch(() => undefined);
-    return this.readSettings();
+    const before = await this.readSettings();
+    await this.prisma.$transaction(async (tx) => {
+      await tx.budgetSetting.upsert({ where: { id: 1 }, update: data, create: { id: 1, ...data } });
+      for (const r of rules) await tx.budgetAlertRule.update({ where: { code: r.code }, data: { enabled: r.enabled, threshold: r.threshold } });
+    });
+    const after = await this.readSettings();
+    this.audit.log({ tableName: 'budget_settings', recordId: 1, action: 'UPDATE', changedBy: userId, oldValues: before, newValues: after }).catch(() => undefined);
+    return after;
   }
 
   // ── Financial-year helpers ───────────────────────────────────────────────
@@ -444,7 +455,7 @@ export class BudgetsService {
     if (costObject === 'ORDER') data.buildOrderId = Number(body.build_order_id) || null;
     if (costObject === 'DEPARTMENT') data.departmentId = Number(body.department_id) || null;
     if (costObject !== 'RESERVE' && !this.objectIdOf(data)) throw new HttpException('Choose the project, product, order or department.', HttpStatus.BAD_REQUEST);
-    if (costObject === 'ORDER' && !(await this.prisma.buildOrder.findUnique({ where: { id: data.buildOrderId }, select: { id: true } }))) throw new HttpException('Build order not found.', HttpStatus.NOT_FOUND);
+    if (costObject === 'ORDER' && !(await this.prisma.buildOrder.findUnique({ where: { id: data.buildOrderId }, select: { id: true } }))) throw new HttpException('Order not found.', HttpStatus.NOT_FOUND);
     if (costObject === 'RESERVE') { data.isContingency = false; data.strict = false; }
     const needsType = costObject !== 'RESERVE' && !data.isContingency;
     if (needsType) {
@@ -966,8 +977,65 @@ export class BudgetsService {
 
   // ── Reports ──────────────────────────────────────────────────────────────
 
-  async budgetVsActual(fy?: number) {
-    const m = await this.monitor(fy);
+  // Budget, actual and committed money month by month, with the running totals, for lines the caller may see
+  async budgetByMonth(fy: number | undefined, scope: { ownerId?: number } = {}) {
+    const s = await this.getSettings();
+    const useFy = fy ?? this.fyOf(new Date(), s.fyStartMonth);
+    const title = `Budget by Month ${this.fyLabel(useFy, s.fyStartMonth)}`;
+    const columns = ['Month', 'Budget', 'Actual', 'Committed', 'Remaining', 'Cumulative Budget', 'Cumulative Used'];
+    const plan = await this.prisma.budgetPlan.findUnique({ where: { fy: useFy } });
+    if (!plan) return { title, columns, rows: [], totals: {} };
+    const [lines, parts] = await Promise.all([
+      this.prisma.budgetLine.findMany({ where: { planId: plan.id, isActive: true }, include: { periods: true } }),
+      this.loadParts(useFy, s),
+    ]);
+    const { usage } = this.computeUsage(lines, parts);
+    const counted = lines.filter((l) => !l.isContingency && l.costObject !== 'RESERVE' && (scope.ownerId == null || l.ownerId === scope.ownerId));
+    let cumBudget = 0; let cumUsed = 0;
+    const rows = this.fyMonths(useFy, s.fyStartMonth).map((m) => {
+      let budget = 0; let actual = 0; let committed = 0;
+      for (const l of counted) {
+        const c = usage.get(l.id)?.get(`${m.year}-${m.month}`);
+        if (c) { budget += c.budget; actual += c.actual; committed += c.committed; }
+      }
+      cumBudget += budget; cumUsed += actual + committed;
+      return { Month: `${MON[m.month - 1]} ${m.year}`, Budget: r2(budget), Actual: r2(actual), Committed: r2(committed), Remaining: r2(budget - actual - committed), 'Cumulative Budget': r2(cumBudget), 'Cumulative Used': r2(cumUsed) };
+    });
+    const sum = (k: 'Budget' | 'Actual' | 'Committed' | 'Remaining') => r2(rows.reduce((a, r) => a + r[k], 0));
+    return { title, columns, rows, totals: { Budget: sum('Budget'), Actual: sum('Actual'), Committed: sum('Committed'), Remaining: sum('Remaining') } };
+  }
+
+  // Expenses that no budget line covers: nothing was planned for them, so they count against no budget
+  async unbudgetedSpend(fy?: number) {
+    const s = await this.getSettings();
+    const useFy = fy ?? this.fyOf(new Date(), s.fyStartMonth);
+    const plan = await this.prisma.budgetPlan.findUnique({ where: { fy: useFy } });
+    const [lines, parts, lk] = await Promise.all([
+      plan ? this.prisma.budgetLine.findMany({ where: { planId: plan.id, isActive: true }, include: { periods: true } }) : Promise.resolve([] as any[]),
+      this.loadParts(useFy, s),
+      this.lookups(),
+    ]);
+    const { unmatched } = this.computeUsage(lines, parts);
+    const kindName: Record<string, string> = { PROJECT: 'Project', PRODUCT: 'Product', DEPARTMENT: 'Overhead' };
+    const words = (x: string) => x.toLowerCase().replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+    const rows = unmatched.map((p) => {
+      const obj = p.costObject === 'PROJECT' ? lk.projects.get(p.projectId as number)?.name : p.costObject === 'PRODUCT' ? lk.products.get(p.productId as number)?.name : lk.departments.get(p.departmentId as number)?.name;
+      const t = p.typeId != null ? lk.types.get(p.typeId) : null;
+      const c = p.categoryId != null ? lk.categories.get(p.categoryId) : null;
+      return {
+        Reference: p.ref || `#${p.txnId}`, Month: `${MON[p.month - 1]} ${p.year}`, 'Charged To': kindName[p.costObject] ?? p.costObject, 'Cost Object': obj ?? '',
+        Type: t ? [t.code, t.name].filter(Boolean).join(' ') : '', Category: c?.name ?? '', Status: words(p.status ?? ''), 'Submitted By': p.submitterName ?? '', Amount: r2(p.amount),
+      };
+    }).sort((a, b) => b.Amount - a.Amount);
+    return {
+      title: `Unbudgeted Spend ${this.fyLabel(useFy, s.fyStartMonth)}`,
+      columns: ['Reference', 'Month', 'Charged To', 'Cost Object', 'Type', 'Category', 'Status', 'Submitted By', 'Amount'],
+      rows, totals: { Amount: r2(rows.reduce((a, r) => a + r.Amount, 0)) },
+    };
+  }
+
+  async budgetVsActual(fy?: number, scope: { ownerId?: number } = {}) {
+    const m = await this.monitor(fy, scope);
     const rows = (m.lines as any[]).filter((l) => !l.is_contingency && l.cost_object !== 'RESERVE').map((l) => ({
       'Cost object': l.object_name, Type: l.category_label ? `${l.type_label} / ${l.category_label}` : l.type_label,
       Budget: l.total, Actual: l.actual, Committed: l.committed, Remaining: l.available, '% Used': l.pct,
@@ -976,8 +1044,8 @@ export class BudgetsService {
   }
 
   // Top lines by utilisation for the dashboard card
-  async dashboardLines(limit = 6) {
-    const m = await this.monitor(undefined);
+  async dashboardLines(limit = 6, scope: { ownerId?: number } = {}) {
+    const m = await this.monitor(undefined, scope);
     return (m.lines as any[])
       .filter((l) => !l.is_contingency && l.cost_object !== 'RESERVE' && l.total > 0)
       .sort((a, b) => b.pct - a.pct)

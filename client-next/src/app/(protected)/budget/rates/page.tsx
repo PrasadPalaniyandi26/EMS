@@ -14,7 +14,7 @@ import { useDataTable } from '@/hooks/use-data-table';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
 import { type FilterDef } from '@/components/data-table/filters';
-import { DateCell, TextCell, headerRight } from '@/components/data-table/cells';
+import { DateCell, TextCell, headerRight, NumCell } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { ConfirmDialog } from '@/components/shared/modal-primitives';
@@ -30,9 +30,6 @@ type Tab = 'cards' | 'overheads';
 const TABS: { value: Tab; label: string }[] = [{ value: 'cards', label: 'Rate card' }, { value: 'overheads', label: 'Overhead pools' }];
 const TAB_VALUES = TABS.map((t) => t.value);
 
-const Num = ({ children, strong }: { children: React.ReactNode; strong?: boolean }) => (
-  <div className={cn('text-right text-[13px] tabular-nums text-[var(--shell-text)]', strong && 'font-medium')}>{children}</div>
-);
 
 export default function RatesPage() {
   const setHeader = useHeaderStore((s) => s.setHeader);
@@ -60,8 +57,8 @@ export default function RatesPage() {
   const rows = useMemo<any[]>(() => (tab === 'cards' ? data?.cards ?? [] : pools), [data, tab, pools]);
   const columns = useMemo<ColumnDef<any, any>[]>(() => tab === 'cards' ? [
     { accessorKey: 'role', header: 'Role', cell: ({ row }) => <TextCell value={row.original.role} strong /> },
-    { accessorKey: 'rate_per_hour', header: headerRight('Cost per hour'), cell: ({ row }) => <Num strong>{money(row.original.rate_per_hour, currency)}</Num>, size: 150 },
-    { accessorKey: 'used_in', header: headerRight('Operations using it'), cell: ({ row }) => <Num>{row.original.used_in}</Num>, size: 150 },
+    { accessorKey: 'rate_per_hour', header: headerRight('Cost per hour'), cell: ({ row }) => <NumCell strong>{money(row.original.rate_per_hour, currency)}</NumCell>, size: 150 },
+    { accessorKey: 'used_in', header: headerRight('Operations using it'), cell: ({ row }) => <NumCell>{row.original.used_in}</NumCell>, size: 150 },
     { accessorKey: 'effective_from', header: 'Effective from', cell: ({ row }) => <DateCell value={row.original.effective_from} />, size: 140 },
     {
       id: 'next', header: 'Next rate', size: 200, sortUndefined: 'last', accessorFn: (r) => r.next_from ?? undefined,
@@ -71,9 +68,9 @@ export default function RatesPage() {
     },
   ] : [
     { accessorKey: 'name', header: 'Pool', cell: ({ row }) => <TextCell value={row.original.name} strong /> },
-    { accessorKey: 'pool_amount', header: headerRight('Annual cost'), cell: ({ row }) => <Num>{money(row.original.pool_amount, currency)}</Num>, size: 170 },
-    { accessorKey: 'rate_per_hour', header: headerRight('Rate per hour'), cell: ({ row }) => <Num strong>{money(row.original.rate_per_hour, currency)}</Num>, size: 130 },
-    { id: 'share', header: headerRight('Share of total'), cell: ({ row }) => <Num>{poolShare(row.original.pool_amount)}</Num>, size: 130 },
+    { accessorKey: 'pool_amount', header: headerRight('Annual cost'), cell: ({ row }) => <NumCell>{money(row.original.pool_amount, currency)}</NumCell>, size: 170 },
+    { accessorKey: 'rate_per_hour', header: headerRight('Rate per hour'), cell: ({ row }) => <NumCell strong>{money(row.original.rate_per_hour, currency)}</NumCell>, size: 130 },
+    { id: 'share', header: headerRight('Share of total'), cell: ({ row }) => <NumCell>{poolShare(row.original.pool_amount)}</NumCell>, size: 130 },
   ], [tab, currency, poolTotal]);
 
   const table = useDataTable({

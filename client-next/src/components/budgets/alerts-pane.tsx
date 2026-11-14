@@ -129,8 +129,8 @@ export function AlertsPane() {
           <Kpi label="Caution" value={count('CAUTION')} />
           <Kpi label="Info" value={count('INFO')} />
         </KpiStrip>
-        <div className="min-h-0 flex-1">
-          <DataTable isLoading={isLoading} columns={columns} data={rows} tableInstance={table} emptyMessage={status === 'OPEN' ? 'No open alerts. Spending is within its budgets.' : 'Nothing to show.'} />
+        <div className="flex min-h-0 flex-1 flex-col">
+          <DataTable isLoading={isLoading} columns={columns} data={rows} tableInstance={table} fullHeight emptyMessage={status === 'OPEN' ? 'No open alerts. Spending is within its budgets.' : 'Nothing to show.'} />
         </div>
       </div>
     </ModuleShell>

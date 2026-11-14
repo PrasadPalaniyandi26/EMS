@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ColumnDef, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, getSortedRowModel, SortingState } from '@tanstack/react-table';
 import { useHeaderStore } from '@/stores/header-store';
@@ -10,7 +11,7 @@ import { useDataTable } from '@/hooks/use-data-table';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
 import { type FilterDef } from '@/components/data-table/filters';
-import { IdCell, TextCell, headerRight } from '@/components/data-table/cells';
+import { IdCell, TextCell, headerRight, WholeCell } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 
@@ -18,6 +19,8 @@ import { DetailSummary, DetailSection, DetailGrid, DetailField } from '@/compone
 import { Kpi, KpiStrip, LevelText, LineStatusText, STATUS_TEXT, TabBar, UtilBar, fyOptions, money, plain, useTabParam } from '@/components/budgets/budget-ui';
 import { AlertsPane } from '@/components/budgets/alerts-pane';
 import { MonthClosePane } from '@/components/budgets/month-close-pane';
+import { ObjectChanges } from '@/components/budgets/object-changes';
+import { useBudgetChanges } from '@/hooks/use-planning-queries';
 import { detailHref, kindOfLine, objectIdOf } from '@/components/budgets/planner-objects';
 import { formatDate } from '@/lib/currency';
 import { DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
@@ -25,27 +28,28 @@ import { FolderOpen } from 'lucide-react';
 import { StatusText } from '@/components/data-table/cells';
 
 // Whole-rupee amount, right-aligned like MoneyCell
-const Whole = ({ value, currency }: { value: number; currency: string }) => <div className="text-right text-[13px] font-medium tabular-nums text-[var(--shell-text)]">{plain(value, currency)}</div>;
 
 const STATUS_FILTERS = ['All', 'Needs attention', 'On track'] as const;
 
-type Tab = 'lines' | 'alerts' | 'close';
+type Tab = 'lines' | 'alerts' | 'changes' | 'close';
 
 export default function BudgetMonitorPage() {
   const setHeader = useHeaderStore((s) => s.setHeader);
-  const [tab, setTab] = useTabParam<Tab>(['lines', 'alerts', 'close'], 'lines');
+  const [tab, setTab] = useTabParam<Tab>(['lines', 'alerts', 'changes', 'close'], 'lines');
   const { data: count } = useBudgetAlertCount(true);
-  useEffect(() => { setHeader('Budget monitor', 'What has been spent, what is committed, where it needs attention and the month close'); }, [setHeader]);
+  const { data: waiting } = useBudgetChanges('PENDING');
+  useEffect(() => { setHeader('Budget monitor', 'What has been spent, what is committed, where it needs attention, budget changes and the month close'); }, [setHeader]);
   const tabs: { value: Tab; label: string }[] = [
     { value: 'lines', label: 'Lines' },
     { value: 'alerts', label: count?.open ? `Alerts (${count.open})` : 'Alerts' },
+    { value: 'changes', label: waiting?.rows.length ? `Changes (${waiting.rows.length})` : 'Changes' },
     { value: 'close', label: 'Month close' },
   ];
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--shell-surface)]">
       <TabBar<Tab> value={tab} onChange={setTab} tabs={tabs} />
       <div role="tabpanel" id="tabpanel" aria-labelledby={`tab-${tab}`} className="min-h-0 flex-1">
-        {tab === 'alerts' ? <AlertsPane /> : tab === 'close' ? <MonthClosePane /> : <MonitorLines onOpenAlerts={() => setTab('alerts')} />}
+        {tab === 'alerts' ? <AlertsPane /> : tab === 'changes' ? <ObjectChanges /> : tab === 'close' ? <MonthClosePane /> : <MonitorLines onOpenAlerts={() => setTab('alerts')} />}
       </div>
     </div>
   );
@@ -88,8 +92,8 @@ function MonitorLines({ onOpenAlerts }: { onOpenAlerts: () => void }) {
       size: 210,
     },
     { accessorKey: 'owner_name', header: 'Owner', cell: ({ row }) => <TextCell value={row.original.owner_name} muted />, size: 80 },
-    { accessorKey: 'total', header: headerRight('Budget'), cell: ({ row }) => <Whole value={row.original.total} currency={currency} />, size: 100 },
-    { accessorKey: 'used', header: headerRight('Used'), cell: ({ row }) => <Whole value={row.original.used} currency={currency} />, size: 100 },
+    { accessorKey: 'total', header: headerRight('Budget'), cell: ({ row }) => <WholeCell value={row.original.total} currency={currency} />, size: 100 },
+    { accessorKey: 'used', header: headerRight('Used'), cell: ({ row }) => <WholeCell value={row.original.used} currency={currency} />, size: 100 },
     {
       accessorKey: 'pct', header: 'Used %', size: 120,
       cell: ({ row }) => (
@@ -99,7 +103,7 @@ function MonitorLines({ onOpenAlerts }: { onOpenAlerts: () => void }) {
         </div>
       ),
     },
-    { accessorKey: 'forecast', header: headerRight('Forecast'), cell: ({ row }) => (row.original.forecast != null ? <Whole value={row.original.forecast} currency={currency} /> : <div className="text-right"><TextCell value="" /></div>), size: 100 },
+    { accessorKey: 'forecast', header: headerRight('Forecast'), cell: ({ row }) => (row.original.forecast != null ? <WholeCell value={row.original.forecast} currency={currency} /> : <div className="text-right"><TextCell value="" /></div>), size: 100 },
     // One word here; whether the forecast runs over, and when the line runs out, are in the panel
     { accessorKey: 'status', header: 'Status', size: 90, cell: ({ row }) => <LineStatusText status={row.original.status} /> },
   ], [currency]);
@@ -213,10 +217,11 @@ function MonitorLines({ onOpenAlerts }: { onOpenAlerts: () => void }) {
         {k && k.unbudgeted_count > 0 && (
           <p className="shrink-0 border-b border-[var(--shell-border)] px-4 py-2 text-[13px] text-[var(--warning)]">
             {k.unbudgeted_count} expense{k.unbudgeted_count === 1 ? '' : 's'} totalling {money(k.unbudgeted, currency)} match no budget line.
+            {['ADMIN', 'FINANCE'].includes((user?.role_name || '').toUpperCase()) && <> <Link href={`/reporting?report=unbudgeted-spend${fy != null ? `&year=${fy}` : ''}`} className="font-medium underline">See them in Reports</Link></>}
           </p>
         )}
-        <div className="min-h-0 flex-1">
-          <DataTable
+        <div className="flex min-h-0 flex-1 flex-col">
+          <DataTable fullHeight
             isLoading={isLoading} columns={columns} data={rows} tableInstance={table}
             emptyMessage={data && !data.plan ? `There is no budget plan for ${data.label}. Create one in the budget planner.` : 'No lines match these filters.'}
           />

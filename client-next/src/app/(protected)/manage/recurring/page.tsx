@@ -47,6 +47,7 @@ import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAttachment, DetailTimeline, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import { getStatusConfig } from '@/lib/status';
+import { PageFrame } from '@/components/shared/module/page-frame';
 
 export default function RecurringPage() {
   const setHeader = useHeaderStore((s) => s.setHeader);
@@ -479,6 +480,7 @@ export default function RecurringPage() {
   })();
 
   return (
+    <PageFrame label="Recurring">
     <ModuleShell
       showPanel={!!activeRow}
       searchRow={
@@ -619,5 +621,6 @@ export default function RecurringPage() {
       />
       <ManageCategoriesDialog isOpen={categoriesOpen} onClose={() => setCategoriesOpen(false)} kinds={['expense', 'income']} />
     </ModuleShell>
+    </PageFrame>
   );
 }

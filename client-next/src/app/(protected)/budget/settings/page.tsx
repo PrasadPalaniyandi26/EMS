@@ -12,6 +12,9 @@ import { useBudgetSettings, MONTH_NAMES, type BudgetSettings } from '@/hooks/use
 import { Field, NativeSelect, CurrencyInput, SegmentedControl, inp } from '@/components/shared/modal-primitives';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import type { ColumnDef } from '@tanstack/react-table';
+import { DataTable } from '@/components/data-table/data-table';
+import { PageFrame } from '@/components/shared/module/page-frame';
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
@@ -46,7 +49,8 @@ export default function BudgetSettingsPage() {
 
   const set = <K extends keyof BudgetSettings>(k: K, v: BudgetSettings[K]) => setForm((f) => (f ? { ...f, [k]: v } : f));
   const dirty = !!form && !!data && JSON.stringify(form) !== JSON.stringify(data);
-  const valid = !!form && Number(form.approval_threshold) >= 0 && Number(form.contingency_pct) >= 0 && Number(form.contingency_pct) <= 100;
+  const valid = !!form && Number(form.approval_threshold) >= 0 && Number(form.contingency_pct) >= 0 && Number(form.contingency_pct) <= 100
+    && form.rules.every((r) => r.threshold == null || Number(r.threshold) > 0);
 
   const save = async () => {
     if (!form || saving) return;
@@ -81,6 +85,7 @@ export default function BudgetSettingsPage() {
   if (!form) return <div className="p-6 text-[13px] text-[var(--shell-text-muted)]">Loading…</div>;
 
   return (
+    <PageFrame label="Budget settings">
     <div className="flex h-full flex-col overflow-hidden bg-[var(--shell-surface)]">
       <div className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--shell-border)] px-6">
         <p className="text-[13px] text-[var(--shell-text-muted)]">{dirty ? 'You have unsaved changes.' : 'Changes apply to new expenses straight away.'}</p>
@@ -151,34 +156,29 @@ export default function BudgetSettingsPage() {
         </Section>
 
         <Section title="Where each expense type may be used" hint="Enforced when an expense is entered and when a budget line is added. Only an admin changes it.">
-          <div className="overflow-hidden rounded-lg border border-[var(--shell-border)]">
-            <table className="w-full text-[13px]">
-              <thead>
-                <tr className="bg-[var(--table-header)] text-left text-[12px] font-semibold text-[var(--shell-text-muted)]">
-                  <th className="px-4 py-2">Expense type</th>
-                  {KINDS.map((k) => <th key={k.key} className="w-24 px-2 py-2 text-center">{k.label}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {sortByCode(types ?? []).filter((t) => t.code).map((t) => (
-                  <tr key={t.id} className="border-t border-[var(--shell-border)]">
-                    <td className="px-4 py-2 text-[var(--shell-text)]">{t.code} {t.name}</td>
-                    {KINDS.map((k) => {
-                      const on = !t.applies_to?.length || t.applies_to.includes(k.key);
-                      return (
-                        <td key={k.key} className="px-2 py-2 text-center">
-                          <Switch checked={on} disabled={!isAdmin} onCheckedChange={() => toggleKind(t.id, t.name, t.code, t.applies_to, k.key)} aria-label={`${t.name} allowed for ${k.label}`} />
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-                {!(types ?? []).some((t) => t.code) && <tr><td colSpan={4} className="px-4 py-4 text-[var(--shell-text-muted)]">No coded expense types yet. Load them with the code list or add codes in the Category dialog.</td></tr>}
-              </tbody>
-            </table>
-          </div>
+          {(() => {
+            const typeRows = sortByCode(types ?? []).filter((t) => t.code);
+            const columns = [
+              { id: 'type', header: 'Expense type', cell: ({ row }: any) => <span className="text-[var(--shell-text)]">{row.original.code} {row.original.name}</span> },
+              ...KINDS.map((k) => ({
+                id: k.key, size: 100,
+                header: () => <div className="text-center">{k.label}</div>,
+                cell: ({ row }: any) => {
+                  const t = row.original;
+                  const on = !t.applies_to?.length || t.applies_to.includes(k.key);
+                  return <div className="flex justify-center"><Switch checked={on} disabled={!isAdmin} onCheckedChange={() => toggleKind(t.id, t.name, t.code, t.applies_to, k.key)} aria-label={`${t.name} allowed for ${k.label}`} /></div>;
+                },
+              })),
+            ] as ColumnDef<any, any>[];
+            return (
+              <div className="flex flex-col overflow-hidden rounded-lg border border-[var(--shell-border)]" style={{ height: `min(60vh, ${(typeRows.length + 2) * 41 + 8}px)`, minHeight: 170 }}>
+                <DataTable<any, any> columns={columns} data={typeRows} fullHeight emptyMessage="No coded expense types yet. Load them with the code list or add codes in the Category dialog." />
+              </div>
+            );
+          })()}
         </Section>
       </div>
     </div>
+    </PageFrame>
   );
 }

@@ -3,13 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
-import { useAuditLogs } from '@/hooks/use-queries';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { User, Lock, SlidersHorizontal, ClipboardList } from 'lucide-react';
+import { User, Lock, SlidersHorizontal } from 'lucide-react';
 import api from '@/lib/api-client';
 import { toast } from 'sonner';
 
@@ -43,12 +41,6 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordSaving, setPasswordSaving] = useState(false);
 
-  const [auditPage, setAuditPage] = useState(0);
-  const AUDIT_PAGE_SIZE = 50;
-  const { data: auditLogsData, isLoading: auditLoading } = useAuditLogs({ page: String(auditPage + 1), limit: String(AUDIT_PAGE_SIZE) });
-  const auditLogs = auditLogsData?.rows ?? [];
-  const auditTotal = auditLogsData?.total ?? 0;
-
   const validateEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
   const validatePhone = (v: string) => !v || /^\+?[0-9\s\-().]{7,20}$/.test(v);
 
@@ -60,6 +52,12 @@ export default function SettingsPage() {
 
     setProfileSaving(true);
     try {
+      // The email goes first: if it is already taken, nothing else is saved
+      if (email !== user?.email) {
+        const eRes = await api.put(`/users/${user!.id}/email`, { email });
+        updateUser({ email: (eRes as any).data?.email ?? email });
+      }
+
       // Update name, phone and login_name via self-profile endpoint
       const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
       const profilePayload: any = { contact_no: phone || null };
@@ -72,12 +70,6 @@ export default function SettingsPage() {
         login_name: updated?.login_name ?? (loginName || null),
         username: updated?.username ?? user?.username,
       } as any);
-
-      // Update email separately if changed
-      if (email !== user?.email) {
-        const eRes = await api.put(`/users/${user!.id}/email`, { email });
-        updateUser({ email: (eRes as any).data?.email ?? email });
-      }
 
       toast.success('Profile updated.');
     } catch (err: any) {
@@ -107,26 +99,26 @@ export default function SettingsPage() {
     }
   };
 
-  const isAdmin = user?.roles?.some((r) => r.role_name === 'ADMIN');
-
+  // The audit log has its own page under System, so it is not repeated here
   const TABS = [
     { id: 'profile',     label: 'Profile',      icon: User },
     { id: 'security',    label: 'Security',     icon: Lock },
     { id: 'preferences', label: 'Preferences',  icon: SlidersHorizontal },
-    ...(isAdmin ? [{ id: 'audit', label: 'Audit Log', icon: ClipboardList }] : []),
   ];
 
   return (
     <div className="flex h-[calc(100vh-4rem)] w-full overflow-hidden flex-col" style={{ background: 'var(--shell-surface)' }}>
 
       {/* ── Tab bar ── */}
-      <div className="px-4 flex items-end gap-0 shrink-0" style={{ borderBottom: '1px solid var(--shell-border)' }}>
+      <div role="tablist" aria-label="Settings" className="px-4 flex items-end gap-0 shrink-0" style={{ borderBottom: '1px solid var(--shell-border)' }}>
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const active = activeTab === tab.id;
           return (
             <button
               key={tab.id}
+              role="tab"
+              aria-selected={active}
               onClick={() => setActiveTab(tab.id)}
               className={`relative flex items-center gap-2 px-4 py-2.5 text-[12px] font-semibold transition-all ${
                 active
@@ -249,62 +241,6 @@ export default function SettingsPage() {
                 <Input className={INP} value={user?.currency || 'INR'} disabled />
               </div>
               <p className="text-[12px] text-muted-foreground">Contact your administrator to change preferences.</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Audit Log — Admin only */}
-        {activeTab === 'audit' && isAdmin && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-[14px]">Audit Log</CardTitle>
-              <span className="text-[12px] text-muted-foreground">{auditTotal} entries</span>
-            </CardHeader>
-            <CardContent>
-              {auditLoading ? (
-                <div className="space-y-2">
-                  {[...Array(6)].map((_, i) => (
-                    <div key={i} className="h-9 rounded-md animate-pulse bg-[var(--shell-hover)]" />
-                  ))}
-                </div>
-              ) : (
-                <>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Action</TableHead>
-                        <TableHead>Table</TableHead>
-                        <TableHead>Record ID</TableHead>
-                        <TableHead>Date</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {auditLogs.map((log: any) => (
-                        <TableRow key={log.id}>
-                          <TableCell className="font-medium">{log.action}</TableCell>
-                          <TableCell>{log.table_name}</TableCell>
-                          <TableCell>{log.record_id}</TableCell>
-                          <TableCell>{new Date(log.changed_at).toLocaleString()}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  {auditLogs.length === 0 && (
-                    <p className="py-6 text-center text-muted-foreground">No audit entries yet.</p>
-                  )}
-                  {auditTotal > AUDIT_PAGE_SIZE && (
-                    <div className="flex items-center justify-between pt-3 border-t border-[var(--shell-border)] mt-2">
-                      <span className="text-[12px] text-muted-foreground">
-                        Showing {auditPage * AUDIT_PAGE_SIZE + 1}–{Math.min((auditPage + 1) * AUDIT_PAGE_SIZE, auditTotal)} of {auditTotal}
-                      </span>
-                      <div className="flex gap-1.5">
-                        <Button variant="outline" size="sm" className="h-7 text-[12px]" disabled={auditPage === 0} onClick={() => setAuditPage(p => p - 1)}>Previous</Button>
-                        <Button variant="outline" size="sm" className="h-7 text-[12px]" disabled={(auditPage + 1) * AUDIT_PAGE_SIZE >= auditTotal} onClick={() => setAuditPage(p => p + 1)}>Next</Button>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
             </CardContent>
           </Card>
         )}

@@ -1,18 +1,14 @@
 'use client';
 
 import { useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { NativeSelect } from '@/components/shared/modal-primitives';
+import { RelatedLinks } from '@/components/layout/related-links';
 import type { AlertLevel, BudgetPlanInfo, LineStatus, PlanStatus } from '@/hooks/use-budget-queries';
 
-// Whole-rupee amounts for budget screens; paise never matter at planning level
-const whole = (currency: string, symbol: boolean) => new Intl.NumberFormat(currency === 'INR' ? 'en-IN' : 'en-US', { style: symbol ? 'currency' : 'decimal', currency, maximumFractionDigits: 0, minimumFractionDigits: 0 });
-export const money = (v: number | null | undefined, currency = 'INR') => whole(currency, true).format(Math.round(Number(v || 0)));
-export const plain = (v: number | null | undefined, currency = 'INR') => whole(currency, false).format(Math.round(Number(v || 0)));
-// Unit prices keep their paise (0.35 stays 0.35); totals above stay whole rupees
-const unitFmt = (currency: string, symbol: boolean) => new Intl.NumberFormat(currency === 'INR' ? 'en-IN' : 'en-US', { style: symbol ? 'currency' : 'decimal', currency, maximumFractionDigits: 2, minimumFractionDigits: 0 });
-export const unitPrice = (v: number | null | undefined, currency = 'INR') => unitFmt(currency, true).format(Number(v || 0));
-export const unitPlain = (v: number | null | undefined, currency = 'INR') => unitFmt(currency, false).format(Number(v || 0));
+// The money formats live in lib/money.ts; they are re-exported here because every budget screen imports them from this file
+import { money, plain, unitPrice, unitPlain } from '@/lib/money';
+export { money, plain, unitPrice, unitPlain };
 
 const LEVEL_TEXT: Record<AlertLevel, { label: string; cls: string }> = {
   CRITICAL: { label: 'Critical', cls: 'text-[var(--danger)]' },
@@ -63,19 +59,6 @@ export function UtilBar({ pct, className }: { pct: number; className?: string })
   );
 }
 
-// Financial-year chooser: the plans that exist, plus the current year when it has none yet
-export function FySelect({ plans, value, onChange, currentFy, startMonth = 4 }: {
-  plans: BudgetPlanInfo[]; value: number | null; onChange: (fy: number) => void; currentFy?: number; startMonth?: number;
-}) {
-  const label = (fy: number) => (startMonth === 1 ? `FY ${fy}` : `FY ${fy}-${String(fy + 1).slice(2)}`);
-  const fys = [...new Set([...plans.map((p) => p.fy), ...(currentFy != null ? [currentFy] : [])])].sort((a, b) => b - a);
-  return (
-    <NativeSelect aria-label="Financial year" value={value ?? ''} onChange={(e) => onChange(Number(e.target.value))} className="!h-8 !w-auto min-w-[130px]">
-      {fys.map((fy) => <option key={fy} value={fy}>{label(fy)}</option>)}
-    </NativeSelect>
-  );
-}
-
 // The financial years to choose from, as filter options: the plans that exist, plus the current year when it has none yet
 export function fyOptions(plans: BudgetPlanInfo[], currentFy?: number, startMonth = 4) {
   const label = (fy: number) => (startMonth === 1 ? `FY ${fy}` : `FY ${fy}-${String(fy + 1).slice(2)}`);
@@ -121,7 +104,8 @@ export function TabBar<T extends string>({ tabs, value, onChange, panelId = 'tab
     requestAnimationFrame(() => document.getElementById(`tab-${tabs[next].value}`)?.focus());
   };
   return (
-    <div role="tablist" onKeyDown={onKey} className="flex shrink-0 gap-1 border-b border-[var(--shell-border)] px-4">
+    <div className="flex shrink-0 border-b border-[var(--shell-border)] px-4">
+    <div role="tablist" onKeyDown={onKey} className="flex gap-1">
       {tabs.map((t) => (
         <button
           key={t.value} id={`tab-${t.value}`} type="button" role="tab" aria-selected={value === t.value} aria-controls={panelId} tabIndex={value === t.value ? 0 : -1} onClick={() => onChange(t.value)}
@@ -132,23 +116,15 @@ export function TabBar<T extends string>({ tabs, value, onChange, panelId = 'tab
         </button>
       ))}
     </div>
+    <RelatedLinks />
+    </div>
   );
 }
 
-// Plain table used inside tabs; amounts right-aligned
-export function Grid({ head, children, className }: { head: { label: string; right?: boolean; w?: string }[]; children: ReactNode; className?: string }) {
-  return (
-    <table className={cn('w-full border-separate border-spacing-0 text-[13px]', className)}>
-      <thead>
-        <tr className="text-left text-[12px] font-semibold text-[var(--shell-text-muted)]">
-          {head.map((h, i) => <th key={i} className={cn('sticky top-0 border-b border-[var(--shell-border)] bg-[var(--table-header)] px-4 py-2', h.right && 'text-right', h.w)}>{h.label}</th>)}
-        </tr>
-      </thead>
-      <tbody>{children}</tbody>
-    </table>
-  );
+// A text link to a record on another page
+export function RecordLink({ href, children }: { href: string; children: ReactNode }) {
+  return <Link href={href} className="whitespace-nowrap text-[13px] font-medium text-[var(--shell-accent)] hover:underline focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]">{children}</Link>;
 }
-export const td = 'border-b border-[var(--shell-border)] px-4 py-2 text-[var(--shell-text)]';
 
 // One word for where a project stands, worst first. At risk: the margin is below the minimum (or negative), or the spend
 // is already over the estimate. Below target: the margin is under the target but above the minimum.

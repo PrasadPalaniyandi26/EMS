@@ -14,7 +14,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { useCategoryTypes, useInvalidate } from '@/hooks/use-queries';
 import { useBudgetMonitor } from '@/hooks/use-budget-queries';
 import type { BaselineRow, BudgetChangeRow, CloseLine, EstimateLineRow, Item, JobBom, Milestone, OperationRow, OperationType, BomLineRow, OverheadRate, RateCard, ProductCosting, ProjectBudget } from '@/hooks/use-planning-queries';
-import { Grid, money, plain, td, unitPrice } from '@/components/budgets/budget-ui';
+import { money, plain, unitPrice } from '@/components/budgets/budget-ui';
+import type { ColumnDef } from '@tanstack/react-table';
+import { DataTable } from '@/components/data-table/data-table';
+import { headerRight } from '@/components/data-table/cells';
+
+// A dialog table sized to its rows (header, rows and footer at about 41px each), up to half the screen; the pager appears only when more rows exist
+const tableBox = (rows: number, vh = 50) => ({ height: `min(${vh}vh, ${(rows + 2) * 41 + 8}px)` });
 import { useItemCategories, useEstimatePhases, useItemUsage, usePartHistory, type ItemCategory } from '@/hooks/use-planning-queries';
 import { formatDate } from '@/lib/currency';
 import { ManageList } from '@/components/manage/manage-list';
@@ -47,9 +53,9 @@ export function useSaver(onClose: () => void) {
 interface Base { isOpen: boolean; onClose: () => void }
 
 // One layout for the product and project "Price and costing" dialogs: what it sells for on the left, what it costs on the right
-const pricingGrid = (two: boolean) => cn('grid grid-cols-1 gap-y-5', two && 'md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]');
-const priceColumn = (two: boolean) => cn(two && 'md:pr-6');
-const COST_COLUMN = 'md:border-l md:border-[var(--shell-border)] md:pl-6';
+export const pricingGrid = (two: boolean) => cn('grid grid-cols-1 gap-y-5', two && 'md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]');
+export const priceColumn = (two: boolean) => cn(two && 'md:pr-6');
+export const COST_COLUMN ='md:border-l md:border-[var(--shell-border)] md:pl-6';
 
 // ─── Project settings ────────────────────────────────────────────────────────
 
@@ -541,7 +547,9 @@ export function BomLineModal({ isOpen, onClose, data, job, editing }: Base & { d
   );
 }
 
-export function BuildStepModal({ isOpen, onClose, data: productData, job, editing }: Base & { data?: ProductCosting | undefined; job?: JobBom | undefined; editing: OperationRow | null }) {
+// url: where to save when it is not the product or job BOM, such as a build order's own operations
+type StepChoices = { operation_types: OperationType[]; rate_cards: { id: number; role: string; rate_per_hour: number }[]; product?: { id: number } };
+export function BuildStepModal({ isOpen, onClose, data: productData, job, editing, url }: Base & { data?: StepChoices | undefined; job?: JobBom | undefined; editing: OperationRow | null; url?: string }) {
   const data = job ?? productData;
   const { saving, run } = useSaver(onClose);
   const [typeId, setTypeId] = useState(''); const [hours, setHours] = useState(''); const [card, setCard] = useState(''); const [out, setOut] = useState(''); const [fix, setFix] = useState(''); const [costed, setCosted] = useState<'ALL' | 'LABOUR' | 'OUT' | 'FIXED'>('ALL');
@@ -560,7 +568,7 @@ export function BuildStepModal({ isOpen, onClose, data: productData, job, editin
   const rate = data?.rate_cards.find((c) => String(c.id) === card)?.rate_per_hour ?? 0;
   const seqOk = Number.isInteger(Number(seq)) && Number(seq) >= 1 && Number(seq) <= 99;
   const ready = seqOk && !!type && (isFixed ? Number(fix) > 0 : outsourced ? Number(out) > 0 : !!card && hours !== '' && Number(hours) >= 0);
-  const base = job ? `/budgets/projects/${job.project.id}/job-bom/operations` : `/budgets/products/${productData?.product.id}/operations`;
+  const base = url ?? (job ? `/budgets/projects/${job.project.id}/job-bom/operations` : `/budgets/products/${productData?.product?.id}/operations`);
   const box = 'flex h-9 items-center rounded-md border border-[var(--input)] bg-transparent px-3 text-[13px] tabular-nums text-[var(--shell-text)]';
   return (
     <ModuleModal isOpen={isOpen} onClose={onClose} size="sm" title={editing ? 'Edit build operation' : 'Add build operation'} icon={editing ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
@@ -701,9 +709,16 @@ export function PartUsageModal({ isOpen, onClose, item }: Base & { item: Item | 
     const rank = { PRODUCT: 0, JOB: 1, ORDER: 2 } as const;
     return [...byOwner.values()].sort((a, b) => rank[a.kind] - rank[b.kind] || (a.code ?? a.name).localeCompare(b.code ?? b.name));
   }, [usage.data]);
+  const qty = (v: number) => String(Math.round(v * 1000) / 1000);
+  const usageColumns = useMemo<ColumnDef<(typeof rows)[number], any>[]>(() => [
+    { id: 'code', header: 'Part ID', size: 120, cell: ({ row }) => <span className="text-[12px] text-[var(--shell-text-muted)]">{row.original.code ?? '—'}</span> },
+    { id: 'name', header: 'Name', cell: ({ row }) => <span className="font-medium text-[var(--shell-text)]">{row.original.name}</span> },
+    { id: 'kind', header: 'Type', size: 100, cell: ({ row }) => <span className="text-[var(--shell-text)]">{row.original.kind === 'PRODUCT' ? 'Product' : row.original.kind === 'JOB' ? 'Job BOM' : 'Order'}</span> },
+    { id: 'qty', header: headerRight('Quantity per unit'), size: 170, cell: ({ row }) => <div className="text-right tabular-nums text-[var(--shell-text)]">{qty(row.original.quantity)} {item?.uom}{row.original.lines > 1 && <span className="text-[var(--shell-text-muted)]"> ({row.original.lines} lines)</span>}</div> },
+    { id: 'cost', header: headerRight('Cost per unit'), size: 140, cell: ({ row }) => <div className="text-right font-medium tabular-nums text-[var(--shell-text)]">{unitPrice(row.original.cost)}</div> },
+  ], [item?.uom]);
   if (!item) return null;
   const products = rows.filter((r) => r.kind === 'PRODUCT').length; const jobs = rows.filter((r) => r.kind === 'JOB').length; const orders = rows.filter((r) => r.kind === 'ORDER').length;
-  const qty = (v: number) => String(Math.round(v * 1000) / 1000);
   return (
     <ModuleModal isOpen={isOpen} onClose={onClose} size="lg" title={`Where used: ${item.part_no}`} icon={<Network className="h-4 w-4" />}
       footer={<Button onClick={onClose} className="h-8 px-5 text-[12px] font-semibold">Close</Button>}>
@@ -713,18 +728,8 @@ export function PartUsageModal({ isOpen, onClose, item }: Base & { item: Item | 
           {usage.data && (rows.length ? ` It is in ${[products ? `${products} product${products === 1 ? '' : 's'}` : '', jobs ? `${jobs} job BOM${jobs === 1 ? '' : 's'}` : '', orders ? `${orders} open order${orders === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and ')}.` : ' It is not in any BOM.')}
         </p>
         {usage.isLoading ? <p className="text-[12px] text-[var(--shell-text-muted)]">Loading…</p> : rows.length > 0 && (
-          <div className="max-h-[50vh] overflow-auto rounded-md border border-[var(--shell-border)]">
-            <Grid head={[{ label: 'Part ID', w: 'w-32' }, { label: 'Name' }, { label: 'Type', w: 'w-28' }, { label: 'Quantity per unit', right: true, w: 'w-40' }, { label: 'Cost per unit', right: true, w: 'w-36' }]}>
-              {rows.map((r) => (
-                <tr key={r.key}>
-                  <td className={cn(td, 'text-[12px] text-[var(--shell-text-muted)]')}>{r.code ?? '—'}</td>
-                  <td className={cn(td, 'font-medium')}>{r.name}</td>
-                  <td className={td}>{r.kind === 'PRODUCT' ? 'Product' : r.kind === 'JOB' ? 'Job BOM' : 'Order'}</td>
-                  <td className={cn(td, 'text-right tabular-nums')}>{qty(r.quantity)} {item.uom}{r.lines > 1 && <span className="text-[var(--shell-text-muted)]"> ({r.lines} lines)</span>}</td>
-                  <td className={cn(td, 'text-right font-medium tabular-nums')}>{unitPrice(r.cost)}</td>
-                </tr>
-              ))}
-            </Grid>
+          <div className="flex flex-col overflow-hidden rounded-md border border-[var(--shell-border)]" style={tableBox(rows.length)}>
+            <DataTable columns={usageColumns} data={rows} fullHeight emptyMessage="Not in any BOM." />
           </div>
         )}
         {rows.length > 0 && <p className="text-[12px] text-[var(--shell-text-muted)]">Cost per unit is the quantity, with scrap, at the part's standard price. A product that lists the part on more than one line is shown once, with the lines added together.</p>}
@@ -1291,21 +1296,17 @@ export function PartAlternatesModal({ isOpen, onClose, item, items, canEdit }: B
         )}
         {!inGroup ? <p className="text-[13px] text-[var(--shell-text)]">{canEdit ? 'This part has no alternates yet. The first one you add makes this part the default.' : 'This part has no alternates.'}</p> : (
           <>
-            <div className="overflow-auto rounded-md border border-[var(--shell-border)]">
-              <Grid head={[{ label: 'Part' }, { label: 'OEM part number', w: 'w-40' }, { label: 'Supplier' }, { label: 'Standard price', right: true, w: 'w-32' }, { label: 'Last paid', right: true, w: 'w-28' }, { label: 'Lead time', right: true, w: 'w-24' }, { label: 'Default', w: 'w-24' }]}>
-                {members.map((m) => (
-                  <tr key={m.id} tabIndex={0} aria-selected={sel === m.id} onClick={() => setSel(m.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSel(m.id); } }}
-                    className={cn('cursor-pointer hover:bg-[var(--shell-hover)] focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]', sel === m.id && 'bg-[var(--shell-hover)]')}>
-                    <td className={td}><span className="text-[12px] text-[var(--shell-text-muted)]">{m.part_no}</span> <span className="font-medium">{m.name}</span>{m.id === item.id && <span className="text-[var(--shell-text-muted)]"> (this part)</span>}</td>
-                    <td className={td}>{m.oem_part_no ?? '—'}{m.id !== item.id && sameOem(m.oem_part_no) && <span className="block text-[12px] text-[var(--shell-text-muted)]">Same part, another source</span>}</td>
-                    <td className={cn(td, 'text-[var(--shell-text-muted)]')}>{m.supplier ?? '—'}</td>
-                    <td className={cn(td, 'text-right tabular-nums')}>{unitPrice(m.standard_price)}</td>
-                    <td className={cn(td, 'text-right tabular-nums')}>{m.last_price != null ? unitPrice(m.last_price) : '—'}</td>
-                    <td className={cn(td, 'text-right tabular-nums text-[var(--shell-text-muted)]')}>{m.lead_time_days != null ? `${m.lead_time_days} d` : '—'}</td>
-                    <td className={cn(td, m.is_default ? 'font-medium text-[var(--success)]' : 'text-[var(--shell-text-muted)]')}>{m.is_default ? 'Default' : ''}</td>
-                  </tr>
-                ))}
-              </Grid>
+            <div className="flex flex-col overflow-hidden rounded-md border border-[var(--shell-border)]" style={tableBox(members.length)}>
+              <DataTable<any, any> data={members} fullHeight selectedRowId={sel ?? undefined} onRowClick={(m: any) => setSel(m.id)} emptyMessage="No alternates."
+                columns={[
+                  { id: 'part', header: 'Part', cell: ({ row }: any) => { const m = row.original; return <span><span className="text-[12px] text-[var(--shell-text-muted)]">{m.part_no}</span> <span className="font-medium text-[var(--shell-text)]">{m.name}</span>{m.id === item.id && <span className="text-[var(--shell-text-muted)]"> (this part)</span>}</span>; } },
+                  { id: 'oem', header: 'OEM part number', size: 170, cell: ({ row }: any) => { const m = row.original; return <span className="text-[var(--shell-text)]">{m.oem_part_no ?? '—'}{m.id !== item.id && sameOem(m.oem_part_no) && <span className="block text-[12px] text-[var(--shell-text-muted)]">Same part, another source</span>}</span>; } },
+                  { id: 'supplier', header: 'Supplier', cell: ({ row }: any) => <span className="text-[var(--shell-text-muted)]">{row.original.supplier ?? '—'}</span> },
+                  { id: 'price', header: headerRight('Standard price'), size: 130, cell: ({ row }: any) => <div className="text-right tabular-nums text-[var(--shell-text)]">{unitPrice(row.original.standard_price)}</div> },
+                  { id: 'last', header: headerRight('Last paid'), size: 120, cell: ({ row }: any) => <div className="text-right tabular-nums text-[var(--shell-text)]">{row.original.last_price != null ? unitPrice(row.original.last_price) : '—'}</div> },
+                  { id: 'lead', header: headerRight('Lead time'), size: 100, cell: ({ row }: any) => <div className="text-right tabular-nums text-[var(--shell-text-muted)]">{row.original.lead_time_days != null ? `${row.original.lead_time_days} d` : '—'}</div> },
+                  { id: 'default', header: 'Default', size: 90, cell: ({ row }: any) => <span className={row.original.is_default ? 'font-medium text-[var(--success)]' : 'text-[var(--shell-text-muted)]'}>{row.original.is_default ? 'Default' : ''}</span> },
+                ] as ColumnDef<any, any>[]} />
             </div>
             {canEdit && <div className="flex flex-wrap items-center gap-2">
               <span className="text-[12px] text-[var(--shell-text-muted)]">{chosen ? `Selected: ${chosen.part_no}` : 'Select a row to change it.'}</span>
@@ -1336,17 +1337,14 @@ export function PartHistoryModal({ isOpen, onClose, item }: Base & { item: Item 
       <div className="space-y-3">
         <p className="text-[13px] text-[var(--shell-text)]"><strong>{item.name}</strong>: edits, purchases, replacements and alternates, newest first.</p>
         {history.isLoading ? <p className="text-[12px] text-[var(--shell-text-muted)]">Loading…</p> : rows.length === 0 ? <p className="text-[12px] text-[var(--shell-text-muted)]">Nothing recorded yet.</p> : (
-          <div className="max-h-[55vh] overflow-auto rounded-md border border-[var(--shell-border)]">
-            <Grid head={[{ label: 'Date', w: 'w-28' }, { label: 'Event', w: 'w-32' }, { label: 'Details' }, { label: 'By', w: 'w-28' }]}>
-              {rows.map((e, i) => (
-                <tr key={`${e.at}-${i}`}>
-                  <td className={cn(td, 'tabular-nums')}>{formatDate(e.at)}</td>
-                  <td className={cn(td, 'font-medium')}>{PART_EVENT[e.kind] ?? e.kind}</td>
-                  <td className={td}>{e.text}</td>
-                  <td className={cn(td, 'text-[var(--shell-text-muted)]')}>{e.by ?? '—'}</td>
-                </tr>
-              ))}
-            </Grid>
+          <div className="flex flex-col overflow-hidden rounded-md border border-[var(--shell-border)]" style={tableBox(rows.length, 55)}>
+            <DataTable<any, any> data={rows} fullHeight emptyMessage="Nothing recorded yet."
+              columns={[
+                { id: 'at', header: 'Date', size: 120, cell: ({ row }: any) => <span className="tabular-nums text-[var(--shell-text)]">{formatDate(row.original.at)}</span> },
+                { id: 'kind', header: 'Event', size: 140, cell: ({ row }: any) => <span className="font-medium text-[var(--shell-text)]">{PART_EVENT[row.original.kind] ?? row.original.kind}</span> },
+                { id: 'text', header: 'Details', cell: ({ row }: any) => <span className="whitespace-normal text-[var(--shell-text)]">{row.original.text}</span> },
+                { id: 'by', header: 'By', size: 120, cell: ({ row }: any) => <span className="text-[var(--shell-text-muted)]">{row.original.by ?? '—'}</span> },
+              ] as ColumnDef<any, any>[]} />
           </div>
         )}
       </div>

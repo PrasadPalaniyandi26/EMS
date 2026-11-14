@@ -1,23 +1,25 @@
 'use client';
-import { useEffect, useState, useMemo, useRef } from 'react';
-import { useFitPageSize } from '@/hooks/use-fit-page-size';
+import { useEffect, useState, useMemo } from 'react';
+import { ColumnDef, getCoreRowModel } from '@tanstack/react-table';
+import { useDataTable } from '@/hooks/use-data-table';
+import { DataTable } from '@/components/data-table/data-table';
+import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useTransactions, useClients } from '@/hooks/use-queries';
 import api, { getAccessToken, API_BASE } from '@/lib/api-client';
 import { Input } from '@/components/ui/input';
-import { Filters, type FilterDef } from '@/components/data-table/filters';
+import { type FilterDef } from '@/components/data-table/filters';
 import { Field } from '@/components/shared/modal-primitives';
-import { Checkbox } from '@/components/ui/checkbox';
-import { ChevronLeft, ChevronRight, FileText, ArrowUpRight, CreditCard, Download, CheckCircle2, Clock, PauseCircle, Wallet } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { getStatusConfig } from '@/lib/status';
 import { formatCurrency, formatDate, getDateRange, toLocalYMD } from '@/lib/currency';
 import { toast } from 'sonner';
-import { TextCell, DateCell, MoneyCell, StatusText } from '@/components/data-table/cells';
+import { TextCell, DateCell, MoneyCell, StatusText, headerRight } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
+import { ChargedToSection } from '@/components/transactions/charged-to';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAttachment } from '@/components/shared/detail/detail-kit';
+import { PageFrame } from '@/components/shared/module/page-frame';
 
 export default function TransactionsPage() {
   const setHeader = useHeaderStore((s) => s.setHeader);
@@ -92,48 +94,58 @@ export default function TransactionsPage() {
     }
   };
 
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [selectedTxn, setSelectedTxn] = useState<any>(null);
-  const [page, setPage] = useState(0);
-  // Rows per page follow the height of the table area (see useFitPageSize); 25 until it is measured
-  const tableAreaRef = useRef<HTMLDivElement>(null);
-  const fitted = useFitPageSize(tableAreaRef);
-  const PAGE_SIZE = fitted ?? 25;
+  const [selection, setSelection] = useState<Record<string, boolean>>({});
+  // Rows per page follow the height of the table (DataTable measures it); 25 until then
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 });
 
   useEffect(() => { setHeader('Transactions', 'View all transactions'); }, [setHeader]);
 
-  useEffect(() => { setPage(0); }, [search, filterType, filterPayment, filterClient, datePreset, dateFrom, dateTo, PAGE_SIZE]);
+  useEffect(() => { setPagination((p) => ({ ...p, pageIndex: 0 })); }, [search, filterType, filterPayment, filterClient, datePreset, dateFrom, dateTo]);
 
   const queryParams = useMemo(() => ({
     ...filters,
     ...(search ? { search } : {}),
-    page: String(page + 1),
-    limit: String(PAGE_SIZE),
-  }), [filters, search, page, PAGE_SIZE]);
+    page: String(pagination.pageIndex + 1),
+    limit: String(pagination.pageSize),
+  }), [filters, search, pagination]);
 
   const { data: txnData, isLoading } = useTransactions(queryParams);
-  const displayedTxns = txnData?.rows || [];
+  const displayedTxns = useMemo(() => txnData?.rows || [], [txnData]);
   const total = txnData?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const selectedTxn = displayedTxns.find((t: any) => String(t.id) === Object.keys(selection)[0]) ?? null;
 
-  const toggleSelect = (id: number) => {
-    const next = new Set(selectedIds);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    setSelectedIds(next);
-  };
+  const columns = useMemo<ColumnDef<any, any>[]>(() => [
+    { accessorKey: 'date_recorded', header: 'Date', size: 112, cell: ({ row }) => <DateCell value={row.original.date_recorded} /> },
+    { accessorKey: 'description', header: 'Description', cell: ({ row }) => <TextCell value={row.original.description} strong className="block max-w-[350px] truncate" /> },
+    { accessorKey: 'category_name', header: 'Category', size: 140, cell: ({ row }) => <TextCell value={row.original.category_name} /> },
+    { accessorKey: 'client_name', header: 'Client', size: 140, cell: ({ row }) => <TextCell value={row.original.client_name} /> },
+    { id: 'type', header: 'Type', size: 100, cell: ({ row }) => <TextCell value={row.original.type === 'income' ? 'Income' : 'Expense'} /> },
+    { accessorKey: 'status', header: 'Status', size: 150, cell: ({ row }) => <StatusText status={row.original.status} /> },
+    { accessorKey: 'amount', header: headerRight('Amount'), size: 130, cell: ({ row }) => <MoneyCell value={row.original.amount} currency={currency} /> },
+  ], [currency]);
 
-  const toggleAll = () => {
-    if (selectedIds.size === displayedTxns.length && displayedTxns.length > 0) setSelectedIds(new Set());
-    else setSelectedIds(new Set(displayedTxns.map((t: any) => t.id)));
-  };
+  // The server pages, searches and orders the rows; the table only shows the page it was given
+  const table = useDataTable({
+    data: displayedTxns, columns,
+    state: { pagination, rowSelection: selection },
+    onPaginationChange: setPagination,
+    onRowSelectionChange: (u) => setSelection(typeof u === 'function' ? u(selection) : u),
+    getRowId: (t: any) => String(t.id),
+    enableRowSelection: true, enableMultiRowSelection: false,
+    manualPagination: true,
+    pageCount: Math.max(1, Math.ceil(total / pagination.pageSize), pagination.pageIndex + 1),
+    getCoreRowModel: getCoreRowModel(),
+  });
 
   return (
+    <PageFrame label="Transactions">
     <ModuleShell
       showPanel={!!selectedTxn}
+      searchRow={<DataTableToolbar table={table} filterDefs={filterDefs} onExport={handleExportCsv} exporting={exporting} searchValue={search} onSearchChange={setSearch} />}
       intelligencePanel={
         <ModuleIntelligencePanel
           title="Transaction Detail"
-          onClose={() => setSelectedTxn(null)}
+          onClose={() => setSelection({})}
           hasSelection={!!selectedTxn}
         >
           {selectedTxn && (() => {
@@ -157,9 +169,10 @@ export default function TransactionsPage() {
                     <DetailField label="Payment method" value={t.payment_method ? String(t.payment_method).replace(/_/g, ' ').replace(/^./, (c: string) => c.toUpperCase()) : undefined} />
                     <DetailField label="Category" value={t.category_name} />
                     <DetailField label="Client" value={t.client_name} />
-                    {(t.project_name || t.product_name) && <DetailField label="Project / product" value={t.project_name || t.product_name} wide />}
                   </DetailGrid>
                 </DetailSection>
+
+                <ChargedToSection txn={t} />
 
                 {t.needs_reimbursement && (
                   <DetailSection title="Reimbursement">
@@ -182,115 +195,8 @@ export default function TransactionsPage() {
         </ModuleIntelligencePanel>
       }
     >
-      {/* Export, Filters and Search on the right, in the same order as every list page */}
-      <div className="px-4 min-h-12 py-1.5 shrink-0 flex flex-wrap items-center justify-end gap-2 border-b border-[var(--shell-border)]">
-        <button type="button" className="btn-action" onClick={handleExportCsv} disabled={exporting}>
-          <Download aria-hidden className="h-4 w-4 text-[var(--shell-text-muted)]" />
-          {exporting ? 'Exporting…' : 'Export'}
-        </button>
-        <Filters defs={filterDefs} />
-        <div className="relative w-full sm:w-[220px] min-w-[140px]">
-          <Input
-            aria-label="Search transactions"
-            placeholder="Search..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-8 w-full rounded-md pl-3 text-[13px] focus-visible:ring-1"
-            style={{ background: 'transparent', border: '1px solid var(--input)', color: 'var(--shell-text)' }}
-          />
-        </div>
-      </div>
-
-      {/* Table */}
-      <div ref={tableAreaRef} className="flex-1 overflow-auto min-h-0">
-        <table className="w-full border-collapse whitespace-nowrap text-left text-[13px]">
-          <thead className="sticky top-0 z-10 border-b border-[var(--shell-border)] bg-[var(--table-header)] text-[12px] font-semibold text-[var(--shell-text)]">
-            <tr>
-              <th scope="col" className="h-10 w-10 px-4 text-center">
-                <Checkbox aria-label="Select all transactions" checked={selectedIds.size === displayedTxns.length && displayedTxns.length > 0} onCheckedChange={toggleAll} />
-              </th>
-              <th scope="col" className="h-10 w-28 px-4 font-medium">Date</th>
-              <th scope="col" className="h-10 px-4 font-medium">Description</th>
-              <th scope="col" className="h-10 w-32 px-4 font-medium">Category</th>
-              <th scope="col" className="h-10 w-32 px-4 font-medium">Client</th>
-              <th scope="col" className="h-10 w-24 px-4 font-medium">Type</th>
-              <th scope="col" className="h-10 w-36 px-4 font-medium">Status</th>
-              <th scope="col" className="h-10 w-32 px-4 text-right font-medium">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && [...Array(8)].map((_, i) => (
-              <tr key={i} className="animate-pulse">
-                <td className="px-4 py-3"><div className="h-4 w-4 rounded-md bg-[var(--shell-hover)]" /></td>
-                <td className="px-3 py-3"><div className="h-3 w-20 rounded-md bg-[var(--shell-hover)]" /></td>
-                <td className="px-3 py-3"><div className="h-3 w-48 rounded-md bg-[var(--shell-hover)]" /></td>
-                <td className="px-3 py-3"><div className="h-3 w-24 rounded-md bg-[var(--shell-hover)]" /></td>
-                <td className="px-3 py-3"><div className="h-3 w-20 rounded-md bg-[var(--shell-hover)]" /></td>
-                <td className="px-3 py-3"><div className="h-5 w-16 rounded-sm bg-[var(--shell-hover)]" /></td>
-                <td className="px-3 py-3"><div className="h-3 w-16 rounded-md bg-[var(--shell-hover)]" /></td>
-                <td className="px-4 py-3"><div className="h-3 w-20 rounded-md bg-[var(--shell-hover)] ml-auto" /></td>
-              </tr>
-            ))}
-            {!isLoading && displayedTxns.map((t: any) => {
-              const isSelected = selectedIds.has(t.id);
-              const isViewing = selectedTxn?.id === t.id;
-              const isIncome = t.type === 'income';
-              return (
-                <tr
-                  key={t.id}
-                  className={`cursor-pointer transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--shell-accent)] border-b border-[var(--shell-border)] ${isViewing ? 'bg-[var(--shell-accent)]/8 shadow-[inset_2px_0_0_var(--shell-accent)]' : (isSelected ? 'bg-[var(--shell-accent)]/5' : 'hover:bg-[var(--shell-hover)]')}`}
-                  tabIndex={0}
-                  aria-selected={isViewing}
-                  onClick={() => setSelectedTxn(t)}
-                  onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); setSelectedTxn(t); } }}
-                >
-                  <td className="px-4 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
-                    <Checkbox aria-label={`Select ${t.description}`} checked={isSelected} onCheckedChange={() => toggleSelect(t.id)} />
-                  </td>
-                  <td className="px-4 py-2.5"><DateCell value={t.date_recorded} /></td>
-                  <td className="max-w-[350px] truncate px-4 py-2.5"><TextCell value={t.description} strong /></td>
-                  <td className="px-4 py-2.5"><TextCell value={t.category_name} /></td>
-                  <td className="px-4 py-2.5"><TextCell value={t.client_name} /></td>
-                  <td className="px-4 py-2.5"><TextCell value={isIncome ? 'Income' : 'Expense'} /></td>
-                  <td className="px-4 py-2.5"><StatusText status={t.status} /></td>
-                  <td className="px-4 py-2.5"><MoneyCell value={t.amount} currency={currency} /></td>
-                </tr>
-              );
-            })}
-            {!isLoading && displayedTxns.length === 0 && (
-              <tr>
-                <td colSpan={8} className="py-12 text-center text-[var(--shell-text-muted)] text-sm">No transactions found matching the criteria.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination */}
-      <div className="px-4 py-2.5 shrink-0 border-t border-[var(--shell-border)] flex items-center justify-between text-[12px] text-[var(--shell-text-muted)] font-medium">
-        <p>
-          Showing <span className="text-[var(--shell-text)] font-semibold">{total === 0 ? 0 : page * PAGE_SIZE + 1}–{page * PAGE_SIZE + displayedTxns.length}</span> of <span className="text-[var(--shell-text)] font-semibold">{total}</span>
-        </p>
-        <div className="flex gap-1.5">
-          <button
-            onClick={() => setPage((p) => Math.max(0, p - 1))}
-            disabled={page === 0}
-            aria-label="Previous page"
-            className="w-7 h-7 flex items-center justify-center rounded-md border border-[var(--shell-border)] bg-[var(--shell-surface)] hover:bg-[var(--shell-hover)] transition-all text-[var(--shell-text-muted)] disabled:opacity-30"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <button aria-current="page" aria-label={`Page ${page + 1}`} className="w-7 h-7 flex items-center justify-center rounded-md bg-[var(--shell-accent)] text-[var(--shell-accent-fg)] font-semibold">{page + 1}</button>
-          <button
-            onClick={() => setPage((p) => p + 1)}
-            disabled={page + 1 >= totalPages}
-            aria-label="Next page"
-            className="w-7 h-7 flex items-center justify-center rounded-md border border-[var(--shell-border)] bg-[var(--shell-surface)] hover:bg-[var(--shell-hover)] transition-all text-[var(--shell-text-muted)] disabled:opacity-30"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
+      <DataTable isLoading={isLoading} columns={columns} data={displayedTxns} tableInstance={table} totalRows={total} fullHeight emptyMessage="No transactions found matching the criteria." />
     </ModuleShell>
+    </PageFrame>
   );
 }

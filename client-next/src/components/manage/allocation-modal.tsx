@@ -1,6 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { ColumnDef, getCoreRowModel, getPaginationRowModel } from '@tanstack/react-table';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useDataTable } from '@/hooks/use-data-table';
+import { DataTable } from '@/components/data-table/data-table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -96,9 +100,27 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
     } catch { toast.error('Failed to remove allocations.'); } finally { setSaving(false); }
   };
 
-  const toggleSelect = (id: number) => {
-    setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  };
+  const rowSelection = useMemo(() => Object.fromEntries([...selected].map((id) => [String(id), true])), [selected]);
+  const allocColumns = useMemo<ColumnDef<any, any>[]>(() => [
+    {
+      id: 'select', size: 44,
+      header: ({ table }) => <Checkbox aria-label="Select all allocations" checked={table.getIsAllRowsSelected()} onCheckedChange={(v) => table.toggleAllRowsSelected(!!v)} />,
+      cell: ({ row }) => <Checkbox aria-label={`Select ${row.original.code}`} checked={row.getIsSelected()} onCheckedChange={(v) => row.toggleSelected(!!v)} onClick={(e) => e.stopPropagation()} />,
+    },
+    { accessorKey: 'client_name', header: 'Client', cell: ({ row }) => <span className="font-semibold text-[var(--shell-text)]">{row.original.client_name}</span> },
+    { accessorKey: 'category', header: 'Category', cell: ({ row }) => <span className="text-[var(--shell-text)]">{row.original.category}</span> },
+    { accessorKey: 'type', header: 'Type', cell: ({ row }) => <span className="text-[var(--shell-text)]">{row.original.type}</span> },
+    { accessorKey: 'code', header: 'Code', cell: ({ row }) => <span className="font-semibold text-[var(--shell-text)]">{row.original.code}</span> },
+  ], []);
+  const allocTable = useDataTable({
+    data: allocations, columns: allocColumns, state: { rowSelection },
+    onRowSelectionChange: (u) => {
+      const next = typeof u === 'function' ? u(rowSelection) : u;
+      setSelected(new Set(Object.keys(next).filter((k) => next[k]).map(Number)));
+    },
+    getRowId: (a: any) => String(a.id), enableRowSelection: true,
+    getCoreRowModel: getCoreRowModel(), getPaginationRowModel: getPaginationRowModel(),
+  });
   return (
     <ModuleModal
       isOpen={isOpen}
@@ -174,37 +196,8 @@ export function AllocationModal({ isOpen, onClose, user }: { isOpen: boolean; on
         </div>
 
         {/* Table */}
-        <div className="border border-[var(--shell-border)] rounded-lg overflow-hidden" style={{ background: 'var(--shell-surface)' }}>
-          <table className="w-full text-left">
-            <thead className="dialog-header">
-              <tr className="text-[12px] font-semibold">
-                <th className="w-10 px-4 py-3 text-center">
-                  <input type="checkbox" className="size-3.5 rounded-md border-[var(--shell-border)]" onChange={(e) => setSelected(e.target.checked ? new Set(allocations.map((a) => a.id)) : new Set())} checked={selected.size === allocations.length && allocations.length > 0} />
-                </th>
-                <th className="px-4 py-3">Client</th>
-                <th className="px-4 py-3">Category</th>
-                <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3">Code</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--shell-border)] text-[12px]">
-              {loading ? (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-[var(--shell-text-muted)] italic">Loading...</td></tr>
-              ) : allocations.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-10 text-center text-[var(--shell-text-muted)] italic font-medium">No allocations yet.</td></tr>
-              ) : allocations.map((a) => (
-                <tr key={a.id} className={cn('transition-colors', selected.has(a.id) ? 'bg-[var(--shell-accent)]/10' : 'hover:rounded-lg border')}>
-                  <td className="px-4 py-3 text-center">
-                    <input type="checkbox" className="size-3.5 rounded-md border-[var(--shell-border)]" checked={selected.has(a.id)} onChange={() => toggleSelect(a.id)} />
-                  </td>
-                  <td className="px-4 py-3 font-semibold text-[var(--shell-text)]">{a.client_name}</td>
-                  <td className="px-4 py-3 text-[var(--shell-text)]">{a.category}</td>
-                  <td className="px-4 py-3 text-[var(--shell-text)]">{a.type}</td>
-                  <td className="px-4 py-3 text-[var(--shell-text)] font-semibold">{a.code}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex flex-col overflow-hidden rounded-lg border border-[var(--shell-border)]" style={{ height: `min(40vh, ${(allocations.length + 2) * 41 + 8}px)`, minHeight: 170 }}>
+          <DataTable isLoading={loading} columns={allocColumns} data={allocations} tableInstance={allocTable} fullHeight emptyMessage="No allocations yet." />
         </div>
       </div>
     </ModuleModal>

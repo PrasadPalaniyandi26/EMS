@@ -14,7 +14,7 @@ import { useJobBom, useProjectBudget, type BaselineRow, type BomLineRow, type Es
 import { useDataTable } from '@/hooks/use-data-table';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
-import { DateCell, TextCell, ToneText, headerRight } from '@/components/data-table/cells';
+import { DateCell, TextCell, ToneText, headerRight, NumCell } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { ConfirmDialog } from '@/components/shared/modal-primitives';
@@ -40,9 +40,6 @@ const EMPTY: Record<Tab, string> = {
   evm: 'Build an estimate first; earned value is measured against it.',
 };
 
-const Num = ({ children, strong }: { children: React.ReactNode; strong?: boolean }) => (
-  <div className={cn('text-right text-[13px] tabular-nums text-[var(--shell-text)]', strong && 'font-medium')}>{children}</div>
-);
 const late = (m: Milestone) => !m.done_date && new Date(m.planned_date) < new Date();
 
 export default function ProjectBudgetPage() {
@@ -118,42 +115,42 @@ export default function ProjectBudgetPage() {
 
   const columns = useMemo<ColumnDef<any, any>[]>(() => {
     if (tab === 'jobbom') return [
-      { accessorKey: 'sequence', header: headerRight('Seq'), cell: ({ row }) => <Num>{row.original.sequence}</Num>, size: 60 },
+      { accessorKey: 'sequence', header: headerRight('Seq'), cell: ({ row }) => <NumCell>{row.original.sequence}</NumCell>, size: 60 },
       { accessorKey: 'group_name', header: 'Group', cell: ({ row }) => <TextCell value={row.original.group_name} muted className="block max-w-[120px] truncate" />, size: 120 },
       { accessorKey: 'part_no', header: 'Part', cell: ({ row }) => <TextCell value={row.original.part_no} muted />, size: 110 },
       { accessorKey: 'name', header: 'Name', cell: ({ row }) => <TextCell value={row.original.name} strong className="block max-w-[220px] truncate" /> },
       { id: 'source', header: 'Make / Buy', cell: ({ row }) => <TextCell value={row.original.sourcing === 'MAKE' ? 'Make' : 'Buy'} muted />, size: 100 },
-      { accessorKey: 'quantity', header: headerRight('Qty'), cell: ({ row }) => <Num>{row.original.quantity}</Num>, size: 80 },
-      { accessorKey: 'unit_cost', header: headerRight('Unit cost'), cell: ({ row }) => <Num>{money(row.original.unit_cost, currency)}</Num>, size: 120 },
-      { accessorKey: 'amount', header: headerRight('Amount'), cell: ({ row }) => <Num strong>{money(row.original.amount, currency)}</Num>, size: 120 },
+      { accessorKey: 'quantity', header: headerRight('Qty'), cell: ({ row }) => <NumCell>{row.original.quantity}</NumCell>, size: 80 },
+      { accessorKey: 'unit_cost', header: headerRight('Unit cost'), cell: ({ row }) => <NumCell>{money(row.original.unit_cost, currency)}</NumCell>, size: 120 },
+      { accessorKey: 'amount', header: headerRight('Amount'), cell: ({ row }) => <NumCell strong>{money(row.original.amount, currency)}</NumCell>, size: 120 },
     ];
     if (tab === 'jobsteps') return [
-      { accessorKey: 'sequence', header: headerRight('Seq'), cell: ({ row }) => <Num>{row.original.sequence}</Num>, size: 60 },
+      { accessorKey: 'sequence', header: headerRight('Seq'), cell: ({ row }) => <NumCell>{row.original.sequence}</NumCell>, size: 60 },
       { accessorKey: 'type_name', header: 'Operation', cell: ({ row }) => <TextCell value={row.original.type_name} strong />, size: 200 },
       { id: 'costed_as', header: 'Costed as', accessorFn: (r) => (r.is_fixed ? 'Fixed' : r.is_outsourced ? 'Outsourced' : 'Labour'), cell: ({ row }) => <TextCell value={row.original.is_fixed ? 'Fixed' : row.original.is_outsourced ? 'Outsourced' : 'Labour'} muted />, size: 110 },
       { accessorKey: 'role', header: 'Role', cell: ({ row }) => <TextCell value={row.original.role ?? '—'} muted />, size: 160 },
-      { accessorKey: 'amount', header: headerRight('Direct cost'), cell: ({ row }) => <Num>{money(row.original.amount, currency)}</Num>, size: 120 },
-      { id: 'overhead', header: headerRight('Overhead'), cell: ({ row }) => <Num>{(row.original.is_outsourced || row.original.is_fixed) ? '—' : money(row.original.hours * (job?.cost?.overhead_rate ?? 0), currency)}</Num>, size: 110 },
-      { id: 'total', header: headerRight('Total'), cell: ({ row }) => <Num strong>{money(row.original.amount + ((row.original.is_outsourced || row.original.is_fixed) ? 0 : row.original.hours * (job?.cost?.overhead_rate ?? 0)), currency)}</Num>, size: 120 },
+      { accessorKey: 'amount', header: headerRight('Direct cost'), cell: ({ row }) => <NumCell>{money(row.original.amount, currency)}</NumCell>, size: 120 },
+      { id: 'overhead', header: headerRight('Overhead'), cell: ({ row }) => <NumCell>{(row.original.is_outsourced || row.original.is_fixed) ? '—' : money(row.original.hours * (job?.cost?.overhead_rate ?? 0), currency)}</NumCell>, size: 110 },
+      { id: 'total', header: headerRight('Total'), cell: ({ row }) => <NumCell strong>{money(row.original.amount + ((row.original.is_outsourced || row.original.is_fixed) ? 0 : row.original.hours * (job?.cost?.overhead_rate ?? 0)), currency)}</NumCell>, size: 120 },
     ];
     if (tab === 'estimate') return [
       { accessorKey: 'phase', header: 'Phase', cell: ({ row }) => <TextCell value={row.original.phase} muted />, size: 130 },
       { accessorKey: 'description', header: 'Description', cell: ({ row }) => <TextCell value={row.original.description} strong className="block max-w-[300px] truncate" /> },
       { accessorKey: 'type_label', header: 'Type', cell: ({ row }) => <TextCell value={row.original.type_label} muted />, size: 160 },
-      { accessorKey: 'quantity', header: headerRight('Qty'), cell: ({ row }) => <Num>{row.original.quantity} {row.original.unit}</Num>, size: 100 },
-      { accessorKey: 'amount', header: headerRight('Amount'), cell: ({ row }) => <Num strong>{money(row.original.amount, currency)}</Num>, size: 120 },
+      { accessorKey: 'quantity', header: headerRight('Qty'), cell: ({ row }) => <NumCell>{row.original.quantity} {row.original.unit}</NumCell>, size: 100 },
+      { accessorKey: 'amount', header: headerRight('Amount'), cell: ({ row }) => <NumCell strong>{money(row.original.amount, currency)}</NumCell>, size: 120 },
     ];
     if (tab === 'baselines') return [
       { accessorKey: 'created_at', header: 'Proposed', cell: ({ row }) => <DateCell value={row.original.created_at} />, size: 110 },
       { accessorKey: 'proposed_by_name', header: 'By', cell: ({ row }) => <TextCell value={row.original.proposed_by_name ?? '—'} muted />, size: 130 },
-      { accessorKey: 'line_count', header: headerRight('Lines'), cell: ({ row }) => <Num>{row.original.line_count}</Num>, size: 80 },
-      { accessorKey: 'direct', header: headerRight('Direct cost'), cell: ({ row }) => <Num>{money(row.original.direct, currency)}</Num>, size: 130 },
-      { accessorKey: 'total', header: headerRight('Total'), cell: ({ row }) => <Num strong>{money(row.original.total, currency)}</Num>, size: 130 },
+      { accessorKey: 'line_count', header: headerRight('Lines'), cell: ({ row }) => <NumCell>{row.original.line_count}</NumCell>, size: 80 },
+      { accessorKey: 'direct', header: headerRight('Direct cost'), cell: ({ row }) => <NumCell>{money(row.original.direct, currency)}</NumCell>, size: 130 },
+      { accessorKey: 'total', header: headerRight('Total'), cell: ({ row }) => <NumCell strong>{money(row.original.total, currency)}</NumCell>, size: 130 },
       { accessorKey: 'status', header: 'Status', size: 120, cell: ({ row }) => { const s = row.original.status; return <ToneText label={s === 'APPROVED' ? 'Approved' : s === 'PROPOSED' ? 'Proposed' : s === 'REJECTED' ? 'Rejected' : 'Replaced'} tone={s === 'APPROVED' ? 'success' : s === 'PROPOSED' ? 'warning' : s === 'REJECTED' ? 'danger' : 'muted'} />; } },
     ];
     if (tab === 'milestones') return [
       { accessorKey: 'name', header: 'Milestone', cell: ({ row }) => <TextCell value={row.original.name} strong /> },
-      { accessorKey: 'weight_pct', header: headerRight('Weight'), cell: ({ row }) => <Num>{row.original.weight_pct}%</Num>, size: 100 },
+      { accessorKey: 'weight_pct', header: headerRight('Weight'), cell: ({ row }) => <NumCell>{row.original.weight_pct}%</NumCell>, size: 100 },
       { accessorKey: 'planned_date', header: 'Planned', cell: ({ row }) => <DateCell value={row.original.planned_date} />, size: 120 },
       { accessorKey: 'done_date', header: 'Status', size: 130,
         cell: ({ row }) => row.original.done_date ? <ToneText label={`Done ${formatDate(row.original.done_date)}`} tone="success" /> : <ToneText label={late(row.original) ? 'Late' : 'Open'} tone={late(row.original) ? 'warning' : 'muted'} /> },

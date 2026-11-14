@@ -41,8 +41,10 @@ import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { TransactionDetail } from '@/components/transactions/transaction-detail';
+import { VoidModal } from '@/components/approvals/approvals-modals';
 import { DetailActions, DetailSummary, DetailSection, DetailGrid, DetailField, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import { CurrencyInput, useConfirm } from '@/components/shared/modal-primitives';
+import { PageFrame } from '@/components/shared/module/page-frame';
 
 export default function ExpensePage() {
   const setHeader = useHeaderStore((s) => s.setHeader);
@@ -105,23 +107,17 @@ export default function ExpensePage() {
   const [newNote, setNewNote] = useState('');
   const [noteSaving, setNoteSaving] = useState(false);
   const [voidOpen, setVoidOpen] = useState(false);
-  const [voidReason, setVoidReason] = useState('');
-  const [voidSaving, setVoidSaving] = useState(false);
 
-  const handleVoid = async () => {
-    if (!selectedTxn || voidSaving) return;
-    setVoidSaving(true);
+  const handleVoid = async (reason: string) => {
+    if (!selectedTxn) return;
     try {
-      await api.post(`/transactions/${selectedTxn.id}/void`, { reason: voidReason });
+      await api.post(`/transactions/${selectedTxn.id}/void`, { reason });
       toast.success('Transaction voided');
       setVoidOpen(false);
-      setVoidReason('');
       invalidate('transactions', 'dashboard');
       setRowSelection({});
     } catch (err: any) {
       toast.error(err?.message || 'Failed to void transaction');
-    } finally {
-      setVoidSaving(false);
     }
   };
 
@@ -185,14 +181,15 @@ export default function ExpensePage() {
     setModalOpen(true);
   };
 
-  const LOCKED_STATUSES = ['APPROVED', 'REJECTED'];
+  // In the approval chain or already decided: the API refuses to delete these, so the screen does not offer it
+  const LOCKED_STATUSES = ['APPROVED', 'REJECTED', 'PENDING_MANAGER', 'PENDING_FINANCE', 'VOIDED'];
 
   const openSplit = async () => {
     const sr = table.getSelectedRowModel().rows;
     const target = sr.length === 1 ? sr[0].original : selectedTxn;
     if (!target) { toast.error('Select one record to split'); return; }
-    if ((target.status || '').toUpperCase() !== 'DRAFT') {
-      toast.error('Only DRAFT expenses can be split');
+    if (!['DRAFT', 'SENT_BACK'].includes((target.status || '').toUpperCase())) {
+      toast.error('Only draft and sent-back expenses can be split');
       return;
     }
     setEditing(target);
@@ -292,7 +289,7 @@ export default function ExpensePage() {
     const sr = table.getSelectedRowModel().rows;
     const locked = sr.filter(r => LOCKED_STATUSES.includes((r.original.status || '').toUpperCase()));
     if (locked.length > 0) {
-      toast.error(`Cannot delete expense(s) with status APPROVED or REJECTED`);
+      toast.error('Only draft and sent-back expenses can be deleted');
       return;
     }
     const ids = sr.map(r => r.original.id);
@@ -361,7 +358,7 @@ export default function ExpensePage() {
 
   const sr = table.getSelectedRowModel().rows;
   const selectedCount = sr.length;
-  // True when the single selected row is in a locked status (APPROVED/REJECTED)
+  // True when the single selected row is in approval or already decided
   const isSelectedLocked = selectedCount === 1 && LOCKED_STATUSES.includes((sr[0].original.status || '').toUpperCase());
 
   useEffect(() => {
@@ -426,7 +423,7 @@ export default function ExpensePage() {
       const owed = selectedTxn.needs_reimbursement && selectedTxn.reimbursement_status !== 'PAID';
       return [
         ...(owed ? [{ label: 'Process reimbursement', variant: 'primary' as const, icon: <Banknote className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setProcessTxnId(selectedTxn.id); setProcessOpen(true); } }] : []),
-        { label: 'Void', variant: 'danger', onClick: () => { setVoidReason(''); setVoidOpen(true); } },
+        { label: 'Void', variant: 'danger', onClick: () => setVoidOpen(true) },
       ];
     }
     return [];
@@ -455,6 +452,7 @@ export default function ExpensePage() {
   })();
 
   return (
+    <PageFrame label="Expense">
     <ModuleShell
       showPanel={!!selectedTxn}
       searchRow={
@@ -648,46 +646,14 @@ export default function ExpensePage() {
         </button>
       </ModuleModal>
 
-      {/* Void Transaction Modal */}
-      <ModuleModal
+      <VoidModal
         isOpen={voidOpen}
         onClose={() => setVoidOpen(false)}
-        title="Void Transaction"
-        icon={<Ban className="w-4 h-4" />}
-        isDestructive={true}
-        size="sm"
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setVoidOpen(false)} disabled={voidSaving} className="h-8 px-4 text-[12px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>
-              Cancel
-            </Button>
-            <button
-              onClick={handleVoid}
-              disabled={voidSaving}
-              className="px-8 py-2.5 bg-[var(--danger)] text-[var(--danger-foreground)] text-[12px] font-semibold rounded-lg active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {voidSaving && <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />}
-              Confirm Void
-            </button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <div className="p-3 bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] border border-[color-mix(in_srgb,var(--danger)_20%,transparent)] rounded-lg text-[12px] text-[var(--danger)] font-medium">
-            This will permanently mark <strong>{selectedTxn?.reference_id || `#${selectedTxn?.id}`}</strong> as VOIDED. The record is kept for audit purposes but will no longer count in reports.
-          </div>
-          <div className="space-y-2">
-            <label className="text-[12px] font-semibold text-[var(--shell-text)] block">Void Reason (optional)</label>
-            <textarea
-              className="w-full h-20 p-3 border-input bg-transparent text-[var(--shell-text)] border border-[var(--shell-border)] rounded-lg text-[13px] text-[var(--shell-text)] placeholder:text-[var(--shell-text-muted)] focus:ring-1 focus:ring-[color-mix(in_srgb,var(--danger)_50%,transparent)] focus:border-[color-mix(in_srgb,var(--danger)_50%,transparent)] resize-none outline-none"
-              placeholder="Describe why this transaction is being voided..."
-              value={voidReason}
-              onChange={(e) => setVoidReason(e.target.value)}
-            />
-          </div>
-        </div>
-      </ModuleModal>
+        selectedRequest={selectedTxn ? { id: selectedTxn.id, code: selectedTxn.reference_id, submitted_by_name: selectedTxn.submitted_by_name, amount: selectedTxn.total_amount ?? selectedTxn.amount, description: selectedTxn.description, category_name: selectedTxn.category_name } : null}
+        onConfirm={({ reason }: { reason?: string }) => handleVoid(reason || '')}
+      />
       <ManageCategoriesDialog isOpen={categoriesOpen} onClose={() => setCategoriesOpen(false)} kinds={['expense']} />
     </ModuleShell>
+    </PageFrame>
   );
 }

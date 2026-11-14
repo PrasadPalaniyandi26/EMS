@@ -1,5 +1,6 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { assertDateRange, cleanDate, cleanId, cleanStatus, cleanText, PRODUCT_STATUSES } from '../common/helpers/master-data';
 
 @Injectable()
 export class ProductsService {
@@ -50,58 +51,85 @@ export class ProductsService {
     return this.mapProductFull(p);
   }
 
-  async create(data: any) {
-    try {
-      const p = await this.prisma.product.create({
-        data: {
-          clientId: data.clientId ? Number(data.clientId) : (data.client_id ? Number(data.client_id) : 0),
-          typeId: data.typeId ? Number(data.typeId) : (data.type_id ? Number(data.type_id) : null),
-          name: data.name,
-          description: data.description || null,
-          createdBy: data.createdBy ? Number(data.createdBy) : (data.created_by ? Number(data.created_by) : null),
-          status: data.status || 'R&D',
-          lead_id: data.lead_id ? Number(data.lead_id) : null,
-          start_date: data.start_date ? new Date(data.start_date) : null,
-          end_date: data.end_date ? new Date(data.end_date) : null,
-          category: data.category || null,
-        },
-      });
-      const code = `PRD-${String(10000 + p.id).padStart(5, '0')}`;
-      await this.prisma.product.update({ where: { id: p.id }, data: { code } });
-      return this.findById(p.id);
-    } catch (error) {
-      this.logger.error('Error creating product', error?.stack ?? error);
-      throw error;
+  // The checks a product goes through on create and on change. On a change only the fields that were sent are touched,
+  // so a partial request never blanks what it left out.
+  private async fields(data: any, current?: any) {
+    const out: any = {};
+    const sent = (a: string, b?: string) => data[a] !== undefined || (b != null && data[b] !== undefined);
+    if (!current || sent('name')) out.name = cleanText(data.name, 'Product name', 100, true);
+    if (!current || sent('clientId', 'client_id')) {
+      const clientId = cleanId(data.clientId ?? data.client_id, 'client');
+      const client = await this.prisma.client.findUnique({ where: { id: clientId } });
+      if (!client) throw new HttpException('Client not found.', HttpStatus.NOT_FOUND);
+      if (!client.isActive && clientId !== current?.clientId) throw new HttpException('That client is inactive. Choose an active client.', HttpStatus.BAD_REQUEST);
+      out.clientId = clientId;
     }
+    if (sent('typeId', 'type_id')) {
+      const raw = data.typeId ?? data.type_id;
+      if (raw === null || raw === '' || raw === 0) out.typeId = null;
+      else {
+        const typeId = cleanId(raw, 'product type');
+        if (!(await this.prisma.productType.findUnique({ where: { id: typeId } }))) throw new HttpException('Product type not found.', HttpStatus.NOT_FOUND);
+        out.typeId = typeId;
+      }
+    }
+    if (sent('lead_id')) {
+      if (data.lead_id === null || data.lead_id === '' || data.lead_id === 0) out.lead_id = null;
+      else {
+        const leadId = cleanId(data.lead_id, 'product lead');
+        if (!(await this.prisma.user.findUnique({ where: { id: leadId }, select: { id: true } }))) throw new HttpException('Product lead not found.', HttpStatus.NOT_FOUND);
+        out.lead_id = leadId;
+      }
+    }
+    if (sent('description')) out.description = cleanText(data.description, 'Description', 500);
+    if (sent('category')) out.category = cleanText(data.category, 'Category', 100);
+    if (!current || sent('status')) out.status = data.status === undefined ? 'R&D' : cleanStatus(data.status, PRODUCT_STATUSES, current?.status);
+    if (sent('start_date')) out.start_date = cleanDate(data.start_date, 'start date');
+    if (sent('end_date')) out.end_date = cleanDate(data.end_date, 'end date');
+    assertDateRange(out.start_date !== undefined ? out.start_date : current?.start_date ?? null, out.end_date !== undefined ? out.end_date : current?.end_date ?? null);
+    const isActive = data.isActive !== undefined ? data.isActive : data.is_active;
+    if (isActive !== undefined) out.isActive = Boolean(isActive);
+    // One product name per client, ignoring case (the database also keeps deleted ones)
+    const name = out.name ?? current?.name; const clientId = out.clientId ?? current?.clientId;
+    if (name && (out.name !== undefined || out.clientId !== undefined)) {
+      const clash = await this.prisma.product.findFirst({ where: { clientId, name: { equals: name, mode: 'insensitive' }, ...(current && { NOT: { id: current.id } }) } });
+      if (clash) throw new HttpException(clash.isActive ? 'This client already has a product with that name.' : 'This client had a product with that name that was deleted. Use another name.', HttpStatus.CONFLICT);
+    }
+    return out;
+  }
+
+  async create(data: any) {
+    const fields = await this.fields(data);
+    const p = await this.prisma.product.create({
+      data: { ...fields, createdBy: data.createdBy ? Number(data.createdBy) : (data.created_by ? Number(data.created_by) : null) },
+    });
+    const code = `PRD-${String(10000 + p.id).padStart(5, '0')}`;
+    await this.prisma.product.update({ where: { id: p.id }, data: { code } });
+    return this.findById(p.id);
   }
 
   async update(id: number, data: any) {
-    try {
-      await this.prisma.product.updateMany({
-        where: { id, isSystem: false },
-        data: {
-          clientId: data.clientId ? Number(data.clientId) : (data.client_id ? Number(data.client_id) : undefined),
-          typeId: data.typeId ? Number(data.typeId) : (data.type_id ? Number(data.type_id) : undefined),
-          name: data.name,
-          description: data.description || null,
-          isActive: data.isActive !== undefined ? Boolean(data.isActive) : (data.is_active !== undefined ? Boolean(data.is_active) : undefined),
-          ...(data.status !== undefined && { status: data.status }),
-          ...(data.lead_id !== undefined && { lead_id: data.lead_id ? Number(data.lead_id) : null }),
-          ...(data.start_date !== undefined && { start_date: data.start_date ? new Date(data.start_date) : null }),
-          ...(data.end_date !== undefined && { end_date: data.end_date ? new Date(data.end_date) : null }),
-          ...(data.category !== undefined && { category: data.category || null }),
-        },
-      });
-      return this.findById(id);
-    } catch (error) {
-      this.logger.error(`Error updating product ${id}`, error?.stack ?? error);
-      throw error;
-    }
+    const current = await this.prisma.product.findUnique({ where: { id } });
+    if (!current) throw new HttpException('Product not found.', HttpStatus.NOT_FOUND);
+    if (current.isSystem) throw new HttpException('A system product cannot be changed.', HttpStatus.FORBIDDEN);
+    await this.prisma.product.update({ where: { id }, data: await this.fields(data, current) });
+    return this.findById(id);
   }
 
+  // A product with orders in flight, or lines in a budget plan that is still in use, is not deleted from under them
   async delete(id: number) {
-    const result = await this.prisma.product.updateMany({ where: { id, isSystem: false }, data: { isActive: false } });
-    return result.count > 0;
+    const current = await this.prisma.product.findUnique({ where: { id } });
+    if (!current) return false;
+    if (current.isSystem) throw new HttpException('A system product cannot be deleted.', HttpStatus.FORBIDDEN);
+    const open = await this.prisma.buildOrder.count({ where: { productId: id, status: { in: ['COMMITTED', 'RELEASED', 'IN_BUILD'] } } });
+    if (open) throw new HttpException(`This product has ${open} open order${open === 1 ? '' : 's'}. Deliver or cancel ${open === 1 ? 'it' : 'them'} first.`, HttpStatus.CONFLICT);
+    const lines = await this.prisma.budgetLine.findMany({ where: { productId: id, isActive: true, plan: { status: { not: 'CLOSED' } } }, select: { plan: { select: { fy: true } } } });
+    if (lines.length) {
+      const years = [...new Set(lines.map((l) => l.plan.fy))].sort().join(', ');
+      throw new HttpException(`This product has budget lines in the plan for ${years}. Take them out of the plan first.`, HttpStatus.CONFLICT);
+    }
+    await this.prisma.product.update({ where: { id }, data: { isActive: false } });
+    return true;
   }
 
   // --- Product Types (global: a product is "client X, product Y, of type Z") ---

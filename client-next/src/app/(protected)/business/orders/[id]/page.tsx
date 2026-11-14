@@ -1,10 +1,10 @@
 'use client';
 
-import { canPropose } from '@/lib/permissions';
+import { canPropose, isFinanceRole } from '@/lib/permissions';
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { ArrowLeftRight, PackageOpen, RefreshCw, Rocket, Tag, Undo2 } from 'lucide-react';
+import { ArrowLeftRight, Ban, CircleCheck, Hammer, PackageOpen, Pencil, Plus, RefreshCw, Rocket, Tag, Trash2, Undo2 } from 'lucide-react';
 import { ColumnDef, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, getSortedRowModel, SortingState } from '@tanstack/react-table';
 import api from '@/lib/api-client';
 import { formatDate } from '@/lib/currency';
@@ -15,11 +15,13 @@ import { ORDER_STATUS, useBuildOrder, type OrderLine, type OrderOperation } from
 import { useDataTable } from '@/hooks/use-data-table';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
-import { IdCell, TextCell, ToneText, headerRight } from '@/components/data-table/cells';
+import { IdCell, TextCell, ToneText, headerRight, NumCell } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
-import { OrderPricingModal, OrderStepModal, ReimportOrderBomModal, SwapPartModal, type OrderStep } from '@/components/budgets/build-order-modals';
+import { BuildOrderModal, CancelOrderModal, OrderPricingModal, OrderStepModal, ReimportOrderBomModal, SwapPartModal, type OrderStep } from '@/components/budgets/build-order-modals';
+import { BuildStepModal } from '@/components/budgets/planning-modals';
+import { ConfirmDialog } from '@/components/shared/modal-primitives';
 import { TabBar, marginTone as projectMarginTone, money, unitPrice, useTabParam } from '@/components/budgets/budget-ui';
 import { cn } from '@/lib/utils';
 
@@ -33,7 +35,7 @@ const TAB_VALUES = TABS.map((t) => t.value);
 const marginTone = (m: number | null, target: number | null, min: number | null) => (target == null && min == null ? (m != null && m < 0 ? 'danger' as const : 'muted' as const) : projectMarginTone(m, target, min));
 const EMPTY: Record<Tab, string> = {
   bom: 'The standard BOM has not been imported yet. Click Import BOM.',
-  operations: 'No build operations were copied with the BOM.',
+  operations: 'No build operations on this order. Click Add build operation, or reimport the BOM from the product.',
   standard: 'The standard BOM has not been imported yet, so there is nothing to compare.',
   schedule: 'The standard BOM has not been imported yet, so there is nothing to schedule.',
   variances: 'No expenses are charged to this order yet. Choose this order as the Order when you record a product expense.',
@@ -44,9 +46,6 @@ const EXPENSE_STATUS: Record<string, { label: string; tone: 'success' | 'warning
 };
 const TONE_CLASS = { success: 'text-[var(--success)]', warning: 'text-[var(--warning)]', danger: 'text-[var(--danger)]', info: 'text-[var(--info)]', muted: 'text-[var(--shell-text-muted)]' } as const;
 
-const Num = ({ children, strong }: { children: React.ReactNode; strong?: boolean }) => (
-  <div className={cn('text-right text-[13px] tabular-nums text-[var(--shell-text)]', strong && 'font-medium')}>{children}</div>
-);
 const monthLabel = (year: number, month: number) => new Date(year, month - 1, 1).toLocaleString('en', { month: 'short', year: 'numeric' });
 const fyText = (fy: number) => `${fy}-${String(fy + 1).slice(2)}`;
 const sourcingText = (s?: string) => (s === 'MAKE' ? 'Make' : 'Buy');
@@ -57,6 +56,8 @@ export default function BuildOrderDetailPage() {
   const user = useAuthStore((s) => s.user);
   const currency = user?.currency || 'INR';
   const canEdit = canPropose(user?.role_name);
+  const isFinance = isFinanceRole(user?.role_name); // delivering and cancelling an order are Finance decisions
+  const router = useRouter();
   const invalidate = useInvalidate();
   const { data, isLoading } = useBuildOrder(id);
   const [tab, setTab] = useTabParam<Tab>(TAB_VALUES, 'bom');
@@ -65,6 +66,9 @@ export default function BuildOrderDetailPage() {
   const [swapOpen, setSwapOpen] = useState(false); const [pricingOpen, setPricingOpen] = useState(false);
   const [step, setStep] = useState<OrderStep | null>(null); const [lastStep, setLastStep] = useState<OrderStep>('release');
   const [reimport, setReimport] = useState(false);
+  const [startOpen, setStartOpen] = useState(false); const [cancelOpen, setCancelOpen] = useState(false); const [editOpen, setEditOpen] = useState(false);
+  const [deliverOpen, setDeliverOpen] = useState(false); const [delOrder, setDelOrder] = useState(false);
+  const [opOpen, setOpOpen] = useState(false); const [editOp, setEditOp] = useState<OrderOperation | null>(null); const [delOp, setDelOp] = useState<OrderOperation | null>(null);
 
   const act = async (job: () => Promise<unknown>, ok: string) => {
     try { await job(); toast.success(ok); invalidate('budgets'); } catch (err: any) { toast.error(err?.message || 'Could not complete that.'); }
@@ -94,15 +98,15 @@ export default function BuildOrderDetailPage() {
 
   const columns = useMemo<ColumnDef<any, any>[]>(() => {
     if (tab === 'bom') return [
-      { accessorKey: 'sequence', header: headerRight('Seq'), cell: ({ row }) => <Num>{row.original.sequence}</Num>, size: 48 },
+      { accessorKey: 'sequence', header: headerRight('Seq'), cell: ({ row }) => <NumCell>{row.original.sequence}</NumCell>, size: 48 },
       { accessorKey: 'part_no', header: 'Part', cell: ({ row }) => <IdCell value={row.original.part_no} />, size: 110 },
       { accessorKey: 'name', header: 'Name', cell: ({ row }) => <TextCell value={row.original.name} strong className="block max-w-[170px] truncate" /> },
-      { accessorKey: 'quantity', header: headerRight('Qty'), cell: ({ row }) => <Num>{row.original.quantity}{row.original.scrap_pct ? <span className="text-[var(--shell-text-muted)]"> (+{row.original.scrap_pct}%)</span> : null}</Num>, size: 90 },
-      { accessorKey: 'unit_cost', header: headerRight('Unit cost'), cell: ({ row }) => <Num>{unitPrice(row.original.unit_cost, currency)}</Num>, size: 110 },
-      { accessorKey: 'amount', header: headerRight('Amount'), cell: ({ row }) => <Num strong>{unitPrice(row.original.amount, currency)}</Num>, size: 110 },
+      { accessorKey: 'quantity', header: headerRight('Qty'), cell: ({ row }) => <NumCell>{row.original.quantity}{row.original.scrap_pct ? <span className="text-[var(--shell-text-muted)]"> (+{row.original.scrap_pct}%)</span> : null}</NumCell>, size: 90 },
+      { accessorKey: 'unit_cost', header: headerRight('Unit cost'), cell: ({ row }) => <NumCell>{unitPrice(row.original.unit_cost, currency)}</NumCell>, size: 110 },
+      { accessorKey: 'amount', header: headerRight('Amount'), cell: ({ row }) => <NumCell strong>{unitPrice(row.original.amount, currency)}</NumCell>, size: 110 },
       {
         accessorKey: 'lead_time_days', header: headerRight('Lead time'), size: 100,
-        cell: ({ row }) => { const l = row.original as OrderLine; if (l.item_id == null) return <Num>—</Num>; const late = !!o?.lead.late_lines.includes(l.id); return <div className="text-right">{l.lead_time_days == null ? <ToneText label="Not set" tone="warning" /> : <ToneText label={`${l.lead_time_days} d`} tone={late ? 'danger' : 'muted'} />}</div>; },
+        cell: ({ row }) => { const l = row.original as OrderLine; if (l.item_id == null) return <NumCell>—</NumCell>; const late = !!o?.lead.late_lines.includes(l.id); return <div className="text-right">{l.lead_time_days == null ? <ToneText label="Not set" tone="warning" /> : <ToneText label={`${l.lead_time_days} d`} tone={late ? 'danger' : 'muted'} />}</div>; },
       },
       {
         id: 'alternate', header: 'Alternate', size: 170,
@@ -111,10 +115,10 @@ export default function BuildOrderDetailPage() {
     ];
     if (tab === 'schedule') return [
       { accessorKey: 'label', header: 'Month', cell: ({ row }) => <TextCell value={row.original.label} strong /> },
-      { accessorKey: 'spend', header: headerRight('Cash out'), cell: ({ row }) => <Num strong>{row.original.spend ? money(row.original.spend, currency) : '—'}</Num>, size: 130 },
-      { accessorKey: 'revenue', header: headerRight('Sale in'), cell: ({ row }) => <Num strong>{row.original.revenue ? money(row.original.revenue, currency) : '—'}</Num>, size: 130 },
+      { accessorKey: 'spend', header: headerRight('Cash out'), cell: ({ row }) => <NumCell strong>{row.original.spend ? money(row.original.spend, currency) : '—'}</NumCell>, size: 130 },
+      { accessorKey: 'revenue', header: headerRight('Sale in'), cell: ({ row }) => <NumCell strong>{row.original.revenue ? money(row.original.revenue, currency) : '—'}</NumCell>, size: 130 },
       { accessorKey: 'net', header: headerRight('Net'), cell: ({ row }) => <div className="text-right"><ToneText label={`${row.original.net < 0 ? '-' : ''}${money(Math.abs(row.original.net), currency)}`} tone={row.original.net < 0 ? 'warning' : row.original.net > 0 ? 'success' : 'muted'} /></div>, size: 130 },
-      { accessorKey: 'running', header: headerRight('Running net'), cell: ({ row }) => <Num>{`${row.original.running < 0 ? '-' : ''}${money(Math.abs(row.original.running), currency)}`}</Num>, size: 140 },
+      { accessorKey: 'running', header: headerRight('Running net'), cell: ({ row }) => <NumCell>{`${row.original.running < 0 ? '-' : ''}${money(Math.abs(row.original.running), currency)}`}</NumCell>, size: 140 },
     ];
     if (tab === 'variances') return [
       { accessorKey: 'reference_id', header: 'Expense', cell: ({ row }) => <IdCell value={row.original.reference_id} />, size: 110 },
@@ -122,23 +126,24 @@ export default function BuildOrderDetailPage() {
       { accessorKey: 'description', header: 'Description', cell: ({ row }) => <TextCell value={row.original.description} strong className="block max-w-[300px] truncate" /> },
       { accessorKey: 'category_name', header: 'Category', cell: ({ row }) => <TextCell value={row.original.category_name} muted />, size: 170 },
       { accessorKey: 'is_e200', header: 'Counts as', cell: ({ row }) => <TextCell value={row.original.is_e200 ? 'Materials and production' : 'Other'} muted />, size: 170 },
-      { accessorKey: 'amount', header: headerRight('Amount'), cell: ({ row }) => <Num strong>{unitPrice(row.original.amount, currency)}</Num>, size: 120 },
+      { accessorKey: 'amount', header: headerRight('Amount'), cell: ({ row }) => <NumCell strong>{unitPrice(row.original.amount, currency)}</NumCell>, size: 120 },
       { accessorKey: 'status', header: 'Status', cell: ({ row }) => { const s = EXPENSE_STATUS[row.original.status ?? ''] ?? { label: row.original.status ?? '', tone: 'muted' as const }; return <ToneText label={s.label} tone={s.tone} />; }, size: 160 },
     ];
     if (tab === 'operations') return [
+      { accessorKey: 'sequence', header: headerRight('Seq'), cell: ({ row }) => <NumCell>{row.original.sequence}</NumCell>, size: 60 },
       { accessorKey: 'type_name', header: 'Operation', cell: ({ row }) => <TextCell value={row.original.type_name} strong /> },
       { accessorKey: 'role', header: 'Role', cell: ({ row }) => <TextCell value={row.original.role} muted />, size: 170 },
-      { accessorKey: 'hours', header: headerRight('Hours per unit'), cell: ({ row }) => <Num>{row.original.is_outsourced || row.original.is_fixed ? '—' : row.original.hours}</Num>, size: 130 },
-      { accessorKey: 'amount', header: headerRight('Direct cost'), cell: ({ row }) => <Num>{money(row.original.amount, currency)}</Num>, size: 120 },
-      { id: 'overhead', header: headerRight('Overhead'), cell: ({ row }) => <Num>{(row.original.is_outsourced || row.original.is_fixed) ? '—' : money(row.original.hours * (c?.overhead_rate ?? 0), currency)}</Num>, size: 110 },
-      { id: 'total', header: headerRight('Total'), cell: ({ row }) => <Num strong>{money(row.original.amount + ((row.original.is_outsourced || row.original.is_fixed) ? 0 : row.original.hours * (c?.overhead_rate ?? 0)), currency)}</Num>, size: 120 },
+      { accessorKey: 'hours', header: headerRight('Hours per unit'), cell: ({ row }) => <NumCell>{row.original.is_outsourced || row.original.is_fixed ? '—' : row.original.hours}</NumCell>, size: 130 },
+      { accessorKey: 'amount', header: headerRight('Direct cost'), cell: ({ row }) => <NumCell>{money(row.original.amount, currency)}</NumCell>, size: 120 },
+      { id: 'overhead', header: headerRight('Overhead'), cell: ({ row }) => <NumCell>{(row.original.is_outsourced || row.original.is_fixed) ? '—' : money(row.original.hours * (c?.overhead_rate ?? 0), currency)}</NumCell>, size: 110 },
+      { id: 'total', header: headerRight('Total'), cell: ({ row }) => <NumCell strong>{money(row.original.amount + ((row.original.is_outsourced || row.original.is_fixed) ? 0 : row.original.hours * (c?.overhead_rate ?? 0)), currency)}</NumCell>, size: 120 },
     ];
     return [
       { accessorKey: 'label', header: 'Cost per unit', cell: ({ row }) => <TextCell value={row.original.label} strong={row.original.total} /> },
-      { accessorKey: 'mine', header: headerRight('This order'), cell: ({ row }) => <Num strong={row.original.total}>{money(row.original.mine, currency)}</Num>, size: 150 },
+      { accessorKey: 'mine', header: headerRight('This order'), cell: ({ row }) => <NumCell strong={row.original.total}>{money(row.original.mine, currency)}</NumCell>, size: 150 },
       // With no approved standard there is nothing to compare, so the two empty columns are left out
       ...(sn ? [
-        { accessorKey: 'std', header: headerRight(`Approved standard ${fyText(sn.fy)}`), cell: ({ row }: any) => <Num strong={row.original.total}>{row.original.std == null ? '—' : money(row.original.std, currency)}</Num>, size: 190 },
+        { accessorKey: 'std', header: headerRight(`Approved standard ${fyText(sn.fy)}`), cell: ({ row }: any) => <NumCell strong={row.original.total}>{row.original.std == null ? '—' : money(row.original.std, currency)}</NumCell>, size: 190 },
         {
           accessorKey: 'diff', header: headerRight('Difference'), size: 140,
           cell: ({ row }: any) => { const d = row.original.diff as number | null; return <div className="text-right"><ToneText label={d == null ? '—' : d === 0 ? '0' : `${d > 0 ? '+' : '-'}${money(Math.abs(d), currency)}`} tone={d == null || Math.abs(d) < 0.5 ? 'muted' : d > 0 ? 'warning' : 'success'} /></div>; },
@@ -167,18 +172,27 @@ export default function BuildOrderDetailPage() {
     : o.editable && o.has_bom && t?.min_margin_pct != null && ((o.margin_pct ?? 100) < t.min_margin_pct || (liveMargin ?? 100) < t.min_margin_pct) ? 'Below minimum margin'
     : o.editable && o.has_bom ? 'On time' : ORDER_STATUS[o.status].label;
   useEffect(() => {
-    setHeader(data ? `${data.code} ${data.product_name ?? ''}`.trim() : 'Order costing', data ? [data.client_name, data.customer_po ? `PO ${data.customer_po}` : null, verdict].filter(Boolean).join(' · ') : 'Locked BOM, cost and delivery');
+    setHeader(data ? `${data.code} ${data.product_name ?? ''}`.trim() : 'Order', data ? [data.client_name, data.customer_po ? `PO ${data.customer_po}` : null, verdict].filter(Boolean).join(' · ') : 'Locked BOM, cost and delivery');
   }, [setHeader, data, verdict]);
-  const itemActions: DetailActionDef[] = !selected || tab !== 'bom' || !editable || !(selected as OrderLine).alternates?.length ? [] : [
+  const itemActions: DetailActionDef[] = !selected || !editable ? [] : tab === 'bom' ? (!(selected as OrderLine).alternates?.length ? [] : [
     { label: 'Swap part', icon: <ArrowLeftRight className="h-4 w-4 text-[var(--nav-purple)]" />, onClick: () => setSwapOpen(true) },
-  ];
+  ]) : tab === 'operations' ? [
+    { label: 'Edit', icon: <Pencil className="h-4 w-4 text-[var(--info)]" />, onClick: () => { setEditOp(selected as OrderOperation); setOpOpen(true); } },
+    { label: 'Delete', variant: 'danger', icon: <Trash2 className="h-4 w-4 text-[var(--danger)]" />, onClick: () => setDelOp(selected as OrderOperation) },
+  ] : [];
   const alwaysActions: DetailActionDef[] = !o || !canEdit ? [] : [
+    ...(tab === 'operations' && o.editable && o.has_bom ? [{ label: 'Add build operation', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setEditOp(null); setOpOpen(true); } }] : []),
     ...(o.editable ? [{ label: 'Price and costing', icon: <Tag className="h-4 w-4 text-[var(--nav-violet)]" />, onClick: () => setPricingOpen(true) }] : []),
     ...(o.editable && o.has_bom && driftNow ? [{ label: 'Recost', icon: <RefreshCw className="h-4 w-4 text-[var(--nav-orange)]" />, onClick: () => act(() => api.post(`/build-orders/${o.id}/recost`, {}), 'Order costed again.') }] : []),
     ...(o.status === 'COMMITTED' && o.has_bom ? [{ label: 'Reimport BOM', icon: <PackageOpen className="h-4 w-4 text-[var(--nav-cyan)]" />, onClick: () => setReimport(true) }] : []),
     ...(o.status === 'COMMITTED' && !o.has_bom ? [{ label: 'Import BOM', variant: 'primary' as const, icon: <PackageOpen className="h-4 w-4 text-[var(--nav-cyan)]" />, onClick: () => act(() => api.post(`/build-orders/${o.id}/import-bom`, {}), 'Standard BOM imported and the order costed.') }] : []),
     ...(o.status === 'COMMITTED' && o.has_bom ? [{ label: 'Release', variant: 'primary' as const, icon: <Rocket className="h-4 w-4 text-[var(--nav-indigo)]" />, onClick: () => openStep('release') }] : []),
     ...(o.status === 'RELEASED' ? [{ label: 'Reopen', icon: <Undo2 className="h-4 w-4 text-[var(--nav-slate)]" />, onClick: () => openStep('reopen') }] : []),
+    ...(o.status === 'RELEASED' ? [{ label: 'Start build', variant: 'primary' as const, icon: <Hammer className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setStartOpen(true) }] : []),
+    ...(o.status === 'IN_BUILD' && isFinance ? [{ label: 'Deliver', variant: 'primary' as const, icon: <CircleCheck className="h-4 w-4 text-[var(--nav-violet)]" />, onClick: () => setDeliverOpen(true) }] : []),
+    ...((o.status === 'RELEASED' || o.status === 'IN_BUILD') && isFinance ? [{ label: 'Cancel order', icon: <Ban className="h-4 w-4 text-[var(--nav-rose)]" />, onClick: () => setCancelOpen(true) }] : []),
+    ...(o.editable ? [{ label: 'Edit order', icon: <Pencil className="h-4 w-4 text-[var(--info)]" />, onClick: () => setEditOpen(true) }] : []),
+    ...(o.status === 'COMMITTED' ? [{ label: 'Delete order', variant: 'danger' as const, icon: <Trash2 className="h-4 w-4 text-[var(--danger)]" />, onClick: () => setDelOrder(true) }] : []),
   ];
   // A selected part's own action (Swap part) comes first, then the order's main action
   const panelActions = [...itemActions, ...alwaysActions.filter((a) => a.variant === 'primary')].slice(0, 3);
@@ -201,7 +215,6 @@ export default function BuildOrderDetailPage() {
           {o.status === 'COMMITTED' ? <p>Use Reimport BOM to pick the changes up.</p> : <p>Reopen the order first if you want to reimport the BOM.</p>}
         </div>
       )}
-      {(o.status === 'RELEASED' || o.status === 'IN_BUILD') && canEdit && <p className="text-[12px] text-[var(--shell-text-muted)]">{o.status === 'RELEASED' ? 'Start the build, or cancel the order, on Manage > Order.' : 'Deliver or cancel the order on Manage > Order.'}</p>}
       {o.has_bom && c && (
         <DetailSection title="Cost per unit">
           <DetailGrid>
@@ -412,7 +425,7 @@ export default function BuildOrderDetailPage() {
             )}
           </DetailGrid>
         </DetailSection>
-        <p className="text-[12px] text-[var(--shell-text-muted)]">Operations are a locked copy of the product&apos;s. To change them, change the product and import again before the order is released.</p>
+        <p className="text-[12px] text-[var(--shell-text-muted)]">Operations start as a copy of the product&apos;s. Changes here are for this order only and cost it again. Reimporting the BOM copies the product&apos;s operations again and replaces these changes.</p>
       </div>
     );
   })();
@@ -438,7 +451,17 @@ export default function BuildOrderDetailPage() {
       <SwapPartModal isOpen={swapOpen} onClose={() => setSwapOpen(false)} order={o} lineId={selected?.id ?? null} />
       <OrderStepModal isOpen={step != null} onClose={() => setStep(null)} order={o} step={step ?? lastStep} />
       <OrderPricingModal isOpen={pricingOpen} onClose={() => setPricingOpen(false)} order={o} />
+      <OrderStepModal isOpen={startOpen} onClose={() => setStartOpen(false)} order={o} step="start" />
+      <BuildOrderModal isOpen={editOpen} onClose={() => setEditOpen(false)} editing={o} />
+      <CancelOrderModal isOpen={cancelOpen} onClose={() => setCancelOpen(false)} order={o} />
+      <ConfirmDialog open={deliverOpen} title="Mark as delivered" confirmLabel="Deliver" message={`Record ${o?.code} as delivered today, ${formatDate(new Date().toISOString())}? It can no longer change.`} onCancel={() => setDeliverOpen(false)}
+        onConfirm={() => { setDeliverOpen(false); if (o) act(() => api.post(`/build-orders/${o.id}/deliver`, {}), 'Order delivered.'); }} />
+      <ConfirmDialog open={delOrder} destructive title="Delete order" confirmLabel="Delete" message={`Delete ${o?.code}? It has not been released. Its BOM copy goes with it.`} onCancel={() => setDelOrder(false)}
+        onConfirm={async () => { setDelOrder(false); if (!o) return; try { await api.delete(`/build-orders/${o.id}`); toast.success('Order deleted.'); invalidate('budgets'); router.push('/business/orders'); } catch (err: any) { toast.error(err?.message || 'Could not delete.'); } }} />
       <ReimportOrderBomModal isOpen={reimport} onClose={() => { setReimport(false); setSelection({}); }} order={o} />
+      <BuildStepModal isOpen={opOpen} onClose={() => setOpOpen(false)} data={o ? { operation_types: o.operation_types, rate_cards: o.rate_cards } : undefined} editing={editOp} url={o ? `/build-orders/${o.id}/operations` : undefined} />
+      <ConfirmDialog open={!!delOp} destructive title="Remove build operation" message={`Remove ${delOp?.type_name ?? delOp?.name} from this order? The product's own operations are not changed.`} confirmLabel="Remove" onCancel={() => setDelOp(null)}
+        onConfirm={async () => { const x = delOp; setDelOp(null); if (x && o) { await act(() => api.delete(`/build-orders/${o.id}/operations/${x.id}`), 'Build operation removed from this order.'); setSelection({}); } }} />
     </div>
   );
 }

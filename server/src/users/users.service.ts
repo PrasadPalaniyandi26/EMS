@@ -131,7 +131,7 @@ export class UsersService {
       const created: any = await this.findById(user.id); // no viewer: full record, not redacted
       this.audit.log({
         tableName: 'users', recordId: user.id,
-        action: 'CREATE', changedBy: user.id,
+        action: 'INSERT', changedBy: user.id,
         newValues: { username: created.username, email: created.email, role_name: created.role_name },
       }).catch((e: any) => this.logger.warn('Audit log failed on user create', e?.message));
       return created;
@@ -200,7 +200,8 @@ export class UsersService {
       this.audit.log({
         tableName: 'users', recordId: id,
         action: 'UPDATE', changedBy: changedBy ?? id,
-        oldValues: oldSnapshot, newValues: updated,
+        // A password is never logged, but the log says that it changed
+        oldValues: oldSnapshot, newValues: dto.password ? { ...(updated as object), password_changed: true } : updated,
       }).catch((e: any) => this.logger.warn('Audit log failed on user update', e?.message));
       return updated;
     } catch (err: any) {
@@ -242,7 +243,12 @@ export class UsersService {
 
   async updateEmail(id: number, email: string) {
     try {
+      const before = await this.prisma.user.findUnique({ where: { id }, select: { email: true } });
       await this.prisma.user.update({ where: { id }, data: { email } });
+      this.audit.log({
+        tableName: 'users', recordId: id, action: 'UPDATE', changedBy: id,
+        oldValues: { email: before?.email }, newValues: { email },
+      }).catch((e: any) => this.logger.warn('Audit log failed on email change', e?.message));
       return this.findById(id);
     } catch (err: any) {
       if (err.code === 'P2002') {
@@ -291,6 +297,12 @@ export class UsersService {
   }
 
   async updateOwnProfile(userId: number, dto: any) {
+    const bad = (m: string) => { throw new HttpException(m, HttpStatus.BAD_REQUEST); };
+    if (dto.username !== undefined && (typeof dto.username !== 'string' || !dto.username.trim() || dto.username.trim().length > 50)) bad('Name must be 1 to 50 characters.');
+    if (dto.username) dto.username = dto.username.trim();
+    if (dto.login_name !== undefined && dto.login_name !== null && dto.login_name !== '' && !/^[a-z0-9]{1,100}$/.test(String(dto.login_name).toLowerCase())) bad('Username may use letters and numbers only.');
+    if (dto.contact_no !== undefined && dto.contact_no !== null && dto.contact_no !== '' && !/^\+?[0-9\s\-().]{7,20}$/.test(String(dto.contact_no))) bad('Phone number is not valid.');
+    if (dto.password !== undefined && dto.password !== '' && (typeof dto.password !== 'string' || dto.password.length < 6 || dto.password.length > 128)) bad('Password must be 6 to 128 characters.');
     if (dto.password) {
       if (!dto.currentPassword) {
         throw new HttpException('Current password is required to set a new password.', HttpStatus.BAD_REQUEST);
@@ -303,7 +315,7 @@ export class UsersService {
         ? await bcrypt.compare(dto.currentPassword, existing.passwordHash)
         : false;
       if (!matches) {
-        throw new HttpException('Current password is incorrect.', HttpStatus.UNAUTHORIZED);
+        throw new HttpException('Current password is incorrect.', HttpStatus.BAD_REQUEST);
       }
     }
     return this.update(userId, dto, userId);

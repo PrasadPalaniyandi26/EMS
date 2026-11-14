@@ -17,6 +17,9 @@ interface DataTableToolbarProps<TData> {
   onExport?: () => void
   exporting?: boolean
   extra?: React.ReactNode
+  // Search done by the server: the page owns the text, instead of the table filtering the rows it holds
+  searchValue?: string
+  onSearchChange?: (value: string) => void
 }
 
 export function DataTableToolbar<TData>({
@@ -27,9 +30,13 @@ export function DataTableToolbar<TData>({
   onExport,
   exporting,
   extra,
+  searchValue,
+  onSearchChange,
 }: DataTableToolbarProps<TData>) {
   if (!table) return null;
-  const isFiltered = table.getState().columnFilters.length > 0 || !!table.getState().globalFilter
+  const searchText = onSearchChange ? (searchValue ?? "") : ((table.getState().globalFilter as string) ?? "")
+  const setSearchText = (v: string) => (onSearchChange ? onSearchChange(v) : table.setGlobalFilter(v))
+  const isFiltered = table.getState().columnFilters.length > 0 || !!searchText
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 w-full">
@@ -59,16 +66,16 @@ export function DataTableToolbar<TData>({
           <Input
             aria-label="Search"
             placeholder="Search..."
-            value={(table.getState().globalFilter as string) ?? ""}
-            onChange={(event) => table.setGlobalFilter(event.target.value)}
+            value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
             className="h-8 w-full rounded-md pl-3 pr-7 text-[13px] focus-visible:ring-1"
             style={{ background: 'transparent', border: '1px solid var(--input)', color: 'var(--shell-text)' }}
           />
-          {((table.getState().globalFilter as string) ?? "") && (
+          {searchText && (
             <button
               type="button"
               aria-label="Clear search"
-              onClick={() => table.setGlobalFilter("")}
+              onClick={() => setSearchText("")}
               className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 transition-colors"
               style={{ color: 'var(--shell-text-muted)' }}
             >
@@ -82,7 +89,7 @@ export function DataTableToolbar<TData>({
             variant="ghost"
             onClick={() => {
               table.resetColumnFilters();
-              table.setGlobalFilter("");
+              setSearchText("");
             }}
             className="h-8 px-3 text-[13px] font-medium rounded-md"
             style={{ color: 'var(--shell-text-muted)' }}

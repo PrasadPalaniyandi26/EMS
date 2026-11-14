@@ -11,7 +11,7 @@ import { useBudgetChanges, type BudgetChangeRow } from '@/hooks/use-planning-que
 import { useDataTable } from '@/hooks/use-data-table';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
-import { DateCell, TextCell, ToneText, headerRight } from '@/components/data-table/cells';
+import { DateCell, TextCell, ToneText, WholeCell, headerRight } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { ConfirmDialog } from '@/components/shared/modal-primitives';
@@ -43,7 +43,7 @@ export function ObjectChanges({ lineIds, allowRequest }: { lineIds?: number[]; a
     { accessorKey: 'created_at', header: 'Requested', cell: ({ row }) => <DateCell value={row.original.created_at} />, size: 110 },
     { accessorKey: 'kind', header: 'Kind', cell: ({ row }) => <TextCell value={CHANGE_KIND[row.original.kind]} strong />, size: 160 },
     { id: 'lines', header: 'Lines', cell: ({ row }) => <TextCell value={[row.original.from_label, row.original.to_label].filter(Boolean).join('  →  ')} className="block max-w-[380px] truncate" /> },
-    { accessorKey: 'amount', header: headerRight('Amount'), cell: ({ row }) => <div className="text-right text-[13px] font-medium tabular-nums text-[var(--shell-text)]">{plain(row.original.amount, currency)}</div>, size: 120 },
+    { accessorKey: 'amount', header: headerRight('Amount'), cell: ({ row }) => <WholeCell value={row.original.amount} currency={currency} />, size: 120 },
     { accessorKey: 'requested_by_name', header: 'Requested by', cell: ({ row }) => <TextCell value={row.original.requested_by_name} muted />, size: 120 },
     { accessorKey: 'status', header: 'Status', cell: ({ row }) => <ToneText label={CHANGE_STATUS[row.original.status].label} tone={CHANGE_STATUS[row.original.status].tone} />, size: 100 },
   ], [currency]);
@@ -69,8 +69,7 @@ export function ObjectChanges({ lineIds, allowRequest }: { lineIds?: number[]; a
         <DataTableToolbar table={table} filterDefs={[
           { id: 'status', label: 'Status', value: status, onChange: (v) => { setStatus(v); setSelection({}); }, options: [{ value: 'PENDING', label: 'Pending' }, { value: 'APPROVED', label: 'Approved' }, { value: 'REJECTED', label: 'Rejected' }, { value: 'ALL', label: 'All' }] },
         ]} actions={<>
-          {allowRequest && <button className="btn-action" onClick={() => setReqOpen(true)}><Plus className="h-4 w-4 text-[var(--warning)]" /> Request change</button>}
-          <ToolbarActions actions={actions.filter((a) => a.label !== 'Withdraw')} />
+          <ToolbarActions actions={[...(allowRequest ? [{ label: 'Request change', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => setReqOpen(true) }] : []), ...actions.filter((a) => a.label !== 'Withdraw')]} />
         </>} />
       }
       intelligencePanel={

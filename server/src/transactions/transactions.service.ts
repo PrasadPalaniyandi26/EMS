@@ -9,6 +9,10 @@ import { BudgetsService } from '../budgets/budgets.service';
 
 // Upper bound for ?limit= on list endpoints; the client's largest request is 500.
 const MAX_PAGE_SIZE = 500;
+const INCLUDE = { category: true, client: true, project: true, product: true, department: true, buildOrder: { select: { code: true } } } as const;
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+// A record in one of these can no longer be removed by its owner: it is in the approval chain or is a decided record
+const KEPT = ['APPROVED', 'REJECTED', 'PENDING_MANAGER', 'PENDING_FINANCE', 'VOIDED'];
 
 @Injectable()
 export class TransactionsService {
@@ -37,7 +41,7 @@ export class TransactionsService {
       receipt_number: t.receiptNumber, submitted_at: t.submittedAt, currency: t.currency,
       client_id: t.clientId, client_name: t.client?.name, project_id: t.projectId, project_name: t.project?.name,
       context_code: t.project?.code || t.product?.code || t.department?.name, department_name: t.department?.name ?? null, product_id: t.productId, product_name: t.product?.name,
-      build_order_id: t.buildOrderId ?? null, department_id: t.departmentId ?? null, budget_line_id: t.budgetLineId ?? null, over_budget_reason: t.overBudgetReason ?? null,
+      build_order_id: t.buildOrderId ?? null, build_order_code: t.buildOrder?.code ?? null, department_id: t.departmentId ?? null, budget_line_id: t.budgetLineId ?? null, over_budget_reason: t.overBudgetReason ?? null,
       context_type: t.contextType, is_split: t.isSplit ? 1 : 0, created_at: t.createdAt, updated_at: t.updatedAt, status: t.status,
       approved_by_id: t.approvedById ?? null,
       approved_by_name: t.approvedByName ?? null,
@@ -96,7 +100,7 @@ export class TransactionsService {
     const [total, transactions] = await Promise.all([
       this.prisma.transaction.count({ where }),
       this.prisma.transaction.findMany({
-        where, include: { category: true, client: true, project: true, product: true, department: true },
+        where, include: INCLUDE,
         orderBy: [{ dateRecorded: 'desc' }, { id: 'desc' }], skip, take: limit,
       }),
     ]);
@@ -106,7 +110,7 @@ export class TransactionsService {
 
   async findById(id: number, userId: number) {
     const t = await this.prisma.transaction.findFirst({
-      where: { id, userId, NOT: { status: 'DELETED' } }, include: { category: true, client: true, project: true, product: true, department: true },
+      where: { id, userId, NOT: { status: 'DELETED' } }, include: INCLUDE,
     });
     if (!t) return null;
     return this.mapTransaction(t);
@@ -114,7 +118,7 @@ export class TransactionsService {
 
   private async findByIdAny(id: number) {
     const t = await this.prisma.transaction.findFirst({
-      where: { id, NOT: { status: 'DELETED' } }, include: { category: true, client: true, project: true, product: true, department: true },
+      where: { id, NOT: { status: 'DELETED' } }, include: INCLUDE,
     });
     if (!t) return null;
     return this.mapTransaction(t);
@@ -129,10 +133,10 @@ export class TransactionsService {
   private async resolveBuildOrder(data: any): Promise<number | null> {
     const id = data.buildOrderId ? Number(data.buildOrderId) : null;
     if (!id) return null;
-    if (data.type !== 'expense' || (data.contextType || 'project') !== 'product' || !data.productId) throw new HttpException('A build order can only be chosen for a product expense.', HttpStatus.BAD_REQUEST);
+    if (data.type !== 'expense' || (data.contextType || 'project') !== 'product' || !data.productId) throw new HttpException('An order can only be chosen for a product expense.', HttpStatus.BAD_REQUEST);
     const o = await this.prisma.buildOrder.findUnique({ where: { id }, select: { productId: true, status: true } });
-    if (!o || o.productId !== Number(data.productId)) throw new HttpException('That build order is not for the chosen product.', HttpStatus.BAD_REQUEST);
-    if (o.status === 'CANCELLED') throw new HttpException('That build order is cancelled.', HttpStatus.BAD_REQUEST);
+    if (!o || o.productId !== Number(data.productId)) throw new HttpException('That order is not for the chosen product.', HttpStatus.BAD_REQUEST);
+    if (o.status === 'CANCELLED') throw new HttpException('That order is cancelled.', HttpStatus.BAD_REQUEST);
     return id;
   }
 
@@ -284,6 +288,15 @@ export class TransactionsService {
         action: 'UPDATE', changedBy: userId,
         oldValues: { status: txn.status }, newValues: { status: 'PENDING_FINANCE' },
       }).catch((e) => this.logger.error('audit failed', e));
+      // Another Finance user has to approve it, so they hear about it
+      const others = await this.prisma.user.findMany({ where: { isActive: true, id: { not: userId }, userRoles: { some: { role: { name: ROLES.FINANCE } } } }, select: { id: true } });
+      for (const o of others) {
+        this.notifications.create(o.id, {
+          type: 'approval', title: `New ${txn.type === 'income' ? 'Income' : 'Expense'} Pending Finance Review`,
+          message: `${submitter?.username} submitted ${refId || `#${transactionId}`} for Finance review.`,
+          entityType: 'transaction', entityId: transactionId, referenceId: refId,
+        }).catch((e: any) => this.logger.warn('Background task failed', e?.message));
+      }
       return submitted;
     }
 
@@ -421,16 +434,43 @@ export class TransactionsService {
     return submitted;
   }
 
-  async update(id: number, userId: number, data: any) {
+  async update(id: number, userId: number, patch: any) {
     // Guard: only DRAFT or SENT_BACK transactions can be edited
-    const existing = await this.prisma.transaction.findFirst({ where: { id, userId } });
-    if (existing && !['DRAFT', 'SENT_BACK'].includes(existing.status || '')) {
+    const existing = await this.prisma.transaction.findFirst({ where: { id, userId, NOT: { status: 'DELETED' } } });
+    if (!existing) throw new HttpException('Transaction not found.', HttpStatus.NOT_FOUND);
+    if (!['DRAFT', 'SENT_BACK'].includes(existing.status || '')) {
       throw new HttpException(
         `Cannot edit transaction with status '${existing.status}'. Only DRAFT or SENT_BACK records can be modified.`,
         HttpStatus.BAD_REQUEST,
       );
     }
-    const oldSnapshot = existing ? this.mapTransaction(existing) : null;
+    const oldSnapshot = this.mapTransaction(existing);
+    // A change names only what it changes (the panel's receipt upload sends the receipt alone): the rest stays as it was
+    const has = (k: string) => patch[k] !== undefined;
+    const gstWas = existing.gstRate != null ? Number(existing.gstRate) : null;
+    const gstIncludedWas = existing.gstIncluded ?? false;
+    const enteredWas = gstIncludedWas ? Number(existing.totalAmount ?? existing.amount) : Number(existing.netAmount ?? existing.amount);
+    const data: any = {
+      type: patch.type ?? existing.type,
+      amount: has('amount') ? patch.amount : enteredWas,
+      gstRate: has('gstRate') ? patch.gstRate : gstWas,
+      gstIncluded: has('gstIncluded') ? patch.gstIncluded : gstIncludedWas,
+      dateRecorded: patch.dateRecorded ?? existing.dateRecorded,
+      categoryId: has('categoryId') ? patch.categoryId : existing.categoryId,
+      description: has('description') ? patch.description : existing.description,
+      paymentMethod: patch.paymentMethod ?? existing.paymentMethod,
+      receiptPath: has('receiptPath') ? patch.receiptPath : existing.receiptPath,
+      receiptNumber: has('receiptNumber') ? patch.receiptNumber : existing.receiptNumber,
+      clientId: has('clientId') ? patch.clientId : existing.clientId,
+      projectId: has('projectId') ? patch.projectId : existing.projectId,
+      productId: has('productId') ? patch.productId : existing.productId,
+      buildOrderId: has('buildOrderId') ? patch.buildOrderId : existing.buildOrderId,
+      departmentId: has('departmentId') ? patch.departmentId : existing.departmentId,
+      overBudgetReason: has('overBudgetReason') ? patch.overBudgetReason : existing.overBudgetReason,
+      contextType: patch.contextType ?? existing.contextType,
+      currency: patch.currency ?? existing.currency,
+      isClaimable: patch.isClaimable, needsReimbursement: patch.needsReimbursement,
+    };
     const gstFieldsUpd = buildGstFields(Number(data.amount), data.gstRate ?? null, !!data.gstIncluded);
     const buildOrderId = await this.resolveBuildOrder(data);
 
@@ -452,7 +492,7 @@ export class TransactionsService {
       },
     });
     // A split is only valid for the amount it was made for: a different amount (or an income) drops the split, so budget lines never see stale parts
-    if (existing?.isSplit && (data.type !== 'expense' || Math.abs(Number(existing.amount) - gstFieldsUpd.totalAmount) > 0.01)) {
+    if (existing.isSplit && (data.type !== 'expense' || Math.abs(Number(existing.amount) - gstFieldsUpd.totalAmount) > 0.01)) {
       await this.prisma.$transaction([
         this.prisma.transactionSplit.deleteMany({ where: { transactionId: id } }),
         this.prisma.transaction.update({ where: { id }, data: { isSplit: false } }),
@@ -468,8 +508,9 @@ export class TransactionsService {
   }
 
   async delete(id: number, userId: number) {
-    const existing = await this.prisma.transaction.findFirst({ where: { id, userId } });
-    if (existing && ['APPROVED', 'REJECTED', 'PENDING_MANAGER', 'PENDING_FINANCE'].includes(existing.status || '')) {
+    const existing = await this.prisma.transaction.findFirst({ where: { id, userId, NOT: { status: 'DELETED' } } });
+    if (!existing) throw new HttpException('Transaction not found.', HttpStatus.NOT_FOUND);
+    if (KEPT.includes(existing.status || '')) {
       throw new HttpException(`Cannot delete a transaction with status '${existing.status}'.`, HttpStatus.BAD_REQUEST);
     }
     const result = await this.prisma.transaction.updateMany({ where: { id, userId }, data: { status: 'DELETED' } });
@@ -487,14 +528,14 @@ export class TransactionsService {
     const existing = await this.prisma.transaction.findMany({
       where: { userId, id: { in: ids }, NOT: { status: 'DELETED' } }, select: { id: true, referenceId: true, status: true },
     });
-    const locked = existing.filter((e) => ['APPROVED', 'REJECTED'].includes(e.status || ''));
+    const locked = existing.filter((e) => KEPT.includes(e.status || ''));
     if (locked.length > 0) {
       throw new HttpException(
-        `Cannot delete ${locked.length} transaction(s) with status APPROVED or REJECTED.`,
+        `Cannot delete ${locked.length} transaction(s) that are in approval or already decided.`,
         HttpStatus.BAD_REQUEST,
       );
     }
-    const result = await this.prisma.transaction.updateMany({ where: { userId, id: { in: ids } }, data: { status: 'DELETED' } });
+    const result = await this.prisma.transaction.updateMany({ where: { userId, id: { in: existing.map((e) => e.id) } }, data: { status: 'DELETED' } });
     if (result.count > 0) {
       for (const e of existing) {
         this.audit.log({
@@ -572,9 +613,12 @@ export class TransactionsService {
 
     const original = await this.prisma.transaction.findFirst({ where: { id: transactionId, userId } });
     if (!original) throw new HttpException('Transaction not found.', HttpStatus.NOT_FOUND);
-    if (['APPROVED', 'REJECTED'].includes(original.status || '')) {
-      throw new HttpException(`Cannot split a transaction with status '${original.status}'.`, HttpStatus.BAD_REQUEST);
+    if (!['DRAFT', 'SENT_BACK'].includes(original.status || '')) {
+      throw new HttpException(`Cannot split a transaction with status '${original.status}'. Only DRAFT or SENT_BACK records can be split.`, HttpStatus.BAD_REQUEST);
     }
+    const categoryIds = [...new Set(splits.map((x) => Number(x.categoryId)))];
+    const known = await this.prisma.category.count({ where: { id: { in: categoryIds }, isActive: true } });
+    if (known !== categoryIds.length) throw new HttpException('One of the split categories does not exist or is inactive.', HttpStatus.BAD_REQUEST);
 
     const splitTotal = parseFloat(splits.reduce((sum, s) => sum + Number(s.amount), 0).toFixed(2));
     const originalAmount = parseFloat(Number(original.amount).toFixed(2));
@@ -611,7 +655,17 @@ export class TransactionsService {
     return true;
   }
 
-  async getNotes(transactionId: number) {
+  // Notes follow the same rule as the approval trail: the owner, or a Manager, Finance or Admin
+  private async assertCanSee(transactionId: number, userId: number) {
+    const t = await this.prisma.transaction.findFirst({ where: { id: transactionId, NOT: { status: 'DELETED' } }, select: { userId: true } });
+    if (!t) throw new HttpException('Transaction not found.', HttpStatus.NOT_FOUND);
+    if (t.userId === userId) return;
+    const hasRole = await this.prisma.userRole.findFirst({ where: { userId, role: { name: { in: [ROLES.FINANCE, ROLES.MANAGER, ROLES.ADMIN] } } } });
+    if (!hasRole) throw new HttpException('Access denied.', HttpStatus.FORBIDDEN);
+  }
+
+  async getNotes(transactionId: number, userId: number) {
+    await this.assertCanSee(transactionId, userId);
     const notes = await this.prisma.transactionNote.findMany({
       where: { transactionId },
       include: { user: { select: { id: true, username: true } } },
@@ -625,6 +679,7 @@ export class TransactionsService {
 
   async addNote(transactionId: number, userId: number, note: string) {
     if (!note?.trim()) throw new HttpException('Note cannot be empty.', HttpStatus.BAD_REQUEST);
+    await this.assertCanSee(transactionId, userId);
     const n = await this.prisma.transactionNote.create({
       data: { transactionId, userId, note: note.trim().slice(0, 1000) },
       include: { user: { select: { id: true, username: true } } },
@@ -644,6 +699,7 @@ export class TransactionsService {
     const txn = await this.prisma.transaction.findFirst({ where: { id: transactionId } });
     if (!txn) throw new HttpException('Transaction not found.', HttpStatus.NOT_FOUND);
     if (!txn.needsReimbursement) throw new HttpException('Transaction does not require reimbursement.', HttpStatus.BAD_REQUEST);
+    if (txn.status !== 'APPROVED') throw new HttpException('Only an approved expense can be reimbursed.', HttpStatus.BAD_REQUEST);
     if (txn.reimbursementStatus === 'PAID') throw new HttpException('Transaction already reimbursed.', HttpStatus.BAD_REQUEST);
 
     const actingUser = await this.prisma.user.findUnique({ where: { id: userId } });
@@ -796,20 +852,35 @@ export class TransactionsService {
     if (filters.clientId) where.clientId = Number(filters.clientId);
     if (filters.status) where.status = filters.status;
     if (filters.type) where.type = filters.type;
+    if (filters.contextType) where.contextType = filters.contextType;
+    if (filters.search) {
+      where.OR = [
+        { description: { contains: filters.search, mode: 'insensitive' } },
+        { referenceId: { contains: filters.search, mode: 'insensitive' } },
+        { receiptNumber: { contains: filters.search, mode: 'insensitive' } },
+      ];
+    }
 
     const transactions = await this.prisma.transaction.findMany({
-      where, include: { category: true, client: true, project: true, product: true, department: true },
+      where, include: INCLUDE,
       orderBy: [{ dateRecorded: 'desc' }, { id: 'desc' }],
       take: 10000,
     });
 
-    const esc = (v: any) => v == null ? '' : `"${String(v).replace(/"/g, '""')}"`;
-    const headers = ['Reference', 'Date', 'Type', 'Description', 'Category', 'Client', 'Project', 'Payment Method', 'Status', 'Net Amount', 'GST Rate', 'Total Amount', 'Is Claimable'];
+    // A cell that starts with = + - or @ would run as a formula when the file is opened in a spreadsheet
+    const esc = (v: any) => {
+      if (v == null) return '';
+      let t = String(v);
+      if (/^[=+\-@\t\r]/.test(t) && typeof v === 'string') t = `'${t}`;
+      return `"${t.replace(/"/g, '""')}"`;
+    };
+    const headers = ['Reference', 'Date', 'Type', 'Description', 'Category', 'Charged To', 'Project', 'Product', 'Department', 'Order', 'Client', 'Payment Method', 'Status', 'Net Amount', 'GST Rate', 'Total Amount', 'Is Claimable'];
     const rows = transactions.map((t) => {
       const m = this.mapTransaction(t);
       return [
         m.reference_id, m.date_recorded, m.type, m.description, m.category_name,
-        m.client_name, m.project_name, m.payment_method, m.status,
+        m.context_type, m.project_name, m.product_name, m.department_name, m.build_order_code,
+        m.client_name, m.payment_method, m.status,
         m.net_amount, m.gst_rate != null ? `${m.gst_rate}%` : '', m.total_amount,
         m.is_claimable ? 'Yes' : 'No',
       ].map(esc).join(',');
@@ -840,7 +911,7 @@ export class TransactionsService {
         description: original.description,
         paymentMethod: original.paymentMethod,
         clientId: original.clientId, projectId: original.projectId,
-        productId: original.productId, contextType: original.contextType, buildOrderId: original.isSplit ? null : original.buildOrderId,
+        productId: original.productId, contextType: original.contextType, departmentId: original.departmentId, buildOrderId: original.isSplit ? null : original.buildOrderId,
         currency: original.currency, status: 'DRAFT',
       },
     });
@@ -914,6 +985,12 @@ export class TransactionsService {
     if (txn.status !== 'APPROVED') {
       throw new HttpException('Only APPROVED transactions can be voided.', HttpStatus.BAD_REQUEST);
     }
+    if (!reason?.trim()) throw new HttpException('Say why this approved transaction is being voided.', HttpStatus.BAD_REQUEST);
+    if (txn.reimbursementStatus === 'PAID') throw new HttpException('This expense was already reimbursed, so it cannot be voided.', HttpStatus.BAD_REQUEST);
+    const d = new Date(txn.dateRecorded);
+    if (await this.prisma.periodLock.findUnique({ where: { year_month: { year: d.getFullYear(), month: d.getMonth() + 1 } } })) {
+      throw new HttpException(`${MON[d.getMonth()]} ${d.getFullYear()} is closed. Ask Finance to reopen it before voiding a record dated in it.`, HttpStatus.CONFLICT);
+    }
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     const voidedByName = user?.username || 'Unknown';
 
@@ -924,7 +1001,7 @@ export class TransactionsService {
         voidedById: userId,
         voidedByName: voidedByName,
         voidedAt: new Date(),
-        voidReason: reason || null,
+        voidReason: reason.trim(),
       },
     });
 

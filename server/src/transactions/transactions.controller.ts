@@ -114,8 +114,8 @@ export class TransactionsController {
   }
 
   @Get(':id/notes')
-  getNotes(@Param('id', ParseIntPipe) id: number) {
-    return this.service.getNotes(id);
+  getNotes(@Param('id', ParseIntPipe) id: number, @CurrentUser('id') userId: number) {
+    return this.service.getNotes(id, userId);
   }
 
   @Post(':id/notes')

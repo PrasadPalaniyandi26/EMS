@@ -1,6 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { ColumnDef, SortingState, getCoreRowModel, getPaginationRowModel, getSortedRowModel } from '@tanstack/react-table';
+import { useDataTable } from '@/hooks/use-data-table';
+import { DataTable } from '@/components/data-table/data-table';
+import { headerRight } from '@/components/data-table/cells';
+import { TableCell, TableRow } from '@/components/ui/table';
 import { inputStyle } from '@/components/shared/modal-primitives';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
@@ -11,8 +16,10 @@ import {
   BarChart3, FileText, TrendingDown, TrendingUp, Scale, Target,
   ArrowLeftRight, Users, Download, Sheet,
   ChevronDown, Loader2, Search, Receipt, Wallet, AlertTriangle,
+  CalendarRange, FileWarning, Boxes, Percent, Ruler,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { PageFrame } from '@/components/shared/module/page-frame';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const escapeHtml = (v: unknown): string => {
@@ -40,7 +47,18 @@ const REPORTS = [
   { id: 'client-summary', label: 'Client Summary', icon: Users, desc: 'Expense & Income for Project & Product', color: 'text-[var(--info)]', bg: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]' },
   { id: 'claimable-gst', label: 'Claimable GST', icon: Receipt, desc: 'GST claimable on expense transactions by category', color: 'text-[var(--warning)]', bg: 'bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]' },
   { id: 'reimbursement-register', label: 'Reimbursement Register', icon: Wallet, desc: 'All reimbursed expenses with payment details, by employee', color: 'text-[var(--info)]', bg: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]' },
+  { id: 'budget-by-month', label: 'Budget by Month', icon: CalendarRange, desc: 'Budget, actual and committed for each month of the year, with running totals', color: 'text-[var(--success)]', bg: '' },
+  { id: 'unbudgeted-spend', label: 'Unbudgeted Spend', icon: FileWarning, desc: 'Expenses that no budget line covers', color: 'text-[var(--danger)]', bg: '' },
+  { id: 'order-costing', label: 'Order Costing', icon: Boxes, desc: 'Orders: planned cost, order value, budget and spend', color: 'text-[var(--warning)]', bg: '' },
+  { id: 'product-margin', label: 'Product Margin', icon: Percent, desc: 'Price against standard cost, and the margin against its goals', color: 'text-[var(--success)]', bg: '' },
+  { id: 'project-estimate', label: 'Project Estimate vs Actual', icon: Ruler, desc: 'Approved project estimate against spend so far', color: 'text-[var(--info)]', bg: '' },
 ];
+
+// Reports driven by a financial year rather than a date range
+const FY_REPORTS = new Set(['budget-vs-actual', 'budget-by-month', 'unbudgeted-spend', 'product-margin']);
+// Costing figures are for Finance and Admin; a manager sees the generic reports and the budgets they own
+const FINANCE_ONLY = new Set(['unbudgeted-spend', 'order-costing', 'product-margin', 'project-estimate']);
+const NO_PERIOD = new Set(['project-estimate']);
 
 const DATE_PRESETS = [
   { label: 'This Month', key: 'thisMonth' },
@@ -51,7 +69,11 @@ const DATE_PRESETS = [
   { label: 'Custom', key: 'custom' },
 ];
 
-const CURRENCY_COLS = new Set(['Amount', 'Income', 'Expenses', 'Net', 'Budget', 'Actual', 'Committed', 'Spent', 'Remaining', 'Net Amount', 'Total Amount', 'GST Amount']);
+const CURRENCY_COLS = new Set([
+  'Amount', 'Income', 'Expenses', 'Net', 'Budget', 'Actual', 'Committed', 'Spent', 'Remaining', 'Net Amount', 'Total Amount', 'GST Amount',
+  'Cumulative Budget', 'Cumulative Used', 'Unit Cost', 'Planned Cost', 'Order Value', 'Price', 'Standard Cost', 'Margin', 'Contract Value', 'Estimate',
+]);
+const isPctCol = (c: string) => c === '% Used' || c.endsWith(' %');
 
 // ── Number util ───────────────────────────────────────────────────────────────
 function isNumericCol(col: string, rows: Record<string, any>[]) {
@@ -63,6 +85,12 @@ export default function ReportingPage() {
   const setHeader = useHeaderStore((s) => s.setHeader);
   const user = useAuthStore((s) => s.user);
   const currency = user?.currency || 'INR';
+  // The API checks the active role, so the list does too
+  const isFinanceUser = ['ADMIN', 'FINANCE'].includes(String(user?.role_name ?? '').toUpperCase());
+  const role = String(user?.role_name ?? '').toUpperCase();
+  // The API limits transaction reports the same way
+  const scopeNote = isFinanceUser ? 'Covers everyone\'s approved records.' : role === 'MANAGER' ? 'Covers your records and those of people whose requests you have decided.' : 'Covers your own records.';
+  const reports = REPORTS.filter((r) => isFinanceUser || !FINANCE_ONLY.has(r.id));
   const fmt = (n: number) => formatCurrency(n, currency);
 
   useEffect(() => { setHeader('Reports', 'Generate, view & export financial reports'); }, [setHeader]);
@@ -82,12 +110,24 @@ export default function ReportingPage() {
   const [result, setResult] = useState<ReportResult | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
 
+  // A link from another page can open a report straight away: /reporting?report=unbudgeted-spend&year=2026
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const wanted = q.get('report');
+    if (wanted && REPORTS.some((r) => r.id === wanted)) { setSelectedType(wanted); setResult(null); }
+    const y = q.get('year');
+    if (y && /^\d{4}$/.test(y)) setFy(y);
+  }, []);
+
   // Init date range to This Month
   useEffect(() => {
     const r = getDateRange('thisMonth');
     setDateFrom(r.from);
     setDateTo(r.to);
   }, []);
+
+  // A result belongs to the filters it was made with, so changing one clears it
+  useEffect(() => { setResult(null); }, [dateFrom, dateTo, txnType, categoryType, activeFy]);
 
   const handlePreset = (label: string, key: string) => {
     setDatePreset(label);
@@ -103,9 +143,9 @@ export default function ReportingPage() {
     setResult(null);
     try {
       const params: Record<string, string> = { type: selectedType };
-      if (selectedType === 'budget-vs-actual') {
+      if (FY_REPORTS.has(selectedType)) {
         if (activeFy) params.year = activeFy;
-      } else {
+      } else if (!NO_PERIOD.has(selectedType)) {
         if (dateFrom) params.dateFrom = dateFrom;
         if (dateTo) params.dateTo = dateTo;
         if (selectedType === 'transaction-ledger' && txnType) params.txnType = txnType;
@@ -124,21 +164,63 @@ export default function ReportingPage() {
     }
   }, [selectedType, dateFrom, dateTo, txnType, categoryType, activeFy]);
 
-  const filteredRows = result
+  const filteredRows = useMemo(() => (result
     ? result.rows.filter((row) =>
         !search || Object.values(row).some((v) => String(v).toLowerCase().includes(search.toLowerCase()))
       )
-    : [];
+    : []), [result, search]);
+
+  // The columns come with the report, so the table is built from them; numbers sit right, in the same cell style as every table
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const columns = useMemo<ColumnDef<Record<string, any>, any>[]>(() => (result?.columns ?? []).map((col) => {
+    const numeric = isNumericCol(col, result!.rows);
+    return {
+      id: col,
+      header: numeric ? headerRight(col) : col,
+      accessorFn: (row: Record<string, any>) => row[col],
+      cell: ({ row }: { row: { original: Record<string, any> } }) => {
+        const val = row.original[col];
+        const isNum = typeof val === 'number';
+        const isPct = isPctCol(col);
+        const display = isNum && CURRENCY_COLS.has(col) ? formatCurrency(val, currency) : isPct ? (val != null ? `${val}%` : '—') : val ?? '—';
+        const color = isPct
+          ? col === '% Used' && val >= 100 ? 'var(--danger)' : col === '% Used' && val >= 80 ? 'var(--warning)' : undefined
+          : col === 'Net' ? (val >= 0 ? 'var(--success)' : 'var(--danger)') : undefined;
+        return (
+          <div className={isNum ? 'text-right font-semibold tabular-nums whitespace-nowrap' : undefined} style={{ color: color ?? 'var(--shell-text)' }}>{display}</div>
+        );
+      },
+    } as ColumnDef<Record<string, any>, any>;
+  }), [result, currency]);
+
+  const table = useDataTable({
+    data: filteredRows, columns, state: { sorting }, onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(), getPaginationRowModel: getPaginationRowModel(), getSortedRowModel: getSortedRowModel(),
+  });
+
+  const totalsRow = result && Object.keys(result.totals).length > 0 ? (
+    <TableRow className="hover:bg-transparent">
+      {result.columns.map((col, ci) => {
+        const val = result.totals[col];
+        return (
+          <TableCell key={col} className={`font-semibold ${val != null ? 'text-right tabular-nums' : ''}`}>
+            {ci === 0 ? 'Total' : val != null ? (CURRENCY_COLS.has(col) ? fmt(val) : val) : ''}
+          </TableCell>
+        );
+      })}
+    </TableRow>
+  ) : null;
 
   // ── Export ──────────────────────────────────────────────────────────────────
+  const csvCell = (v: unknown) => JSON.stringify(typeof v === 'string' && /^[=+\-@\t\r]/.test(v) ? `'${v}` : v ?? '');
   const exportCSV = () => {
     if (!result) return;
-    const lines = [result.columns.join(',')];
+    const lines = [result.columns.map(csvCell).join(',')];
     for (const row of filteredRows) {
-      lines.push(result.columns.map((c) => JSON.stringify(row[c] ?? '')).join(','));
+      lines.push(result.columns.map((c) => csvCell(row[c])).join(','));
     }
     if (Object.keys(result.totals).length > 0) {
-      lines.push(result.columns.map((c) => result.totals[c] != null ? JSON.stringify(result.totals[c]) : '').join(','));
+      lines.push(result.columns.map((c) => result.totals[c] != null ? csvCell(result.totals[c]) : '').join(','));
     }
     const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
@@ -177,11 +259,11 @@ export default function ReportingPage() {
         .meta { color: #64748b; font-size: 11px; margin-bottom: 12px; }
       </style></head><body>
       <h2>${escapeHtml(result.title)}</h2>
-      <p class="meta">Generated: ${escapeHtml(new Date().toLocaleString())} &nbsp;|&nbsp; Period: ${escapeHtml(dateFrom || '—')} to ${escapeHtml(dateTo || '—')} &nbsp;|&nbsp; ${filteredRows.length} records</p>
+      <p class="meta">Generated: ${escapeHtml(new Date().toLocaleString())} &nbsp;|&nbsp; Period: ${escapeHtml(FY_REPORTS.has(selectedType) ? (activeFy ? fyLabel(Number(activeFy)) : '—') : NO_PERIOD.has(selectedType) ? 'Now' : `${dateFrom || '—'} to ${dateTo || '—'}`)} &nbsp;|&nbsp; ${filteredRows.length} records</p>
       <table>
         <thead><tr>${result.columns.map((c) => `<th class="${isNumericCol(c, result.rows) ? 'right' : ''}">${escapeHtml(c)}</th>`).join('')}</tr></thead>
         <tbody>
-          ${filteredRows.map((row) => `<tr>${result.columns.map((c) => { const v = row[c]; const isPct = c === '% Used' || c === 'GST %'; return `<td class="${typeof v === 'number' ? 'right' : ''}">${isPct && v != null ? escapeHtml(v) + '%' : escapeHtml(v)}</td>`; }).join('')}</tr>`).join('')}
+          ${filteredRows.map((row) => `<tr>${result.columns.map((c) => { const v = row[c]; const isPct = isPctCol(c); return `<td class="${typeof v === 'number' ? 'right' : ''}">${isPct && v != null ? escapeHtml(v) + '%' : escapeHtml(v)}</td>`; }).join('')}</tr>`).join('')}
           ${Object.keys(result.totals).length > 0 ? `<tr class="totals">${result.columns.map((c) => `<td class="${result.totals[c] != null ? 'right' : ''}">${result.totals[c] != null ? escapeHtml(result.totals[c]) : ''}</td>`).join('')}</tr>` : ''}
         </tbody>
       </table>
@@ -194,19 +276,21 @@ export default function ReportingPage() {
 
   const surface = { background: 'var(--shell-surface)', border: '1px solid var(--shell-border)' };
   const selectedReport = REPORTS.find((r) => r.id === selectedType);
-  const isBudgetReport = selectedType === 'budget-vs-actual';
+  const isBudgetReport = FY_REPORTS.has(selectedType);
+  const hasPeriod = !isBudgetReport && !NO_PERIOD.has(selectedType);
   const isClientSummary = selectedType === 'client-summary';
   const selectStyle = inputStyle;
   const selectClass = 'rounded-lg px-3 py-2 text-[13px] font-medium border outline-none focus:ring-2 focus:ring-[var(--shell-accent)]';
 
   return (
+    <PageFrame label="Reports">
     <div className="h-full overflow-y-auto custom-scrollbar px-4 py-4 space-y-4">
 
       {/* Filters */}
       <div className="rounded-lg overflow-hidden" style={surface}>
         {/* Row 1: Report type selector */}
         <div className="px-4 pt-3 pb-2 flex flex-wrap items-center gap-2" style={{ borderBottom: '1px solid var(--shell-border)' }}>
-          {REPORTS.map((r) => {
+          {reports.map((r) => {
             const Icon = r.icon;
             const active = selectedType === r.id;
             return (
@@ -241,7 +325,7 @@ export default function ReportingPage() {
                 ))}
               </select>
             </>
-          ) : (
+          ) : !hasPeriod ? null : (
             <>
               {/* Date presets + date range inline */}
               <div className="flex flex-wrap items-center gap-1.5">
@@ -280,6 +364,10 @@ export default function ReportingPage() {
                 </select>
               )}
             </>
+          )}
+
+          {!isBudgetReport && !NO_PERIOD.has(selectedType) && !FINANCE_ONLY.has(selectedType) && (
+            <span className="text-[12px] text-[var(--shell-text-muted)]">{scopeNote}</span>
           )}
 
           <button
@@ -340,6 +428,9 @@ export default function ReportingPage() {
           </div>
 
           {/* Truncation notice */}
+          {!result.truncated && result.note && (
+            <p role="status" className="border-b border-[var(--shell-border)] px-4 py-2 text-[12px] text-[var(--shell-text-muted)]">{result.note}</p>
+          )}
           {result.truncated && (
             <div role="status" className="px-4 py-2 text-[12px] font-medium flex items-center gap-2"
               style={{ background: 'color-mix(in srgb, var(--warning) 12%, transparent)', color: 'var(--warning)', borderBottom: '1px solid var(--shell-border)' }}>
@@ -348,68 +439,9 @@ export default function ReportingPage() {
             </div>
           )}
 
-          {/* Table */}
-          <div className="overflow-x-auto" ref={tableRef}>
-            <table className="w-full text-[13px]">
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--shell-border)', background: 'var(--shell-hover)' }}>
-                  {result.columns.map((col) => (
-                    <th key={col} scope="col"
-                      className={`px-4 py-2.5 font-semibold text-[12px] whitespace-nowrap ${isNumericCol(col, result.rows) ? 'text-right' : 'text-left'}`}
-                      style={{ color: 'var(--shell-text-muted)' }}>
-                      {col}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRows.map((row, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid var(--shell-border)' }}
-                    className="transition-colors hover:bg-[var(--shell-hover)]">
-                    {result.columns.map((col) => {
-                      const val = row[col];
-                      const isNum = typeof val === 'number';
-                      const isCurrency = isNum && CURRENCY_COLS.has(col);
-                      const isPct = col === '% Used' || col === 'GST %';
-                      const display = isCurrency ? fmt(val) : isPct ? (val != null ? `${val}%` : '—') : val ?? '—';
-                      const color = isPct
-                        ? val >= 100 ? 'var(--danger)' : val >= 80 ? 'var(--warning)' : undefined
-                        : col === 'Net' ? (val >= 0 ? 'var(--success)' : 'var(--danger)') : undefined;
-                      return (
-                        <td key={col} className={`px-4 py-2.5 ${isNum ? 'text-right font-semibold tabular-nums' : ''}`}
-                          style={{ color: color ?? 'var(--shell-text)', whiteSpace: isNum ? 'nowrap' : undefined }}>
-                          {display}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-
-                {/* Totals row */}
-                {Object.keys(result.totals).length > 0 && (
-                  <tr style={{ borderTop: '2px solid var(--shell-border)', background: 'var(--shell-hover)' }}>
-                    {result.columns.map((col, ci) => {
-                      const val = result.totals[col];
-                      const isCurrency = val != null && CURRENCY_COLS.has(col);
-                      return (
-                        <td key={col} className={`px-4 py-2.5 font-semibold text-[12px] ${val != null ? 'text-right tabular-nums' : ''}`}
-                          style={{ color: 'var(--shell-text)' }}>
-                          {ci === 0 ? 'TOTAL' : val != null ? (isCurrency ? fmt(val) : val) : ''}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                )}
-
-                {filteredRows.length === 0 && (
-                  <tr>
-                    <td colSpan={result.columns.length} className="px-4 py-12 text-center text-[12px] italic" style={{ color: 'var(--shell-text-muted)' }}>
-                      No data found for the selected period.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+          {/* Table: the shared DataTable, pages to the height of the box */}
+          <div ref={tableRef} className="flex h-[65dvh] min-h-[320px] flex-col">
+            <DataTable columns={columns} data={filteredRows} tableInstance={table} fullHeight footerRow={totalsRow} emptyMessage="No data found for the selected period." />
           </div>
         </div>
       )}
@@ -423,5 +455,6 @@ export default function ReportingPage() {
         </div>
       )}
     </div>
+    </PageFrame>
   );
 }

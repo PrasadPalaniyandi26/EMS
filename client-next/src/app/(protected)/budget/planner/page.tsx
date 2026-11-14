@@ -18,13 +18,13 @@ import { useDataTable } from '@/hooks/use-data-table';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
 import { type FilterDef } from '@/components/data-table/filters';
-import { IdCell, TextCell, ToneText, headerRight } from '@/components/data-table/cells';
+import { IdCell, TextCell, ToneText, headerRight, WholeCell } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { ConfirmDialog } from '@/components/shared/modal-primitives';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import { BudgetLineModal, NewPlanModal, PlanDecisionModal, PlanDetailsModal } from '@/components/budgets/budget-modals';
-import { Kpi, KpiStrip, PlanStatusText, TabBar, UtilBar, fyOptions, money, plain, useTabParam } from '@/components/budgets/budget-ui';
+import { Kpi, PlanStatusText, TabBar, UtilBar, fyOptions, money, plain, useTabParam } from '@/components/budgets/budget-ui';
 import { KIND_COST_OBJECT, KIND_LABEL, STATUS_TONE, changesFor, detailHref, linesOf, rollUp, statusSort, type ObjectStatus, type PlannerKind } from '@/components/budgets/planner-objects';
 
 type Tab = 'projects' | 'products' | 'orders' | 'overheads';
@@ -33,13 +33,12 @@ const TAB_KIND: Record<Tab, PlannerKind> = { projects: 'project', products: 'pro
 const EMPTY: Record<Tab, string> = {
   projects: 'No projects yet. Add them under Manage, then plan their budget here.',
   products: 'No products yet. Add them under Manage, then plan their budget here.',
-  orders: 'No orders yet. Commit an order under Order costing, then plan its budget here.',
+  orders: 'No orders yet. Add an order under Orders, then plan its budget here.',
   overheads: 'No departments yet.',
 };
 
 interface ObjRow { key: string; kind: PlannerKind; id: number; code: string | null; name: string; client: string | null; lines: MonitorLine[]; r: ReturnType<typeof rollUp>; waiting: number }
 
-const Whole = ({ value, currency }: { value: number; currency: string }) => <div className="text-right text-[13px] font-medium tabular-nums text-[var(--shell-text)]">{plain(value, currency)}</div>;
 
 export default function BudgetPlannerPage() {
   const setHeader = useHeaderStore((s) => s.setHeader);
@@ -104,8 +103,8 @@ export default function BudgetPlannerPage() {
     ...(tab === 'overheads' ? [] : [{ accessorKey: 'client', header: tab === 'orders' ? 'Customer' : 'Client', cell: ({ row }: any) => <TextCell value={row.original.client} muted className="block max-w-[120px] truncate" />, size: 130 } as ColumnDef<ObjRow, any>]),
     { id: 'status', header: 'Status', size: 100, accessorFn: (o) => o.r.status, cell: ({ row }) => <ToneText label={row.original.r.status} tone={STATUS_TONE[row.original.r.status as ObjectStatus]} /> },
     { id: 'rank', header: 'Rank', accessorFn: (o) => statusSort(o.r.status), cell: () => null, enableHiding: true },
-    { id: 'planned', header: headerRight('Budget'), size: 100, accessorFn: (o) => o.r.planned, cell: ({ row }) => (row.original.r.count ? <Whole value={row.original.r.planned} currency={currency} /> : <div className="text-right"><TextCell value="—" muted /></div>) },
-    { id: 'used', header: headerRight('Used'), size: 100, accessorFn: (o) => o.r.used, cell: ({ row }) => (row.original.r.count ? <Whole value={row.original.r.used} currency={currency} /> : <div className="text-right"><TextCell value="—" muted /></div>) },
+    { id: 'planned', header: headerRight('Budget'), size: 100, accessorFn: (o) => o.r.planned, cell: ({ row }) => (row.original.r.count ? <WholeCell value={row.original.r.planned} currency={currency} /> : <div className="text-right"><TextCell value="—" muted /></div>) },
+    { id: 'used', header: headerRight('Used'), size: 100, accessorFn: (o) => o.r.used, cell: ({ row }) => (row.original.r.count ? <WholeCell value={row.original.r.used} currency={currency} /> : <div className="text-right"><TextCell value="—" muted /></div>) },
     {
       id: 'pct', header: 'Used %', size: 110, accessorFn: (o) => o.r.pct,
       cell: ({ row }) => row.original.r.count ? (
@@ -138,9 +137,20 @@ export default function BudgetPlannerPage() {
     try { await api.delete(`/budgets/plans/${plan.fy}`); toast.success('Plan deleted.'); invalidate('budgets'); setFy(plansData?.current_fy ?? null); } catch (err: any) { toast.error(err?.message || 'Could not delete the plan.'); } finally { setDeletePlan(false); }
   };
 
+  // The plan's own actions (the same list the toolbar always shows); the selected row's actions follow them
+  const planActions: DetailActionDef[] = [
+    ...(canPlan ? [{ label: 'New plan', icon: <FilePlus2 className="h-4 w-4 text-[var(--success)]" />, onClick: () => setNewPlanOpen(true) }] : []),
+    ...(plan && draft && (view?.lines.length ?? 0) > 0 ? [{ label: 'Submit for approval', icon: <Send className="h-4 w-4 text-[var(--shell-accent)]" />, onClick: () => setSubmitOpen(true) }] : []),
+    ...(plan?.status === 'SUBMITTED' && isFinance ? [
+      { label: 'Approve', icon: <CheckCircle2 className="h-4 w-4 text-[var(--nav-emerald)]" />, onClick: () => setDecision('approve') },
+      { label: 'Send back', icon: <CornerUpLeft className="h-4 w-4 text-[var(--info)]" />, onClick: () => setDecision('send_back') },
+    ] : []),
+    ...(plan && canPlan ? [{ label: 'Plan details', icon: <Settings2 className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setDetailsOpen(true) }] : []),
+    ...(plan && isFinance && draft ? [{ label: 'Delete plan', icon: <Trash2 className="h-4 w-4 text-[var(--danger)]" />, onClick: () => setDeletePlan(true) }] : []),
+  ];
   const actions: DetailActionDef[] = selected ? [
     { label: 'Open', variant: 'primary', icon: <FolderOpen className="h-4 w-4 text-[var(--nav-slate)]" />, onClick: () => router.push(detailHref(selected.kind, selected.id, fy)) },
-    ...(canEditLines ? [{ label: 'Add budget line', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => setLineFor(selected) }] : []),
+    ...(canEditLines ? [{ label: 'Add budget line', icon: <Plus className="h-4 w-4 text-[var(--nav-cyan)]" />, onClick: () => setLineFor(selected) }] : []),
   ] : [];
 
   const k = mon?.kpis;
@@ -153,6 +163,14 @@ export default function BudgetPlannerPage() {
           <DetailField label="No budget yet" value={all.filter((o) => o.r.count === 0).length} tone={all.some((o) => o.r.count === 0) ? 'warning' : 'muted'} />
           <DetailField label="Needs attention" value={all.filter((o) => ['Warning', 'Critical'].includes(o.r.status)).length} tone={all.some((o) => ['Warning', 'Critical'].includes(o.r.status)) ? 'danger' : 'muted'} />
           <DetailField label="Changes waiting" value={all.reduce((a, o) => a + o.waiting, 0)} />
+        </DetailGrid>
+      </DetailSection>
+      <DetailSection title={`Across ${all.filter((o) => o.r.count > 0).length} with a budget`}>
+        <DetailGrid>
+          <DetailField label="Budget" value={money(all.reduce((a, o) => a + o.r.planned, 0), currency)} />
+          <DetailField label="Used" value={money(all.reduce((a, o) => a + o.r.used, 0), currency)} />
+          <DetailField label="Left" value={money(all.reduce((a, o) => a + o.r.left, 0), currency)} tone={all.reduce((a, o) => a + o.r.left, 0) < 0 ? 'danger' : undefined} />
+          <DetailField label="Used %" value={(() => { const b = all.reduce((a, o) => a + o.r.planned, 0); return b > 0 ? `${Math.round((all.reduce((a, o) => a + o.r.used, 0) / b) * 100)}%` : '–'; })()} />
         </DetailGrid>
       </DetailSection>
       {tab === 'orders' && <p className="text-[12px] text-[var(--shell-text-muted)]">An order budget takes the order&apos;s own expenses first. Expenses it does not cover count against the product&apos;s budget.</p>}
@@ -199,21 +217,7 @@ export default function BudgetPlannerPage() {
           <ModuleShell
             showPanel={!!selected}
             searchRow={
-              <DataTableToolbar table={table} filterDefs={filterDefs} actions={
-                <>
-                  {canPlan && <button className="btn-action" onClick={() => setNewPlanOpen(true)}><FilePlus2 className="h-4 w-4 text-[var(--success)]" /> New plan</button>}
-                  {plan && draft && (view?.lines.length ?? 0) > 0 && <button className="btn-action" onClick={() => setSubmitOpen(true)}><Send className="h-4 w-4 text-[var(--shell-accent)]" /> Submit for approval</button>}
-                  {plan?.status === 'SUBMITTED' && isFinance && (
-                    <>
-                      <button className="btn-action" onClick={() => setDecision('approve')}><CheckCircle2 className="h-4 w-4 text-[var(--success)]" /> Approve</button>
-                      <button className="btn-action" onClick={() => setDecision('send_back')}><CornerUpLeft className="h-4 w-4 text-[var(--info)]" /> Send back</button>
-                    </>
-                  )}
-                  {plan && canPlan && <button className="btn-action" onClick={() => setDetailsOpen(true)}><Settings2 className="h-4 w-4 text-[var(--warning)]" /> Plan details</button>}
-                  {plan && isFinance && draft && <button className="btn-action" onClick={() => setDeletePlan(true)}><Trash2 className="h-4 w-4 text-[var(--danger)]" /> Delete plan</button>}
-                  <ToolbarActions actions={actions} />
-                </>
-              } />
+              <DataTableToolbar table={table} filterDefs={filterDefs} actions={<><ToolbarActions actions={planActions} /><ToolbarActions actions={actions} /></>} />
             }
             intelligencePanel={
               <ModuleIntelligencePanel title={selected ? KIND_LABEL[selected.kind] : 'Summary'} onClose={() => setSelection({})} hasSelection={!!selected} idle={summary} footer={actions.length ? <DetailActions actions={actions} /> : undefined}>
@@ -222,17 +226,17 @@ export default function BudgetPlannerPage() {
             }
           >
             <div className="flex h-full min-h-0 flex-col">
-              <KpiStrip>
-                <Kpi label="Plan" value={plan ? <PlanStatusText status={plan.status} /> : '–'} sub={plan?.label} />
-                <Kpi label="Company envelope" value={plan?.envelope != null ? money(plan.envelope, currency) : 'Not set'} />
-                <Kpi label="Planned" value={money(view?.totals.planned, currency)} sub={`${view?.lines.length ?? 0} line${view?.lines.length === 1 ? '' : 's'}`} />
-                <Kpi label="Used" value={money(k ? k.actual + k.committed : 0, currency)} sub="Actual and committed" />
-                <Kpi label="Left to allocate" value={view?.totals.unallocated != null ? money(view.totals.unallocated, currency) : '–'} tone={view?.totals.unallocated != null && view.totals.unallocated < 0 ? 'danger' : undefined} sub={view?.totals.unallocated != null && view.totals.unallocated < 0 ? 'Plan is over the envelope' : undefined} />
-                <Kpi label="Changes waiting" value={pendingRows.length ? <Link href="/budget/changes" className="hover:underline">{pendingRows.length}</Link> : 0} />
-              </KpiStrip>
+              <div className="grid shrink-0 grid-cols-2 border-b border-[var(--shell-border)] bg-[var(--shell-surface)] md:grid-cols-3">
+                <div className="border-b border-r border-[var(--shell-border)]"><Kpi label="Plan" value={plan ? <PlanStatusText status={plan.status} /> : '–'} sub={plan?.label} /></div>
+                <div className="border-b border-r border-[var(--shell-border)]"><Kpi label="Company envelope" value={plan?.envelope != null ? money(plan.envelope, currency) : 'Not set'} /></div>
+                <div className="border-b border-r border-[var(--shell-border)]"><Kpi label="Planned" value={money(view?.totals.planned, currency)} sub={`${view?.lines.length ?? 0} line${view?.lines.length === 1 ? '' : 's'}`} /></div>
+                <div className="border-b border-r border-[var(--shell-border)]"><Kpi label="Used" value={money(k ? k.actual + k.committed : 0, currency)} sub="Actual and committed" /></div>
+                <div className="border-b border-r border-[var(--shell-border)]"><Kpi label="Left to allocate" value={view?.totals.unallocated != null ? money(view.totals.unallocated, currency) : '–'} tone={view?.totals.unallocated != null && view.totals.unallocated < 0 ? 'danger' : undefined} sub={view?.totals.unallocated != null && view.totals.unallocated < 0 ? 'Plan is over the envelope' : undefined} /></div>
+                <div className="border-b border-r border-[var(--shell-border)]"><Kpi label="Changes waiting" value={pendingRows.length ? <Link href="/budget/monitor?tab=changes" className="hover:underline">{pendingRows.length}</Link> : 0} /></div>
+              </div>
               {plan?.decision_note && plan.status === 'DRAFT' && <p className="shrink-0 border-b border-[var(--shell-border)] px-4 py-2 text-[13px] text-[var(--warning)]">Sent back: {plan.decision_note}</p>}
-              <div className="min-h-0 flex-1">
-                <DataTable isLoading={isLoading} columns={columns} data={rows} tableInstance={table} emptyMessage={all.length === 0 ? EMPTY[tab] : 'Nothing matches this filter.'} />
+              <div className="flex min-h-0 flex-1 flex-col">
+                <DataTable isLoading={isLoading} columns={columns} data={rows} tableInstance={table} fullHeight emptyMessage={all.length === 0 ? EMPTY[tab] : 'Nothing matches this filter.'} />
               </div>
             </div>
           </ModuleShell>

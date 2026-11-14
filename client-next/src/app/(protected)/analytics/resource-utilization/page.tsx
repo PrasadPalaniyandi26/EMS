@@ -6,9 +6,13 @@ import { PeriodBar } from '@/components/shared/period-bar';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { formatCurrency, formatDate, getDateRange } from '@/lib/currency';
+import { useBudgetMonitor } from '@/hooks/use-budget-queries';
+import { RecordLink } from '@/components/budgets/budget-ui';
+import { detailHref, kindOfLine, objectIdOf } from '@/components/budgets/planner-objects';
 import {
   useTopSpenders, useCategoryHeatmap, useProjectBurn, useProductBurn,
 } from '@/hooks/use-queries';
+import { PageFrame } from '@/components/shared/module/page-frame';
 
 const DATE_PRESETS = [
   { label: 'This month', key: 'thisMonth' },
@@ -45,7 +49,7 @@ function SkeletonRect({ h = '120px' }: { h?: string }) {
 const empty = 'px-4 py-10 text-pretty text-center text-[13px] text-[var(--shell-text-muted)]';
 
 // Spend against budget, one row per project or product: the name, how much of the budget is used, a bar, and the amounts
-function BudgetRows({ data, nameKey, fmt }: { data: any[]; nameKey: string; fmt: (n: number) => string }) {
+function BudgetRows({ data, nameKey, fmt, hrefOf }: { data: any[]; nameKey: string; fmt: (n: number) => string; hrefOf?: (row: any) => string | null }) {
   return (
     <ul className="divide-y divide-[var(--shell-border)]">
       {data.map((p: any, i: number) => {
@@ -53,9 +57,11 @@ function BudgetRows({ data, nameKey, fmt }: { data: any[]; nameKey: string; fmt:
         const pct: number | null = hasBudget ? (p.pct ?? Math.round((p.spent / p.budget) * 100)) : null;
         const color = budgetColor(pct);
         return (
-          <li key={p[nameKey]} className="px-4 py-3">
+          <li key={`${p[nameKey]}-${i}`} className="px-4 py-3">
             <div className="flex items-baseline justify-between gap-3">
-              <span title={p[nameKey]} className="truncate text-[13px] text-[var(--shell-text)]">{p[nameKey]}</span>
+              {hrefOf?.(p)
+                ? <span title={p[nameKey]} className="min-w-0 truncate"><RecordLink href={hrefOf(p)!}>{p[nameKey]}</RecordLink></span>
+                : <span title={p[nameKey]} className="truncate text-[13px] text-[var(--shell-text)]">{p[nameKey]}</span>}
               {pct !== null
                 ? <span className="shrink-0 text-[13px] font-semibold tabular-nums" style={{ color: pct >= 80 ? color : 'var(--shell-text)' }}>{pct}%</span>
                 : <span className="shrink-0 text-[13px] font-semibold tabular-nums" style={{ color: SPEND }}>{fmt(p.spent)}</span>}
@@ -107,7 +113,7 @@ export default function SpendAnalyticsPage() {
   const { data: burnProject, isLoading: loadBurnProj  } = useProjectBurn(dateFrom, dateTo);
   const { data: burnProduct, isLoading: loadBurnProd  } = useProductBurn(dateFrom, dateTo);
 
-  // The grid covers the last 12 months whatever the period, so rows with no spend at the start and end are dropped
+  // The grid covers the months of the chosen period, so rows with no spend at the start and end are dropped
   const heatMonths = (() => {
     const months = ((heatmap?.months || []) as any[]);
     const cats = ((heatmap?.categories || []) as string[]);
@@ -125,11 +131,28 @@ export default function SpendAnalyticsPage() {
       ), 1)
     : 1;
 
+  // The budget plan for the current financial year, whatever period is chosen above
+  const { data: monitor, isLoading: loadMonitor } = useBudgetMonitor(null);
+  const watch = (monitor?.lines ?? [])
+    .filter((l) => !l.is_contingency && l.cost_object !== 'RESERVE' && l.total > 0 && l.status !== 'On track' && l.status !== 'Held')
+    .sort((a, b) => b.pct - a.pct)
+    .slice(0, 8)
+    .map((l) => ({ label: l.label, spent: l.used, budget: l.total, pct: l.pct, href: objectIdOf(l) != null ? detailHref(kindOfLine(l), objectIdOf(l)!, monitor?.fy ?? null) : null }));
+  const k = monitor?.kpis;
+  const budgetFigures = k ? [
+    { label: 'Approved budget', value: k.approved, color: 'var(--shell-text)' },
+    { label: 'Actual', value: k.actual, color: SPEND },
+    { label: 'Committed', value: k.committed, color: 'var(--shell-text)' },
+    { label: 'Forecast', value: k.forecast, color: k.forecast > k.approved ? 'var(--danger)' : 'var(--shell-text)' },
+    { label: `Unbudgeted${k.unbudgeted_count ? ` (${k.unbudgeted_count})` : ''}`, value: k.unbudgeted, color: k.unbudgeted > 0 ? 'var(--warning)' : 'var(--shell-text)' },
+  ] : [];
+
   const spenderRows = ((spenders || []) as any[]).map((s) => ({ name: s.username as string, value: Number(s.total) || 0 }));
   const spenderMax = spenderRows.reduce((m, s) => Math.max(m, s.value), 0);
   const spenderTotal = spenderRows.reduce((t, s) => t + s.value, 0);
 
   return (
+    <PageFrame label="Spend analytics">
     <div className="h-full overflow-y-auto custom-scrollbar space-y-6 px-4 py-4">
 
       <PeriodBar
@@ -141,6 +164,26 @@ export default function SpendAnalyticsPage() {
         onFrom={(v) => { setDateFrom(v); setPreset('Custom'); }}
         onTo={(v) => { setDateTo(v); setPreset('Custom'); }}
       />
+
+      <p className="text-[12px] text-[var(--shell-text-muted)]">
+        Spend here counts approved expenses and those waiting for approval, the way Budget does. Reports count approved ones only.
+      </p>
+
+      {/* Where the year's budget stands: the plan, what is spent and promised, and where it is heading */}
+      {(loadMonitor || k) && (
+        <Panel title={`Budget ${monitor?.label ?? ''}`.trim()}>
+          {loadMonitor ? <div className="p-4"><SkeletonRect h="56px" /></div> : (
+            <dl className="grid grid-cols-2 divide-x divide-y divide-[var(--shell-border)] sm:grid-cols-5 sm:divide-y-0">
+              {budgetFigures.map((f) => (
+                <div key={f.label} className="px-4 py-3">
+                  <dt className="text-[12px] text-[var(--shell-text-muted)]">{f.label}</dt>
+                  <dd className="mt-1 text-[16px] font-semibold tabular-nums" style={{ color: f.color }}>{fmt(f.value)}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </Panel>
+      )}
 
       {/* The overview first, across the full width so every category has room: spend by category and month */}
       <Panel title="Spend by category and month" action={
@@ -196,7 +239,7 @@ export default function SpendAnalyticsPage() {
       </Panel>
 
       {/* Who spends, and how projects and products stand against their budgets */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 2xl:grid-cols-4">
 
         <Panel title="Top spenders">
           {loadSpenders ? (
@@ -223,27 +266,38 @@ export default function SpendAnalyticsPage() {
           )}
         </Panel>
 
-        <Panel title="Projects against budget">
+        {k && (
+          <Panel title="Budget lines to watch">
+            {!watch.length ? (
+              <p className={empty}>Every budget line is on track.</p>
+            ) : (
+              <BudgetRows data={watch} nameKey="label" fmt={fmt} hrefOf={(r) => r.href} />
+            )}
+          </Panel>
+        )}
+
+        <Panel title="Projects against estimate">
           {loadBurnProj ? (
             <div className="space-y-3 p-4">{[...Array(4)].map((_, i) => <SkeletonRect key={i} h="40px" />)}</div>
           ) : !burnProject?.length ? (
             <p className={empty}>No expenses charged to a project in this period.</p>
           ) : (
-            <BudgetRows data={burnProject} nameKey="project_name" fmt={fmt} />
+            <BudgetRows data={burnProject} nameKey="project_name" fmt={fmt} hrefOf={(r) => `/business/projects/${r.project_id}`} />
           )}
         </Panel>
 
-        <Panel title="Products against budget">
+        <Panel title="Products against budget plan">
           {loadBurnProd ? (
             <div className="space-y-3 p-4">{[...Array(4)].map((_, i) => <SkeletonRect key={i} h="40px" />)}</div>
           ) : !burnProduct?.length ? (
             <p className={empty}>No expenses charged to a product in this period.</p>
           ) : (
-            <BudgetRows data={burnProduct} nameKey="product_name" fmt={fmt} />
+            <BudgetRows data={burnProduct} nameKey="product_name" fmt={fmt} hrefOf={(r) => `/business/products/${r.product_id}`} />
           )}
         </Panel>
       </div>
 
     </div>
+    </PageFrame>
   );
 }

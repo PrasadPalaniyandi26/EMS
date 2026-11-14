@@ -38,6 +38,10 @@ interface DataTableProps<TData, TValue> {
   emptyMessage?: string;
   // First load of the data: show skeleton rows instead of flashing the empty message
   isLoading?: boolean;
+  // Server paging: the table holds one page of rows, so the footer counts this many in total instead
+  totalRows?: number;
+  // A closing row after the data, such as the totals of a report (a <TableRow> with its cells)
+  footerRow?: React.ReactNode;
 }
 
 export function DataTable<TData, TValue>({
@@ -50,6 +54,8 @@ export function DataTable<TData, TValue>({
   mobileHiddenColumns,
   emptyMessage = "No results found.",
   isLoading = false,
+  totalRows,
+  footerRow,
 }: DataTableProps<TData, TValue>) {
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
@@ -214,7 +220,7 @@ export function DataTable<TData, TValue>({
                   </TableRow>
                 ))
               ) : table.getRowModel().rows?.length ? (
-                table.getRowModel().rows.map((row: any) => {
+                <>{table.getRowModel().rows.map((row: any) => {
                   const isSelected = tableInstance
                     ? row.getIsSelected()
                     : effectiveSelectedId !== undefined && (row.original as any).id === effectiveSelectedId;
@@ -239,7 +245,7 @@ export function DataTable<TData, TValue>({
                       ))}
                     </TableRow>
                   );
-                })
+                })}{footerRow}</>
               ) : (
                 <TableRow>
                   <TableCell colSpan={columns.length} className="h-32 whitespace-normal text-center">
@@ -255,8 +261,10 @@ export function DataTable<TData, TValue>({
         </div>
         <div className="px-4 py-2 flex items-center justify-between shrink-0" style={{ borderTop: '1px solid var(--shell-border)', background: 'var(--shell-surface)' }}>
           <div className="flex-1 text-[12px]" style={{ color: 'var(--shell-text-muted)' }}>
-            {isLoading ? 'Loading…' : `${table.getFilteredRowModel().rows.length} results`}
+            {isLoading ? 'Loading…' : `${(totalRows ?? table.getFilteredRowModel().rows.length).toLocaleString()} results`}
           </div>
+          {/* Paging controls appear only when there is more than one page */}
+          {table.getPageCount() > 1 && (
           <div className="flex items-center gap-1.5">
             <button
               className="px-3 py-1 text-[12px] font-medium rounded-lg transition-colors disabled:opacity-30"
@@ -275,6 +283,7 @@ export function DataTable<TData, TValue>({
               Next
             </button>
           </div>
+          )}
         </div>
       </div>
     </div>

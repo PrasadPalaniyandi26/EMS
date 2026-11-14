@@ -3,6 +3,7 @@
 import { Split, Trash2, UploadCloud } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/currency';
 import { getStatusConfig } from '@/lib/status';
+import { ChargedToSection } from './charged-to';
 import {
   DetailSummary, DetailSection, DetailGrid, DetailField, DetailAttachment, DetailAllocation, DetailTimeline,
   type DetailTone,
@@ -37,7 +38,6 @@ export function TransactionDetail({ kind, txn, currency, approvalTrail, split, n
   const total = txn.total_amount ?? txn.amount;
   const net = txn.net_amount ?? txn.amount;
   const comment = (s: string) => approvalTrail?.find((r: any) => r.status === s)?.comments;
-  const linked = txn.project_name || txn.product_name;
   const canSplit = ['DRAFT', 'SENT_BACK'].includes((txn.status || '').toUpperCase()) && split.onSplit;
 
   const trail: Array<{ title: React.ReactNode; meta?: React.ReactNode; tone: DetailTone }> = [];
@@ -94,6 +94,8 @@ export function TransactionDetail({ kind, txn, currency, approvalTrail, split, n
         />
       </DetailSection>
 
+      <ChargedToSection txn={txn} />
+
       <DetailSection
         title="Fund allocation"
         action={canSplit ? <button type="button" onClick={split.onSplit} className={textBtn}><Split aria-hidden className="h-3 w-3" />{txn.is_split === 1 ? 'Re-split' : 'Split'}</button> : undefined}
@@ -114,10 +116,8 @@ export function TransactionDetail({ kind, txn, currency, approvalTrail, split, n
           ) : (
             <p className="text-[12px] text-[var(--shell-text-muted)]">No split details available.</p>
           )
-        ) : linked ? (
-          <DetailGrid><DetailField label={txn.project_name ? 'Project' : 'Product'} value={linked} wide /></DetailGrid>
         ) : (
-          <p className="text-[12px] text-[var(--shell-text-muted)]">Not linked to a project or product.</p>
+          <p className="text-[12px] text-[var(--shell-text-muted)]">Not split. The whole amount goes to one category.</p>
         )}
       </DetailSection>
 

@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useHeaderStore } from '@/stores/header-store';
 import { useClients, useClientSectors, useInvalidate } from '@/hooks/use-queries';
 import { useAuthStore } from '@/stores/auth-store';
@@ -26,16 +26,20 @@ import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAllocation, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import { useConfirm } from '@/components/shared/modal-primitives';
+import { PageFrame } from '@/components/shared/module/page-frame';
 
 const COUNTRIES = ['United Kingdom', 'United States', 'India', 'Germany', 'Canada', 'Singapore', 'Australia'];
 
 export default function ClientsPage() {
   const setHeader = useHeaderStore((s) => s.setHeader);
-  const { data: clients, isLoading } = useClients();
+  const { data: clients, isLoading } = useClients(true);
   const { data: sectors } = useClientSectors();
   const invalidate = useInvalidate();
   // Managing sectors is admin-only; the API checks the active role the same way
-  const isAdmin = (useAuthStore((s) => s.user)?.role_name || '').toUpperCase() === 'ADMIN';
+  const role = (useAuthStore((s) => s.user)?.role_name || '').toUpperCase();
+  const isAdmin = role === 'ADMIN';
+  // The API lets managers and admins change clients; the other roles only read them
+  const canManage = role === 'ADMIN' || role === 'MANAGER';
   const [sectorsOpen, setSectorsOpen] = useState(false);
   const { confirm: confirmDialog, dialog: confirmDialogEl } = useConfirm();
 
@@ -72,6 +76,18 @@ export default function ClientsPage() {
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
   });
+
+
+  // /manage/clients?id=7 opens the list with that client selected
+  const linked = useRef(false);
+  useEffect(() => {
+    if (linked.current || !clients?.length) return;
+    const wanted = Number(new URLSearchParams(window.location.search).get('id'));
+    if (!wanted) return;
+    const at = clients.findIndex((r: any) => r.id === wanted);
+    linked.current = true;
+    if (at >= 0) setRowSelection({ [at]: true });
+  }, [clients]);
 
   const selectedRows = table.getSelectedRowModel().rows;
 
@@ -124,7 +140,7 @@ export default function ClientsPage() {
 
   const handleDelete = async () => {
     if (!selectedClient) return;
-    const ok = await confirmDialog('Delete client', `Delete ${selectedClient.name}? Projects and products linked to it lose their client. This cannot be undone.`, { confirmLabel: 'Delete client', destructive: true });
+    const ok = await confirmDialog('Delete client', `Delete ${selectedClient.name}? It is deactivated: no longer offered when you add a project, product or expense, and kept on everything it is already on. Edit turns it back on.`, { confirmLabel: 'Delete client', destructive: true });
     if (!ok) return;
     try {
       await api.delete(`/clients/${selectedClient.id}`);
@@ -135,7 +151,7 @@ export default function ClientsPage() {
   };
 
   // The built-in Internal client cannot be changed, so it offers no actions
-  const itemActions: DetailActionDef[] = selectedClient && !selectedClient.is_system ? [
+  const itemActions: DetailActionDef[] = canManage && selectedClient && !selectedClient.is_system ? [
     { label: 'Edit', variant: 'primary', onClick: openEdit },
     { label: 'Delete', variant: 'danger', onClick: handleDelete },
   ] : [];
@@ -158,21 +174,17 @@ export default function ClientsPage() {
   );
 
   return (
+    <PageFrame label="Clients">
     <ModuleShell
       showPanel={!!selectedClient}
       searchRow={
         <DataTableToolbar
           table={table}
-          actions={<>
-            <button className="btn-action" onClick={openAdd}>
-              <Plus className="h-4 w-4 text-[var(--success)]" /> Add
-            </button>
-            {isAdmin && (
-              <button className="btn-action" onClick={() => setSectorsOpen(true)}>
-                <Layers aria-hidden className="h-4 w-4 text-[var(--nav-violet)]" /> Sectors
-              </button>
-            )}
-          <ToolbarActions actions={itemActions} /></>}
+          actions={<ToolbarActions actions={[
+            ...(canManage ? [{ label: 'Add', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: openAdd }] : []),
+            ...(isAdmin ? [{ label: 'Sectors', icon: <Layers aria-hidden className="h-4 w-4 text-[var(--nav-violet)]" />, onClick: () => setSectorsOpen(true) }] : []),
+            ...itemActions,
+          ]} />}
         />
       }
       intelligencePanel={
@@ -199,12 +211,6 @@ export default function ClientsPage() {
                       <DetailField label="Contact name" value={c.contact_name} />
                       <DetailField label="Phone" value={c.contact_phone} />
                       <DetailField label="Email" value={c.contact_email ? <a className="text-[var(--shell-accent)] hover:underline" href={`mailto:${c.contact_email}`}>{c.contact_email}</a> : undefined} wide />
-                    </DetailGrid>
-                  </DetailSection>
-                  <DetailSection title="Billing">
-                    <DetailGrid>
-                      <DetailField label="Payment terms" value={c.payment_terms} />
-                      <DetailField label="Tax ID" value={c.tax_id} />
                     </DetailGrid>
                   </DetailSection>
                   <DetailSection title="Location">
@@ -234,7 +240,7 @@ export default function ClientsPage() {
         columns={columns}
         data={clients || []}
         tableInstance={table}
-        emptyMessage={globalFilter ? 'No clients match this search.' : 'No clients yet. Use Add to create the first one.'}
+        emptyMessage={globalFilter ? 'No clients match this search.' : canManage ? 'No clients yet. Use Add to create the first one.' : 'No clients yet.'}
       />
 
       {confirmDialogEl}
@@ -248,5 +254,6 @@ export default function ClientsPage() {
 
       <ManageSectorsDialog isOpen={sectorsOpen} onClose={() => setSectorsOpen(false)} sectors={sectors || []} />
     </ModuleShell>
+    </PageFrame>
   );
 }

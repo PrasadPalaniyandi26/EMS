@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, ParseIntPipe } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ClientsService } from './clients.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -13,7 +13,7 @@ export class ClientsController {
   constructor(private service: ClientsService) {}
 
   @Get()
-  findAll() { return this.service.findAll(true); }
+  findAll(@Query('all') all?: string) { return this.service.findAll(all === '1' || all === 'true'); }
 
   @Post()
   @UseGuards(RolesGuard)

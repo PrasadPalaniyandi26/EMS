@@ -31,8 +31,8 @@ export class DashboardController {
   }
 
   @Get('budget-utilization')
-  getBudgetUtilization(@CurrentUser('id') userId: number) {
-    return this.service.getBudgetUtilization(userId);
+  getBudgetUtilization(@CurrentUser('id') userId: number, @CurrentUser('role_name') roleName: string) {
+    return this.service.getBudgetUtilization(userId, roleName);
   }
 
   @Get('approval-counts')

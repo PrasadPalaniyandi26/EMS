@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/currency';
 import { ModuleModal } from '@/components/shared/module/module-modal';
 import { Field } from '@/components/shared/modal-primitives';
+import { DetailGrid, DetailField } from '@/components/shared/detail/detail-kit';
 import { useAuthStore } from '@/stores/auth-store';
 import { cn } from '@/lib/utils';
 
@@ -14,34 +15,21 @@ import { cn } from '@/lib/utils';
 export function RequestSummary({ request, refId }: { request: any; refId?: string | number }) {
   const currency = useAuthStore((s) => s.user?.currency || 'INR');
   return (
-    <div className="overflow-x-auto rounded-lg border" style={{ borderColor: 'var(--shell-border)' }}>
-      <table className="w-full text-[12px]">
-        <thead className="border-b font-semibold" style={{ borderColor: 'var(--shell-border)', background: 'var(--table-header)', color: 'var(--shell-text)' }}>
-          <tr>
-            <th className="px-4 py-2 text-left">Reference</th>
-            <th className="px-4 py-2 text-left">Employee</th>
-            <th className="px-4 py-2 text-right">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td className="px-4 py-3 font-semibold" style={{ color: 'var(--shell-accent)' }}>{request.code || `#${refId ?? request.id}`}</td>
-            <td className="px-4 py-3 font-medium" style={{ color: 'var(--shell-text)' }}>{request.submitted_by_name || '—'}</td>
-            <td className="px-4 py-3 text-right font-semibold tabular-nums" style={{ color: 'var(--shell-text)' }}>{formatCurrency(request.amount, currency)}</td>
-          </tr>
-          {request.description && (
-            <tr className="border-t" style={{ borderColor: 'var(--shell-border)' }}>
-              <td colSpan={3} className="px-4 py-2.5">
-                <p className="mb-1 flex items-center gap-1.5 text-[13px] font-medium" style={{ color: 'var(--shell-text)' }}>
-                  <FileText aria-hidden size={12} /> Description
-                </p>
-                <p className="text-[12px]" style={{ color: 'var(--shell-text)' }}>{request.description}</p>
-                {request.category_name && <p className="mt-1 text-[12px]" style={{ color: 'var(--shell-text-muted)' }}>Category: {request.category_name}</p>}
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+    <div className="rounded-lg border" style={{ borderColor: 'var(--shell-border)' }}>
+      <DetailGrid>
+        <DetailField label="Reference" value={request.code || `#${refId ?? request.id}`} />
+        <DetailField label="Employee" value={request.submitted_by_name || '—'} />
+        <DetailField label="Amount" value={formatCurrency(request.amount, currency)} />
+      </DetailGrid>
+      {request.description && (
+        <div className="border-t px-4 py-2.5" style={{ borderColor: 'var(--shell-border)' }}>
+          <p className="mb-1 flex items-center gap-1.5 text-[13px] font-medium" style={{ color: 'var(--shell-text)' }}>
+            <FileText aria-hidden size={12} /> Description
+          </p>
+          <p className="text-[12px]" style={{ color: 'var(--shell-text)' }}>{request.description}</p>
+          {request.category_name && <p className="mt-1 text-[12px]" style={{ color: 'var(--shell-text-muted)' }}>Category: {request.category_name}</p>}
+        </div>
+      )}
     </div>
   );
 }

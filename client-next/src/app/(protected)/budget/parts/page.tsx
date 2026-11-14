@@ -16,7 +16,7 @@ import { useDataTable } from '@/hooks/use-data-table';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
 import { type FilterDef } from '@/components/data-table/filters';
-import { IdCell, TextCell, ToneText, headerRight } from '@/components/data-table/cells';
+import { IdCell, TextCell, ToneText, headerRight, WholeCell } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { ConfirmDialog } from '@/components/shared/modal-primitives';
@@ -25,10 +25,8 @@ import { ItemCategoriesModal, ItemModal, PartAlternatesModal, PartHistoryModal, 
 import { useItemCategories } from '@/hooks/use-planning-queries';
 import { ImportModal } from '@/components/budgets/import-modal';
 import { money, unitPlain } from '@/components/budgets/budget-ui';
+import { PageFrame } from '@/components/shared/module/page-frame';
 
-const Whole = ({ value, currency }: { value: number | null; currency: string }) => (
-  <div className="text-right text-[13px] font-medium tabular-nums text-[var(--shell-text)]">{value == null ? '—' : unitPlain(value, currency)}</div>
-);
 
 type Sourcing = 'ALL' | 'BUY' | 'MAKE';
 type Price = 'ALL' | 'DRIFT' | 'NO_LAST';
@@ -72,7 +70,7 @@ export default function PartMasterPage() {
     { accessorKey: 'oem_part_no', header: 'OEM part number' },
     { accessorKey: 'category_name', header: 'Category', cell: ({ row }) => <TextCell value={row.original.category_name} muted className="block max-w-[130px] truncate" />, size: 130 },
     { accessorKey: 'sourcing', header: 'Make / Buy', cell: ({ row }) => <TextCell value={row.original.sourcing === 'MAKE' ? 'Make' : 'Buy'} />, size: 90 },
-    { accessorKey: 'standard_price', header: headerRight('Standard'), cell: ({ row }) => <Whole value={row.original.standard_price} currency={currency} />, size: 110 },
+    { accessorKey: 'standard_price', header: headerRight('Standard'), cell: ({ row }) => <WholeCell unit value={row.original.standard_price} currency={currency} />, size: 110 },
     {
       accessorKey: 'price_drift_pct', header: headerRight('Drift'), size: 90,
       cell: ({ row }) => { const d = row.original.price_drift_pct; return <div className="text-right">{d ? <ToneText label={`${d > 0 ? '+' : ''}${d.toFixed(1)}%`} tone={Math.abs(d) >= 5 ? 'warning' : 'muted'} /> : <TextCell value="" />}</div>; },
@@ -223,6 +221,7 @@ export default function PartMasterPage() {
   ];
 
   return (
+    <PageFrame label="Part master">
     <ModuleShell
       showPanel={!!selected}
       searchRow={<DataTableToolbar table={table} filterDefs={filterDefs} onImport={canEdit ? () => setImpOpen(true) : undefined} onExport={exportParts} actions={<><ToolbarActions actions={alwaysActions} /><ToolbarActions actions={itemActions} /></>} />}
@@ -250,5 +249,6 @@ export default function PartMasterPage() {
         sample={[['CONN-24', '24-pin terminal block', 'Electronics', 'Buy', 'nos', '95', '', '', '102', 'Phoenix', '10', '1757019'], ['SUB-FRAME', 'Welded frame', 'Mechanical', 'Make', 'nos', '', '4200', '1800', '', '', '21', '']]}
         notes="One row per part, matched by part_no. Category must match a name under Part categories. A new part is added and an existing one is updated. Blank cells keep the current value, except lead_time_days: every part needs one (zero means on hand). Make_or_buy is Buy or Make; a bought part needs its oem_part_no (the manufacturer's number); a made part is priced from its material and manufacturing cost." />
     </ModuleShell>
+    </PageFrame>
   );
 }

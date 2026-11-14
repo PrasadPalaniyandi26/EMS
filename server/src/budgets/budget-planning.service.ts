@@ -763,8 +763,18 @@ export class BudgetPlanningService {
   async saveProjectSettings(id: number, b: any, user: Actor) {
     await this.projectOrThrow(id);
     const data: any = {};
-    if (b.contract_value !== undefined) data.contractValue = b.contract_value === '' || b.contract_value === null ? null : Number(b.contract_value);
-    if (b.target_margin_pct !== undefined) data.targetMarginPct = b.target_margin_pct === '' || b.target_margin_pct === null ? null : Number(b.target_margin_pct);
+    const blank = (v: any) => v === '' || v === null;
+    if (b.contract_value !== undefined) {
+      data.contractValue = blank(b.contract_value) ? null : Number(b.contract_value);
+      if (data.contractValue != null && (!Number.isFinite(data.contractValue) || data.contractValue < 0)) throw bad('Contract value must be zero or more.');
+    }
+    if (b.target_margin_pct !== undefined) {
+      data.targetMarginPct = blank(b.target_margin_pct) ? null : Number(b.target_margin_pct);
+      if (data.targetMarginPct != null && (!Number.isFinite(data.targetMarginPct) || data.targetMarginPct < 0 || data.targetMarginPct >= 100)) throw bad('Target margin must be from 0 up to, but not including, 100.');
+    }
+    for (const [key, label] of [['contingency_pct', 'Contingency'], ['warranty_pct', 'Warranty']] as const) {
+      if (b[key] !== undefined && !(Number(b[key]) >= 0 && Number(b[key]) <= 100)) throw bad(`${label} must be between 0 and 100.`);
+    }
     if (b.min_margin_pct !== undefined) {
       data.minMarginPct = b.min_margin_pct === '' || b.min_margin_pct === null ? null : Number(b.min_margin_pct);
       if (data.minMarginPct != null && (!Number.isFinite(data.minMarginPct) || data.minMarginPct < 0 || data.minMarginPct >= 100)) throw bad('Minimum margin must be from 0 up to, but not including, 100.');
@@ -932,7 +942,15 @@ export class BudgetPlanningService {
     const w = Number(b.weight_pct);
     if (!(w > 0 && w <= 100)) throw bad('Weight is a percentage between 0 and 100.');
     if (!b.planned_date) throw bad('Planned date is required.');
-    const data = { name, weightPct: w, plannedDate: new Date(b.planned_date), doneDate: b.done_date ? new Date(b.done_date) : null };
+    const planned = new Date(b.planned_date); const done = b.done_date ? new Date(b.done_date) : null;
+    if (Number.isNaN(planned.getTime())) throw bad('Enter the planned date as a real date.');
+    if (done && Number.isNaN(done.getTime())) throw bad('Enter the done date as a real date.');
+    // The weights share the project's 100%; the others on the project plus this one cannot pass it
+    // (a change that does not raise the weight is always allowed, so data from before this check can still be edited)
+    const cur = id ? await this.prisma.projectMilestone.findUnique({ where: { id }, select: { weightPct: true } }) : null;
+    const others = (await this.prisma.projectMilestone.findMany({ where: { projectId, ...(id ? { NOT: { id } } : {}) }, select: { weightPct: true } })).reduce((a, m) => a + n(m.weightPct), 0);
+    if ((!cur || w > n(cur.weightPct) + 0.0001) && others + w > 100.0001) throw bad(`The milestones already use ${Math.round(others * 100) / 100}% of the project. This one can be at most ${Math.max(0, Math.round((100 - others) * 100) / 100)}%.`);
+    const data = { name, weightPct: w, plannedDate: planned, doneDate: done };
     const row = id ? await this.prisma.projectMilestone.update({ where: { id }, data }) : await this.prisma.projectMilestone.create({ data: { ...data, projectId } });
     return { id: row.id };
   }
@@ -1165,16 +1183,16 @@ export class BudgetPlanningService {
     if (!mine) throw bad(`That ${what} belongs to a different ${typeof owner === 'number' ? 'product' : 'project'}.`, HttpStatus.NOT_FOUND);
   }
 
-  // A build order's BOM is a locked copy; its only change is swapping a part for an alternate, done on the build order
+  // An order's BOM is a copy that is changed on the order itself (swap a part, edit its operations and cost settings), never through the product
   private async assertNotOrderBom(bomId?: number | null) {
     if (bomId == null) return;
     const b = await this.prisma.bom.findUnique({ where: { id: bomId }, select: { buildOrderId: true } });
-    if (b?.buildOrderId != null) throw bad('A build order\'s BOM is locked. The only change allowed is swapping a part for one of its alternates.', HttpStatus.CONFLICT);
+    if (b?.buildOrderId != null) throw bad('An order\'s parts are locked here. Change them on the order itself: swap a part for an alternate, or edit its build operations.', HttpStatus.CONFLICT);
   }
 
-  // A product's costing data is changed by Finance and Admin only; job BOMs follow the project
+  // A product's BOM and operations are changed by the people who build them (Configurator, Finance, Admin); job BOMs follow the project
   private assertCostingRole(productId: number | null, user?: Actor) {
-    if (productId != null && user && !['ADMIN', 'FINANCE'].includes((user.role_name ?? '').toUpperCase())) throw bad('Only Finance and Admin can change the costing of a product.', HttpStatus.FORBIDDEN);
+    if (productId != null && user && !['ADMIN', 'FINANCE', 'CONFIGURATOR'].includes((user.role_name ?? '').toUpperCase())) throw bad('Only a Configurator, Finance or Admin can change the BOM of a product.', HttpStatus.FORBIDDEN);
   }
 
   async removeBomLine(id: number, user?: Actor) {
@@ -1190,11 +1208,9 @@ export class BudgetPlanningService {
     return { deleted: true };
   }
 
-  async saveOperation(owner: Owner, id: number | null, b: any, user?: Actor) {
-    const jobId = typeof owner === 'number' ? null : owner.projectId;
-    if (jobId != null) await this.assertJobEditable(jobId);
-    if (id) await this.assertOwnsRow(await this.prisma.bomOperation.findUnique({ where: { id }, select: { bom: { select: { id: true, productId: true, projectId: true, buildOrderId: true } } } }), owner, 'operation');
-    const bom = await this.bomFor(owner);
+  // What a build operation must say: its type, then the role and hours, the outsourced cost or the fixed cost that type calls for.
+  // Shared by a product or job BOM and by the BOM copy on a build order.
+  async operationFields(b: any, fallbackSequence: number) {
     const type = b.operation_type_id ? await this.prisma.operationType.findUnique({ where: { id: Number(b.operation_type_id) } }) : null;
     if (!type) throw bad('Choose the operation type.');
     let hours = 0; let rateCardId: number | null = null; let outsourcedCost: number | null = null; let fixedCost: number | null = null;
@@ -1209,8 +1225,27 @@ export class BudgetPlanningService {
       if (!(Number(b.hours) >= 0)) throw bad('Enter the hours.');
       hours = Number(b.hours) || 0; rateCardId = Number(b.rate_card_id);
     }
+    const data = { name: type.name, operationTypeId: type.id, hours, rateCardId, outsourcedCost, fixedCost, sequence: this.sequenceOf(b.sequence, fallbackSequence) };
+    return { data, hours, rateCardId, outsourcedCost, fixedCost };
+  }
+
+  // What the Build operation dialog picks from: the active operation types and the roles with their rates today
+  async operationChoices() {
+    const cards = await this.prisma.rateCard.findMany({ where: { isActive: true }, orderBy: { role: 'asc' } });
+    const rm = await this.rateNow(cards);
+    return {
+      operation_types: (await this.operationTypes()).filter((t) => t.is_active),
+      rate_cards: cards.map((c) => ({ id: c.id, role: c.role, rate_per_hour: rm.get(c.id)?.rate ?? n(c.ratePerHour) })),
+    };
+  }
+
+  async saveOperation(owner: Owner, id: number | null, b: any, user?: Actor) {
+    const jobId = typeof owner === 'number' ? null : owner.projectId;
+    if (jobId != null) await this.assertJobEditable(jobId);
+    if (id) await this.assertOwnsRow(await this.prisma.bomOperation.findUnique({ where: { id }, select: { bom: { select: { id: true, productId: true, projectId: true, buildOrderId: true } } } }), owner, 'operation');
+    const bom = await this.bomFor(owner);
     const before = id ? await this.prisma.bomOperation.findUnique({ where: { id } }) : null;
-    const data = { name: type.name, operationTypeId: type.id, hours, rateCardId, outsourcedCost, fixedCost, sequence: this.sequenceOf(b.sequence, before?.sequence ?? 1) };
+    const { data, hours, rateCardId, outsourcedCost, fixedCost } = await this.operationFields(b, before?.sequence ?? 1);
     const row = id ? await this.prisma.bomOperation.update({ where: { id }, data }) : await this.prisma.bomOperation.create({ data: { ...data, bomId: bom.id } });
     if (jobId != null) await this.syncJobEstimate(jobId);
     this.log('bom_operations', row.id, id ? 'UPDATE' : 'INSERT', user?.id, { bom_id: bom.id, name: data.name, hours, rate_card_id: rateCardId, outsourced_cost: outsourcedCost, fixed_cost: fixedCost }, before ? { name: before.name, hours: n(before.hours), rate_card_id: before.rateCardId, outsourced_cost: before.outsourcedCost == null ? null : n(before.outsourcedCost) } : undefined);
@@ -1601,7 +1636,15 @@ export class BudgetPlanningService {
     if (kind !== 'REVISION' && !from) throw bad('Choose the line the money comes from.');
     if (kind !== 'RELEASE' && !to) throw bad('Choose the line that receives it.');
     if (from && to && from === to) throw bad('Choose two different lines.');
-    for (const id of [from, to]) if (id && !(await this.prisma.budgetLine.findFirst({ where: { id, isActive: true } }))) throw bad('Budget line not found.', HttpStatus.NOT_FOUND);
+    const lines: { id: number; ownerId: number | null }[] = [];
+    for (const id of [from, to]) {
+      if (!id) continue;
+      const line = await this.prisma.budgetLine.findFirst({ where: { id, isActive: true }, select: { id: true, ownerId: true } });
+      if (!line) throw bad('Budget line not found.', HttpStatus.NOT_FOUND);
+      lines.push(line);
+    }
+    // A manager only sees the lines they own, so a change they raise has to involve one of them
+    if ((user.role_name || '').toUpperCase() === 'MANAGER' && !lines.some((l) => l.ownerId === user.id)) throw bad('You can only raise a change that involves a budget line you own.', HttpStatus.FORBIDDEN);
     const row = await this.prisma.budgetChange.create({ data: { kind, fromLineId: from, toLineId: to, amount, reason: String(b.reason).trim(), requestedById: user.id, requestedByName: user.username ?? null } });
     this.log('budget_changes', row.id, 'INSERT', user.id, b);
     return { id: row.id };
@@ -1631,6 +1674,8 @@ export class BudgetPlanningService {
       const months = this.budgets.fyMonths(line.plan.fy, s.fyStartMonth);
       const now = new Date();
       const m = months.find((x) => x.year === now.getFullYear() && x.month === now.getMonth() + 1) ?? months[11];
+      // Money in a closed month does not move, the same as when a line is edited
+      if (await this.prisma.periodLock.findUnique({ where: { year_month: { year: m.year, month: m.month } } })) throw bad(`Month ${m.month}/${m.year} is closed, so budget cannot move in it. Ask an Admin to reopen the month first.`, HttpStatus.CONFLICT);
       const cur = line.periods.find((p) => p.year === m.year && p.month === m.month);
       const next = r2(n(cur?.amount) + delta);
       if (next < 0) throw bad('The line does not have that much budget left in the current month.');
@@ -1655,7 +1700,13 @@ export class BudgetPlanningService {
 
   // ── Monthly close ────────────────────────────────────────────────────────
 
+  private assertMonth(year: any, month: any) {
+    const y = Number(year); const m = Number(month);
+    if (!Number.isInteger(y) || y < 2000 || y > 2100 || !Number.isInteger(m) || m < 1 || m > 12) throw bad('Choose a valid month and year.');
+  }
+
   async close(year: number, month: number) {
+    this.assertMonth(year, month);
     const s = await this.budgets.getSettings();
     const fyKey = s.fyStartMonth === 1 ? year : month >= s.fyStartMonth ? year : year - 1;
     const plan = await this.prisma.budgetPlan.findUnique({ where: { fy: fyKey } });
@@ -1686,6 +1737,8 @@ export class BudgetPlanningService {
 
   async saveVariance(b: { line_id: number; year: number; month: number; reason_code: string; comment?: string }, user: Actor) {
     if (!b.reason_code) throw bad('Choose a reason.');
+    this.assertMonth(b.year, b.month);
+    if (!(await this.prisma.budgetLine.findFirst({ where: { id: Number(b.line_id), isActive: true }, select: { id: true } }))) throw bad('Budget line not found.', HttpStatus.NOT_FOUND);
     if (await this.prisma.periodLock.findUnique({ where: { year_month: { year: Number(b.year), month: Number(b.month) } } })) throw bad('This month is closed.', HttpStatus.CONFLICT);
     await this.prisma.varianceNote.upsert({
       where: { lineId_year_month: { lineId: Number(b.line_id), year: Number(b.year), month: Number(b.month) } },
@@ -1706,6 +1759,7 @@ export class BudgetPlanningService {
   }
 
   async unlockMonth(year: number, month: number, user: Actor) {
+    this.assertMonth(year, month);
     await this.prisma.periodLock.delete({ where: { year_month: { year, month } } }).catch(() => undefined);
     this.log('period_locks', year * 100 + month, 'UNLOCK', user.id, {});
     return { locked: false };

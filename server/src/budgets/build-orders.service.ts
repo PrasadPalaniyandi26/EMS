@@ -253,7 +253,7 @@ export class BuildOrdersService {
 
   async get(id: number) {
     const o = await this.prisma.buildOrder.findUnique({ where: { id }, include: { product: { select: { code: true, name: true } }, client: { select: { name: true } } } });
-    if (!o) throw bad('Build order not found.', HttpStatus.NOT_FOUND);
+    if (!o) throw bad('Order not found.', HttpStatus.NOT_FOUND);
     const bom = await this.orderBom(id);
     const roll = bom ? await this.planning.rollup(bom.id) : null;
     const rawLines = bom ? await this.prisma.bomLine.findMany({ where: { bomId: bom.id } }) : [];
@@ -300,7 +300,7 @@ export class BuildOrdersService {
     return {
       ...this.shape(o, { has_bom: !!bom, bom_id: bom?.id ?? null }),
       editable: OPEN.includes(o.status),
-      lines, operations: roll?.operations ?? [], cost: roll?.cost ?? null,
+      lines, operations: roll?.operations ?? [], cost: roll?.cost ?? null, bom_settings: roll?.bom ?? null, ...(await this.planning.operationChoices()),
       live_unit_cost: live, cost_drift: live != null && o.unitCost != null ? r2(live - n(o.unitCost)) : null,
       lead: { ...lead, late_lines: lateLines },
       plan: await this.planCheck(o.productId, o.startDate),
@@ -406,8 +406,8 @@ export class BuildOrdersService {
 
   private async openOrder(id: number) {
     const o = await this.prisma.buildOrder.findUnique({ where: { id } });
-    if (!o) throw bad('Build order not found.', HttpStatus.NOT_FOUND);
-    if (!OPEN.includes(o.status)) throw bad('This build order is already in build, delivered or cancelled, so it can no longer change.', HttpStatus.CONFLICT);
+    if (!o) throw bad('Order not found.', HttpStatus.NOT_FOUND);
+    if (!OPEN.includes(o.status)) throw bad('This order is already in build, delivered or cancelled, so it can no longer change.', HttpStatus.CONFLICT);
     return o;
   }
 
@@ -441,7 +441,7 @@ export class BuildOrdersService {
   // Always replaces the whole copy, from the same product again or from a different one. A different product makes this an order for that product.
   async importBom(id: number, b: any, user: Actor) {
     const o = await this.prisma.buildOrder.findUnique({ where: { id } });
-    if (!o) throw bad('Build order not found.', HttpStatus.NOT_FOUND);
+    if (!o) throw bad('Order not found.', HttpStatus.NOT_FOUND);
     if (o.status !== 'COMMITTED') throw bad('The standard BOM can only be imported before the order is released.', HttpStatus.CONFLICT);
     const wanted = b?.product_id === undefined || b?.product_id === null || b?.product_id === '' ? o.productId : Number(b.product_id);
     if (!Number.isInteger(wanted) || !(await this.prisma.product.findFirst({ where: { id: wanted, isActive: true, isSystem: false }, select: { id: true } }))) throw bad('Choose the product to import from.');
@@ -489,6 +489,63 @@ export class BuildOrdersService {
     return { id, unit_cost: cost };
   }
 
+  // Freight and handling %, warranty % and an overhead rate per hour for this order only. They live on the order's own BOM copy,
+  // so the product and its approved standard cost are not touched. An overhead rate equal to the company rate clears the override.
+  async saveCostSettings(id: number, b: any, user: Actor) {
+    await this.openOrder(id);
+    const bom = await this.orderBom(id);
+    if (!bom) throw bad('Import the standard BOM first.', HttpStatus.CONFLICT);
+    const roll = await this.planning.rollup(bom.id);
+    const { default_freight_pct: defFreight, default_warranty_pct: defWarranty, default_overhead_rate: defRate } = roll.cost;
+    const pct = (v: any, label: string) => { const x = Number(v); if (v === '' || v === null || v === undefined || !(x >= 0 && x <= 100)) throw bad(`${label} must be between 0 and 100.`); return x; };
+    const freight = b.freight_pct !== undefined ? pct(b.freight_pct, 'Freight and handling %') : n(bom.freightPct);
+    const warranty = b.warranty_pct !== undefined ? pct(b.warranty_pct, 'Warranty %') : n(bom.warrantyPct);
+    let override: number | null = bom.overheadRateOverride == null ? null : n(bom.overheadRateOverride);
+    if (b.overhead_rate !== undefined) {
+      if (b.overhead_rate === null || b.overhead_rate === '') override = null;
+      else {
+        override = Number(b.overhead_rate);
+        if (!(override >= 0)) throw bad('Overhead rate must be zero or more.');
+        if (Math.abs(override - defRate) <= 0.005) override = null;
+      }
+    }
+    const reason = String(b.reason ?? '').trim();
+    const adjusted = override != null || freight !== defFreight || warranty !== defWarranty;
+    if (adjusted && !reason) throw bad('Give a reason for the change.');
+    await this.prisma.bom.update({ where: { id: bom.id }, data: { freightPct: freight, warrantyPct: warranty, overheadRateOverride: override, adjustReason: adjusted ? reason.slice(0, 300) : null } });
+    const cost = await this.refresh(id);
+    this.log(id, 'COST_SETTINGS', user.id, { overhead_rate: override, freight_pct: freight, warranty_pct: warranty, reason: adjusted ? reason : null, unit_cost: cost },
+      { overhead_rate: bom.overheadRateOverride == null ? null : n(bom.overheadRateOverride), freight_pct: n(bom.freightPct), warranty_pct: n(bom.warrantyPct) });
+    return { id, unit_cost: cost };
+  }
+
+  // Build operations of this order's own BOM. They start as the product's and each order can change them; the order is costed again after every change.
+  async saveOperation(id: number, opId: number | null, b: any, user: Actor) {
+    await this.openOrder(id);
+    const bom = await this.orderBom(id);
+    if (!bom) throw bad('Import the standard BOM first.', HttpStatus.CONFLICT);
+    const before = opId ? await this.prisma.bomOperation.findFirst({ where: { id: opId, bomId: bom.id } }) : null;
+    if (opId && !before) throw bad('That operation is not on this order.', HttpStatus.NOT_FOUND);
+    const { data } = await this.planning.operationFields(b, before?.sequence ?? 1);
+    const row = opId ? await this.prisma.bomOperation.update({ where: { id: opId }, data }) : await this.prisma.bomOperation.create({ data: { ...data, bomId: bom.id } });
+    const cost = await this.refresh(id);
+    this.log(id, opId ? 'OPERATION_UPDATE' : 'OPERATION_ADD', user.id,
+      { operation: data.name, hours: data.hours, outsourced_cost: data.outsourcedCost, fixed_cost: data.fixedCost, sequence: data.sequence, unit_cost: cost },
+      before ? { operation: before.name, hours: n(before.hours), sequence: before.sequence } : undefined);
+    return { id: row.id, unit_cost: cost };
+  }
+
+  async removeOperation(id: number, opId: number, user: Actor) {
+    await this.openOrder(id);
+    const bom = await this.orderBom(id);
+    const op = bom ? await this.prisma.bomOperation.findFirst({ where: { id: opId, bomId: bom.id } }) : null;
+    if (!op) throw bad('That operation is not on this order.', HttpStatus.NOT_FOUND);
+    await this.prisma.bomOperation.delete({ where: { id: opId } });
+    const cost = await this.refresh(id);
+    this.log(id, 'OPERATION_DELETE', user.id, { unit_cost: cost }, { operation: op.name, hours: n(op.hours) });
+    return { deleted: true, unit_cost: cost };
+  }
+
   async refreshCost(id: number, user: Actor) {
     await this.openOrder(id);
     if (!(await this.orderBom(id))) throw bad('Import the standard BOM first.', HttpStatus.CONFLICT);
@@ -506,7 +563,7 @@ export class BuildOrdersService {
   // Release, start the build, deliver or cancel
   async move(id: number, action: string, b: any, user: Actor) {
     const o = await this.prisma.buildOrder.findUnique({ where: { id } });
-    if (!o) throw bad('Build order not found.', HttpStatus.NOT_FOUND);
+    if (!o) throw bad('Order not found.', HttpStatus.NOT_FOUND);
     const data: any = {};
     if (action === 'release') {
       if (o.status !== 'COMMITTED') throw bad('Only a committed order can be released.', HttpStatus.CONFLICT);

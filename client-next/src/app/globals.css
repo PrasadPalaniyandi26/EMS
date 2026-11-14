@@ -440,8 +440,12 @@
     .main-workspace {
       margin-left: var(--sidebar-w);
     }
+    /* The footer runs under the sidebar as well, and the sidebar stops at its top line, so the bottom of the page and of the navigation meet on one line */
+    .menu-fixed {
+      bottom: var(--footer-h);
+    }
     .footer-fixed {
-      left: var(--sidebar-w);
+      left: 0;
     }
     /* Slim sidebar offsets */
     .layout-slim .fixed-top {
@@ -449,9 +453,6 @@
     }
     .layout-slim .main-workspace {
       margin-left: var(--sidebar-w-slim);
-    }
-    .layout-slim .footer-fixed {
-      left: var(--sidebar-w-slim);
     }
   }
 

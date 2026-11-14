@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatDate } from '@/lib/currency';
+import { money, plain, unitPlain } from '@/lib/money';
 import { getStatusConfig } from '@/lib/status';
 
 // The one vocabulary for table cells. Every cell is a plain string: no pills, dots or avatars.
@@ -38,6 +39,21 @@ export function MoneyCell({ value, currency, symbol = true }: { value?: number |
   return (
     <div className="text-right text-[13px] font-medium tabular-nums text-[var(--shell-text)]">
       {formatCurrency(Number(value || 0), currency || 'INR', symbol)}
+    </div>
+  );
+}
+
+// A right-aligned number of any kind (hours, counts, percentages, amounts already formatted)
+export function NumCell({ children, strong }: { children: ReactNode; strong?: boolean }) {
+  return <div className={cn('text-right text-[13px] tabular-nums text-[var(--shell-text)]', strong && 'font-medium')}>{children}</div>;
+}
+
+// A whole-rupee amount for planning and costing tables; `unit` keeps the paise (unit prices) and `symbol` adds the currency sign. No value shows a dash.
+export function WholeCell({ value, currency, unit, symbol }: { value?: number | null; currency?: string; unit?: boolean; symbol?: boolean }) {
+  const c = currency || 'INR';
+  return (
+    <div className="text-right text-[13px] font-medium tabular-nums text-[var(--shell-text)]">
+      {value == null ? EMPTY : unit ? unitPlain(value, c) : symbol ? money(value, c) : plain(value, c)}
     </div>
   );
 }

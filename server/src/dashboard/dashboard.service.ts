@@ -3,12 +3,15 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { BudgetsService } from '../budgets/budgets.service';
 import { COMMITTED_STATUSES, committedStatusSql } from '../common/constants/transaction-status';
+import { ApprovalsService } from '../approvals/approvals.service';
+import { parseRange } from '../common/helpers/dates';
 
 @Injectable()
 export class DashboardService {
-  constructor(private prisma: PrismaService, private budgets: BudgetsService) {}
+  constructor(private prisma: PrismaService, private budgets: BudgetsService, private approvals: ApprovalsService) {}
 
   async getSummary(userId: number, dateFrom?: string, dateTo?: string) {
+    parseRange(dateFrom, dateTo);
     const where: any = { userId, status: { in: COMMITTED_STATUSES } };
     if (dateFrom || dateTo) {
       where.dateRecorded = {};
@@ -59,6 +62,7 @@ export class DashboardService {
   }
 
   async getByCategory(userId: number, dateFrom?: string, dateTo?: string) {
+    parseRange(dateFrom, dateTo);
     const where: any = { userId, status: { in: COMMITTED_STATUSES } };
     if (dateFrom || dateTo) {
       where.dateRecorded = {};
@@ -137,15 +141,15 @@ export class DashboardService {
   }
 
   // Lines closest to or over their budget, from the active plan
-  async getBudgetUtilization(_userId: number) {
-    const lines = await this.budgets.dashboardLines(6);
+  async getBudgetUtilization(userId: number, roleName: string) {
+    const role = (roleName || '').toUpperCase();
+    // Budget is read by the same roles as the Budget screens, and a Manager sees only the lines they own
+    if (!['ADMIN', 'FINANCE', 'MANAGER', 'OPERATIONS', 'CONFIGURATOR'].includes(role)) return [];
+    const lines = await this.budgets.dashboardLines(6, role === 'MANAGER' ? { ownerId: userId } : {});
     return lines.map((l) => ({ category_id: l.id, category_name: l.label, budget: l.budget, spent: l.spent, remaining: l.remaining, pct: l.pct, status: l.status }));
   }
 
-  async getApprovalCounts(userId: number, roleName: string) {
-    const isFinance = roleName?.toLowerCase().includes('finance');
-    const isManager = roleName?.toLowerCase().includes('manager') || roleName?.toLowerCase().includes('admin');
-
+  async getApprovalCounts(userId: number, _roleName?: string) {
     const [draft, pendingManager, pendingFinance, approved, rejected] = await Promise.all([
       this.prisma.transaction.count({ where: { userId, status: 'DRAFT', type: 'expense' } }),
       this.prisma.transaction.count({ where: { userId, status: 'PENDING_MANAGER', type: 'expense' } }),
@@ -154,15 +158,14 @@ export class DashboardService {
       this.prisma.transaction.count({ where: { userId, status: 'REJECTED', type: 'expense' } }),
     ]);
 
-    let pendingMyAction = 0;
-    if (isFinance || isManager) {
-      pendingMyAction = await this.prisma.approvalRequest.count({ where: { approverId: userId, status: 'PENDING' } });
-    }
+    // The same list the Approvals page shows, so the two numbers always agree
+    const pendingMyAction = (await this.approvals.getPending(userId)).length;
 
     return { draft, pendingManager, pendingFinance, approved, rejected, pendingMyAction };
   }
 
   async getProjectSpend(userId: number, dateFrom?: string, dateTo?: string) {
+    parseRange(dateFrom, dateTo);
     const where: any = { userId, type: 'expense', status: { in: COMMITTED_STATUSES }, projectId: { not: null } };
     if (dateFrom || dateTo) {
       where.dateRecorded = {};
@@ -219,6 +222,7 @@ export class DashboardService {
   }
 
   async getTopSpenders(userId: number, roleName: string, dateFrom?: string, dateTo?: string) {
+    parseRange(dateFrom, dateTo);
     const visibleIds = await this.resolveVisibleUserIds(userId, roleName);
     const where: any = { type: 'expense', status: { in: COMMITTED_STATUSES } };
     if (visibleIds !== null) where.userId = { in: visibleIds };
@@ -255,82 +259,72 @@ export class DashboardService {
   }
 
   async getCategoryHeatmap(userId: number, roleName: string, dateFrom?: string, dateTo?: string) {
+    const range = parseRange(dateFrom, dateTo);
     const visibleIds = await this.resolveVisibleUserIds(userId, roleName);
-    const cutoff = dateFrom ? new Date(dateFrom) : (() => {
-      const d = new Date(); d.setMonth(d.getMonth() - 11); d.setDate(1); d.setHours(0, 0, 0, 0); return d;
-    })();
-    const endDate = dateTo ? new Date(dateTo) : new Date();
-    const userClause = visibleIds === null ? Prisma.empty : Prisma.sql`AND t.user_id = ANY(${visibleIds})`;
+    const end = range.to ?? new Date();
+    const start = range.from ?? (() => { const d = new Date(end); d.setUTCMonth(d.getUTCMonth() - 11); d.setUTCDate(1); d.setUTCHours(0, 0, 0, 0); return d; })();
 
-    const rows = await this.prisma.$queryRaw<{ yr: number; mo: number; cat: string; total: number }[]>`
-      SELECT
-        EXTRACT(YEAR  FROM t.date_recorded)::int AS yr,
-        EXTRACT(MONTH FROM t.date_recorded)::int AS mo,
-        COALESCE(c.name, 'Uncategorized')        AS cat,
-        SUM(t.amount)::float                     AS total
-      FROM transactions t
-      LEFT JOIN categories c ON c.id = t.category_id
-      WHERE t.type = 'expense'
-        AND t.date_recorded >= ${cutoff}
-        AND t.date_recorded <= ${endDate}
-        AND t.status IN ${Prisma.raw(committedStatusSql)}
-        ${userClause}
-      GROUP BY yr, mo, cat
-      ORDER BY yr, mo, total DESC
-    `;
-
-    // Collect top 6 categories by overall total
-    const catTotals: Record<string, number> = {};
-    for (const r of rows as any[]) {
-      catTotals[r.cat] = (catTotals[r.cat] || 0) + r.total;
-    }
-    const topCats = Object.entries(catTotals).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([c]) => c);
-
-    // Build months axis (12 months back)
-    const now = new Date();
-    const months = Array.from({ length: 12 }, (_, i) => {
-      const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
-      return { key: `${d.getFullYear()}-${d.getMonth() + 1}`, label: d.toLocaleString('default', { month: 'short', year: '2-digit' }) };
+    // A split expense counts under each category it was split into, the same way Budget counts it
+    const parts = await this.budgets.partsWhere({
+      status: { in: COMMITTED_STATUSES },
+      dateRecorded: { gte: start, lte: end },
+      ...(visibleIds !== null ? { userId: { in: visibleIds } } : {}),
     });
+    const names = new Map((await this.prisma.category.findMany({ select: { id: true, name: true } })).map((c) => [c.id, c.name]));
+    const nameOf = (id: number | null) => (id != null ? names.get(id) : undefined) ?? 'Uncategorized';
 
-    // Build heatmap: months × categories
-    const dataMap: Record<string, Record<string, number>> = {};
-    for (const r of rows as any[]) {
-      const key = `${r.yr}-${r.mo}`;
-      if (!dataMap[key]) dataMap[key] = {};
-      if (topCats.includes(r.cat)) dataMap[key][r.cat] = parseFloat(r.total.toFixed(2));
+    const catTotals = new Map<string, number>();
+    for (const p of parts) catTotals.set(nameOf(p.categoryId), (catTotals.get(nameOf(p.categoryId)) ?? 0) + p.amount);
+    const ranked = [...catTotals.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c);
+    const topCats = ranked.slice(0, 6);
+    const hasOther = ranked.length > 6;
+
+    // The months of the period, oldest first, at most the last 24
+    // Dates arrive as UTC midnight, so the months are counted in UTC too
+    const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months: { key: string; label: string }[] = [];
+    for (let y = start.getUTCFullYear(), m = start.getUTCMonth(); y * 12 + m <= end.getUTCFullYear() * 12 + end.getUTCMonth(); m++) {
+      if (m === 12) { m = 0; y++; }
+      months.push({ key: `${y}-${m + 1}`, label: `${MON[m]} ${String(y).slice(2)}` });
     }
+    const shown = months.slice(-24);
+
+    const dataMap: Record<string, Record<string, number>> = {};
+    for (const p of parts) {
+      const key = `${p.year}-${p.month}`;
+      const cat = topCats.includes(nameOf(p.categoryId)) ? nameOf(p.categoryId) : 'Other';
+      (dataMap[key] ??= {})[cat] = (dataMap[key][cat] ?? 0) + p.amount;
+    }
+    const categories = hasOther ? [...topCats, 'Other'] : topCats;
 
     return {
-      categories: topCats,
-      months: months.map((m) => ({
+      categories,
+      months: shown.map((m) => ({
         label: m.label,
-        values: Object.fromEntries(topCats.map((c) => [c, dataMap[m.key]?.[c] || 0])),
+        values: Object.fromEntries(categories.map((c) => [c, parseFloat((dataMap[m.key]?.[c] ?? 0).toFixed(2))])),
       })),
     };
   }
 
-  async getProjectBurn(userId: number, roleName: string, dateFrom?: string, dateTo?: string) {
+  // Expense parts in the period for the people this user may see; the same rows Budget and Costing add up
+  private async periodParts(userId: number, roleName: string, dateFrom?: string, dateTo?: string) {
+    const range = parseRange(dateFrom, dateTo);
     const visibleIds = await this.resolveVisibleUserIds(userId, roleName);
-    const where: any = { type: 'expense', status: { in: COMMITTED_STATUSES }, projectId: { not: null } };
-    if (visibleIds !== null) where.userId = { in: visibleIds };
-    if (dateFrom || dateTo) {
-      where.dateRecorded = {};
-      if (dateFrom) where.dateRecorded.gte = new Date(dateFrom);
-      if (dateTo)   where.dateRecorded.lte = new Date(dateTo);
-    }
-
-    const spent = await this.prisma.transaction.groupBy({
-      by: ['projectId'],
-      where,
-      _sum: { amount: true },
-      orderBy: { _sum: { amount: 'desc' } },
-      take: 8,
+    return this.budgets.partsWhere({
+      status: { in: COMMITTED_STATUSES },
+      ...(visibleIds !== null ? { userId: { in: visibleIds } } : {}),
+      ...(range.from || range.to ? { dateRecorded: { ...(range.from ? { gte: range.from } : {}), ...(range.to ? { lte: range.to } : {}) } } : {}),
     });
+  }
 
+  async getProjectBurn(userId: number, roleName: string, dateFrom?: string, dateTo?: string) {
+    const parts = await this.periodParts(userId, roleName, dateFrom, dateTo);
+    const spentBy = new Map<number, number>();
+    for (const p of parts) if (p.costObject === 'PROJECT' && p.projectId != null) spentBy.set(p.projectId, (spentBy.get(p.projectId) ?? 0) + p.amount);
+    const spent = [...spentBy.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
     if (!spent.length) return [];
 
-    const projectIds = spent.map((r) => r.projectId).filter(Boolean) as number[];
+    const projectIds = spent.map(([id]) => id);
     const [projects, baselines] = await Promise.all([
       this.prisma.project.findMany({ where: { id: { in: projectIds } }, select: { id: true, name: true } }),
       // The budget is the approved estimate baseline's direct cost; the newest approved one counts
@@ -340,45 +334,28 @@ export class DashboardService {
     const baseMap = new Map<number, number>();
     for (const b of baselines) if (!baseMap.has(b.projectId)) baseMap.set(b.projectId, Number(b.direct));
 
-    return spent.map((r) => {
-      const proj = projMap[r.projectId!];
-      const spentAmt = parseFloat((Number(r._sum.amount) || 0).toFixed(2));
-      const budget   = parseFloat((baseMap.get(r.projectId!) ?? 0).toFixed(2));
+    return spent.map(([id, amount]) => {
+      const spentAmt = parseFloat(amount.toFixed(2));
+      const budget = parseFloat((baseMap.get(id) ?? 0).toFixed(2));
       return {
-        project_id:   r.projectId,
-        project_name: proj?.name || 'Unknown',
-        spent:        spentAmt,
-        budget:       budget,
-        pct:          budget > 0 ? parseFloat(((spentAmt / budget) * 100).toFixed(1)) : null,
+        project_id: id,
+        project_name: projMap[id]?.name || 'Unknown',
+        spent: spentAmt,
+        budget,
+        pct: budget > 0 ? parseFloat(((spentAmt / budget) * 100).toFixed(1)) : null,
       };
     });
   }
 
   async getProductBurn(userId: number, roleName: string, dateFrom?: string, dateTo?: string) {
-    const visibleIds = await this.resolveVisibleUserIds(userId, roleName);
-    const where: any = { type: 'expense', status: { in: COMMITTED_STATUSES }, productId: { not: null } };
-    if (visibleIds !== null) where.userId = { in: visibleIds };
-    if (dateFrom || dateTo) {
-      where.dateRecorded = {};
-      if (dateFrom) where.dateRecorded.gte = new Date(dateFrom);
-      if (dateTo)   where.dateRecorded.lte = new Date(dateTo);
-    }
-
-    const spent = await this.prisma.transaction.groupBy({
-      by: ['productId'],
-      where,
-      _sum: { amount: true },
-      orderBy: { _sum: { amount: 'desc' } },
-      take: 8,
-    });
-
+    const parts = await this.periodParts(userId, roleName, dateFrom, dateTo);
+    const spentBy = new Map<number, number>();
+    for (const p of parts) if (p.costObject === 'PRODUCT' && p.productId != null) spentBy.set(p.productId, (spentBy.get(p.productId) ?? 0) + p.amount);
+    const spent = [...spentBy.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
     if (!spent.length) return [];
 
-    const productIds = spent.map((r) => r.productId).filter(Boolean) as number[];
-    const products = await this.prisma.product.findMany({
-      where: { id: { in: productIds } },
-      select: { id: true, name: true },
-    });
+    const productIds = spent.map(([id]) => id);
+    const products = await this.prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true, name: true } });
     const prodMap = Object.fromEntries(products.map((p) => [p.id, p]));
 
     // A product's budget is what the budget plan allows for it, for the months in the chosen range
@@ -386,8 +363,9 @@ export class DashboardService {
       where: { costObject: 'PRODUCT', productId: { in: productIds }, isActive: true, isContingency: false },
       include: { periods: true },
     });
-    const from = dateFrom ? new Date(dateFrom).getTime() : null;
-    const to = dateTo ? new Date(dateTo).getTime() : null;
+    const range = parseRange(dateFrom, dateTo);
+    const from = range.from ? range.from.getTime() : null;
+    const to = range.to ? range.to.getTime() : null;
     const planned = new Map<number, number>();
     for (const l of lines) {
       for (const p of l.periods) {
@@ -397,16 +375,15 @@ export class DashboardService {
       }
     }
 
-    return spent.map((r) => {
-      const prod = prodMap[r.productId!];
-      const spentAmt = parseFloat((Number(r._sum.amount) || 0).toFixed(2));
-      const budget   = parseFloat((planned.get(r.productId!) ?? 0).toFixed(2));
+    return spent.map(([id, amount]) => {
+      const spentAmt = parseFloat(amount.toFixed(2));
+      const budget = parseFloat((planned.get(id) ?? 0).toFixed(2));
       return {
-        product_id:   r.productId,
-        product_name: prod?.name || 'Unknown',
-        spent:        spentAmt,
-        budget:       budget,
-        pct:          budget > 0 ? parseFloat(((spentAmt / budget) * 100).toFixed(1)) : null,
+        product_id: id,
+        product_name: prodMap[id]?.name || 'Unknown',
+        spent: spentAmt,
+        budget,
+        pct: budget > 0 ? parseFloat(((spentAmt / budget) * 100).toFixed(1)) : null,
       };
     });
   }

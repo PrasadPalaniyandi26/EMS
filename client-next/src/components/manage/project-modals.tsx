@@ -93,7 +93,7 @@ export function ProjectModal({
               onChange={(e) => set("client_id", e.target.value)}
             >
               <option value="">Select client</option>
-              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {clients.filter((c) => c.is_active || String(c.id) === form.client_id).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </NativeSelect>
           </Field>
           <TypeCategoryFields

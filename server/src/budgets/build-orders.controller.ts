@@ -27,6 +27,10 @@ export class BuildOrdersController {
   @Put(':id') @Roles('admin', 'finance', 'operations') update(@Param('id', ParseIntPipe) id: number, @Body() b: any, @CurrentUser() u: Actor) { return this.s.update(id, b, u); }
   @Delete(':id') @Roles('admin', 'finance', 'operations') remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() u: Actor) { return this.s.remove(id, u); }
   @Post(':id/import-bom') @Roles('admin', 'finance', 'operations') importBom(@Param('id', ParseIntPipe) id: number, @Body() b: any, @CurrentUser() u: Actor) { return this.s.importBom(id, b ?? {}, u); }
+  @Post(':id/operations') @Roles('admin', 'finance', 'operations') addOperation(@Param('id', ParseIntPipe) id: number, @Body() b: any, @CurrentUser() u: Actor) { return this.s.saveOperation(id, null, b ?? {}, u); }
+  @Put(':id/operations/:oid') @Roles('admin', 'finance', 'operations') editOperation(@Param('id', ParseIntPipe) id: number, @Param('oid', ParseIntPipe) oid: number, @Body() b: any, @CurrentUser() u: Actor) { return this.s.saveOperation(id, oid, b ?? {}, u); }
+  @Delete(':id/operations/:oid') @Roles('admin', 'finance', 'operations') removeOperation(@Param('id', ParseIntPipe) id: number, @Param('oid', ParseIntPipe) oid: number, @CurrentUser() u: Actor) { return this.s.removeOperation(id, oid, u); }
+  @Put(':id/cost-settings') @Roles('admin', 'finance', 'operations') costSettings(@Param('id', ParseIntPipe) id: number, @Body() b: any, @CurrentUser() u: Actor) { return this.s.saveCostSettings(id, b ?? {}, u); }
   @Post(':id/recost') @Roles('admin', 'finance', 'operations') recost(@Param('id', ParseIntPipe) id: number, @CurrentUser() u: Actor) { return this.s.refreshCost(id, u); }
   @Post(':id/lines/:lid/swap') @Roles('admin', 'finance', 'operations') swap(@Param('id', ParseIntPipe) id: number, @Param('lid', ParseIntPipe) lid: number, @Body() b: any, @CurrentUser() u: Actor) { return this.s.swap(id, lid, b, u); }
   @Post(':id/release') @Roles('admin', 'finance', 'operations') release(@Param('id', ParseIntPipe) id: number, @Body() b: any, @CurrentUser() u: Actor) { return this.s.move(id, 'release', b ?? {}, u); }

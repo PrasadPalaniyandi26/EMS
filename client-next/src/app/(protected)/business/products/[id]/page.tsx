@@ -15,7 +15,7 @@ import { useDataTable } from '@/hooks/use-data-table';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
 import { type FilterDef } from '@/components/data-table/filters';
-import { DateCell, IdCell, TextCell, ToneText, headerRight } from '@/components/data-table/cells';
+import { DateCell, IdCell, TextCell, ToneText, headerRight, NumCell } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { ConfirmDialog } from '@/components/shared/modal-primitives';
@@ -43,9 +43,6 @@ const EMPTY: Record<Tab, string> = {
   variances: 'No parts on this product yet. Add parts on the Bill of materials tab.',
 };
 
-const Num = ({ children, strong }: { children: React.ReactNode; strong?: boolean }) => (
-  <div className={cn('text-right text-[13px] tabular-nums text-[var(--shell-text)]', strong && 'font-medium')}>{children}</div>
-);
 const fyText = (fy: number) => `${fy}-${String(fy + 1).slice(2)}`;
 const sourcingText = (s?: string) => (s === 'MAKE' ? 'Make' : 'Buy');
 const advice = (l: BomLineRow, pct: number | null) => {
@@ -122,43 +119,43 @@ export default function ProductCostingDetailPage() {
 
   const columns = useMemo<ColumnDef<any, any>[]>(() => {
     if (tab === 'bom') return [
-      { accessorKey: 'sequence', header: headerRight('Seq'), cell: ({ row }) => <Num>{row.original.sequence}</Num>, size: 48 },
+      { accessorKey: 'sequence', header: headerRight('Seq'), cell: ({ row }) => <NumCell>{row.original.sequence}</NumCell>, size: 48 },
       { accessorKey: 'group_name', header: 'Group', cell: ({ row }) => <TextCell value={row.original.group_name} muted className="block max-w-[110px] truncate" />, size: 110 },
       { accessorKey: 'part_no', header: 'Part', cell: ({ row }) => <IdCell value={row.original.part_no} />, size: 110 },
       { accessorKey: 'name', header: 'Name', cell: ({ row }) => <TextCell value={row.original.name} strong className="block max-w-[220px] truncate" /> },
       { accessorKey: 'sourcing', header: 'Make / Buy', cell: ({ row }) => <TextCell value={sourcingText(row.original.sourcing)} />, size: 90 },
-      { accessorKey: 'quantity', header: headerRight('Qty'), cell: ({ row }) => <Num>{row.original.quantity}</Num>, size: 80 },
-      { accessorKey: 'unit_cost', header: headerRight('Unit cost'), cell: ({ row }) => <Num>{unitPrice(row.original.unit_cost, currency)}</Num>, size: 110 },
-      { accessorKey: 'amount', header: headerRight('Amount'), cell: ({ row }) => <Num strong>{unitPrice(row.original.amount, currency)}</Num>, size: 120 },
+      { accessorKey: 'quantity', header: headerRight('Qty'), cell: ({ row }) => <NumCell>{row.original.quantity}</NumCell>, size: 80 },
+      { accessorKey: 'unit_cost', header: headerRight('Unit cost'), cell: ({ row }) => <NumCell>{unitPrice(row.original.unit_cost, currency)}</NumCell>, size: 110 },
+      { accessorKey: 'amount', header: headerRight('Amount'), cell: ({ row }) => <NumCell strong>{unitPrice(row.original.amount, currency)}</NumCell>, size: 120 },
     ];
     if (tab === 'operations') return [
-      { accessorKey: 'sequence', header: headerRight('Seq'), cell: ({ row }) => <Num>{row.original.sequence}</Num>, size: 60 },
+      { accessorKey: 'sequence', header: headerRight('Seq'), cell: ({ row }) => <NumCell>{row.original.sequence}</NumCell>, size: 60 },
       { accessorKey: 'type_name', header: 'Operation', cell: ({ row }) => <TextCell value={row.original.type_name} strong /> },
       { id: 'costed_as', header: 'Costed as', accessorFn: (r) => (r.is_fixed ? 'Fixed' : r.is_outsourced ? 'Outsourced' : 'Labour'), cell: ({ row }) => <TextCell value={row.original.is_fixed ? 'Fixed' : row.original.is_outsourced ? 'Outsourced' : 'Labour'} muted />, size: 110 },
       { accessorKey: 'role', header: 'Role', cell: ({ row }) => <TextCell value={row.original.role} muted />, size: 160 },
-      { accessorKey: 'amount', header: headerRight('Direct cost'), cell: ({ row }) => <Num>{money(row.original.amount, currency)}</Num>, size: 120 },
-      { id: 'overhead', header: headerRight('Overhead'), cell: ({ row }) => <Num>{(row.original.is_outsourced || row.original.is_fixed) ? '—' : money(row.original.hours * (data?.cost?.overhead_rate ?? 0), currency)}</Num>, size: 110 },
-      { id: 'total', header: headerRight('Total'), cell: ({ row }) => <Num strong>{money(row.original.amount + ((row.original.is_outsourced || row.original.is_fixed) ? 0 : row.original.hours * (data?.cost?.overhead_rate ?? 0)), currency)}</Num>, size: 120 },
+      { accessorKey: 'amount', header: headerRight('Direct cost'), cell: ({ row }) => <NumCell>{money(row.original.amount, currency)}</NumCell>, size: 120 },
+      { id: 'overhead', header: headerRight('Overhead'), cell: ({ row }) => <NumCell>{(row.original.is_outsourced || row.original.is_fixed) ? '—' : money(row.original.hours * (data?.cost?.overhead_rate ?? 0), currency)}</NumCell>, size: 110 },
+      { id: 'total', header: headerRight('Total'), cell: ({ row }) => <NumCell strong>{money(row.original.amount + ((row.original.is_outsourced || row.original.is_fixed) ? 0 : row.original.hours * (data?.cost?.overhead_rate ?? 0)), currency)}</NumCell>, size: 120 },
     ];
     if (tab === 'plan') return [
       { accessorKey: 'label', header: 'Month', cell: ({ row }) => <TextCell value={`${row.original.label} ${row.original.year}`} strong /> },
-      { accessorKey: 'planned', header: headerRight('Planned units'), cell: ({ row }) => <Num>{row.original.planned}</Num>, size: 120 },
-      { accessorKey: 'taken', header: headerRight('On orders'), cell: ({ row }) => <Num>{row.original.taken || '—'}</Num>, size: 100 },
-      { accessorKey: 'open', header: headerRight('Left to take'), size: 110, cell: ({ row }) => { const m = row.original; if (!m.planned && !m.taken) return <Num>—</Num>; return <div className="text-right"><ToneText label={String(m.open)} tone={m.open < 0 ? 'danger' : 'muted'} /></div>; } },
-      { accessorKey: 'actual', header: headerRight('Built units'), cell: ({ row }) => <Num>{row.original.actual}</Num>, size: 110 },
+      { accessorKey: 'planned', header: headerRight('Planned units'), cell: ({ row }) => <NumCell>{row.original.planned}</NumCell>, size: 120 },
+      { accessorKey: 'taken', header: headerRight('On orders'), cell: ({ row }) => <NumCell>{row.original.taken || '—'}</NumCell>, size: 100 },
+      { accessorKey: 'open', header: headerRight('Left to take'), size: 110, cell: ({ row }) => { const m = row.original; if (!m.planned && !m.taken) return <NumCell>—</NumCell>; return <div className="text-right"><ToneText label={String(m.open)} tone={m.open < 0 ? 'danger' : 'muted'} /></div>; } },
+      { accessorKey: 'actual', header: headerRight('Built units'), cell: ({ row }) => <NumCell>{row.original.actual}</NumCell>, size: 110 },
       { id: 'achieved', header: headerRight('Achieved'), size: 100, cell: ({ row }) => { const st = planStatus(row.original).label; const p = st === 'Planned' ? null : planMath(row.original).achieved; return <div className="text-right"><ToneText label={p == null ? '—' : `${Math.round(p)}%`} tone={p == null || st === 'In progress' ? 'muted' : p >= 100 ? 'success' : p < 90 ? 'warning' : 'muted'} /></div>; } },
-      { id: 'cost', header: headerRight('Planned cost'), cell: ({ row }) => <Num strong>{a ? money(planMath(row.original).plannedCost, currency) : '—'}</Num>, size: 130 },
+      { id: 'cost', header: headerRight('Planned cost'), cell: ({ row }) => <NumCell strong>{a ? money(planMath(row.original).plannedCost, currency) : '—'}</NumCell>, size: 130 },
       { id: 'status', header: 'Status', size: 110, cell: ({ row }) => { const s = planStatus(row.original); return <ToneText label={s.label} tone={s.tone} />; } },
     ];
     if (tab === 'standard') return [
       { accessorKey: 'created_at', header: 'Proposed', cell: ({ row }) => <DateCell value={row.original.created_at} />, size: 110 },
       // Only the newest proposal can be approved, so an older one that is still open reads as superseded
       { accessorKey: 'status', header: 'Status', size: 110, cell: ({ row }) => { const s = row.original.status; const old = s === 'PROPOSED' && row.original.id < newestStandardId; return <ToneText label={old ? 'Superseded' : s === 'APPROVED' ? 'Approved' : s === 'PROPOSED' ? 'Proposed' : s === 'REJECTED' ? 'Rejected' : 'Replaced'} tone={old ? 'muted' : s === 'APPROVED' ? 'success' : s === 'PROPOSED' ? 'warning' : s === 'REJECTED' ? 'danger' : 'muted'} />; } },
-      { accessorKey: 'total', header: headerRight('Unit cost'), cell: ({ row }) => <Num strong>{money(row.original.total, currency)}</Num>, size: 120 },
-      { id: 'bom', header: headerRight('Parts and scrap'), cell: ({ row }) => <Num>{money(row.original.material + row.original.scrap, currency)}</Num>, size: 170 },
-      { id: 'steps', header: headerRight('Build operations'), cell: ({ row }) => <Num>{money(row.original.conversion + row.original.fixed, currency)}</Num>, size: 120 },
-      { accessorKey: 'overhead', header: headerRight('Overhead'), cell: ({ row }) => <Num>{money(row.original.overhead, currency)}</Num>, size: 120 },
-      { id: 'fw', header: headerRight('Freight and warranty'), accessorFn: (r) => r.freight + r.warranty, cell: ({ row }) => <Num>{money(row.original.freight + row.original.warranty, currency)}</Num>, size: 150 },
+      { accessorKey: 'total', header: headerRight('Unit cost'), cell: ({ row }) => <NumCell strong>{money(row.original.total, currency)}</NumCell>, size: 120 },
+      { id: 'bom', header: headerRight('Parts and scrap'), cell: ({ row }) => <NumCell>{money(row.original.material + row.original.scrap, currency)}</NumCell>, size: 170 },
+      { id: 'steps', header: headerRight('Build operations'), cell: ({ row }) => <NumCell>{money(row.original.conversion + row.original.fixed, currency)}</NumCell>, size: 120 },
+      { accessorKey: 'overhead', header: headerRight('Overhead'), cell: ({ row }) => <NumCell>{money(row.original.overhead, currency)}</NumCell>, size: 120 },
+      { id: 'fw', header: headerRight('Freight and warranty'), accessorFn: (r) => r.freight + r.warranty, cell: ({ row }) => <NumCell>{money(row.original.freight + row.original.warranty, currency)}</NumCell>, size: 150 },
     ];
     return [
       { accessorKey: 'part_no', header: 'Part', cell: ({ row }) => <IdCell value={row.original.part_no} />, size: 110 },
@@ -167,7 +164,7 @@ export default function ProductCostingDetailPage() {
         cell: ({ row }) => { const p = priceChange(row.original); return <div className="text-right"><ToneText label={p == null ? '—' : `${p > 0 ? '+' : ''}${p.toFixed(1)}%`} tone={driftTone(row.original)} /></div>; } },
       // With no units built the allowance and price variance are all zero, so they are left out until there is something to measure
       ...(units > 0 ? [
-        { id: 'allow', header: headerRight('Standard allowance'), cell: ({ row }: any) => <Num>{money(lineVar(row.original).allow, currency)}</Num>, size: 130 },
+        { id: 'allow', header: headerRight('Standard allowance'), cell: ({ row }: any) => <NumCell>{money(lineVar(row.original).allow, currency)}</NumCell>, size: 130 },
         { id: 'price', header: headerRight('Price variance'), size: 130,
           cell: ({ row }: any) => { const x = lineVar(row.original).price; return <div className="text-right"><ToneText label={signed(x)} tone={toneOf(x)} /></div>; } },
       ] : []),

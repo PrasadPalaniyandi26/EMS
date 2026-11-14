@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api-client';
+import type { OperationRow, OperationType } from '@/hooks/use-planning-queries';
 
 // Build orders: a customer's commitment to have units of a standard product built and delivered.
 // Keys start with 'budgets' so invalidate('budgets') refreshes them with the rest of budget control.
@@ -18,10 +19,8 @@ export interface BuildOrderRow {
 }
 
 export interface OrderAlternate { id: number; part_no: string; name: string; supplier: string | null; standard_price: number; lead_time_days: number | null; is_default: boolean; cost_change: number }
-export interface OrderOperation {
-  id: number; name: string; type_name: string; is_outsourced: boolean; is_fixed: boolean; fixed_cost: number | null; outsourced_cost: number | null;
-  role: string | null; hours: number; rate: number; amount: number;
-}
+// The order's own copy of a build operation: the same shape as the product's, so the same dialog edits it
+export type OrderOperation = OperationRow;
 export interface OrderStandard { fy: number; total: number; material: number; scrap: number; freight: number; conversion: number; outsourced: number; fixed: number; overhead: number; warranty: number }
 export interface OrderLine {
   id: number; item_id: number | null; group_name: string | null; sequence: number; tail_days: number; part_status: 'ACTIVE' | 'REPLACED' | 'RETIRED' | null; sourcing: 'MAKE' | 'BUY'; item_drift: number; part_no: string; name: string; quantity: number; scrap_pct: number; unit_cost: number; amount: number;
@@ -34,7 +33,12 @@ export interface OrderPlan { year: number; month: number; planned: number; taken
 export interface BuildOrder extends BuildOrderRow {
   bom_id: number | null; editable: boolean; lines: OrderLine[];
   operations: OrderOperation[];
-  cost: { material: number; scrap: number; freight: number; conversion: number; outsourced: number; fixed: number; overhead: number; warranty: number; total: number; hours: number; overhead_rate: number; freight_pct?: number } | null;
+  cost: { material: number; scrap: number; freight: number; conversion: number; outsourced: number; fixed: number; overhead: number; warranty: number; total: number; hours: number; overhead_rate: number; freight_pct?: number;
+    default_overhead_rate: number; default_freight_pct: number; default_warranty_pct: number; base_cost: number; freight_base: number } | null;
+  // The order's own copy of the cost settings; Price and costing changes them for this order only
+  bom_settings: { freight_pct: number; warranty_pct: number; overhead_rate_override: number | null; adjust_reason: string | null } | null;
+  // What the Build operation dialog picks from
+  operation_types: OperationType[]; rate_cards: { id: number; role: string; rate_per_hour: number }[];
   live_unit_cost: number | null; cost_drift: number | null; lead: OrderLead; plan: OrderPlan;
   stale: { bom_newer: number | null; standard_changed: boolean; ended_parts: number };
   schedule: OrderScheduleMonth[]; actuals: OrderActuals;

@@ -16,7 +16,19 @@ const nextConfig: NextConfig = {
   ...(!isCapacitor && {
     // Build orders became Order costing; keep old bookmarks working
     async redirects() {
-      return [{ source: '/budget/build-orders/:path*', destination: '/budget/order-costing/:path*', permanent: true }];
+      // Orders moved into one page under Business; the old addresses keep working
+      return [
+        { source: '/budget/build-orders/:path*', destination: '/business/orders/:path*', permanent: true },
+        { source: '/budget/order-costing/:path*', destination: '/business/orders/:path*', permanent: true },
+        { source: '/budget/order-costing', destination: '/business/orders', permanent: true },
+        { source: '/manage/orders', destination: '/business/orders', permanent: true },
+        { source: '/manage/projects', destination: '/business/projects', permanent: true },
+        { source: '/manage/products', destination: '/business/products', permanent: true },
+        { source: '/budget/projects/:path*', destination: '/business/projects/:path*', permanent: true },
+        { source: '/budget/projects', destination: '/business/projects', permanent: true },
+        { source: '/budget/products/:path*', destination: '/business/products/:path*', permanent: true },
+        { source: '/budget/products', destination: '/business/products', permanent: true },
+      ];
     },
     async rewrites() {
       return [

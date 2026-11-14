@@ -8,6 +8,7 @@ import { financeSelfApprovalAllowed } from '../common/config/approval-policy';
 // Approval levels:
 //   Level 1 = Manager approval  → status PENDING_MANAGER
 //   Level 2 = Finance approval  → status PENDING_FINANCE
+// A decision that turns a record down needs a reason, and a closed month takes no new approved spend.
 // After Finance approves → APPROVED
 // Reject at any level   → REJECTED
 // Send back at any level → SENT_BACK (submitter can re-edit and resubmit)
@@ -143,6 +144,20 @@ export class ApprovalsService {
         { [owner]: { user: { manager: { userRoles: { none: { role: { name: ROLES.MANAGER } } } } } } },
       ],
     };
+  }
+
+  // Approved spend lands in its month: once the month is closed it cannot grow, so the request goes back or the month is reopened
+  private async assertMonthOpen(date: Date | string | null | undefined) {
+    if (!date) return;
+    const d = new Date(date);
+    const closed = await this.prisma.periodLock.findUnique({ where: { year_month: { year: d.getFullYear(), month: d.getMonth() + 1 } } });
+    if (closed) {
+      throw new HttpException(`${d.toLocaleString('en-GB', { month: 'long' })} ${d.getFullYear()} is closed, so this cannot be approved into it. Send it back to be re-dated, or ask Finance to reopen the month.`, HttpStatus.CONFLICT);
+    }
+  }
+
+  private needReason(comments: string | undefined, what: string) {
+    if (!comments?.trim()) throw new HttpException(`Say why you are ${what}.`, HttpStatus.BAD_REQUEST);
   }
 
   private async getApproverInfo(approverId: number) {
@@ -425,6 +440,11 @@ export class ApprovalsService {
 
     const approverInfo = await this.getApproverInfo(approverId);
 
+    if (txStatus !== 'PENDING_MANAGER' && txStatus !== 'PENDING_FINANCE') {
+      throw new HttpException(`This record is '${txStatus}', so there is nothing to approve.`, HttpStatus.BAD_REQUEST);
+    }
+    if (txStatus === 'PENDING_FINANCE') await this.assertMonthOpen(req.transaction?.dateRecorded);
+
     if (txStatus === 'PENDING_MANAGER') {
       const financeUsers = await this.prisma.user.findMany({
         where: {
@@ -437,6 +457,8 @@ export class ApprovalsService {
         },
         take: 1,
       });
+      // With no Finance step left this approval books the spend
+      if (financeUsers.length === 0) await this.assertMonthOpen(req.transaction?.dateRecorded);
 
       await this.prisma.$transaction(async (tx) => {
         const claimed = await tx.approvalRequest.updateMany({
@@ -513,20 +535,6 @@ export class ApprovalsService {
       }
       return { message: 'Final approval granted. Expense is now APPROVED.' };
     }
-
-    // Fallback
-    await this.prisma.$transaction(async (tx) => {
-      await tx.approvalRequest.update({
-        where: { id: requestId },
-        data: { status: 'APPROVED', comments: comments || null, actionDate: new Date(), resolvedAt: new Date() },
-      });
-      await tx.transaction.update({ where: { id: req.transactionId! }, data: { status: 'APPROVED' } });
-    });
-    await this.prisma.transaction.update({
-      where: { id: req.transactionId! },
-      data: { approvedById: approverInfo.id, approvedByName: approverInfo.name, approvedByRole: approverInfo.role, approvedAt: new Date() },
-    }).catch((e: any) => this.logger.warn('Background task failed', e?.message));
-    return { message: 'Request approved.' };
   }
 
   async reject(requestId: number, approverId: number, comments?: string) {
@@ -536,6 +544,7 @@ export class ApprovalsService {
     });
     if (!req) throw new HttpException('Approval request not found.', HttpStatus.NOT_FOUND);
     if (req.status !== 'PENDING') return { message: 'Request already processed.' };
+    this.needReason(comments, 'rejecting it');
 
     if (req.recurringTransactionId) {
       const rec = req.recurringTransaction as any;
@@ -614,6 +623,7 @@ export class ApprovalsService {
     });
     if (!req) throw new HttpException('Approval request not found.', HttpStatus.NOT_FOUND);
     if (req.status !== 'PENDING') return { message: 'Request already processed.' };
+    this.needReason(comments, 'sending it back');
 
     if (req.recurringTransactionId) {
       const rec = req.recurringTransaction as any;
@@ -661,7 +671,7 @@ export class ApprovalsService {
     await this.prisma.$transaction(async (tx) => {
       await tx.approvalRequest.updateMany({
         where: { transactionId: req.transactionId!, status: 'PENDING' },
-        data: { status: 'SENT_BACK', comments: comments || null, actionDate: new Date(), resolvedAt: new Date() },
+        data: { approverId, status: 'SENT_BACK', comments: comments || null, actionDate: new Date(), resolvedAt: new Date() },
       });
       await tx.transaction.update({
         where: { id: req.transactionId! },

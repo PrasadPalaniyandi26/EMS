@@ -75,10 +75,11 @@ export function useCategoryUsage(kind: 'expense' | 'income', enabled: boolean) {
 }
 
 // ─── Clients ─────────────────────────────────────
-export function useClients() {
+// The clients that can be chosen; the Clients page passes all = true to list the deactivated ones as well
+export function useClients(all = false) {
   return useQuery({
-    queryKey: [QUERY_KEYS.CLIENTS],
-    queryFn: () => api.get<Client[]>('/clients').then((r) => r.data),
+    queryKey: [QUERY_KEYS.CLIENTS, all],
+    queryFn: () => api.get<Client[]>(all ? '/clients?all=1' : '/clients').then((r) => r.data),
     staleTime: REF_STALE,
   });
 }

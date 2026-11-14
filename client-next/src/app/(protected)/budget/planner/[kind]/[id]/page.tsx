@@ -15,7 +15,7 @@ import { useBuildOrders } from '@/hooks/use-build-orders';
 import { useDataTable } from '@/hooks/use-data-table';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
-import { IdCell, StatusText, TextCell, headerRight } from '@/components/data-table/cells';
+import { IdCell, StatusText, TextCell, headerRight, WholeCell } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { ConfirmDialog, Field, inp } from '@/components/shared/modal-primitives';
@@ -30,7 +30,7 @@ import { KIND_COST_OBJECT, KIND_LABEL, changesFor, isKind, linesOf, rollUp, type
 import { formatDate } from '@/lib/currency';
 
 type Tab = 'lines' | 'changes';
-const Whole = ({ value, currency }: { value: number; currency: string }) => <div className="text-right text-[13px] font-medium tabular-nums text-[var(--shell-text)]">{plain(value, currency)}</div>;
+// The same record on the Costing and Manage pages
 
 export default function PlannerObjectPage() {
   const params = useParams<{ kind: string; id: string }>();
@@ -103,8 +103,8 @@ export default function PlannerObjectPage() {
       ),
     },
     { accessorKey: 'owner_name', header: 'Owner', cell: ({ row }) => <TextCell value={row.original.owner_name} muted />, size: 100 },
-    { accessorKey: 'total', header: headerRight('Budget'), cell: ({ row }) => <Whole value={row.original.total} currency={currency} />, size: 120 },
-    { accessorKey: 'used', header: headerRight('Used'), cell: ({ row }) => <Whole value={row.original.used} currency={currency} />, size: 120 },
+    { accessorKey: 'total', header: headerRight('Budget'), cell: ({ row }) => <WholeCell value={row.original.total} currency={currency} />, size: 120 },
+    { accessorKey: 'used', header: headerRight('Used'), cell: ({ row }) => <WholeCell value={row.original.used} currency={currency} />, size: 120 },
     {
       accessorKey: 'pct', header: 'Utilisation', size: 150,
       cell: ({ row }) => (
@@ -267,8 +267,8 @@ export default function PlannerObjectPage() {
                 <Kpi label="Forecast" value={r.forecast ? money(r.forecast, currency) : '–'} sub="At the current run-rate" tone={r.forecast > r.planned && r.planned > 0 ? 'warning' : undefined} />
                 <Kpi label="Open alerts" value={r.alerts} tone={r.alerts ? 'warning' : undefined} />
               </KpiStrip>
-              <div className="min-h-0 flex-1">
-                <DataTable isLoading={isLoading} columns={columns} data={lines} tableInstance={table}
+              <div className="flex min-h-0 flex-1 flex-col">
+                <DataTable isLoading={isLoading} columns={columns} data={lines} tableInstance={table} fullHeight
                   emptyMessage={planExists ? `No budget lines for this ${KIND_LABEL[kind].toLowerCase()} yet.${canEditLines ? ' Click Add budget line to start.' : ''}` : 'There is no budget plan for this year. Create one in the budget planner.'} />
               </div>
             </div>

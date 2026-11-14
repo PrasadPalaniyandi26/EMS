@@ -226,6 +226,95 @@ describe('Build orders (e2e)', () => {
     });
   });
 
+  describe('build operations for one order', () => {
+    let id: number; let base: number; let labour: any; let card: any;
+    beforeAll(async () => {
+      id = data(await order()).id;
+      await call('post', `/build-orders/${id}/import-bom`, admin, {});
+      const o = await get(id);
+      base = o.unit_cost;
+      labour = o.operation_types.find((t: any) => !t.is_fixed && !t.is_outsourced);
+      card = o.rate_cards[0];
+    });
+
+    it('offers the operation types and roles, and asks for what the type needs', async () => {
+      expect(labour).toBeDefined();
+      expect(card).toBeDefined();
+      expect((await call('post', `/build-orders/${id}/operations`, admin, { hours: 1 })).status).toBe(400);
+      expect((await call('post', `/build-orders/${id}/operations`, admin, { operation_type_id: labour.id, hours: 1 })).status).toBe(400);
+    });
+
+    it('adds, changes and removes an operation on this order only, costing it again each time', async () => {
+      const productOps = () => prisma.bomOperation.count({ where: { bom: { productId, buildOrderId: null } } });
+      const before = await productOps();
+      const added = await call('post', `/build-orders/${id}/operations`, admin, { operation_type_id: labour.id, rate_card_id: card.id, hours: 2, sequence: 1 });
+      expect(added.status).toBe(201);
+      const opId = data(added).id;
+      const withOp = (await get(id)).unit_cost;
+      expect(withOp).toBeGreaterThan(base);
+      expect((await call('put', `/build-orders/${id}/operations/${opId}`, admin, { operation_type_id: labour.id, rate_card_id: card.id, hours: 3, sequence: 1 })).status).toBe(200);
+      expect((await get(id)).unit_cost).toBeGreaterThan(withOp);
+      expect(await productOps()).toBe(before);
+      expect((await call('delete', `/build-orders/${id}/operations/${opId}`, admin)).status).toBe(200);
+      expect((await get(id)).unit_cost).toBe(base);
+    });
+
+    it('cannot touch an operation of another order or of the product', async () => {
+      const other = data(await order()).id;
+      await call('post', `/build-orders/${other}/import-bom`, admin, {});
+      const theirs = (await get(other)).operations[0];
+      if (theirs) {
+        expect((await call('put', `/build-orders/${id}/operations/${theirs.id}`, admin, { operation_type_id: labour.id, rate_card_id: card.id, hours: 1 })).status).toBe(404);
+        expect((await call('delete', `/build-orders/${id}/operations/${theirs.id}`, admin)).status).toBe(404);
+      }
+    });
+
+    it('only Finance, Operations and Admin can change them', async () => {
+      expect((await call('post', `/build-orders/${id}/operations`, employee, { operation_type_id: labour.id, rate_card_id: card.id, hours: 1 })).status).toBe(403);
+    });
+  });
+
+  describe('cost settings for one order', () => {
+    let id: number; let base: number;
+    beforeAll(async () => {
+      id = data(await order()).id;
+      await call('post', `/build-orders/${id}/import-bom`, admin, {});
+      base = (await get(id)).unit_cost;
+    });
+
+    it('needs a BOM first, and a reason when a value is not the default', async () => {
+      const bare = data(await order()).id;
+      expect((await call('put', `/build-orders/${bare}/cost-settings`, admin, { freight_pct: 5, warranty_pct: 2, reason: 'x' })).status).toBe(409);
+      expect((await call('put', `/build-orders/${id}/cost-settings`, admin, { freight_pct: 5, warranty_pct: 2 })).status).toBe(400);
+      expect((await call('put', `/build-orders/${id}/cost-settings`, admin, { freight_pct: 150, warranty_pct: 2, reason: 'x' })).status).toBe(400);
+      expect((await call('put', `/build-orders/${id}/cost-settings`, admin, { freight_pct: 5, warranty_pct: 2, overhead_rate: -1, reason: 'x' })).status).toBe(400);
+    });
+
+    it('changes this order only and costs it again, and the defaults put it back', async () => {
+      const own = await prisma.bom.findFirstOrThrow({ where: { productId, buildOrderId: null }, orderBy: { version: 'desc' } });
+      const r = await call('put', `/build-orders/${id}/cost-settings`, admin, { freight_pct: 10, warranty_pct: 3, overhead_rate: 999, reason: 'Rush freight' });
+      expect(r.status).toBe(200);
+      const o = await get(id);
+      expect(o.unit_cost).toBeGreaterThan(base);
+      expect(o.bom_settings).toMatchObject({ freight_pct: 10, warranty_pct: 3, overhead_rate_override: 999, adjust_reason: 'Rush freight' });
+      // The product's own BOM keeps its settings
+      const after = await prisma.bom.findFirstOrThrow({ where: { productId, buildOrderId: null }, orderBy: { version: 'desc' } });
+      expect(Number(after.freightPct)).toBe(Number(own.freightPct));
+      expect(after.overheadRateOverride).toEqual(own.overheadRateOverride);
+      const d = o.cost;
+      const back = await call('put', `/build-orders/${id}/cost-settings`, admin, { freight_pct: d.default_freight_pct, warranty_pct: d.default_warranty_pct, overhead_rate: d.default_overhead_rate });
+      expect(back.status).toBe(200);
+      const reset = await get(id);
+      expect(reset.bom_settings.overhead_rate_override).toBeNull();
+      expect(reset.bom_settings.adjust_reason).toBeNull();
+      expect(reset.unit_cost).toBe(base);
+    });
+
+    it('only Finance, Operations and Admin can change them', async () => {
+      expect((await call('put', `/build-orders/${id}/cost-settings`, employee, { freight_pct: 2, warranty_pct: 1.5 })).status).toBe(403);
+    });
+  });
+
   describe('lead time', () => {
     it('warns when a part cannot arrive in the window, and suggests the earliest delivery', async () => {
       const id = data(await order({ delivery_date: inDays(30) })).id;

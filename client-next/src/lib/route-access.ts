@@ -4,7 +4,7 @@
 const EMPLOYEE_ROUTES = ['/expense', '/approvals', '/settings', '/notifications'];
 
 // Configurator and Operations work in Budget and Costing; they also keep the routes an employee has
-const PLANNING_ROUTES = [...EMPLOYEE_ROUTES, '/hub', '/budget', '/manage/orders', '/manage/projects', '/manage/products'];
+const PLANNING_ROUTES = [...EMPLOYEE_ROUTES, '/hub', '/budget', '/business'];
 const PLANNING_ROLES = ['CONFIGURATOR', 'OPERATIONS'];
 
 // Routes limited to specific roles for every user; mirrors @Roles() on the API

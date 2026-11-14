@@ -1,12 +1,6 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import { useEffect } from 'react';
-import { useHeaderStore } from '@/stores/header-store';
-import { ObjectChanges } from '@/components/budgets/object-changes';
-
-// Everything waiting for a decision, in one place. New requests are made from the project, order or budget line they are about.
+// Changes now sit beside the lines they move money between, on the Monitor page
 export default function BudgetChangesPage() {
-  const setHeader = useHeaderStore((s) => s.setHeader);
-  useEffect(() => { setHeader('Budget changes', 'Requests to move, revise or release budget. Make a new request from the project, order or budget line'); }, [setHeader]);
-  return <ObjectChanges />;
+  redirect('/budget/monitor?tab=changes');
 }

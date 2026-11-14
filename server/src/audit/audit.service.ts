@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { parseRange } from '../common/helpers/dates';
 
 @Injectable()
 export class AuditService {
@@ -7,9 +8,15 @@ export class AuditService {
 
   async findAll(filters: any = {}) {
     const where: any = {};
-    if (filters.tableName) where.tableName = filters.tableName;
-    if (filters.userId) where.changedBy = Number(filters.userId);
-    if (filters.action) where.action = filters.action;
+    const range = parseRange(filters.dateFrom, filters.dateTo);
+    if (filters.tableName) where.tableName = String(filters.tableName);
+    if (filters.userId) {
+      const uid = Number(filters.userId);
+      if (!Number.isInteger(uid)) throw new BadRequestException('The user filter must be a user number.');
+      where.changedBy = uid;
+    }
+    // Older user records were logged as CREATE; they count as INSERT
+    if (filters.action) where.action = String(filters.action) === 'INSERT' ? { in: ['INSERT', 'CREATE'] } : String(filters.action);
     if (filters.search) {
       where.OR = [
         { tableName: { contains: filters.search, mode: 'insensitive' } },
@@ -17,11 +24,15 @@ export class AuditService {
         { user: { username: { contains: filters.search, mode: 'insensitive' } } },
       ];
     }
-    if (filters.dateFrom) where.changedAt = { ...where.changedAt, gte: new Date(filters.dateFrom) };
-    if (filters.dateTo) where.changedAt = { ...where.changedAt, lte: new Date(filters.dateTo) };
+    if (range.from) where.changedAt = { ...where.changedAt, gte: range.from };
+    // The end date is a whole day: include everything logged on it
+    if (range.to) {
+      const t = range.to;
+      where.changedAt = { ...where.changedAt, lt: new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate() + 1)) };
+    }
 
-    const page = Number(filters.page) || 1;
-    const limit = Number(filters.limit) || 50;
+    const page = Math.max(1, Math.floor(Number(filters.page)) || 1);
+    const limit = Math.min(200, Math.max(1, Math.floor(Number(filters.limit)) || 50));
     const skip = (page - 1) * limit;
 
     const [total, logs] = await Promise.all([
