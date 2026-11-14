@@ -48,8 +48,20 @@ import { PermissionsModal } from '@/components/manage/permissions-modal';
 import { cn } from '@/lib/utils';
 import { parseApiDate } from '@/lib/currency';
 import { useConfirm } from '@/components/shared/modal-primitives';
+import { TabBar, useTabParam } from '@/components/budgets/budget-ui';
+import { useCompanyProfile } from '@/hooks/use-invoicing';
+import { CompanyForm } from '@/components/invoicing/invoicing-modals';
+import { isFinanceRole } from '@/lib/permissions';
+
+type OrgTab = 'people' | 'company';
+const ORG_TABS = ['people', 'company'] as const;
 
 export default function OrganizationPage() {
+  const [orgTab, setOrgTab] = useTabParam<OrgTab>(ORG_TABS, 'people');
+  const orgRole = useAuthStore((st) => st.user?.role_name);
+  // The company details are on every invoice: Admin, Finance, Manager and Operations see them, Admin and Finance change them
+  const canSeeCompany = ['ADMIN', 'FINANCE', 'MANAGER', 'OPERATIONS'].includes((orgRole || '').toUpperCase());
+  const { data: company } = useCompanyProfile(canSeeCompany);
   const setHeader = useHeaderStore((s) => s.setHeader);
   const currentUser = useAuthStore((s) => s.user);
   const isAdmin = (currentUser?.role_name || '').toLowerCase() === 'admin';
@@ -214,7 +226,7 @@ export default function OrganizationPage() {
     </div>
   );
 
-  return (
+  const peopleView = (
     <ModuleShell
       showPanel={!!selectedUser}
       searchRow={
@@ -325,5 +337,15 @@ export default function OrganizationPage() {
         user={selectedUser}
       />
     </ModuleShell>
+  );
+
+  if (!canSeeCompany) return peopleView;
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-[var(--shell-surface)]">
+      <TabBar<OrgTab> value={orgTab} onChange={setOrgTab} tabs={[{ value: 'people', label: 'People' }, { value: 'company', label: 'Company' }]} />
+      <div role="tabpanel" id="tabpanel" aria-labelledby={`tab-${orgTab}`} className="min-h-0 flex-1">
+        {orgTab === 'people' ? peopleView : company ? <CompanyForm company={company} canEdit={isFinanceRole(orgRole)} /> : <p className="p-6 text-[13px] text-[var(--shell-text-muted)]">Loading…</p>}
+      </div>
+    </div>
   );
 }

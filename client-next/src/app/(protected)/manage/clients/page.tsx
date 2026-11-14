@@ -1,17 +1,22 @@
 'use client';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { useHeaderStore } from '@/stores/header-store';
 import { useClients, useClientSectors, useInvalidate } from '@/hooks/use-queries';
 import { useAuthStore } from '@/stores/auth-store';
 import { ManageSectorsDialog } from '@/components/manage/manage-sectors-dialog';
 import api from '@/lib/api-client';
 import { toast } from 'sonner';
-import { Pencil, Trash2, Plus, MapPin, Phone, Mail, Layers } from 'lucide-react';
+import { Pencil, Trash2, Plus, MapPin, Phone, Mail, Layers, FileText, ClipboardList } from 'lucide-react';
 import type { Client } from '@/lib/types';
 import { ClientModal } from '@/components/manage/client-modals';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
-import { columns } from './columns';
+import { columns, owingColumns } from './columns';
+import { TabBar, money, useTabParam } from '@/components/budgets/budget-ui';
+import { useInvoiceSummary } from '@/hooks/use-invoicing';
+import { canPropose } from '@/lib/permissions';
+import { InvoiceModal, PoModal } from '@/components/invoicing/invoicing-modals';
+import { InvoicesView, PurchaseOrdersView } from '@/components/invoicing/client-billing';
 import { 
   getCoreRowModel, 
   getFilteredRowModel, 
@@ -28,6 +33,8 @@ import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAllocation
 import { useConfirm } from '@/components/shared/modal-primitives';
 import { PageFrame } from '@/components/shared/module/page-frame';
 
+type ClientTab = 'clients' | 'pos' | 'invoices';
+const CLIENT_TABS = ['clients', 'pos', 'invoices'] as const;
 const COUNTRIES = ['United Kingdom', 'United States', 'India', 'Germany', 'Canada', 'Singapore', 'Australia'];
 
 export default function ClientsPage() {
@@ -40,6 +47,15 @@ export default function ClientsPage() {
   const isAdmin = role === 'ADMIN';
   // The API lets managers and admins change clients; the other roles only read them
   const canManage = role === 'ADMIN' || role === 'MANAGER';
+  // Purchase orders and invoices: Admin, Finance, Manager and Operations read them; Operations, Finance and Admin add POs and draft invoices
+  const canBill = ['ADMIN', 'FINANCE', 'MANAGER', 'OPERATIONS'].includes(role);
+  const canWrite = canPropose(role);
+  const [tab, setTab] = useTabParam<ClientTab>(CLIENT_TABS, 'clients');
+  const [poOpen, setPoOpen] = useState(false);
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const { data: owingData } = useInvoiceSummary(canBill);
+  const owing = useMemo(() => new Map((owingData?.rows ?? []).map((r) => [r.client_id, r])), [owingData]);
+  const cols = useMemo(() => (canBill ? [...columns.slice(0, -1), ...owingColumns(owing), columns[columns.length - 1]] : columns), [canBill, owing]);
   const [sectorsOpen, setSectorsOpen] = useState(false);
   const { confirm: confirmDialog, dialog: confirmDialogEl } = useConfirm();
 
@@ -52,13 +68,13 @@ export default function ClientsPage() {
   const [activitySummary, setActivitySummary] = useState<{ projects: number; products: number } | null>(null);
   const [activityFailed, setActivityFailed] = useState(false);
   
-  useEffect(() => { setHeader('Clients', 'Customers you work for and charge spend to'); }, [setHeader]);
+  useEffect(() => { setHeader(tab === 'pos' ? 'Purchase orders' : tab === 'invoices' ? 'Invoices' : 'Clients', tab === 'pos' ? 'What clients have ordered and what is left to invoice' : tab === 'invoices' ? 'Tax invoices to clients and what is still owed' : 'Customers you work for and charge spend to'); }, [setHeader, tab]);
 
   // Active clients first, then by name
   const [sorting, setSorting] = useState<SortingState>([{ id: 'is_active', desc: true }, { id: 'name', desc: false }]);
   const table = useDataTable<Client>({
     data: clients || [],
-    columns,
+    columns: cols,
     state: {
       rowSelection,
       globalFilter,
@@ -156,6 +172,13 @@ export default function ClientsPage() {
     { label: 'Delete', variant: 'danger', onClick: handleDelete },
   ] : [];
 
+  // Raise a PO or an invoice for the selected client
+  const billable = canWrite && selectedClient && !selectedClient.is_system && (selectedClient.is_active === 1 || (selectedClient.is_active as unknown) === true);
+  const billingActions: DetailActionDef[] = billable ? [
+    { label: 'Add PO', icon: <ClipboardList className="h-4 w-4 text-[var(--nav-amber)]" />, onClick: () => setPoOpen(true) },
+    { label: 'New invoice', icon: <FileText className="h-4 w-4 text-[var(--nav-cyan)]" />, onClick: () => setInvoiceOpen(true) },
+  ] : [];
+
   // What the list holds, instead of instructions
   const real = (clients || []).filter((c) => !c.is_system);
   const isOn = (c: any) => c.is_active === 1 || c.is_active === true;
@@ -173,8 +196,7 @@ export default function ClientsPage() {
     </div>
   );
 
-  return (
-    <PageFrame label="Clients">
+  const clientsView = (
     <ModuleShell
       showPanel={!!selectedClient}
       searchRow={
@@ -184,6 +206,7 @@ export default function ClientsPage() {
             ...(canManage ? [{ label: 'Add', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: openAdd }] : []),
             ...(isAdmin ? [{ label: 'Sectors', icon: <Layers aria-hidden className="h-4 w-4 text-[var(--nav-violet)]" />, onClick: () => setSectorsOpen(true) }] : []),
             ...itemActions,
+            ...billingActions,
           ]} />}
         />
       }
@@ -193,7 +216,7 @@ export default function ClientsPage() {
             onClose={() => setRowSelection({})}
             hasSelection={!!selectedClient}
             idle={clientSummary}
-            footer={itemActions.length > 0 ? <DetailActions actions={itemActions} /> : undefined}
+            footer={itemActions.length + billingActions.length > 0 ? <DetailActions actions={[...itemActions, ...billingActions]} /> : undefined}
           >
             {selectedClient && (() => {
               const c: any = selectedClient;
@@ -220,6 +243,23 @@ export default function ClientsPage() {
                       <DetailField label="Industry" value={c.business_type} />
                     </DetailGrid>
                   </DetailSection>
+                  {canBill && (() => {
+                    const o = owing.get(c.id);
+                    return (
+                      <DetailSection title="Billing">
+                        <DetailGrid>
+                          <DetailField label="GSTIN" value={c.gstin} />
+                          <DetailField label="Payment terms" value={c.payment_terms_days != null ? (c.payment_terms_days === 0 ? 'Due on receipt' : `${c.payment_terms_days} days`) : undefined} />
+                          <DetailField label="Billed" value={o ? money(o.billed) : undefined} />
+                          <DetailField label="Received" value={o ? money(o.received) : undefined} />
+                          <DetailField label="Outstanding" value={o ? money(o.outstanding) : undefined} />
+                          <DetailField label="Overdue" value={o && o.overdue > 0 ? money(o.overdue) : undefined} tone="danger" />
+                          <DetailField label="Open POs" value={o?.open_pos} wide />
+                        </DetailGrid>
+                        {!c.gstin && !c.state && <p className="text-[12px] text-[var(--warning)]">Add the GSTIN or the state, so tax invoices can be issued.</p>}
+                      </DetailSection>
+                    );
+                  })()}
                   {activitySummary && (
                     <DetailSection title="Activity">
                       <DetailGrid>
@@ -237,7 +277,7 @@ export default function ClientsPage() {
     >
       <DataTable
         isLoading={isLoading}
-        columns={columns}
+        columns={cols}
         data={clients || []}
         tableInstance={table}
         emptyMessage={globalFilter ? 'No clients match this search.' : canManage ? 'No clients yet. Use Add to create the first one.' : 'No clients yet.'}
@@ -253,7 +293,18 @@ export default function ClientsPage() {
       />
 
       <ManageSectorsDialog isOpen={sectorsOpen} onClose={() => setSectorsOpen(false)} sectors={sectors || []} />
+      <PoModal isOpen={poOpen} onClose={() => setPoOpen(false)} editing={null} clientId={selectedClient?.id ?? null} />
+      <InvoiceModal isOpen={invoiceOpen} onClose={() => setInvoiceOpen(false)} editing={null} clientId={selectedClient?.id ?? null} />
     </ModuleShell>
-    </PageFrame>
+  );
+
+  if (!canBill) return <PageFrame label="Clients">{clientsView}</PageFrame>;
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-[var(--shell-surface)]">
+      <TabBar<ClientTab> value={tab} onChange={setTab} tabs={[{ value: 'clients', label: 'Clients' }, { value: 'pos', label: 'Purchase orders' }, { value: 'invoices', label: 'Invoices' }]} />
+      <div role="tabpanel" id="tabpanel" aria-labelledby={`tab-${tab}`} className="min-h-0 flex-1">
+        {tab === 'clients' ? clientsView : tab === 'pos' ? <PurchaseOrdersView /> : <InvoicesView />}
+      </div>
+    </div>
   );
 }

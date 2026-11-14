@@ -7,6 +7,7 @@ import { ModuleModal } from '@/components/shared/module/module-modal';
 import { Field, NativeSelect, EmailInput, PhoneInput, SegmentedControl, isValidEmail, isValidPhone, inp } from '@/components/shared/modal-primitives';
 import { AddressFields, type AddressKey } from '@/components/shared/address-fields';
 import { SectorSelect } from '@/components/shared/reference-selects';
+import { isValidGstin, stateCodeOf } from '@/lib/invoice-gst';
 
 interface ClientModalProps {
   isOpen: boolean;
@@ -28,8 +29,8 @@ const EMPTY = {
   state: '',
   country: '',
   postal_code: '',
-  tax_id: '',
-  payment_terms: 'Net 30',
+  gstin: '',
+  payment_terms_days: '30',
   is_active: true,
 };
 
@@ -43,6 +44,8 @@ export function ClientModal({ isOpen, onClose, onSave, editing }: ClientModalPro
   const [form, setForm] = useState<typeof EMPTY>(EMPTY);
 
   const set = (k: string, v: string | boolean) => setForm((p) => ({ ...p, [k]: v }));
+  // A GSTIN must agree with the state, when both are given
+  const gstStateOk = !form.gstin || !form.state || !isValidGstin(form.gstin) || !stateCodeOf(null, form.state) || stateCodeOf(form.gstin, null) === stateCodeOf(null, form.state);
 
   useEffect(() => {
     if (editing) {
@@ -63,8 +66,8 @@ export function ClientModal({ isOpen, onClose, onSave, editing }: ClientModalPro
         state: e.state || '',
         country: e.country || '',
         postal_code: e.postal_code || oldPostal,
-        tax_id: e.tax_id || '',
-        payment_terms: e.payment_terms || 'Net 30',
+        gstin: e.gstin || '',
+        payment_terms_days: String(e.payment_terms_days ?? 30),
         is_active: e.is_active === 1 || e.is_active === true,
       });
     } else {
@@ -79,7 +82,7 @@ export function ClientModal({ isOpen, onClose, onSave, editing }: ClientModalPro
     if (!isValidPhone(form.contact_phone)) return;
     // The table and detail panel show the address as one line; the parts are saved too
     const addressStr = [form.street, form.address_line2, form.city, form.state, form.postal_code].filter(Boolean).join(', ');
-    onSave({ ...form, address: addressStr });
+    onSave({ ...form, gstin: form.gstin.trim().toUpperCase(), payment_terms_days: Number(form.payment_terms_days), address: addressStr });
   };
 
   return (
@@ -89,7 +92,7 @@ export function ClientModal({ isOpen, onClose, onSave, editing }: ClientModalPro
       title={editing ? 'Edit Client' : 'Add New Client'}
       icon={editing ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
       onSave={handleSubmit}
-      canSave={!!form.name.trim() && (!form.contact_email || isValidEmail(form.contact_email)) && isValidPhone(form.contact_phone)}
+      canSave={!!form.name.trim() && (!form.contact_email || isValidEmail(form.contact_email)) && isValidPhone(form.contact_phone) && isValidGstin(form.gstin) && gstStateOk}
       saveLabel={editing ? 'Save Changes' : 'Create Client'}
       size="xl"
     >
@@ -129,12 +132,13 @@ export function ClientModal({ isOpen, onClose, onSave, editing }: ClientModalPro
           <Field label="Contact No">
             <PhoneInput value={form.contact_phone} onChange={(v) => set('contact_phone', v)} placeholder="+1 555 0123" />
           </Field>
-          <Field label="Tax ID / VAT Number">
-            <Input className={inp} placeholder="e.g. GB123456789" value={form.tax_id} onChange={(e) => set('tax_id', e.target.value)} />
+          <Field label="GSTIN" hint="For tax invoices. Its first two digits give the client's state." error={!isValidGstin(form.gstin) ? 'A GSTIN has 15 characters, for example 33ABCDE1234F1Z5.' : !gstStateOk ? 'Does not match the state.' : undefined}>
+            <Input className={inp} maxLength={15} placeholder="33ABCDE1234F1Z5" value={form.gstin} onChange={(e) => set('gstin', e.target.value.toUpperCase())} />
           </Field>
-          <Field label="Payment Terms">
-            <NativeSelect value={form.payment_terms} onChange={(e) => set('payment_terms', e.target.value)}>
-              {['Net 15', 'Net 30', 'Net 60', 'Due on Receipt'].map((t) => <option key={t} value={t}>{t}</option>)}
+          <Field label="Payment terms" hint="How many days after the invoice date a client has to pay.">
+            <NativeSelect value={form.payment_terms_days} onChange={(e) => set('payment_terms_days', e.target.value)}>
+              {[['0', 'Due on receipt'], ['15', '15 days'], ['30', '30 days'], ['45', '45 days'], ['60', '60 days'], ['90', '90 days']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              {!['0', '15', '30', '45', '60', '90'].includes(form.payment_terms_days) && <option value={form.payment_terms_days}>{form.payment_terms_days} days</option>}
             </NativeSelect>
           </Field>
         </div>

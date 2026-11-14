@@ -196,6 +196,7 @@ model Transaction {
   recurringTransaction   RecurringTransaction? @relation(fields: [recurringTransactionId], references: [id])
   department             Department?           @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   buildOrder             BuildOrder?           @relation(fields: [buildOrderId], references: [id], onDelete: SetNull)
+  invoicePayment         InvoicePayment?
 
   @@index([buildOrderId])
   @@index([userId])
@@ -264,6 +265,9 @@ model Client {
   city         String?                @db.VarChar(100)
   state        String?                @db.VarChar(100)
   postalCode   String?                @map("postal_code") @db.VarChar(20)
+  // Tax invoices: the client's GSTIN and how many days it has to pay
+  gstin            String?  @db.VarChar(15)
+  paymentTermsDays Int      @default(30) @map("payment_terms_days")
   creator      User?                  @relation("ClientCreator", fields: [createdBy], references: [id])
   products     Product[]
   projects     Project[]
@@ -272,6 +276,8 @@ model Client {
   allocations  UserAllocation[]
   splitLines   TransactionSplit[]
   buildOrders  BuildOrder[]
+  clientPos    ClientPo[]
+  invoices     Invoice[]
 
   @@map("clients")
 }
@@ -345,6 +351,8 @@ model Project {
   transactions                  Transaction[]
   splitLines                    TransactionSplit[]
   boms                          Bom[]
+  clientPos                     ClientPo[]
+  invoices                      Invoice[]
 
   @@unique([clientId, name])
   @@index([typeId])
@@ -951,6 +959,8 @@ model BuildOrder {
   boms               Bom[]
   transactions       Transaction[]
   budgetLines        BudgetLine[]
+  clientPos          ClientPo[]
+  invoices           Invoice[]
 
   @@index([productId, startDate])
   @@index([status])
@@ -1121,4 +1131,151 @@ model VarianceNote {
 
   @@unique([lineId, year, month])
   @@map("variance_notes")
+}
+
+// Client invoicing ---------------------------------------------------------
+
+// Who issues the invoices: one record, shown on every tax invoice
+model CompanyProfile {
+  id          Int      @id @default(1)
+  legalName   String   @map("legal_name") @db.VarChar(150)
+  gstin       String?  @db.VarChar(15)
+  pan         String?  @db.VarChar(10)
+  addressLine String?  @map("address_line") @db.VarChar(300)
+  city        String?  @db.VarChar(100)
+  state       String?  @db.VarChar(100)
+  postalCode  String?  @map("postal_code") @db.VarChar(20)
+  email       String?  @db.VarChar(200)
+  phone       String?  @db.VarChar(30)
+  bankName    String?  @map("bank_name") @db.VarChar(100)
+  bankAccount String?  @map("bank_account") @db.VarChar(30)
+  bankIfsc    String?  @map("bank_ifsc") @db.VarChar(15)
+  terms       String?  @db.VarChar(1000)
+  signatory   String?  @db.VarChar(100)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("company_profile")
+}
+
+// The running invoice number: one row, increased inside the transaction that issues an invoice, so a number is never used twice
+model InvoiceCounter {
+  id      Int @id @default(1)
+  lastSeq Int @map("last_seq")
+
+  @@map("invoice_counter")
+}
+
+// A purchase order a client has sent us
+model ClientPo {
+  id            Int         @id @default(autoincrement())
+  clientId      Int         @map("client_id")
+  poNumber      String      @map("po_number") @db.VarChar(60)
+  poDate        DateTime    @map("po_date") @db.Date
+  value         Decimal     @db.Decimal(14, 2)
+  validUntil    DateTime?   @map("valid_until") @db.Date
+  projectId     Int?        @map("project_id")
+  buildOrderId  Int?        @map("build_order_id")
+  // OPEN, CLOSED or CANCELLED; autoClosed marks a PO that closed itself because it was fully invoiced
+  status        String      @default("OPEN") @db.VarChar(10)
+  autoClosed    Boolean     @default(false) @map("auto_closed")
+  filePath      String?     @map("file_path") @db.VarChar(255)
+  note          String?     @db.VarChar(500)
+  createdBy     Int?        @map("created_by")
+  createdByName String?     @map("created_by_name") @db.VarChar(100)
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @default(now()) @updatedAt @map("updated_at")
+  client        Client      @relation(fields: [clientId], references: [id])
+  project       Project?    @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  buildOrder    BuildOrder? @relation(fields: [buildOrderId], references: [id], onDelete: SetNull)
+  invoices      Invoice[]
+
+  @@unique([clientId, poNumber])
+  @@index([status])
+  @@map("client_pos")
+}
+
+// A tax invoice to a client. The number is given when it is issued; seller and buyer are copied onto it then, so later edits to the client do not change it.
+model Invoice {
+  id              Int              @id @default(autoincrement())
+  number          String?          @unique @db.VarChar(16)
+  clientId        Int              @map("client_id")
+  poId            Int?             @map("po_id")
+  projectId       Int?             @map("project_id")
+  buildOrderId    Int?             @map("build_order_id")
+  invoiceDate     DateTime         @map("invoice_date") @db.Date
+  dueDate         DateTime         @map("due_date") @db.Date
+  // INTRA (CGST and SGST) or INTER (IGST), and the state the supply is made in, both fixed when the invoice is issued
+  supplyType      String?          @map("supply_type") @db.VarChar(5)
+  placeOfSupply   String?          @map("place_of_supply") @db.VarChar(100)
+  taxable         Decimal          @default(0) @db.Decimal(14, 2)
+  cgst            Decimal          @default(0) @db.Decimal(14, 2)
+  sgst            Decimal          @default(0) @db.Decimal(14, 2)
+  igst            Decimal          @default(0) @db.Decimal(14, 2)
+  roundOff        Decimal          @default(0) @map("round_off") @db.Decimal(6, 2)
+  total           Decimal          @default(0) @db.Decimal(14, 2)
+  paid            Decimal          @default(0) @db.Decimal(14, 2)
+  tds             Decimal          @default(0) @db.Decimal(14, 2)
+  // DRAFT, ISSUED, PART_PAID, PAID or CANCELLED
+  status          String           @default("DRAFT") @db.VarChar(10)
+  notes           String?          @db.VarChar(500)
+  seller          Json?
+  buyer           Json?
+  issuedAt        DateTime?        @map("issued_at")
+  issuedByName    String?          @map("issued_by_name") @db.VarChar(100)
+  cancelReason    String?          @map("cancel_reason") @db.VarChar(300)
+  cancelledAt     DateTime?        @map("cancelled_at")
+  cancelledByName String?          @map("cancelled_by_name") @db.VarChar(100)
+  createdBy       Int?             @map("created_by")
+  createdByName   String?          @map("created_by_name") @db.VarChar(100)
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @default(now()) @updatedAt @map("updated_at")
+  client          Client           @relation(fields: [clientId], references: [id])
+  po              ClientPo?        @relation(fields: [poId], references: [id], onDelete: SetNull)
+  project         Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  buildOrder      BuildOrder?      @relation(fields: [buildOrderId], references: [id], onDelete: SetNull)
+  lines           InvoiceLine[]
+  payments        InvoicePayment[]
+
+  @@index([status, dueDate])
+  @@index([clientId])
+  @@map("invoices")
+}
+
+model InvoiceLine {
+  id          Int     @id @default(autoincrement())
+  invoiceId   Int     @map("invoice_id")
+  sequence    Int
+  description String  @db.VarChar(300)
+  hsn         String? @db.VarChar(10)
+  quantity    Decimal @db.Decimal(12, 3)
+  unit        String  @default("nos") @db.VarChar(12)
+  rate        Decimal @db.Decimal(14, 2)
+  gstRate     Decimal @map("gst_rate") @db.Decimal(5, 2)
+  taxable     Decimal @db.Decimal(14, 2)
+  cgst        Decimal @default(0) @db.Decimal(14, 2)
+  sgst        Decimal @default(0) @db.Decimal(14, 2)
+  igst        Decimal @default(0) @db.Decimal(14, 2)
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@map("invoice_lines")
+}
+
+// Money received against an invoice; each one becomes an Income entry
+model InvoicePayment {
+  id            Int          @id @default(autoincrement())
+  invoiceId     Int          @map("invoice_id")
+  paidOn        DateTime     @map("paid_on") @db.Date
+  amount        Decimal      @db.Decimal(14, 2)
+  tds           Decimal      @default(0) @db.Decimal(14, 2)
+  method        String?      @db.VarChar(20)
+  reference     String?      @db.VarChar(100)
+  transactionId Int?         @unique @map("transaction_id")
+  createdByName String?      @map("created_by_name") @db.VarChar(100)
+  createdAt     DateTime     @default(now()) @map("created_at")
+  invoice       Invoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  transaction   Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  @@index([invoiceId])
+  @@map("invoice_payments")
 }

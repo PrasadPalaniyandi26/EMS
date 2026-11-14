@@ -79,3 +79,17 @@ Text 4.5:1, control boundaries 3:1, focus ring on every control, every control l
 - The list lives in one place, `src/lib/related-pages.ts`, one rule per page. **Add a page's links there, never inside the page.** A link to the page you are on, or to one the role cannot open, is left out.
 - Keep it to two or three links: the budget plan of the same record, the list it came from, or the next page in the same job (Expense to Approvals, Monitor to Planner). A detail page links back to its list with `?id=` so the record stays selected.
 - Do not put them in the top bar or the toolbar; the toolbar is for actions on the selected row. Phone width is not settled yet.
+
+## Home
+- Home is the business overview, loaded from one call (`/dashboard/overview`) and refreshed every minute and when the tab regains focus. It covers the records the role may see: everyone for Admin and Finance, the team for a Manager, one's own for the rest (the header says which).
+- Order of the page: period bar and "Updated" time; five headline figures in one strip (Net result, Income, Expenses, Awaiting approval, Budget used or Claims to reimburse), each with the change against the period before and, for the first three, the last twelve months as a line; the monthly chart beside **Needs attention**; Spend by category, Budget health and Projects; Order book and Recent activity.
+- Needs attention is a worst-first list of things to act on, each a link to the page that deals with it. Add an item in `DashboardOverviewService.attention`, not on the page.
+- A month in the chart is clickable and sets the period to that month. Budget and the portfolio are for the roles that can open those pages; others see Spend by category and Recent activity.
+
+## Clients: purchase orders and invoices
+- Clients has three tabs for the roles that can see billing (Admin, Finance, Manager, Operations): **Clients**, **Purchase orders**, **Invoices**. The Clients list gains Outstanding and Overdue columns, and the panel a Billing section.
+- An invoice is a **draft** until Finance or Admin issues it. Issuing gives it the next number (`NTIN-YYMM-NNNNN`, from the invoice date, one running sequence that starts at 10001 and never resets) and fixes the seller, the buyer and the tax. After that it is cancelled with a reason, never edited or deleted.
+- Tax follows the states: CGST and SGST when the company and the client are in the same state, IGST otherwise. The state comes from the GSTIN, or from the state named on the client.
+- A payment becomes one approved Income entry for the amount received. The TDS a client deducts counts towards the invoice but is not income. Income made this way is changed on the invoice, not on the Income page.
+- The printed invoice is paper: dark ink on white in every theme. Its colours live in `lib/invoice-sheet-css.ts`, outside the design check, on purpose.
+- Company details (legal name, GSTIN, state, bank, signatory) are on **Organization > Company**.

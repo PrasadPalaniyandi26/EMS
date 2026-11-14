@@ -200,6 +200,8 @@ export class DashboardService {
   // Returns null = all users (no restriction); number[] = restrict to these IDs.
   // data_scope (set per-user by an admin) is authoritative; role is the fallback
   // when no permission row exists: Admin/Finance → All, Manager → Department, else Self.
+  visibleUserIds(userId: number, roleName: string) { return this.resolveVisibleUserIds(userId, roleName); }
+
   private async resolveVisibleUserIds(userId: number, roleName: string): Promise<number[] | null> {
     const perm = await this.prisma.userPermission.findUnique({ where: { userId } });
     const role = (roleName || '').toUpperCase();

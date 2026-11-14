@@ -57,6 +57,10 @@ export interface Client {
   contact_email?: string;
   contact_phone?: string;
   business_type?: string;
+  gstin?: string | null;
+  payment_terms_days?: number;
+  state?: string;
+  code?: string;
   is_system: number;
   is_active: number;
 }

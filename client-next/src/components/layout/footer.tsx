@@ -15,7 +15,7 @@ export function Footer() {
     <footer className="footer-fixed">
       <div className="w-full flex items-center justify-between">
         <p className="text-[12px] font-medium" style={{ color: 'var(--shell-text-muted)' }}>
-          © {year} NTEMS — NilaTech Expense Management System
+          © {year} Kanakku — NilaTech Finance Management System
         </p>
         <div className="flex items-center gap-3 text-[12px]" style={{ color: 'var(--shell-text-muted)' }}>
           <span className="flex items-center gap-1.5">
@@ -23,7 +23,7 @@ export function Footer() {
             {statusLabel}
           </span>
           <span style={{ color: 'var(--shell-border)' }}>|</span>
-          <span>V1.0</span>
+          <span>V2.0</span>
         </div>
       </div>
     </footer>

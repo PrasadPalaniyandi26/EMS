@@ -2,7 +2,8 @@
 
 import { ColumnDef } from "@tanstack/react-table"
 import { Client } from "@/lib/types"
-import { IdCell, TextCell, ToneText } from "@/components/data-table/cells"
+import { IdCell, TextCell, ToneText, WholeCell, headerRight } from "@/components/data-table/cells"
+import type { ClientOwing } from "@/hooks/use-invoicing"
 
 export const columns: ColumnDef<Client>[] = [
   {
@@ -48,5 +49,24 @@ export const columns: ColumnDef<Client>[] = [
       const isActive = v === 1 || v === true
       return <ToneText label={isActive ? "Active" : "Inactive"} tone={isActive ? "success" : "muted"} />
     },
+  },
+]
+
+// What each client owes on issued invoices, shown to the roles that can see invoices
+export const owingColumns = (owing: Map<number, ClientOwing>): ColumnDef<Client>[] => [
+  {
+    id: "outstanding",
+    header: headerRight("Outstanding"),
+    size: 120,
+    sortUndefined: "last",
+    accessorFn: (row) => owing.get(row.id)?.outstanding ?? 0,
+    cell: ({ row }) => { const v = owing.get(row.original.id)?.outstanding ?? 0; return v > 0 ? <WholeCell symbol value={v} /> : <div className="text-right"><TextCell value="" /></div> },
+  },
+  {
+    id: "overdue",
+    header: headerRight("Overdue"),
+    size: 110,
+    accessorFn: (row) => owing.get(row.id)?.overdue ?? 0,
+    cell: ({ row }) => { const o = owing.get(row.original.id); return o && o.overdue > 0 ? <div className="text-right"><ToneText label={String(Math.round(o.overdue).toLocaleString("en-IN"))} tone="danger" /></div> : <div className="text-right"><TextCell value="" /></div> },
   },
 ]

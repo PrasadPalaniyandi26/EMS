@@ -31,6 +31,7 @@ const getActionCfg = (a: string) => ACTION_CFG[a?.toUpperCase()] ?? { color: 'te
 // The tables the server writes to the log; the filter offers these
 const TABLE_LABELS: Record<string, string> = {
   transactions: 'Expense or income', recurring_transactions: 'Recurring', users: 'User',
+  client_pos: 'Client PO', invoices: 'Invoice', invoice_payments: 'Invoice payment', company_profile: 'Company details',
   budget_plans: 'Budget plan', budget_lines: 'Budget line', budget_line_periods: 'Budget month',
   budget_settings: 'Budget settings', build_orders: 'Order', items: 'Part',
 };

@@ -42,7 +42,7 @@ export default function LoginPage() {
       {/* Brand panel */}
       <div className="hidden w-[44%] shrink-0 flex-col justify-between border-r p-12 lg:flex" style={{ borderColor: 'var(--shell-border)' }}>
         <span className="text-[22px] font-semibold tracking-[0.2em]" style={{ color: 'var(--shell-brand)' }}>
-          NTEMS
+          Kanakku
         </span>
         <div className="max-w-sm">
           <h1 className="text-[28px] font-semibold leading-tight">Expense management for your team</h1>
@@ -67,7 +67,7 @@ export default function LoginPage() {
       <div className="flex flex-1 items-center justify-center px-6 py-12">
         <div className="w-full max-w-[400px]">
           <span className="mb-10 block text-center text-[26px] font-semibold tracking-[0.2em] lg:hidden" style={{ color: 'var(--shell-brand)' }}>
-            NTEMS
+            Kanakku
           </span>
 
           <h2 className="text-[22px] font-semibold">Sign in</h2>

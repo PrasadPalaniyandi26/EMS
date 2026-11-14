@@ -11,7 +11,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 const plexSans = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500", "600"], display: "swap", variable: "--font-plex-sans" });
 
 export const metadata: Metadata = {
-  title: "NTEMS — Expense Management System",
+  title: "Kanakku — NilaTech Finance Management System",
   description: "Enterprise-grade financial management for teams and organizations",
 };
 

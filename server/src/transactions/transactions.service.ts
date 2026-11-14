@@ -982,6 +982,10 @@ export class TransactionsService {
       where: { id, NOT: { status: 'DELETED' } },
     });
     if (!txn) throw new HttpException('Transaction not found.', HttpStatus.NOT_FOUND);
+    // Income that came from an invoice payment is changed on the invoice, not here
+    if (await this.prisma.invoicePayment.findFirst({ where: { transactionId: id }, select: { id: true } })) {
+      throw new HttpException('This income was recorded from an invoice payment. Remove the payment on the invoice instead.', HttpStatus.CONFLICT);
+    }
     if (txn.status !== 'APPROVED') {
       throw new HttpException('Only APPROVED transactions can be voided.', HttpStatus.BAD_REQUEST);
     }

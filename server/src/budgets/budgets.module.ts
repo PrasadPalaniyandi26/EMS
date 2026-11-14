@@ -8,5 +8,5 @@ import { BuildOrdersService } from './build-orders.service';
 import { AuditModule } from '../audit/audit.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
-@Module({ imports: [AuditModule, NotificationsModule], controllers: [BudgetsController, BudgetPlanningController, BuildOrdersController], providers: [BudgetsService, BudgetPlanningService, BuildOrdersService], exports: [BudgetsService] })
+@Module({ imports: [AuditModule, NotificationsModule], controllers: [BudgetsController, BudgetPlanningController, BuildOrdersController], providers: [BudgetsService, BudgetPlanningService, BuildOrdersService], exports: [BudgetsService, BudgetPlanningService, BuildOrdersService] })
 export class BudgetsModule {}

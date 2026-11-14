@@ -1,6 +1,7 @@
 import { Controller, Get, Query, UseGuards, Req } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { DashboardService } from './dashboard.service';
+import { DashboardOverviewService } from './dashboard-overview.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ApiTags } from '@nestjs/swagger';
 
@@ -8,7 +9,13 @@ import { ApiTags } from '@nestjs/swagger';
 @Controller('v1/dashboard')
 @UseGuards(AuthGuard('jwt'))
 export class DashboardController {
-  constructor(private service: DashboardService) {}
+  constructor(private service: DashboardService, private overviewService: DashboardOverviewService) {}
+
+  // Everything the Home page shows, in one call
+  @Get('overview')
+  getOverview(@CurrentUser() user: any, @Query('dateFrom') dateFrom?: string, @Query('dateTo') dateTo?: string) {
+    return this.overviewService.overview(user, dateFrom, dateTo);
+  }
 
   @Get('summary')
   getSummary(@CurrentUser('id') userId: number, @Query('dateFrom') dateFrom?: string, @Query('dateTo') dateTo?: string) {

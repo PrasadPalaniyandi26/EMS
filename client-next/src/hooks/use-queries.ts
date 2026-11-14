@@ -354,6 +354,43 @@ export function useUsers() {
 }
 
 // ─── Dashboard ───────────────────────────────────
+// ─── Home overview ───────────────────────────────
+export interface OverviewTotals { income: number; expenses: number; net: number; margin_pct: number | null; expenses_approved: number; expenses_pending: number; count: number }
+export interface DashboardOverview {
+  as_of: string; scope: 'everyone' | 'team' | 'self'; period: { from: string | null; to: string | null };
+  totals: OverviewTotals; previous: OverviewTotals | null;
+  series: { label: string; year: number; month: number; income: number; expense: number; net: number; cumulative: number }[];
+  categories: { rows: { id: number | null; name: string; amount: number; previous: number | null; share: number }[]; total: number };
+  approvals: { mine: number; drafts: number; pending_count: number; pending_amount: number; oldest_days: number | null };
+  reimbursements: { due_count: number; due_amount: number };
+  budget: null | {
+    fy: number; label: string; plan_status: string; approved: number; actual: number; committed: number; used: number; forecast: number; pct: number | null;
+    open_alerts: number; unbudgeted: number; unbudgeted_count: number; over_lines: number; caution_lines: number; line_count: number; elapsed_pct: number | null;
+    lines: { id: number; label: string; budget: number; used: number; pct: number; status: string }[];
+  };
+  portfolio: null | {
+    projects: { active: number; at_risk: number; overdue: number; contract_value: number; estimate: number; spent: number;
+      top: { id: number; code: string | null; name: string; client: string | null; status: string; overdue: boolean; at_risk: boolean; contract_value: number | null; estimate: number | null; spent: number; pct: number | null; margin_pct: number | null }[] };
+    orders: { open: number; value: number; margin_pct: number | null; late: number; no_bom: number;
+      next: { id: number; code: string; product: string | null; customer: string | null; delivery_date: string; status: string; value: number | null; days: number; late: boolean }[] };
+  };
+  attention: { key: string; tone: 'danger' | 'warning' | 'info'; label: string; detail: string; count: number; href: string }[];
+  recent: { id: number; reference: string | null; type: string; amount: number; status: string | null; date: string; description: string | null; category: string | null; who: string | null }[];
+}
+
+// The whole Home page in one call. It refreshes itself every minute while the page is open, and when you come back to the tab.
+export function useDashboardOverview(dateFrom?: string, dateTo?: string, enabled = true) {
+  const qs = new URLSearchParams();
+  if (dateFrom) qs.set('dateFrom', dateFrom);
+  if (dateTo) qs.set('dateTo', dateTo);
+  const q = qs.toString() ? `?${qs.toString()}` : '';
+  return useQuery({
+    queryKey: [QUERY_KEYS.DASHBOARD, 'overview', dateFrom, dateTo],
+    queryFn: () => api.get<DashboardOverview>(`/dashboard/overview${q}`).then((r) => r.data),
+    staleTime: LIVE_STALE, refetchInterval: 60_000, refetchOnWindowFocus: true, placeholderData: (prev) => prev, enabled,
+  });
+}
+
 export function useDashboardSummary(dateFrom?: string, dateTo?: string) {
   const qs = new URLSearchParams();
   if (dateFrom) qs.set('dateFrom', dateFrom);

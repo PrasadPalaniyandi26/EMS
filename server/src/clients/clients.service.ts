@@ -1,6 +1,7 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { cleanText } from '../common/helpers/master-data';
+import { GSTIN_RE, stateCodeOf } from '../invoicing/gst';
 
 @Injectable()
 export class ClientsService {
@@ -25,7 +26,7 @@ export class ClientsService {
       id: c.id, code: c.code, name: c.name, description: c.description, address: c.address,
       country: c.country, street: c.street, address_line2: c.addressLine2, city: c.city, state: c.state, postal_code: c.postalCode,
       contact_name: c.contactName, contact_email: c.contactEmail, contact_phone: c.contactPhone,
-      business_type: c.businessType, is_active: c.isActive ? 1 : 0, is_system: c.isSystem ? 1 : 0,
+      business_type: c.businessType, gstin: c.gstin, payment_terms_days: c.paymentTermsDays, is_active: c.isActive ? 1 : 0, is_system: c.isSystem ? 1 : 0,
       created_by: c.createdBy, created_at: c.createdAt,
     });
   }
@@ -68,6 +69,22 @@ export class ClientsService {
     text('contactEmail', 'Contact email', 200, 'contactEmail', 'contact_email');
     text('contactPhone', 'Contact phone', 30, 'contactPhone', 'contact_phone');
     text('businessType', 'Business type', 100, 'businessType', 'business_type');
+    // Tax invoices: the GSTIN (15 characters, checked against the state it names) and the days a client has to pay
+    if (data.gstin !== undefined) {
+      const g = String(data.gstin ?? '').trim().toUpperCase().replace(/s+/g, '');
+      if (g && !GSTIN_RE.test(g)) throw new HttpException('The GSTIN is not valid. It has 15 characters, for example 33ABCDE1234F1Z5.', HttpStatus.BAD_REQUEST);
+      out.gstin = g || null;
+    }
+    if (data.payment_terms_days !== undefined || data.paymentTermsDays !== undefined) {
+      const d = Number(data.payment_terms_days ?? data.paymentTermsDays);
+      if (!Number.isInteger(d) || d < 0 || d > 365) throw new HttpException('Payment terms are a whole number of days from 0 to 365.', HttpStatus.BAD_REQUEST);
+      out.paymentTermsDays = d;
+    }
+    {
+      const gst = out.gstin !== undefined ? out.gstin : current?.gstin;
+      const st = out.state !== undefined ? out.state : current?.state;
+      if (gst && st && stateCodeOf(null, st) && stateCodeOf(gst, null) !== stateCodeOf(null, st)) throw new HttpException('The state does not match the first two digits of the GSTIN.', HttpStatus.BAD_REQUEST);
+    }
     if (out.contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(out.contactEmail)) throw new HttpException('Enter a valid contact email.', HttpStatus.BAD_REQUEST);
     if (out.contactPhone && !/^\+?[0-9\s\-().]{7,20}$/.test(out.contactPhone)) throw new HttpException('Enter a valid contact phone, such as +91 98765 43210.', HttpStatus.BAD_REQUEST);
     const isActive = data.isActive !== undefined ? data.isActive : data.is_active;

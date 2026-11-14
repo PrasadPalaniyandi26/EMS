@@ -122,7 +122,7 @@ export function Sidebar() {
           {/* Brand and the collapse control, at the top where it is easy to find */}
           <div className={`relative flex h-[44px] shrink-0 items-center overflow-hidden ${slim ? 'justify-center' : 'pl-5 pr-12'}`} style={{ borderBottom: '1px solid var(--shell-border)' }}>
             {!slim && (
-              <Link href="/" onClick={closeMobile} aria-label="NTEMS, go to Home" className="rounded-md px-1 text-[16px] font-semibold tracking-[0.04em] focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]" style={{ color: 'var(--shell-brand)' }}>NTEMS</Link>
+              <Link href="/" onClick={closeMobile} aria-label="Kanakku, go to Home" className="rounded-md px-1 text-[16px] font-semibold tracking-[0.04em] focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]" style={{ color: 'var(--shell-brand)' }}>Kanakku</Link>
             )}
             <Tooltip>
               <TooltipTrigger asChild>
