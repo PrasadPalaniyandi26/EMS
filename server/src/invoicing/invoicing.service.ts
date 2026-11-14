@@ -527,6 +527,45 @@ export class InvoicingService {
     return { rows, totals: { billed: sum('billed'), received: sum('received'), outstanding: sum('outstanding'), overdue: sum('overdue'), overdue_count: rows.reduce((a, r) => a + r.overdue_count, 0) } };
   }
 
+  // ── Project and order billing ──────────────────────────────────────────────
+
+  // What has been ordered, invoiced and received for one project or one order. An invoice counts when it names the project or order itself or sits on a PO that does.
+  async billing(q: { projectId?: string; buildOrderId?: string } = {}) {
+    const projectId = q.projectId ? Number(q.projectId) : null; const buildOrderId = q.buildOrderId ? Number(q.buildOrderId) : null;
+    if (!!projectId === !!buildOrderId || (projectId ?? buildOrderId)! < 1 || Number.isNaN(projectId ?? buildOrderId)) throw bad('Give either a project or an order.');
+    const poWhere: Prisma.ClientPoWhereInput = projectId ? { projectId } : { buildOrderId };
+    const invWhere: Prisma.InvoiceWhereInput = { status: { not: 'CANCELLED' }, OR: [projectId ? { projectId } : { buildOrderId: buildOrderId! }, { po: poWhere }] };
+    const [pos, invoices, target] = await Promise.all([
+      this.prisma.clientPo.findMany({ where: { ...poWhere, status: { not: 'CANCELLED' } }, orderBy: [{ poDate: 'desc' }, { id: 'desc' }] }),
+      this.prisma.invoice.findMany({ where: invWhere, orderBy: [{ invoiceDate: 'desc' }, { id: 'desc' }], take: 200 }),
+      projectId
+        ? this.prisma.project.findUnique({ where: { id: projectId }, select: { contractValue: true } })
+        : this.prisma.buildOrder.findUnique({ where: { id: buildOrderId! }, select: { unitPrice: true, quantity: true } }),
+    ]);
+    if (!target) throw bad(projectId ? 'Project not found.' : 'Order not found.', HttpStatus.NOT_FOUND);
+    const contract = projectId
+      ? ((target as any).contractValue == null ? null : n((target as any).contractValue))
+      : ((target as any).unitPrice == null ? null : r2(n((target as any).unitPrice) * n((target as any).quantity)));
+    const today = todayUtc().getTime();
+    const issued = invoices.filter((i) => ISSUED.includes(i.status));
+    const byPo = new Map<number, number>();
+    for (const i of issued) if (i.poId) byPo.set(i.poId, (byPo.get(i.poId) ?? 0) + n(i.taxable));
+    const rows = invoices.map((i) => {
+      const bal = i.status === 'DRAFT' ? 0 : r2(n(i.total) - n(i.paid) - n(i.tds));
+      return { id: i.id, number: i.number, status: i.status, invoice_date: iso(i.invoiceDate), taxable: n(i.taxable), total: n(i.total), balance: bal, overdue: ['ISSUED', 'PART_PAID'].includes(i.status) && bal > 0.005 && i.dueDate.getTime() < today };
+    });
+    const invoiced = r2(issued.reduce((a, i) => a + n(i.taxable), 0));
+    const poValue = r2(pos.reduce((a, p) => a + n(p.value), 0));
+    return {
+      contract_value: contract, po_value: poValue, invoiced, to_invoice: contract != null ? r2(contract - invoiced) : null,
+      invoiced_pct: contract && contract > 0 ? r2((invoiced / contract) * 100) : poValue > 0 ? r2((invoiced / poValue) * 100) : null,
+      received: r2(issued.reduce((a, i) => a + n(i.paid) + n(i.tds), 0)), outstanding: r2(rows.reduce((a, r) => a + r.balance, 0)), overdue: r2(rows.filter((r) => r.overdue).reduce((a, r) => a + r.balance, 0)),
+      drafts: rows.filter((r) => r.status === 'DRAFT').length,
+      pos: pos.map((p) => ({ id: p.id, po_number: p.poNumber, value: n(p.value), invoiced: r2(byPo.get(p.id) ?? 0), status: p.status })),
+      invoices: rows,
+    };
+  }
+
   // ── Home and reports ───────────────────────────────────────────────────────
 
   // What Home shows: what is owed, what is late, who owes most, and what is waiting to be issued

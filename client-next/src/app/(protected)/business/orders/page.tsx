@@ -20,6 +20,7 @@ import { type FilterDef } from '@/components/data-table/filters';
 import { DateCell, IdCell, TextCell, ToneText, WholeCell, headerRight } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
+import { BillingSection } from '@/components/invoicing/billing-section';
 import { ConfirmDialog } from '@/components/shared/modal-primitives';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import { BuildOrderModal, CancelOrderModal, OrderStepModal } from '@/components/budgets/build-order-modals';
@@ -247,6 +248,7 @@ export default function OrdersPage() {
         )}
         {selected.source_bom_version != null && <p className="text-[12px] text-[var(--shell-text-muted)]">Copied from BOM version {selected.source_bom_version}{selected.imported_at ? ` on ${formatDate(selected.imported_at)}` : ''}.</p>}
       </DetailSection>
+      <BillingSection kind="order" id={selected.id} />
       {d && (
         <DetailSection title="Build plan">
           <DetailGrid>

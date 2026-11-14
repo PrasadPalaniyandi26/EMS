@@ -41,6 +41,8 @@ describe('Client invoicing (e2e)', () => {
       await prisma.transaction.deleteMany({ where: { clientId: { in: clients } } });
       await prisma.invoice.deleteMany({ where: { clientId: { in: clients } } });
       await prisma.clientPo.deleteMany({ where: { clientId: { in: clients } } });
+      await prisma.buildOrder.deleteMany({ where: { code: { startsWith: 'ZZ-' } } });
+      await prisma.project.deleteMany({ where: { clientId: { in: clients } } });
       await prisma.client.deleteMany({ where: { id: { in: clients } } });
     }
     await prisma.periodLock.deleteMany({ where: { year: 2018, month: 5 } });
@@ -297,6 +299,55 @@ describe('Client invoicing (e2e)', () => {
       expect(r.status).toBe(200);
       expect(r.body.data.length).toBeGreaterThan(0);
       expect(r.body.data.every((i: any) => i.overdue && i.balance > 0)).toBe(true);
+    });
+  });
+
+  describe('a project and an order', () => {
+    let projectId: number; let orderId: number;
+    beforeAll(async () => {
+      projectId = (await prisma.project.create({ data: { clientId: tnClient, name: 'ZZ Billing project', contractValue: 10000 } })).id;
+      const product = await prisma.product.findFirstOrThrow();
+      orderId = (await prisma.buildOrder.create({ data: { code: 'ZZ-BO-1', productId: product.id, clientId: kaClient, quantity: 4, unitPrice: 500, startDate: new Date('2018-06-01'), deliveryDate: new Date('2018-07-01') } })).id;
+    });
+    afterAll(async () => {
+      await prisma.invoicePayment.deleteMany({ where: { invoice: { OR: [{ projectId }, { buildOrderId: orderId }] } } });
+      await prisma.invoice.deleteMany({ where: { OR: [{ projectId }, { buildOrderId: orderId }] } });
+      await prisma.clientPo.deleteMany({ where: { OR: [{ projectId }, { buildOrderId: orderId }] } });
+      await prisma.buildOrder.deleteMany({ where: { id: orderId } });
+      await prisma.project.deleteMany({ where: { id: projectId } });
+    });
+
+    it('adds up the POs and invoices of a project, whether an invoice names the project or sits on its PO', async () => {
+      const po = (await call('post', ops, '/client-pos', { client_id: tnClient, po_number: 'ZZ-PO-PRJ', po_date: '2018-06-01', value: 6000, project_id: projectId })).body.data;
+      const viaPo = (await draft(tnClient, { po_id: po.id })).body.data;
+      const direct = (await draft(tnClient, { project_id: projectId })).body.data;
+      const loose = (await draft(tnClient, { project_id: projectId })).body.data;
+      await call('post', finance, `/invoices/${viaPo.id}/issue`); await call('post', finance, `/invoices/${direct.id}/issue`);
+      const r = await call('get', manager, `/invoices/billing?projectId=${projectId}`);
+      expect(r.status).toBe(200);
+      const b = r.body.data;
+      expect([b.contract_value, b.po_value, b.invoiced, b.to_invoice, b.invoiced_pct]).toEqual([10000, 6000, 4000, 6000, 40]);
+      expect(b.pos).toEqual([expect.objectContaining({ po_number: 'ZZ-PO-PRJ', value: 6000, invoiced: 2000 })]);
+      expect(b.invoices).toHaveLength(3);
+      expect(b.drafts).toBe(1);
+      expect(b.outstanding).toBeCloseTo(2 * 2360, 2);
+      expect(loose.id).toBeGreaterThan(0);
+    });
+
+    it('measures an order against its quantity times its price', async () => {
+      const po = (await call('post', ops, '/client-pos', { client_id: kaClient, po_number: 'ZZ-PO-ORD', po_date: '2018-06-01', value: 2000, build_order_id: orderId })).body.data;
+      const inv = (await draft(kaClient, { po_id: po.id })).body.data;
+      await call('post', finance, `/invoices/${inv.id}/issue`);
+      const b = (await call('get', finance, `/invoices/billing?buildOrderId=${orderId}`)).body.data;
+      expect([b.contract_value, b.invoiced, b.invoiced_pct, b.to_invoice]).toEqual([2000, 2000, 100, 0]);
+      expect(b.pos[0].status).toBe('CLOSED');
+    });
+
+    it('needs exactly one of project or order, and is not for employees', async () => {
+      expect((await call('get', finance, '/invoices/billing')).status).toBe(400);
+      expect((await call('get', finance, `/invoices/billing?projectId=${projectId}&buildOrderId=${orderId}`)).status).toBe(400);
+      expect((await call('get', finance, '/invoices/billing?projectId=99999999')).status).toBe(404);
+      expect((await call('get', employee, `/invoices/billing?projectId=${projectId}`)).status).toBe(403);
     });
   });
 

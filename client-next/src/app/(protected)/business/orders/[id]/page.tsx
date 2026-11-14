@@ -18,6 +18,7 @@ import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
 import { IdCell, TextCell, ToneText, headerRight, NumCell } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
+import { BillingSection } from '@/components/invoicing/billing-section';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import { BuildOrderModal, CancelOrderModal, OrderPricingModal, OrderStepModal, ReimportOrderBomModal, SwapPartModal, type OrderStep } from '@/components/budgets/build-order-modals';
 import { BuildStepModal } from '@/components/budgets/planning-modals';
@@ -263,6 +264,7 @@ export default function BuildOrderDetailPage() {
         </DetailGrid>
         {o.plan.over && <p className="text-[12px] text-[var(--warning)]">Orders starting this month take more units than the plan allows.</p>}
       </DetailSection>
+      <BillingSection kind="order" id={o.id} />
       {o.imported_at && <p className="text-[12px] text-[var(--shell-text-muted)]">Copied from BOM version {o.source_bom_version} on {formatDate(o.imported_at)}.</p>}
       {o.notes && <DetailSection title="Notes"><p className="text-[13px] text-[var(--shell-text)]">{o.notes}</p></DetailSection>}
       {o.cancel_reason && <DetailSection title="Cancelled"><p className="text-[13px] text-[var(--shell-text)]">{o.cancel_reason}</p></DetailSection>}

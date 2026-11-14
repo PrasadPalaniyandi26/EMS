@@ -17,6 +17,7 @@ import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
 import { DateCell, TextCell, ToneText, headerRight, NumCell } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
+import { BillingSection } from '@/components/invoicing/billing-section';
 import { ConfirmDialog } from '@/components/shared/modal-primitives';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import { JobBomImportModal } from '@/components/budgets/job-bom-import-modal';
@@ -300,6 +301,7 @@ export default function ProjectBudgetPage() {
           </p>
         )}
       </DetailSection>
+      <BillingSection kind="project" id={id} />
       {spendLowNote}
     </div>
   );

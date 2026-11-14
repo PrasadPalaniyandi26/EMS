@@ -44,6 +44,7 @@ export class InvoicesController {
   @Get() @Roles(...READ) list(@Query() q: any) { return this.s.listInvoices(q); }
   // Before :id, so "summary" is not read as an invoice number
   @Get('summary') @Roles(...READ) summary() { return this.s.summary(); }
+  @Get('billing') @Roles(...READ) billing(@Query() q: any) { return this.s.billing(q); }
   @Get(':id') @Roles(...READ) get(@Param('id', ParseIntPipe) id: number) { return this.s.getInvoice(id); }
   @Post() @Roles(...WRITE) create(@Body() b: any, @CurrentUser() u: any) { return this.s.createInvoice(b, u); }
   @Put(':id') @Roles(...WRITE) update(@Param('id', ParseIntPipe) id: number, @Body() b: any, @CurrentUser() u: any) { return this.s.updateInvoice(id, b, u); }

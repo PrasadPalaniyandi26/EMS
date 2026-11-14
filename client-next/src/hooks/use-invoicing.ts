@@ -61,6 +61,17 @@ export function useInvoice(id: number | null) {
 export function useInvoiceSummary(enabled = true) {
   return useQuery({ queryKey: [KEY, 'summary'], queryFn: () => get<InvoiceSummary>('/invoices/summary'), enabled, staleTime: 0 });
 }
+export interface Billing {
+  contract_value: number | null; po_value: number; invoiced: number; to_invoice: number | null; invoiced_pct: number | null;
+  received: number; outstanding: number; overdue: number; drafts: number;
+  pos: { id: number; po_number: string; value: number; invoiced: number; status: PoStatus }[];
+  invoices: { id: number; number: string | null; status: InvoiceStatus; invoice_date: string; taxable: number; total: number; balance: number; overdue: boolean }[];
+}
+// What one project or one order has been ordered, invoiced and paid
+export function useBilling(kind: 'project' | 'order', id: number | null, enabled = true) {
+  const q = kind === 'project' ? `projectId=${id}` : `buildOrderId=${id}`;
+  return useQuery({ queryKey: [KEY, 'billing', kind, id], queryFn: () => get<Billing>(`/invoices/billing?${q}`), enabled: enabled && id != null, staleTime: 0 });
+}
 export function useCompanyProfile(enabled = true) {
   return useQuery({ queryKey: [KEY, 'company'], queryFn: () => get<CompanyProfile>('/company-profile'), enabled, staleTime: 60_000 });
 }

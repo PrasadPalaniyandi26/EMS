@@ -20,6 +20,7 @@ import { ManageTypesDialog } from '@/components/manage/manage-types-dialog';
 import { ProjectModal } from '@/components/manage/project-modals';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
+import { BillingSection } from '@/components/invoicing/billing-section';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import { marginTone, plain, TONE_CLASS } from '@/components/budgets/budget-ui';
 import type { Project } from '@/lib/types';
@@ -186,6 +187,7 @@ export default function ProjectsPage() {
           </DetailGrid>
         </DetailSection>
       )}
+      <BillingSection kind="project" id={selected.id} />
       {cost && cost.products.length > 0 && (
         <DetailSection title={`Products (${cost.products.length})`}>
           <ul className="space-y-1">
