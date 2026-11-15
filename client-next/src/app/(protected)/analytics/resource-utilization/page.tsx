@@ -7,12 +7,12 @@ import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { formatCurrency, formatDate, getDateRange } from '@/lib/currency';
 import { useBudgetMonitor } from '@/hooks/use-budget-queries';
-import { RecordLink } from '@/components/budgets/budget-ui';
+import { RecordLink, TabBar, useTabParam } from '@/components/budgets/budget-ui';
 import { detailHref, kindOfLine, objectIdOf } from '@/components/budgets/planner-objects';
 import {
   useTopSpenders, useCategoryHeatmap, useProjectBurn, useProductBurn,
 } from '@/hooks/use-queries';
-import { PageFrame } from '@/components/shared/module/page-frame';
+import { OrdersTab, PartPricesTab, PeopleTab, ProjectsTab, ReceivablesTab } from '@/components/analytics/analytics-tabs';
 
 const DATE_PRESETS = [
   { label: 'This month', key: 'thisMonth' },
@@ -81,32 +81,9 @@ function BudgetRows({ data, nameKey, fmt, hrefOf }: { data: any[]; nameKey: stri
   );
 }
 
-export default function SpendAnalyticsPage() {
-  const setHeader = useHeaderStore((s) => s.setHeader);
+function SpendTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
   const currency  = useAuthStore((s) => s.user?.currency || 'INR');
   const fmt       = (n: number) => formatCurrency(n, currency);
-
-  const [preset, setPreset]     = useState('Financial year');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo]     = useState('');
-
-  useEffect(() => {
-    const r = getDateRange('finYear');
-    setDateFrom(r.from);
-    setDateTo(r.to);
-  }, []);
-
-  // The header says which period the figures cover
-  useEffect(() => {
-    setHeader('Spend Analytics', dateFrom && dateTo ? `${formatDate(dateFrom)} to ${formatDate(dateTo)}` : '');
-  }, [setHeader, dateFrom, dateTo]);
-
-  const handlePreset = (key: string, label: string) => {
-    setPreset(label);
-    const r = getDateRange(key as any);
-    setDateFrom(r.from);
-    setDateTo(r.to);
-  };
 
   const { data: spenders,    isLoading: loadSpenders  } = useTopSpenders(dateFrom, dateTo);
   const { data: heatmap,     isLoading: loadHeatmap   } = useCategoryHeatmap(dateFrom, dateTo);
@@ -152,18 +129,7 @@ export default function SpendAnalyticsPage() {
   const spenderTotal = spenderRows.reduce((t, s) => t + s.value, 0);
 
   return (
-    <PageFrame label="Spend analytics">
-    <div className="h-full overflow-y-auto custom-scrollbar space-y-6 px-4 py-4">
-
-      <PeriodBar
-        presets={DATE_PRESETS}
-        active={preset}
-        onPreset={handlePreset}
-        from={dateFrom}
-        to={dateTo}
-        onFrom={(v) => { setDateFrom(v); setPreset('Custom'); }}
-        onTo={(v) => { setDateTo(v); setPreset('Custom'); }}
-      />
+    <div className="space-y-6">
 
       <p className="text-[12px] text-[var(--shell-text-muted)]">
         Spend here counts approved expenses and those waiting for approval, the way Budget does. Reports count approved ones only.
@@ -298,6 +264,65 @@ export default function SpendAnalyticsPage() {
       </div>
 
     </div>
-    </PageFrame>
+  );
+}
+
+const TABS = [
+  { value: 'spend', label: 'Spend' }, { value: 'projects', label: 'Projects' }, { value: 'orders', label: 'Orders' },
+  { value: 'people', label: 'People' }, { value: 'receivables', label: 'Receivables' }, { value: 'prices', label: 'Part prices' },
+] as const;
+type Tab = (typeof TABS)[number]['value'];
+const TAB_VALUES = TABS.map((t) => t.value);
+// These tabs are about a period; the others are as of today
+const PERIOD_TABS: Tab[] = ['spend', 'people', 'prices'];
+
+export default function AnalyticsPage() {
+  const setHeader = useHeaderStore((s) => s.setHeader);
+  const [tab, setTab] = useTabParam<Tab>(TAB_VALUES, 'spend');
+  const [preset, setPreset]     = useState('Financial year');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo]     = useState('');
+
+  useEffect(() => {
+    const r = getDateRange('finYear');
+    setDateFrom(r.from);
+    setDateTo(r.to);
+  }, []);
+
+  // The header says which period the figures cover, when the tab is about a period
+  useEffect(() => {
+    setHeader('Analytics', PERIOD_TABS.includes(tab) && dateFrom && dateTo ? `${formatDate(dateFrom)} to ${formatDate(dateTo)}` : 'As of today');
+  }, [setHeader, tab, dateFrom, dateTo]);
+
+  const handlePreset = (key: string, label: string) => {
+    setPreset(label);
+    const r = getDateRange(key as any);
+    setDateFrom(r.from);
+    setDateTo(r.to);
+  };
+
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-[var(--shell-surface)]">
+      <TabBar tabs={TABS as unknown as { value: Tab; label: string }[]} value={tab} onChange={setTab} />
+      <div role="tabpanel" id="tabpanel" aria-labelledby={`tab-${tab}`} className="min-h-0 flex-1 space-y-6 overflow-y-auto px-4 py-4 custom-scrollbar">
+        {PERIOD_TABS.includes(tab) && (
+          <PeriodBar
+            presets={DATE_PRESETS}
+            active={preset}
+            onPreset={handlePreset}
+            from={dateFrom}
+            to={dateTo}
+            onFrom={(v) => { setDateFrom(v); setPreset('Custom'); }}
+            onTo={(v) => { setDateTo(v); setPreset('Custom'); }}
+          />
+        )}
+        {tab === 'spend' && <SpendTab dateFrom={dateFrom} dateTo={dateTo} />}
+        {tab === 'projects' && <ProjectsTab />}
+        {tab === 'orders' && <OrdersTab />}
+        {tab === 'people' && <PeopleTab from={dateFrom} to={dateTo} />}
+        {tab === 'receivables' && <ReceivablesTab />}
+        {tab === 'prices' && <PartPricesTab from={dateFrom} to={dateTo} />}
+      </div>
+    </div>
   );
 }

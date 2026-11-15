@@ -15,7 +15,7 @@ import { ORDER_STATUS, useBuildOrder, type OrderLine, type OrderOperation } from
 import { useDataTable } from '@/hooks/use-data-table';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
-import { IdCell, TextCell, ToneText, headerRight, NumCell } from '@/components/data-table/cells';
+import { DateCell, IdCell, TextCell, ToneText, headerRight, NumCell } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { BillingSection } from '@/components/invoicing/billing-section';
@@ -26,10 +26,10 @@ import { ConfirmDialog } from '@/components/shared/modal-primitives';
 import { TabBar, marginTone as projectMarginTone, money, unitPrice, useTabParam } from '@/components/budgets/budget-ui';
 import { cn } from '@/lib/utils';
 
-type Tab = 'bom' | 'operations' | 'standard' | 'schedule' | 'variances';
+type Tab = 'bom' | 'operations' | 'standard' | 'timeline' | 'variances';
 const TABS: { value: Tab; label: string }[] = [
-  { value: 'bom', label: 'Bill of materials' }, { value: 'operations', label: 'Build operations' }, { value: 'standard', label: 'Standard cost' },
-  { value: 'schedule', label: 'Spend schedule' }, { value: 'variances', label: 'Variances' },
+  { value: 'bom', label: 'Bill of materials' }, { value: 'operations', label: 'Build operations' }, { value: 'standard', label: 'Cost vs standard' },
+  { value: 'timeline', label: 'Build timeline' }, { value: 'variances', label: 'Variances' },
 ];
 const TAB_VALUES = TABS.map((t) => t.value);
 // With no target or minimum margin set there is nothing to judge a margin against, so only a loss is coloured
@@ -38,7 +38,7 @@ const EMPTY: Record<Tab, string> = {
   bom: 'The standard BOM has not been imported yet. Click Import BOM.',
   operations: 'No build operations on this order. Click Add build operation, or reimport the BOM from the product.',
   standard: 'The standard BOM has not been imported yet, so there is nothing to compare.',
-  schedule: 'The standard BOM has not been imported yet, so there is nothing to schedule.',
+  timeline: 'The standard BOM has not been imported yet, so there is nothing to put on the timeline.',
   variances: 'No expenses are charged to this order yet. Choose this order as the Order when you record a product expense.',
 };
 const EXPENSE_STATUS: Record<string, { label: string; tone: 'success' | 'warning' | 'muted' | 'danger' }> = {
@@ -90,12 +90,33 @@ export default function BuildOrderDetailPage() {
     return parts.map(([label, mine, std], i) => ({ id: i, label, mine, std, diff: std == null ? null : mine - std, total: label === 'Cost per unit' }));
   }, [c, sn]);
 
-  const scheduleRows = useMemo(() => {
-    let running = 0;
-    return (o?.schedule ?? []).map((m, i) => { const net = m.revenue - m.spend; running += net; return { ...m, id: i, net, running }; });
+  // The dates the order has to hit: parts arriving, each step being built, then the earliest and the promised delivery
+  const timelineRows = useMemo(() => {
+    if (!o || !o.has_bom) return [];
+    const start = o.start_date.slice(0, 10);
+    const at = (day: number) => { const [y, m, d] = start.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + day)).toISOString().slice(0, 10); };
+    const lateLines = new Set(o.lead.late_lines);
+    const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
+    const out: { date: string; day: number; event: string; detail: string; status: string; tone: 'danger' | 'success' | 'muted' }[] = [];
+    out.push({ date: start, day: 0, event: 'Order starts', detail: plural(o.quantity, 'unit'), status: '', tone: 'muted' });
+    for (const st of o.lead.stages) {
+      const parts = o.lines.filter((l) => l.sequence === st.sequence && l.item_id != null);
+      const lateParts = parts.filter((l) => lateLines.has(l.id));
+      if (st.lead_days > 0) {
+        const last = [...parts].sort((x, y) => (y.lead_time_days ?? 0) - (x.lead_time_days ?? 0))[0];
+        out.push({ date: at(st.lead_days), day: st.lead_days, event: `Step ${st.sequence} parts arrive`, detail: `${plural(parts.length, 'part')}${last ? `, last is ${last.part_no}` : ''}`, status: lateParts.length ? 'Too late' : '', tone: lateParts.length ? 'danger' : 'muted' });
+      }
+      if (st.build_days > 0) {
+        out.push({ date: at(st.begins_day), day: st.begins_day, event: `Step ${st.sequence} build begins`, detail: `${plural(st.build_days, 'day')}, done ${formatDate(at(st.finish_day))}`, status: st.finish_day > o.lead.window_days ? 'Too late' : '', tone: st.finish_day > o.lead.window_days ? 'danger' : 'muted' });
+      }
+    }
+    const spare = o.lead.window_days - o.lead.needed_days;
+    out.push({ date: at(o.lead.needed_days), day: o.lead.needed_days, event: 'Earliest delivery', detail: 'When the last step is built', status: o.lead.late ? 'Late' : 'On time', tone: o.lead.late ? 'danger' : 'success' });
+    out.push({ date: o.delivery_date.slice(0, 10), day: o.lead.window_days, event: 'Promised delivery', detail: o.lead.late ? `${plural(-spare, 'day')} short` : `${plural(spare, 'day')} to spare`, status: o.lead.late ? 'Late' : 'On time', tone: o.lead.late ? 'danger' : 'success' });
+    return out.sort((x, y) => x.day - y.day).map((r, i) => ({ ...r, id: i }));
   }, [o]);
 
-  const rows = useMemo<any[]>(() => (!o ? [] : tab === 'bom' ? o.lines : tab === 'operations' ? o.operations : tab === 'schedule' ? scheduleRows : tab === 'variances' ? o.actuals.expenses : stdRows), [o, tab, stdRows, scheduleRows]);
+  const rows = useMemo<any[]>(() => (!o ? [] : tab === 'bom' ? o.lines : tab === 'operations' ? o.operations : tab === 'timeline' ? timelineRows : tab === 'variances' ? o.actuals.expenses : stdRows), [o, tab, stdRows, timelineRows]);
 
   const columns = useMemo<ColumnDef<any, any>[]>(() => {
     if (tab === 'bom') return [
@@ -114,12 +135,12 @@ export default function BuildOrderDetailPage() {
         cell: ({ row }) => { const l = row.original as OrderLine; if (l.part_status && l.part_status !== 'ACTIVE') return <ToneText label={`Part ${l.part_status === 'REPLACED' ? 'replaced' : 'retired'}`} tone="warning" />; return l.swapped ? <ToneText label={`Swapped from ${l.source_part_no}`} tone="info" /> : l.alternates.length ? <TextCell value={`${l.alternates.length} available`} muted /> : <TextCell value="" />; },
       },
     ];
-    if (tab === 'schedule') return [
-      { accessorKey: 'label', header: 'Month', cell: ({ row }) => <TextCell value={row.original.label} strong /> },
-      { accessorKey: 'spend', header: headerRight('Cash out'), cell: ({ row }) => <NumCell strong>{row.original.spend ? money(row.original.spend, currency) : '—'}</NumCell>, size: 130 },
-      { accessorKey: 'revenue', header: headerRight('Sale in'), cell: ({ row }) => <NumCell strong>{row.original.revenue ? money(row.original.revenue, currency) : '—'}</NumCell>, size: 130 },
-      { accessorKey: 'net', header: headerRight('Net'), cell: ({ row }) => <div className="text-right"><ToneText label={`${row.original.net < 0 ? '-' : ''}${money(Math.abs(row.original.net), currency)}`} tone={row.original.net < 0 ? 'warning' : row.original.net > 0 ? 'success' : 'muted'} /></div>, size: 130 },
-      { accessorKey: 'running', header: headerRight('Running net'), cell: ({ row }) => <NumCell>{`${row.original.running < 0 ? '-' : ''}${money(Math.abs(row.original.running), currency)}`}</NumCell>, size: 140 },
+    if (tab === 'timeline') return [
+      { accessorKey: 'date', header: 'Date', cell: ({ row }) => <DateCell value={row.original.date} />, size: 120 },
+      { accessorKey: 'event', header: 'What happens', cell: ({ row }) => <TextCell value={row.original.event} strong /> },
+      { accessorKey: 'detail', header: 'Detail', cell: ({ row }) => <TextCell value={row.original.detail} muted />, size: 260 },
+      { accessorKey: 'day', header: headerRight('Day'), cell: ({ row }) => <NumCell>{row.original.day}</NumCell>, size: 80 },
+      { accessorKey: 'status', header: 'Status', cell: ({ row }) => <ToneText label={row.original.status} tone={row.original.tone} />, size: 110 },
     ];
     if (tab === 'variances') return [
       { accessorKey: 'reference_id', header: 'Expense', cell: ({ row }) => <IdCell value={row.original.reference_id} />, size: 110 },
@@ -155,7 +176,7 @@ export default function BuildOrderDetailPage() {
 
   const table = useDataTable({
     data: rows, columns, state: { sorting, rowSelection: selection }, onSortingChange: setSorting, getRowId: (r) => String(r.id),
-    enableRowSelection: tab !== 'standard' && tab !== 'schedule', enableMultiRowSelection: false,
+    enableRowSelection: tab !== 'standard' && tab !== 'timeline', enableMultiRowSelection: false,
     onRowSelectionChange: (u) => setSelection(typeof u === 'function' ? u(selection) : u),
     getCoreRowModel: getCoreRowModel(), getFilteredRowModel: getFilteredRowModel(), getPaginationRowModel: getPaginationRowModel(), getSortedRowModel: getSortedRowModel(),
   });
@@ -271,27 +292,25 @@ export default function BuildOrderDetailPage() {
     </div>
   );
 
-  const sched = o?.schedule ?? [];
-  const totalSpend = sched.reduce((a, m) => a + m.spend, 0);
-  const totalIn = sched.reduce((a, m) => a + m.revenue, 0);
-  const lowest = scheduleRows.reduce<(typeof scheduleRows)[number] | null>((m, r) => (m == null || r.running < m.running ? r : m), null);
-  const scheduleSummary = !o ? null : (
+  const timelineSummary = !o ? null : (
     <div className="space-y-4">
-      <DetailSummary title="Spend schedule" subtitle={o.code} status={lowest && lowest.running < 0 ? 'Cash is out before the sale comes in' : undefined} statusClass="text-[var(--warning)]"
-        figure={lowest && lowest.running < 0 ? `${'-'}${money(Math.abs(lowest.running), currency)}` : money(totalSpend, currency)} figureLabel={lowest && lowest.running < 0 ? `Lowest running net, ${lowest.label}` : 'Cash out'} />
-      <DetailSection title="Over the order">
+      <DetailSummary title="Build timeline" subtitle={o.code} status={!o.has_bom ? 'No BOM yet' : o.lead.late ? `Cannot deliver by ${formatDate(o.delivery_date)}` : 'On time'}
+        statusClass={!o.has_bom ? 'text-[var(--shell-text-muted)]' : o.lead.late ? 'text-[var(--danger)]' : 'text-[var(--success)]'}
+        figure={o.has_bom ? `${Math.abs(o.lead.window_days - o.lead.needed_days)} days` : undefined} figureLabel={o.lead.late ? 'Short of the promised date' : 'To spare'} />
+      <DetailSection title="Dates">
         <DetailGrid>
-          <DetailField label="Parts" value={money(sched.reduce((a, m) => a + m.materials, 0), currency)} />
-          <DetailField label="Build" value={money(sched.reduce((a, m) => a + m.assembly, 0), currency)} />
-          <DetailField label="Cash out" value={money(totalSpend, currency)} />
-          <DetailField label="Sale in" value={totalIn ? money(totalIn, currency) : 'No price set'} />
-          <DetailField label="Net" value={`${totalIn - totalSpend < 0 ? '-' : ''}${money(Math.abs(totalIn - totalSpend), currency)}`} tone={totalIn - totalSpend < 0 ? 'warning' : 'success'} wide />
+          <DetailField label="Start" value={formatDate(o.start_date)} />
+          <DetailField label="Promised delivery" value={formatDate(o.delivery_date)} />
+          <DetailField label="Earliest delivery" value={o.has_bom ? formatDate(o.lead.earliest_delivery) : undefined} tone={o.lead.late ? 'danger' : 'muted'} />
+          <DetailField label="Days available" value={o.lead.window_days} />
+          <DetailField label="Longest part lead time" value={o.has_bom ? `${o.lead.longest_lead_days} days` : undefined} />
+          <DetailField label="Build time" value={o.has_bom ? `${o.lead.assembly_days} days` : undefined} />
         </DetailGrid>
       </DetailSection>
       <DetailSection title="How it is worked out">
-        <p className="text-[12px] text-[var(--shell-text-muted)]">Each part is paid in the month it arrives, and the build is spread over the days of assembly. The sale comes in on the promised delivery date. Warranty is a provision, not cash, so it is left out.</p>
-        {o.lead.late && <p className="text-[12px] text-[var(--danger)]">The parts arrive after the promised delivery, so some money goes out after the sale comes in.</p>}
-        {!o.has_bom && <p className="text-[12px] text-[var(--shell-text-muted)]">Import the standard BOM to see when the money moves.</p>}
+        <p className="text-[12px] text-[var(--shell-text-muted)]">Parts are ordered from the start date and arrive after their lead time. A step is built once its parts have arrived and the step before it is done. Build days come from the operation hours for the quantity on the order. The earliest delivery is when the last step is built.</p>
+        {o.lead.missing_lead_time > 0 && <p className="text-[12px] text-[var(--warning)]">{o.lead.missing_lead_time} part{o.lead.missing_lead_time === 1 ? ' has' : 's have'} no lead time on the Part master, so {o.lead.missing_lead_time === 1 ? 'it counts' : 'they count'} as zero.</p>}
+        {!o.has_bom && <p className="text-[12px] text-[var(--shell-text-muted)]">Import the standard BOM to see the timeline.</p>}
       </DetailSection>
     </div>
   );
@@ -326,11 +345,13 @@ export default function BuildOrderDetailPage() {
       </DetailSection>
       <DetailSection title="Variances">
         <DetailGrid>
-          <DetailField label="Spend" value={o.status === 'DELIVERED' && a.spend_variance != null ? signedMoney(a.spend_variance) : undefined} tone={a.spend_variance == null || a.spend_variance === 0 ? 'muted' : a.spend_variance > 0 ? 'warning' : 'success'} />
+          {o.status === 'DELIVERED'
+            ? <DetailField label="Spend" value={a.spend_variance != null ? signedMoney(a.spend_variance) : undefined} tone={a.spend_variance == null || a.spend_variance === 0 ? 'muted' : a.spend_variance > 0 ? 'warning' : 'success'} />
+            : <DetailField label="Spend so far" value={a.expected_bought != null ? `${money(a.approved_e200, currency)} of ${money(a.expected_bought, currency)}` : money(a.approved_e200, currency)} tone="muted" />}
           <DetailField label="Price" value={signedMoney(a.price_variance)} tone={a.price_variance > 0 ? 'warning' : a.price_variance < 0 ? 'success' : 'muted'} />
           <DetailField label="Usage (quantity and scrap)" value={o.status === 'DELIVERED' && a.usage_variance != null ? signedMoney(a.usage_variance) : undefined} tone={a.usage_variance == null || a.usage_variance === 0 ? 'muted' : a.usage_variance > 0 ? 'warning' : 'success'} wide />
         </DetailGrid>
-        <p className="text-[12px] text-[var(--shell-text-muted)]">Spend = price + usage. Price is the effect of last paid prices against the standard prices in this BOM. Usage is what price does not explain. Spend and usage are shown once the order is delivered, because until then spend is naturally below what is expected. Watch Left to spend instead.</p>
+        <p className="text-[12px] text-[var(--shell-text-muted)]">Spend = price + usage. Price is the effect of last paid prices against the standard prices in this BOM. Usage is what price does not explain. Spend variance and usage are shown once the order is delivered. Until then, Spend so far shows what has been approved against the expected cost, which is progress, not a variance.</p>
       </DetailSection>
       <DetailSection title="Other expenses">
         <DetailGrid>
@@ -441,7 +462,7 @@ export default function BuildOrderDetailPage() {
           searchRow={<DataTableToolbar table={table} actions={<><ToolbarActions actions={alwaysActions} /><ToolbarActions actions={itemActions} /></>} />}
           intelligencePanel={
             <ModuleIntelligencePanel title={selected ? (tab === 'operations' ? 'Build operation' : tab === 'variances' ? 'Expense' : 'Part') : 'Summary'} onClose={() => setSelection({})} hasSelection={!!selected}
-              idle={tab === 'schedule' ? scheduleSummary : tab === 'variances' ? varianceSummary : tab === 'standard' ? standardSummary : summary} footer={panelActions.length ? <DetailActions actions={panelActions} /> : undefined}>
+              idle={tab === 'timeline' ? timelineSummary : tab === 'variances' ? varianceSummary : tab === 'standard' ? standardSummary : summary} footer={panelActions.length ? <DetailActions actions={panelActions} /> : undefined}>
               {detail}
             </ModuleIntelligencePanel>
           }

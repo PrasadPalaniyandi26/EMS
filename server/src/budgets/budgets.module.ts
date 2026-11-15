@@ -5,8 +5,9 @@ import { BudgetPlanningController } from './budget-planning.controller';
 import { BudgetPlanningService } from './budget-planning.service';
 import { BuildOrdersController } from './build-orders.controller';
 import { BuildOrdersService } from './build-orders.service';
+import { LineSuggestionService } from './line-suggestion.service';
 import { AuditModule } from '../audit/audit.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
-@Module({ imports: [AuditModule, NotificationsModule], controllers: [BudgetsController, BudgetPlanningController, BuildOrdersController], providers: [BudgetsService, BudgetPlanningService, BuildOrdersService], exports: [BudgetsService, BudgetPlanningService, BuildOrdersService] })
+@Module({ imports: [AuditModule, NotificationsModule], controllers: [BudgetsController, BudgetPlanningController, BuildOrdersController], providers: [BudgetsService, BudgetPlanningService, BuildOrdersService, LineSuggestionService], exports: [BudgetsService, BudgetPlanningService, BuildOrdersService] })
 export class BudgetsModule {}

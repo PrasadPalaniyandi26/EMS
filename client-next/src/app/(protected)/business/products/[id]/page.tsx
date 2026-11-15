@@ -149,13 +149,13 @@ export default function ProductCostingDetailPage() {
     ];
     if (tab === 'standard') return [
       { accessorKey: 'created_at', header: 'Proposed', cell: ({ row }) => <DateCell value={row.original.created_at} />, size: 110 },
-      // Only the newest proposal can be approved, so an older one that is still open reads as superseded
-      { accessorKey: 'status', header: 'Status', size: 110, cell: ({ row }) => { const s = row.original.status; const old = s === 'PROPOSED' && row.original.id < newestStandardId; return <ToneText label={old ? 'Superseded' : s === 'APPROVED' ? 'Approved' : s === 'PROPOSED' ? 'Proposed' : s === 'REJECTED' ? 'Rejected' : 'Replaced'} tone={old ? 'muted' : s === 'APPROVED' ? 'success' : s === 'PROPOSED' ? 'warning' : s === 'REJECTED' ? 'danger' : 'muted'} />; } },
       { accessorKey: 'total', header: headerRight('Unit cost'), cell: ({ row }) => <NumCell strong>{money(row.original.total, currency)}</NumCell>, size: 120 },
       { id: 'bom', header: headerRight('Parts and scrap'), cell: ({ row }) => <NumCell>{money(row.original.material + row.original.scrap, currency)}</NumCell>, size: 170 },
       { id: 'steps', header: headerRight('Build operations'), cell: ({ row }) => <NumCell>{money(row.original.conversion + row.original.fixed, currency)}</NumCell>, size: 120 },
       { accessorKey: 'overhead', header: headerRight('Overhead'), cell: ({ row }) => <NumCell>{money(row.original.overhead, currency)}</NumCell>, size: 120 },
       { id: 'fw', header: headerRight('Freight and warranty'), accessorFn: (r) => r.freight + r.warranty, cell: ({ row }) => <NumCell>{money(row.original.freight + row.original.warranty, currency)}</NumCell>, size: 150 },
+      // Only the newest proposal can be approved, so an older one that is still open reads as superseded
+      { accessorKey: 'status', header: 'Status', size: 110, cell: ({ row }) => { const s = row.original.status; const old = s === 'PROPOSED' && row.original.id < newestStandardId; return <ToneText label={old ? 'Superseded' : s === 'APPROVED' ? 'Approved' : s === 'PROPOSED' ? 'Proposed' : s === 'REJECTED' ? 'Rejected' : 'Replaced'} tone={old ? 'muted' : s === 'APPROVED' ? 'success' : s === 'PROPOSED' ? 'warning' : s === 'REJECTED' ? 'danger' : 'muted'} />; } },
     ];
     return [
       { accessorKey: 'part_no', header: 'Part', cell: ({ row }) => <IdCell value={row.original.part_no} />, size: 110 },

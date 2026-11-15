@@ -83,6 +83,21 @@ export function useBudgetPlans(enabled = true) {
   });
 }
 
+// A starting amount for a new budget line, worked out by the server from the order, the product's build plan, the project's estimate or last year's overhead spend
+export interface LineSuggestion {
+  shape: 'even' | 'month'; amount: number | null; from: number; to: number; months: number[] | null; type_id: number | null; note: string | null; reason: string | null;
+}
+export function useLineSuggestion(costObject: CostObject, objectId: string, typeId: string, fy: number | undefined, enabled: boolean) {
+  // The expense type only changes the answer for a project and an overhead
+  const useType = costObject === 'PROJECT' || costObject === 'DEPARTMENT';
+  const qs = `cost_object=${costObject}&object_id=${objectId}${useType && typeId ? `&type_id=${typeId}` : ''}${fy != null ? `&fy=${fy}` : ''}`;
+  return useQuery({
+    queryKey: [KEY, 'line-suggestion', qs],
+    queryFn: () => api.get<LineSuggestion>(`/budgets/line-suggestion?${qs}`).then((r) => r.data),
+    enabled: enabled && !!objectId && fy != null, staleTime: LIVE,
+  });
+}
+
 export function useBudgetPlan(fy: number | null) {
   return useQuery({
     queryKey: [KEY, 'plan', fy],

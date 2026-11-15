@@ -669,7 +669,7 @@ export class BudgetPlanningService {
         id: p.id, code: p.code, name: p.name, client_name: p.client?.name ?? null, contract_value: cv, target_margin_pct: p.targetMarginPct == null ? null : n(p.targetMarginPct), min_margin_pct: p.minMarginPct == null ? null : n(p.minMarginPct),
         products: (productsOf.get(p.id) ?? []).flatMap((id) => { const x = named.get(id); return x ? [{ id: x.id, code: x.code, name: x.name }] : []; }),
         risk_rating: p.riskRating, estimate_status: state, estimate_total: t?.total ?? null, actual: r2(ac.get(p.id) ?? 0),
-        projected_margin_pct: cv && t ? r2(((cv - t.total) / cv) * 100) : null,
+        projected_margin_pct: cv && t && t.total > 0 ? r2(((cv - t.total) / cv) * 100) : null,
       };
     });
   }
@@ -709,8 +709,9 @@ export class BudgetPlanningService {
     const actual = r2(spend.reduce((a, x) => a + x.amount, 0));
     const margin = {
       contract_value: cv, target_pct: p.targetMarginPct == null ? null : n(p.targetMarginPct), min_pct: p.minMarginPct == null ? null : n(p.minMarginPct),
-      estimate_margin_pct: cv ? r2(((cv - t.total) / cv) * 100) : null,
-      projected_margin_pct: cv ? r2(((cv - t.total) / cv) * 100) : null,
+      // With no estimate there is no cost to take from the price, so no margin is shown
+      estimate_margin_pct: cv && est && t.total > 0 ? r2(((cv - t.total) / cv) * 100) : null,
+      projected_margin_pct: cv && est && t.total > 0 ? r2(((cv - t.total) / cv) * 100) : null,
     };
     return {
       project: { id: p.id, code: p.code, name: p.name, client_name: p.client?.name ?? null, contract_value: cv, target_margin_pct: margin.target_pct, min_margin_pct: margin.min_pct, risk_rating: p.riskRating, start_date: p.start_date, end_date: p.end_date, type_code: p.type?.code ?? null, has_job_bom: !!p.type?.hasJobBom },

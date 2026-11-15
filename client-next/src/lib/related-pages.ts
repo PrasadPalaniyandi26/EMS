@@ -18,7 +18,7 @@ const L = {
   income: { label: 'Income', href: '/income' },
   recurring: { label: 'Recurring', href: '/manage/recurring' },
   reports: { label: 'Reports', href: '/reporting' },
-  analytics: { label: 'Spend analytics', href: '/analytics/resource-utilization' },
+  analytics: { label: 'Analytics', href: '/analytics/resource-utilization' },
   planner: { label: 'Planner', href: '/budget/planner' },
   monitor: { label: 'Monitor', href: '/budget/monitor' },
   parts: { label: 'Part master', href: '/budget/parts' },

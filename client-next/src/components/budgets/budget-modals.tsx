@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Plus, Pencil, CheckCircle2, CornerUpLeft } from 'lucide-react';
 import api from '@/lib/api-client';
@@ -12,7 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useCategories, useCategoryTypes, useDepartments, useProducts, useProjects, useUsers, useInvalidate } from '@/hooks/use-queries';
 import { useBuildOrders } from '@/hooks/use-build-orders';
-import { fyLabel, type BudgetLine, type BudgetPlanInfo, type CostObject, type PlanView } from '@/hooks/use-budget-queries';
+import { fyLabel, useLineSuggestion, type BudgetLine, type BudgetPlanInfo, type CostObject, type PlanView } from '@/hooks/use-budget-queries';
 import { money } from '@/components/budgets/budget-ui';
 import { sortByCode } from '@/lib/codes';
 
@@ -26,7 +26,8 @@ export function NewPlanModal({ isOpen, onClose, plans, currentFy, startMonth, on
   isOpen: boolean; onClose: () => void; plans: BudgetPlanInfo[]; currentFy: number; startMonth: number; onCreated: (fy: number) => void;
 }) {
   const invalidate = useInvalidate();
-  const free = useMemo(() => [currentFy - 1, currentFy, currentFy + 1, currentFy + 2].filter((fy) => !plans.some((p) => p.fy === fy)), [plans, currentFy]);
+  // This year, if it has no plan, and the next two; earlier years cannot be planned any more
+  const free = useMemo(() => [currentFy, currentFy + 1, currentFy + 2].filter((fy) => !plans.some((p) => p.fy === fy)), [plans, currentFy]);
   const [fy, setFy] = useState('');
   const [name, setName] = useState('');
   const [envelope, setEnvelope] = useState('');
@@ -35,7 +36,7 @@ export function NewPlanModal({ isOpen, onClose, plans, currentFy, startMonth, on
 
   useEffect(() => {
     if (!isOpen) return;
-    const first = free.find((f) => f >= currentFy) ?? free[0];
+    const first = free[0];
     setFy(first != null ? String(first) : '');
     setName('');
     setEnvelope('');
@@ -67,7 +68,7 @@ export function NewPlanModal({ isOpen, onClose, plans, currentFy, startMonth, on
       onSave={save} canSave={!!fy && !saving} saveLabel="Create plan" size="sm"
     >
       <div className="space-y-3">
-        <Field label="Financial year" required hint={free.length === 0 ? 'Every nearby year already has a plan.' : undefined}>
+        <Field label="Financial year" required hint={free.length === 0 ? 'This year and the next two already have a plan.' : undefined}>
           <NativeSelect value={fy} onChange={(e) => setFy(e.target.value)} disabled={free.length === 0}>
             {free.map((f) => <option key={f} value={f}>{fyLabel(f, startMonth)}</option>)}
           </NativeSelect>
@@ -220,6 +221,8 @@ export function BudgetLineModal({ isOpen, onClose, view, editing, canReserve, on
   const [periods, setPeriods] = useState<string[]>(Array(12).fill(''));
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
+  // Once the person planning has changed the amount or the months, a new starting amount never replaces them
+  const [dirty, setDirty] = useState(false);
 
   const plan = view?.plan;
   const months = view?.months ?? [];
@@ -229,6 +232,7 @@ export function BudgetLineModal({ isOpen, onClose, view, editing, canReserve, on
     if (!isOpen) return;
     setSaving(false);
     setReason('');
+    setDirty(false);
     if (editing) {
       setCostObject(editing.cost_object);
       setObjectId(String(editing.project_id ?? editing.product_id ?? editing.build_order_id ?? editing.department_id ?? ''));
@@ -250,7 +254,8 @@ export function BudgetLineModal({ isOpen, onClose, view, editing, canReserve, on
       setStrict(false); setContingency(false); setOwnerId(''); setNote('');
       setMode('even'); setTotal(''); setFromIdx('0'); setToIdx('11'); setPeriods(Array(12).fill(''));
     }
-  }, [isOpen, editing, preset]);
+  // The preset arrives as a new object on every render of the page, so only what is in it can restart the form; otherwise a refetch or a resize would wipe what was typed
+  }, [isOpen, editing, preset?.cost_object, preset?.object_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const objectOptions = costObject === 'PROJECT'
     ? (projects || []).map((p) => ({ id: String(p.id), name: p.code ? `${p.code} ${p.name}` : p.name }))
@@ -265,6 +270,32 @@ export function BudgetLineModal({ isOpen, onClose, view, editing, canReserve, on
     .map((t) => ({ id: String(t.id), name: labelOf(t) }));
   const categoryOptions = sortByCode((categories || []).filter((c) => c.type === 'expense' && String(c.type_id ?? '') === typeId))
     .map((c) => ({ id: String(c.id), name: labelOf(c) }));
+
+  // A new line starts from a number the system can work out: the order's expected cost, the product's build plan at its standard cost, the project's estimate
+  // for this expense type, or last year's spend for the overhead. It is only a starting point to add to or reduce.
+  const suggestable = !editing && costObject !== 'RESERVE' && !!objectId;
+  const { data: suggestion, isFetching: suggesting } = useLineSuggestion(costObject, objectId, typeId, plan?.fy, suggestable);
+  const apply = (sug: NonNullable<typeof suggestion>) => {
+    if (sug.amount == null) { setTotal(''); setPeriods(Array(12).fill('')); if (autoNote.current) { setNote(''); autoNote.current = false; } return; }
+    if (sug.shape === 'month' && sug.months) { setMode('month'); setPeriods(Array.from({ length: 12 }, (_, i) => (sug.months![i] ? String(sug.months![i]) : ''))); }
+    else { setMode('even'); setTotal(String(sug.amount)); setFromIdx(String(sug.from)); setToIdx(String(sug.to)); }
+    if (sug.note && (!note.trim() || autoNote.current)) { setNote(sug.note); autoNote.current = true; }
+    if (sug.type_id && !typeId) setTypeId(String(sug.type_id));
+  };
+  const autoNote = useRef(false);
+  const appliedFor = useRef('');
+  useEffect(() => { if (!isOpen) { appliedFor.current = ''; autoNote.current = false; } }, [isOpen]);
+  useEffect(() => {
+    // Apply once for each thing chosen (and each expense type, for a project or an overhead), and never over what the person has changed
+    if (!suggestable || !suggestion) return;
+    const key = `${costObject}-${objectId}-${costObject === 'PROJECT' || costObject === 'DEPARTMENT' ? typeId : ''}`;
+    if (appliedFor.current === key) return;
+    appliedFor.current = key;
+    if (!dirty) apply(suggestion);
+  }, [suggestion, suggestable, costObject, objectId, typeId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const changed = !!suggestion && suggestion.amount != null && (suggestion.shape === 'even'
+    ? mode !== 'even' || Number(total) !== suggestion.amount || Number(fromIdx) !== suggestion.from || Number(toIdx) !== suggestion.to
+    : mode !== 'month' || (suggestion.months ?? []).some((v, i) => Number(periods[i] || 0) !== v));
 
   const needsType = costObject !== 'RESERVE' && !contingency;
   const sum = periods.reduce((a, p) => a + (Number(p) || 0), 0);
@@ -375,23 +406,23 @@ export function BudgetLineModal({ isOpen, onClose, view, editing, canReserve, on
           <div className="space-y-1.5">
             <p id="bl-phase" className="text-[13px] font-medium text-[var(--shell-text)]">Phasing</p>
             <SegmentedControl
-              labelledBy="bl-phase" value={mode} onChange={setMode}
+              labelledBy="bl-phase" value={mode} onChange={(v) => { setDirty(true); setMode(v); }}
               options={[{ value: 'even' as const, label: 'Spread evenly' }, { value: 'month' as const, label: 'By month' }]}
             />
           </div>
           {mode === 'even' ? (
             <>
               <Field label="Amount for the period" required>
-                <CurrencyInput value={total} onChange={setTotal} />
+                <CurrencyInput value={total} onChange={(v) => { setDirty(true); setTotal(v); }} />
               </Field>
               <div className="grid grid-cols-2 gap-2">
                 <Field label="From">
-                  <NativeSelect value={fromIdx} onChange={(e) => setFromIdx(e.target.value)}>
+                  <NativeSelect value={fromIdx} onChange={(e) => { setDirty(true); setFromIdx(e.target.value); }}>
                     {months.map((m, i) => <option key={i} value={i}>{m.label}</option>)}
                   </NativeSelect>
                 </Field>
                 <Field label="To">
-                  <NativeSelect value={toIdx} onChange={(e) => setToIdx(e.target.value)}>
+                  <NativeSelect value={toIdx} onChange={(e) => { setDirty(true); setToIdx(e.target.value); }}>
                     {months.map((m, i) => <option key={i} value={i} disabled={i < Number(fromIdx)}>{m.label}</option>)}
                   </NativeSelect>
                 </Field>
@@ -407,13 +438,25 @@ export function BudgetLineModal({ isOpen, onClose, view, editing, canReserve, on
                     <Input
                       aria-label={`Amount for ${m.label}`} type="number" min="0" step="1"
                       className={`${inp} border-input bg-transparent text-right tabular-nums text-[var(--shell-text)] !h-8`}
-                      value={periods[i] ?? ''} onChange={(e) => setPeriods((p) => p.map((x, j) => (j === i ? e.target.value : x)))}
+                      value={periods[i] ?? ''} onChange={(e) => { setDirty(true); setPeriods((p) => p.map((x, j) => (j === i ? e.target.value : x))); }}
                     />
                   </label>
                 ))}
               </div>
               <p className="text-[12px] text-[var(--shell-text-muted)]">Total <strong className="tabular-nums text-[var(--shell-text)]">{money(sum)}</strong></p>
             </div>
+          )}
+          {suggestable && (
+            <p className="text-[12px] text-[var(--shell-text-muted)]">
+              {!suggestion || suggesting && !suggestion
+                ? 'Working out a starting amount…'
+                : suggestion.amount == null
+                  ? suggestion.reason
+                  : <>
+                      Starting amount: <strong className="tabular-nums text-[var(--shell-text)]">{money(suggestion.amount)}</strong>. {suggestion.note}. Add to it or reduce it to plan for more or less.
+                      {changed && <> <button type="button" onClick={() => { setDirty(false); apply(suggestion); }} className="rounded-md px-1 font-medium text-[var(--shell-accent)] hover:underline focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]">Use it again</button></>}
+                    </>}
+            </p>
           )}
         </div>
 
@@ -427,7 +470,7 @@ export function BudgetLineModal({ isOpen, onClose, view, editing, canReserve, on
             </label>
           )}
           <Field label="Note">
-            <Input className={`${inp} border-input bg-transparent text-[var(--shell-text)]`} placeholder="Basis or assumption" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />
+            <Input className={`${inp} border-input bg-transparent text-[var(--shell-text)]`} placeholder="Basis or assumption" value={note} onChange={(e) => { autoNote.current = false; setNote(e.target.value); }} maxLength={500} />
           </Field>
           {approved && (
             <Field label="Reason for the change" required hint="The plan is approved. Finance records why it changed.">

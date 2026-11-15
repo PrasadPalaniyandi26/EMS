@@ -347,6 +347,9 @@ export class BudgetsService {
   async deletePlan(fy: number, userId: number) {
     const plan = await this.planOrThrow(fy);
     if (plan.status !== 'DRAFT') throw new HttpException('Only a draft plan can be deleted.', HttpStatus.CONFLICT);
+    // The plan for this year and earlier years stay; only a plan for a future year can go, which is what makes room for a new one
+    const s = await this.getSettings();
+    if (fy <= this.fyOf(new Date(), s.fyStartMonth)) throw new HttpException('Only a plan for a future year can be deleted.', HttpStatus.CONFLICT);
     await this.prisma.budgetPlan.delete({ where: { id: plan.id } });
     this.audit.log({ tableName: 'budget_plans', recordId: plan.id, action: 'DELETE', changedBy: userId, oldValues: plan }).catch(() => undefined);
     return { deleted: true };

@@ -73,6 +73,7 @@ cd server
 npx prisma migrate deploy             # applies prisma/migrations
 node prisma/seed.js                   # roles, categories, Internal client, admin
 node prisma/seed-test-data.js         # optional: sample users, clients, 117 transactions, budgets, recurring
+node prisma/seed-test-orders.js       # optional, API running: 10 customer orders (delivered, late, in build, at risk, cancelled), created through the API
 ```
 Test users (password `Test@1234`): `fin1`, `fin2`, `mgr1`, `mgr2`, `emp1`–`emp4`, `emp5` (ON_HOLD). `admin` / `admin123` is unchanged. `seed-test-data.js` is idempotent; to reseed from scratch run `docker compose down -v` first.
 

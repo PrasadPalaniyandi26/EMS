@@ -38,7 +38,21 @@ const EMPTY: Record<Tab, string> = {
   milestones: 'No milestones yet. Add the key phases of the project with a planned date, and mark each done when it is finished.',
 };
 
-const late = (m: Milestone) => !m.done_date && new Date(m.planned_date) < new Date();
+const dayNo = (iso: string) => { const [y, mo, d] = iso.slice(0, 10).split('-').map(Number); return Date.UTC(y, mo - 1, d) / 86400000; };
+const todayNo = () => { const t = new Date(); return Date.UTC(t.getFullYear(), t.getMonth(), t.getDate()) / 86400000; };
+const days = (n: number) => `${n} day${n === 1 ? '' : 's'}`;
+type MsTone = 'success' | 'warning' | 'danger' | 'muted';
+// Done on or before the planned date is green, done after it is red, and still open past its date is orange
+const milestoneState = (m: Milestone): { status: string; tone: MsTone; days: string | null; diff: number | null } => {
+  const planned = dayNo(m.planned_date);
+  if (m.done_date) {
+    const diff = dayNo(m.done_date) - planned;
+    return diff > 0 ? { status: 'Done late', tone: 'danger', days: `${days(diff)} late`, diff } : { status: 'Done', tone: 'success', days: diff === 0 ? 'On time' : `${days(-diff)} early`, diff };
+  }
+  const over = todayNo() - planned;
+  return over > 0 ? { status: 'Overdue', tone: 'warning', days: `${days(over)} overdue`, diff: over } : { status: 'Open', tone: 'muted', days: null, diff: null };
+};
+const late = (m: Milestone) => milestoneState(m).status === 'Overdue';
 
 export default function ProjectBudgetPage() {
   const id = Number(useParams<{ id: string }>().id);
@@ -132,8 +146,11 @@ export default function ProjectBudgetPage() {
     return [
       { accessorKey: 'name', header: 'Milestone', cell: ({ row }) => <TextCell value={row.original.name} strong /> },
       { accessorKey: 'planned_date', header: 'Planned', cell: ({ row }) => <DateCell value={row.original.planned_date} />, size: 120 },
-      { accessorKey: 'done_date', header: 'Status', size: 130,
-        cell: ({ row }) => row.original.done_date ? <ToneText label={`Done ${formatDate(row.original.done_date)}`} tone="success" /> : <ToneText label={late(row.original) ? 'Late' : 'Open'} tone={late(row.original) ? 'warning' : 'muted'} /> },
+      { accessorKey: 'done_date', header: 'Completed', cell: ({ row }) => <DateCell value={row.original.done_date} />, size: 120 },
+      { id: 'days', header: headerRight('Days'), accessorFn: (m: Milestone) => milestoneState(m).diff ?? undefined, size: 140,
+        cell: ({ row }) => { const st = milestoneState(row.original); return <div className="text-right"><ToneText label={st.days} tone={st.tone} /></div>; } },
+      { id: 'status', header: 'Status', size: 110, accessorFn: (m: Milestone) => milestoneState(m).status,
+        cell: ({ row }) => { const st = milestoneState(row.original); return <ToneText label={st.status} tone={st.tone} />; } },
     ];
   }, [tab, currency, job?.cost?.overhead_rate]);
 
@@ -216,13 +233,13 @@ export default function ProjectBudgetPage() {
   const lateCount = data?.milestones.filter(late).length ?? 0;
   const milestonesSummary = !data ? null : (
     <div className="space-y-4">
-      <DetailSummary title={data.project.name} subtitle="Milestones" status={data.milestones.length === 0 ? 'No milestones yet' : lateCount ? `${lateCount} late` : 'None late'} statusClass={lateCount ? 'text-[var(--warning)]' : 'text-[var(--shell-text-muted)]'}
+      <DetailSummary title={data.project.name} subtitle="Milestones" status={data.milestones.length === 0 ? 'No milestones yet' : lateCount ? `${lateCount} overdue` : 'None overdue'} statusClass={lateCount ? 'text-[var(--warning)]' : 'text-[var(--shell-text-muted)]'}
         figure={data.milestones.length ? `${doneCount} of ${data.milestones.length}` : undefined} figureLabel="Done" />
       <DetailSection title="Progress">
         <DetailGrid>
           <DetailField label="Milestones" value={data.milestones.length} />
           <DetailField label="Done" value={doneCount} />
-          <DetailField label="Late" value={lateCount} tone={lateCount ? 'warning' : 'muted'} />
+          <DetailField label="Overdue" value={lateCount} tone={lateCount ? 'warning' : 'muted'} />
           <DetailField label="Still open" value={data.milestones.length - doneCount} />
         </DetailGrid>
       </DetailSection>
@@ -393,12 +410,13 @@ export default function ProjectBudgetPage() {
     const x = selected as Milestone;
     return (
       <div className="space-y-4">
-        <DetailSummary title={x.name} subtitle="Milestone" status={x.done_date ? `Done ${formatDate(x.done_date)}` : late(x) ? 'Late' : 'Open'}
-          statusClass={x.done_date ? 'text-[var(--success)]' : late(x) ? 'text-[var(--warning)]' : 'text-[var(--shell-text-muted)]'} />
+        <DetailSummary title={x.name} subtitle="Milestone" status={milestoneState(x).status}
+          statusClass={{ success: 'text-[var(--success)]', warning: 'text-[var(--warning)]', danger: 'text-[var(--danger)]', muted: 'text-[var(--shell-text-muted)]' }[milestoneState(x).tone]} />
         <DetailSection title="Dates">
           <DetailGrid>
             <DetailField label="Planned" value={formatDate(x.planned_date)} />
-            <DetailField label="Done" value={x.done_date ? formatDate(x.done_date) : undefined} />
+            <DetailField label="Completed" value={x.done_date ? formatDate(x.done_date) : undefined} />
+            <DetailField label="Days" value={milestoneState(x).days ?? undefined} tone={milestoneState(x).tone} />
           </DetailGrid>
         </DetailSection>
       </div>

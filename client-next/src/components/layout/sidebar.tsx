@@ -64,9 +64,9 @@ const NAV_GROUPS = [
     ],
   },
   {
-    label: 'Analytics', iconColor: 'text-nav-purple',
+    label: 'Insights', iconColor: 'text-nav-purple',
     items: [
-      { name: 'Spend Analytics', href: '/analytics/resource-utilization', icon: BarChart2 },
+      { name: 'Analytics', href: '/analytics/resource-utilization', icon: BarChart2 },
       { name: 'Reports', href: '/reporting', icon: FileBarChart },
     ],
   },

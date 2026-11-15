@@ -2,6 +2,7 @@ import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, Pars
 import { AuthGuard } from '@nestjs/passport';
 import { ApiTags } from '@nestjs/swagger';
 import { BudgetsService } from './budgets.service';
+import { LineSuggestionService } from './line-suggestion.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -19,7 +20,7 @@ const PREPARE = ['admin', 'finance', 'manager', 'operations'];
 @Controller('v1/budgets')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 export class BudgetsController {
-  constructor(private service: BudgetsService) {}
+  constructor(private service: BudgetsService, private suggestions: LineSuggestionService) {}
 
   // Open to every signed-in user: the headroom shown while booking an expense
   @Get('headroom')
@@ -34,6 +35,13 @@ export class BudgetsController {
       amount: amount ? Number(amount) : undefined, excludeId: excludeId ? Number(excludeId) : undefined,
       gstClaimable: gstClaimable === 'true', netAmount: netAmount ? Number(netAmount) : undefined,
     });
+  }
+
+  // A starting amount for a new budget line: from the order, the product's build plan, the project's estimate, or last year's overhead spend
+  @Get('line-suggestion')
+  @Roles(...PREPARE)
+  lineSuggestion(@Query('cost_object') costObject?: string, @Query('object_id') objectId?: string, @Query('type_id') typeId?: string, @Query('fy') fy?: string) {
+    return this.suggestions.suggest({ cost_object: costObject, object_id: objectId, type_id: typeId, fy });
   }
 
   @Get('impact')

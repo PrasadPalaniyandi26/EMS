@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Trash2, Send, CheckCircle2, CornerUpLeft, Settings2, FilePlus2, FolderOpen, Plus } from 'lucide-react';
+import { Trash2, Send, CheckCircle2, CornerUpLeft, Settings2, FilePlus2, FolderOpen } from 'lucide-react';
 import { ColumnDef, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, getSortedRowModel, SortingState } from '@tanstack/react-table';
 import api from '@/lib/api-client';
 import { useHeaderStore } from '@/stores/header-store';
@@ -23,7 +23,7 @@ import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { ConfirmDialog } from '@/components/shared/modal-primitives';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
-import { BudgetLineModal, NewPlanModal, PlanDecisionModal, PlanDetailsModal } from '@/components/budgets/budget-modals';
+import { NewPlanModal, PlanDecisionModal, PlanDetailsModal } from '@/components/budgets/budget-modals';
 import { Kpi, PlanStatusText, TabBar, UtilBar, fyOptions, money, plain, useTabParam } from '@/components/budgets/budget-ui';
 import { KIND_COST_OBJECT, KIND_LABEL, STATUS_TONE, changesFor, detailHref, linesOf, rollUp, statusSort, type ObjectStatus, type PlannerKind } from '@/components/budgets/planner-objects';
 
@@ -72,7 +72,6 @@ export default function BudgetPlannerPage() {
   const [budget, setBudget] = useState('ALL');
   const [sorting, setSorting] = useState<SortingState>([{ id: 'rank', desc: false }]);
   const [selection, setSelection] = useState<Record<string, boolean>>({});
-  const [lineFor, setLineFor] = useState<ObjRow | null>(null);
   const [newPlanOpen, setNewPlanOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [decision, setDecision] = useState<'approve' | 'send_back' | null>(null);
@@ -138,19 +137,21 @@ export default function BudgetPlannerPage() {
   };
 
   // The plan's own actions (the same list the toolbar always shows); the selected row's actions follow them
+  // A plan can be made for this year, if it has none, and for the next two. Once they all exist there is nothing to create, so the button goes until a future plan is deleted.
+  const thisFy = plansData?.current_fy ?? new Date().getFullYear();
+  const canCreatePlan = canPlan && [thisFy, thisFy + 1, thisFy + 2].some((f) => !(plansData?.plans ?? []).some((p) => p.fy === f));
   const planActions: DetailActionDef[] = [
-    ...(canPlan ? [{ label: 'New plan', icon: <FilePlus2 className="h-4 w-4 text-[var(--success)]" />, onClick: () => setNewPlanOpen(true) }] : []),
+    ...(canCreatePlan ? [{ label: 'New plan', icon: <FilePlus2 className="h-4 w-4 text-[var(--success)]" />, onClick: () => setNewPlanOpen(true) }] : []),
     ...(plan && draft && (view?.lines.length ?? 0) > 0 ? [{ label: 'Submit for approval', icon: <Send className="h-4 w-4 text-[var(--shell-accent)]" />, onClick: () => setSubmitOpen(true) }] : []),
     ...(plan?.status === 'SUBMITTED' && isFinance ? [
       { label: 'Approve', icon: <CheckCircle2 className="h-4 w-4 text-[var(--nav-emerald)]" />, onClick: () => setDecision('approve') },
       { label: 'Send back', icon: <CornerUpLeft className="h-4 w-4 text-[var(--info)]" />, onClick: () => setDecision('send_back') },
     ] : []),
     ...(plan && canPlan ? [{ label: 'Plan details', icon: <Settings2 className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setDetailsOpen(true) }] : []),
-    ...(plan && isFinance && draft ? [{ label: 'Delete plan', icon: <Trash2 className="h-4 w-4 text-[var(--danger)]" />, onClick: () => setDeletePlan(true) }] : []),
+    ...(plan && isFinance && draft && plan.fy > thisFy ? [{ label: 'Delete plan', icon: <Trash2 className="h-4 w-4 text-[var(--danger)]" />, onClick: () => setDeletePlan(true) }] : []),
   ];
   const actions: DetailActionDef[] = selected ? [
     { label: 'Open', variant: 'primary', icon: <FolderOpen className="h-4 w-4 text-[var(--nav-slate)]" />, onClick: () => router.push(detailHref(selected.kind, selected.id, fy)) },
-    ...(canEditLines ? [{ label: 'Add budget line', icon: <Plus className="h-4 w-4 text-[var(--nav-cyan)]" />, onClick: () => setLineFor(selected) }] : []),
   ] : [];
 
   const k = mon?.kpis;
@@ -246,9 +247,6 @@ export default function BudgetPlannerPage() {
       <NewPlanModal isOpen={newPlanOpen} onClose={() => setNewPlanOpen(false)} plans={plansData?.plans ?? []} currentFy={plansData?.current_fy ?? new Date().getFullYear()} startMonth={startMonth} onCreated={setFy} />
       <PlanDetailsModal isOpen={detailsOpen} onClose={() => setDetailsOpen(false)} plan={plan ?? null} />
       <PlanDecisionModal isOpen={decision !== null} onClose={() => setDecision(null)} plan={plan ?? null} mode={decision ?? 'approve'} planned={view?.totals.planned ?? 0} onDone={() => setDecision(null)} />
-      <BudgetLineModal isOpen={!!lineFor} onClose={() => setLineFor(null)} view={view} editing={null} canReserve={isFinance}
-        preset={lineFor ? { cost_object: KIND_COST_OBJECT[lineFor.kind], object_id: lineFor.kind === 'reserve' ? null : lineFor.id, object_name: [lineFor.code, lineFor.name].filter(Boolean).join(' ') } : null}
-        onSaved={() => { if (lineFor) router.push(detailHref(lineFor.kind, lineFor.id, fy)); }} />
       <ConfirmDialog open={submitOpen} title="Submit plan for approval" message={`Submit ${plan?.label ?? ''} with ${view?.lines.length ?? 0} line${view?.lines.length === 1 ? '' : 's'} and ${money(view?.totals.planned, currency)} planned? It cannot be edited while it waits for approval.`} confirmLabel="Submit" onConfirm={submitPlan} onCancel={() => setSubmitOpen(false)} />
       <ConfirmDialog open={deletePlan} destructive title="Delete this plan" message={`Delete the draft plan for ${plan?.label ?? ''} and all of its lines? This cannot be undone.`} confirmLabel="Delete plan" onConfirm={removePlan} onCancel={() => setDeletePlan(false)} />
     </div>
