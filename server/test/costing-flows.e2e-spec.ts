@@ -222,18 +222,20 @@ describe('Costing flows (e2e)', () => {
       expect(row.status).toBe('APPROVED');
     });
 
-    it('milestones need a name, a weight and real dates, and their weights cannot pass 100%', async () => {
+    it('milestones need a name and real dates, and show on the project', async () => {
       const ms = (b: Record<string, unknown>) => call('post', `/budgets/projects/${projectId}/milestones`, finance, b);
-      expect((await ms({ name: '', weight_pct: 50, planned_date: today() })).status).toBe(400);
-      expect((await ms({ name: 'ZZ Half', weight_pct: 0, planned_date: today() })).status).toBe(400);
-      expect((await ms({ name: 'ZZ Half', weight_pct: 50, planned_date: 'not a date' })).status).toBe(400);
-      expect((await ms({ name: 'ZZ Half', weight_pct: 50, planned_date: today(), done_date: 'nope' })).status).toBe(400);
-      const first = await ms({ name: 'ZZ Half', weight_pct: 60, planned_date: today() });
+      expect((await ms({ name: '', planned_date: today() })).status).toBe(400);
+      expect((await ms({ name: 'ZZ Design', planned_date: 'not a date' })).status).toBe(400);
+      expect((await ms({ name: 'ZZ Design', planned_date: today(), done_date: 'nope' })).status).toBe(400);
+      const first = await ms({ name: 'ZZ Design', planned_date: today() });
       expect(first.status).toBe(201);
-      expect((await ms({ name: 'ZZ Rest', weight_pct: 60, planned_date: today() })).status).toBe(400);
-      const second = await ms({ name: 'ZZ Rest', weight_pct: 40, planned_date: today() });
+      const second = await ms({ name: 'ZZ Build', planned_date: today() });
       expect(second.status).toBe(201);
-      expect((await call('put', `/budgets/projects/${projectId}/milestones/${data(second).id}`, finance, { name: 'ZZ Rest', weight_pct: 70, planned_date: today() })).status).toBe(400);
+      expect((await call('put', `/budgets/projects/${projectId}/milestones/${data(second).id}`, finance, { name: 'ZZ Build', planned_date: today(), done_date: today() })).status).toBe(200);
+      const project = data(await call('get', `/budgets/projects/${projectId}`, finance));
+      expect(project.milestones.map((m: any) => m.name).sort()).toEqual(['ZZ Build', 'ZZ Design']);
+      expect(project.milestones.find((m: any) => m.name === 'ZZ Build').done_date).toBeTruthy();
+      expect(project.evm).toBeUndefined();
       expect((await call('delete', `/budgets/milestones/${data(first).id}`, finance)).status).toBe(200);
     });
   });

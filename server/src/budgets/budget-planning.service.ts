@@ -19,7 +19,7 @@ const JOB_LABOUR = 'Build labour and overhead (job BOM)';
 type Owner = number | { projectId: number };
 type Actor = { id: number; username?: string; role_name?: string };
 
-// Projects (estimate, milestones, earned value), products (BOM, standard cost, build plan),
+// Projects (estimate, milestones), products (BOM, standard cost, build plan),
 // rates and items, budget changes and the monthly close.
 @Injectable()
 export class BudgetPlanningService {
@@ -636,7 +636,7 @@ export class BudgetPlanningService {
     return [...used, ...onOrders];
   }
 
-  // ── Projects: estimate, milestones, earned value ─────────────────────────
+  // ── Projects: estimate, milestones ─────────────────────────
 
   private estimateTotals(est: any, lines: any[]) {
     const direct = lines.reduce((a, l) => a + n(l.quantity) * n(l.rate), 0);
@@ -699,62 +699,24 @@ export class BudgetPlanningService {
     const cv = p.contractValue == null ? null : n(p.contractValue);
     const phases = [...new Set(lines.map((l) => l.phase))].map((ph) => ({ phase: ph, amount: r2(lines.filter((l) => l.phase === ph).reduce((a, l) => a + l.amount, 0)) }));
 
-    // Earned value is measured on the approved baseline's direct cost, or on the live estimate until one is approved
     const baselines = baseRows.map((b) => ({
       id: b.id, status: b.status, direct: n(b.direct), contingency: n(b.contingency), warranty: n(b.warranty), total: n(b.total), line_count: Array.isArray(b.lines) ? b.lines.length : 0,
       proposed_by_name: b.proposedByName, created_at: b.createdAt, approved_by_name: b.approvedByName, approved_at: b.approvedAt,
       rejected_by_name: b.rejectedByName, rejected_at: b.rejectedAt, reject_reason: b.rejectReason,
     }));
     const approved = baselines.find((b) => b.status === 'APPROVED') ?? null;
-    const today = new Date();
-    const bac = approved ? approved.direct : t.direct;
-    const plannedW = milestones.filter((m) => new Date(m.plannedDate) <= today).reduce((a, m) => a + n(m.weightPct), 0);
-    const doneW = milestones.filter((m) => m.doneDate).reduce((a, m) => a + n(m.weightPct), 0);
-    const ac = r2(spend.reduce((a, x) => a + x.amount, 0));
-    const pv = r2(bac * Math.min(100, plannedW) / 100);
-    const ev = r2(bac * Math.min(100, doneW) / 100);
-    const cpi = ac > 0 ? r2(ev / ac) : null;
-    const spi = pv > 0 ? r2(ev / pv) : null;
-    // Earned value far above what is recorded as spent usually means spend is not booked yet, not that the work is that cheap.
-    // Past a cost index of 4 the forecast (budget ÷ index) is not trusted, so the forecast stays at the budget and no projected margin is shown.
-    // Month-end running totals for the chart: planned from the milestone dates, earned from the done dates, actual from booked spend.
-    // Earned and actual stop at the current month; planned runs on to the last milestone.
-    const mKey = (d: Date) => d.getFullYear() * 12 + d.getMonth();
-    const todayKey = mKey(today);
-    const keys = [...milestones.map((m) => mKey(new Date(m.plannedDate))), ...milestones.filter((m) => m.doneDate).map((m) => mKey(new Date(m.doneDate as Date))), ...spend.map((x) => x.year * 12 + x.month - 1), todayKey];
-    const lastSpendKey = spend.length ? Math.max(...spend.map((x) => x.year * 12 + x.month - 1)) : null;
-    const from = Math.min(...keys); const to = Math.min(Math.max(...keys), from + 47);
-    const series = milestones.length || spend.length ? Array.from({ length: to - from + 1 }, (_, i) => {
-      const k = from + i;
-      const planned = milestones.filter((m) => mKey(new Date(m.plannedDate)) <= k).reduce((a, m) => a + n(m.weightPct), 0);
-      const done = milestones.filter((m) => m.doneDate && mKey(new Date(m.doneDate)) <= k).reduce((a, m) => a + n(m.weightPct), 0);
-      const past = k <= todayKey;
-      return {
-        label: `${MON[k % 12]} ${String(Math.floor(k / 12)).slice(2)}`,
-        pv: r2(bac * Math.min(100, planned) / 100),
-        ev: past ? r2(bac * Math.min(100, done) / 100) : null,
-        ac: past ? r2(spend.filter((x) => x.year * 12 + x.month - 1 <= k).reduce((a, x) => a + x.amount, 0)) : null,
-      };
-    }) : [];
-    const spendLow = cpi != null && cpi > 4;
-    const eac = cpi && cpi > 0 && !spendLow ? r2(bac / cpi) : bac;
-    const evm = {
-      bac, pv, ev, ac, cpi, spi, eac, etc: r2(Math.max(0, eac - ac)), vac: r2(bac - eac), spend_low: spendLow, series, last_spend: lastSpendKey == null ? null : `${MON[lastSpendKey % 12]} ${Math.floor(lastSpendKey / 12)}`,
-      tcpi: bac - ac > 0 ? r2((bac - ev) / (bac - ac)) : null, percent_complete: r2(doneW), percent_planned: r2(plannedW),
-      weight_total: r2(milestones.reduce((a, m) => a + n(m.weightPct), 0)),
-    };
-    const projectedCost = r2(eac * (1 + n(est?.warrantyPct) / 100));
+    const actual = r2(spend.reduce((a, x) => a + x.amount, 0));
     const margin = {
       contract_value: cv, target_pct: p.targetMarginPct == null ? null : n(p.targetMarginPct), min_pct: p.minMarginPct == null ? null : n(p.minMarginPct),
       estimate_margin_pct: cv ? r2(((cv - t.total) / cv) * 100) : null,
-      projected_margin_pct: cv && !spendLow ? r2(((cv - projectedCost) / cv) * 100) : null,
+      projected_margin_pct: cv ? r2(((cv - t.total) / cv) * 100) : null,
     };
     return {
       project: { id: p.id, code: p.code, name: p.name, client_name: p.client?.name ?? null, contract_value: cv, target_margin_pct: margin.target_pct, min_margin_pct: margin.min_pct, risk_rating: p.riskRating, start_date: p.start_date, end_date: p.end_date, type_code: p.type?.code ?? null, has_job_bom: !!p.type?.hasJobBom },
       estimate: est ? { id: est.id, version: est.version, contingency_pct: n(est.contingencyPct), warranty_pct: n(est.warrantyPct), note: est.note } : null,
       baselines, baseline: approved, changed_since_baseline: approved ? approved.total !== t.total : false,
-      lines, phases, totals: t, margin, evm,
-      milestones: milestones.map((m) => ({ id: m.id, name: m.name, weight_pct: n(m.weightPct), planned_date: m.plannedDate, done_date: m.doneDate })),
+      lines, phases, totals: t, margin, actual,
+      milestones: milestones.map((m) => ({ id: m.id, name: m.name, planned_date: m.plannedDate, done_date: m.doneDate })),
       rate_cards: rates.cards,
       suggested_contingency_pct: p.riskRating === 'HIGH' ? 20 : p.riskRating === 'LOW' ? 5 : 10,
     };
@@ -939,18 +901,11 @@ export class BudgetPlanningService {
     await this.projectOrThrow(projectId);
     const name = String(b.name ?? '').trim();
     if (!name) throw bad('Name is required.');
-    const w = Number(b.weight_pct);
-    if (!(w > 0 && w <= 100)) throw bad('Weight is a percentage between 0 and 100.');
     if (!b.planned_date) throw bad('Planned date is required.');
     const planned = new Date(b.planned_date); const done = b.done_date ? new Date(b.done_date) : null;
     if (Number.isNaN(planned.getTime())) throw bad('Enter the planned date as a real date.');
     if (done && Number.isNaN(done.getTime())) throw bad('Enter the done date as a real date.');
-    // The weights share the project's 100%; the others on the project plus this one cannot pass it
-    // (a change that does not raise the weight is always allowed, so data from before this check can still be edited)
-    const cur = id ? await this.prisma.projectMilestone.findUnique({ where: { id }, select: { weightPct: true } }) : null;
-    const others = (await this.prisma.projectMilestone.findMany({ where: { projectId, ...(id ? { NOT: { id } } : {}) }, select: { weightPct: true } })).reduce((a, m) => a + n(m.weightPct), 0);
-    if ((!cur || w > n(cur.weightPct) + 0.0001) && others + w > 100.0001) throw bad(`The milestones already use ${Math.round(others * 100) / 100}% of the project. This one can be at most ${Math.max(0, Math.round((100 - others) * 100) / 100)}%.`);
-    const data = { name, weightPct: w, plannedDate: planned, doneDate: done };
+    const data = { name, plannedDate: planned, doneDate: done };
     const row = id ? await this.prisma.projectMilestone.update({ where: { id }, data }) : await this.prisma.projectMilestone.create({ data: { ...data, projectId } });
     return { id: row.id };
   }

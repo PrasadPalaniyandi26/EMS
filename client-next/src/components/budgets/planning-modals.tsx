@@ -245,23 +245,22 @@ export function EstimatePhasesModal({ isOpen, onClose }: Base) {
 
 // ─── Milestone ───────────────────────────────────────────────────────────────
 
-export function MilestoneModal({ isOpen, onClose, projectId, editing, weightLeft }: Base & { projectId: number; editing: Milestone | null; weightLeft: number }) {
+export function MilestoneModal({ isOpen, onClose, projectId, editing }: Base & { projectId: number; editing: Milestone | null }) {
   const { saving, run } = useSaver(onClose);
-  const [name, setName] = useState(''); const [w, setW] = useState(''); const [planned, setPlanned] = useState(''); const [done, setDone] = useState('');
+  const [name, setName] = useState(''); const [planned, setPlanned] = useState(''); const [done, setDone] = useState('');
   useEffect(() => {
     if (!isOpen) return;
-    setName(editing?.name ?? ''); setW(editing ? String(editing.weight_pct) : weightLeft > 0 ? String(weightLeft) : ''); setPlanned(editing?.planned_date?.slice(0, 10) ?? ''); setDone(editing?.done_date?.slice(0, 10) ?? '');
-  }, [isOpen, editing, weightLeft]);
+    setName(editing?.name ?? ''); setPlanned(editing?.planned_date?.slice(0, 10) ?? ''); setDone(editing?.done_date?.slice(0, 10) ?? '');
+  }, [isOpen, editing]);
   return (
     <ModuleModal isOpen={isOpen} onClose={onClose} size="sm" title={editing ? 'Edit milestone' : 'Add milestone'} icon={editing ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-      canSave={!saving && !!name.trim() && Number(w) > 0 && Number(w) <= 100 && !!planned} saveLabel={editing ? 'Update milestone' : 'Add milestone'}
+      canSave={!saving && !!name.trim() && !!planned} saveLabel={editing ? 'Update milestone' : 'Add milestone'}
       onSave={() => run(() => {
-        const body = { name, weight_pct: Number(w), planned_date: planned, done_date: done || null };
+        const body = { name, planned_date: planned, done_date: done || null };
         return editing ? api.put(`/budgets/projects/${projectId}/milestones/${editing.id}`, body) : api.post(`/budgets/projects/${projectId}/milestones`, body);
       }, editing ? 'Milestone updated.' : 'Milestone added.')}>
       <div className="space-y-3">
         <Field label="Milestone" required>{text(name, setName, { maxLength: 120 })}</Field>
-        <Field label="Weight %" required hint={`${weightLeft > 0 ? `${weightLeft}% of the project is not yet assigned.` : 'The weights already add up to 100%.'}`}><Input type="number" min="0" max="100" step="0.5" className={ctl} value={w} onChange={(e) => setW(e.target.value)} /></Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Planned date" required><Input type="date" className={ctl} value={planned} onChange={(e) => setPlanned(e.target.value)} /></Field>
           <Field label="Done on"><Input type="date" className={ctl} value={done} onChange={(e) => setDone(e.target.value)} /></Field>

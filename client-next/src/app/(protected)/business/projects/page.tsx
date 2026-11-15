@@ -149,7 +149,7 @@ export default function ProjectsPage() {
           <DetailField label="Contract value" value={plain(sum((r) => r.contract_value), currency)} wide />
         </DetailGrid>
       </DetailSection>
-      <p className="text-[12px] text-[var(--shell-text-muted)]">At risk means the margin is below the minimum or the spend is over the estimate. Select a project, then Open it for its estimate, baseline, milestones and earned value.</p>
+      <p className="text-[12px] text-[var(--shell-text-muted)]">At risk means the margin is below the minimum or the spend is over the estimate. Select a project, then Open it for its estimate, baseline and milestones.</p>
     </div>
   );
 

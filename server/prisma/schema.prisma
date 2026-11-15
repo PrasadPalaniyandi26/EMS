@@ -817,7 +817,6 @@ model ProjectMilestone {
   id          Int       @id @default(autoincrement())
   projectId   Int       @map("project_id")
   name        String    @db.VarChar(120)
-  weightPct   Decimal   @map("weight_pct") @db.Decimal(5, 2)
   plannedDate DateTime  @map("planned_date") @db.Date
   doneDate    DateTime? @map("done_date") @db.Date
 

@@ -36,8 +36,7 @@ export interface BaselineRow {
   id: number; status: 'PROPOSED' | 'APPROVED' | 'REJECTED' | 'SUPERSEDED'; direct: number; contingency: number; warranty: number; total: number; line_count: number;
   proposed_by_name: string | null; created_at: string; approved_by_name: string | null; approved_at: string | null; rejected_by_name: string | null; rejected_at: string | null; reject_reason: string | null;
 }
-export interface Milestone { id: number; name: string; weight_pct: number; planned_date: string; done_date: string | null }
-export interface Evm { bac: number; pv: number; ev: number; ac: number; cpi: number | null; spi: number | null; eac: number; etc: number; vac: number; tcpi: number | null; spend_low: boolean; series: { label: string; pv: number; ev: number | null; ac: number | null }[]; last_spend: string | null; percent_complete: number; percent_planned: number; weight_total: number }
+export interface Milestone { id: number; name: string; planned_date: string; done_date: string | null }
 
 export interface ProjectBudget {
   project: { id: number; code: string | null; name: string; client_name: string | null; contract_value: number | null; target_margin_pct: number | null; min_margin_pct: number | null; risk_rating: string | null; start_date: string | null; end_date: string | null; type_code: string | null; has_job_bom: boolean };
@@ -46,7 +45,7 @@ export interface ProjectBudget {
   lines: EstimateLineRow[]; phases: { phase: string; amount: number }[];
   totals: { direct: number; contingency: number; warranty: number; total: number };
   margin: { contract_value: number | null; target_pct: number | null; min_pct: number | null; estimate_margin_pct: number | null; projected_margin_pct: number | null };
-  evm: Evm; milestones: Milestone[]; rate_cards: RateCard[]; suggested_contingency_pct: number;
+  actual: number; milestones: Milestone[]; rate_cards: RateCard[]; suggested_contingency_pct: number;
 }
 
 export interface ItemUse { kind: 'PRODUCT' | 'JOB' | 'ORDER'; id: number; code: string | null; name: string; client_name: string | null; quantity: number; scrap_pct: number; line_cost: number }
