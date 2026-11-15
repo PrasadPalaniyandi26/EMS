@@ -303,7 +303,8 @@ describe('Client invoicing (e2e)', () => {
   });
 
   describe('a project and an order', () => {
-    let projectId: number; let orderId: number;
+    // -1 matches no row; an undefined id in these deleteMany filters would match every project and order
+    let projectId = -1; let orderId = -1;
     beforeAll(async () => {
       projectId = (await prisma.project.create({ data: { clientId: tnClient, name: 'ZZ Billing project', contractValue: 10000 } })).id;
       const product = await prisma.product.findFirstOrThrow();

@@ -62,13 +62,13 @@ export const COST_COLUMN ='md:border-l md:border-[var(--shell-border)] md:pl-6';
 export function ProjectSettingsModal({ isOpen, onClose, data }: Base & { data: ProjectBudget | undefined }) {
   const { saving, run } = useSaver(onClose);
   const [cv, setCv] = useState(''); const [tm, setTm] = useState(''); const [mn, setMn] = useState(''); const [risk, setRisk] = useState('');
-  const [cont, setCont] = useState(''); const [war, setWar] = useState('');
+  const [cont, setCont] = useState(''); const [war, setWar] = useState(''); const [reason, setReason] = useState('');
   // Fill the fields when the dialog opens only, so a refresh in the background never wipes what is being typed
   const latest = useRef(data); latest.current = data;
   useEffect(() => {
     const d = latest.current;
     if (!isOpen || !d) return;
-    setCv(d.project.contract_value != null ? String(d.project.contract_value) : '');
+    setCv(d.project.contract_value != null ? String(d.project.contract_value) : ''); setReason('');
     setTm(d.project.target_margin_pct != null ? String(d.project.target_margin_pct) : '');
     setMn(d.project.min_margin_pct != null ? String(d.project.min_margin_pct) : '');
     setRisk(d.project.risk_rating ?? '');
@@ -89,13 +89,17 @@ export function ProjectSettingsModal({ isOpen, onClose, data }: Base & { data: P
   const warAmt = allowOk && est ? (direct + contAmt) * (warN / 100) : 0;
   const total = direct + contAmt + warAmt;
   const hasCv = cv !== '' && cvOk && cvN > 0;
+  // The first price needs no reason; changing a price that was already agreed does
+  const was = data?.project.contract_value ?? null;
+  const priceChanged = cvOk && (cv === '' ? null : cvN) !== was;
+  const needsReason = was != null && priceChanged;
   const margin = est && allowOk && hasCv ? ((cvN - total) / cvN) * 100 : null;
   const target = tm !== '' && tmOk ? tmN : null;
   const floor = mn !== '' && mnOk ? mnN : null;
   return (
-    <ModuleModal isOpen={isOpen} onClose={onClose} title="Price and costing" icon={<Pencil className="h-4 w-4" />} size={est ? 'xl' : 'sm'} saveLabel="Save changes" canSave={!saving && cvOk && tmOk && mnOk && orderOk && allowOk}
+    <ModuleModal isOpen={isOpen} onClose={onClose} title="Price and costing" icon={<Pencil className="h-4 w-4" />} size={est ? 'xl' : 'sm'} saveLabel="Save changes" canSave={!saving && cvOk && tmOk && mnOk && orderOk && allowOk && (!needsReason || !!reason.trim())}
       onSave={() => run(() => api.put(`/budgets/projects/${data!.project.id}/settings`, {
-        contract_value: cv === '' ? null : Number(cv), target_margin_pct: tm === '' ? null : Number(tm), min_margin_pct: mn === '' ? null : Number(mn), risk_rating: risk || null,
+        contract_value: cv === '' ? null : Number(cv), ...(needsReason ? { price_reason: reason.trim() } : {}), target_margin_pct: tm === '' ? null : Number(tm), min_margin_pct: mn === '' ? null : Number(mn), risk_rating: risk || null,
         ...(est ? { contingency_pct: Number(cont), warranty_pct: Number(war) } : {}),
       }), 'Project updated.')}>
       <div className={pricingGrid(!!est)}>
@@ -103,6 +107,7 @@ export function ProjectSettingsModal({ isOpen, onClose, data }: Base & { data: P
           <SectionHeader label="Contract price" />
           <div className="space-y-3">
             <Field label="Contract value" hint="What the client pays for the project." error={!cvOk ? 'Enter zero or more.' : undefined}><CurrencyInput value={cv} onChange={setCv} /></Field>
+            {needsReason && <Field label="Reason for the change" required hint="For example: extra scope agreed with the client. It is kept with the price history.">{text(reason, setReason, { maxLength: 300 })}</Field>}
             <div className="grid grid-cols-2 gap-3">
               <Field label="Target margin %" hint="Your goal for the project." error={!tmOk ? 'Enter 0 to 100.' : undefined}><Input type="number" min="0" max="100" step="0.5" className={ctl} value={tm} onChange={(e) => setTm(e.target.value)} /></Field>
               <Field label="Minimum margin %" hint="Below this is flagged." error={!mnOk ? 'Enter 0 up to 100.' : !orderOk ? 'Cannot be above the target.' : undefined}><Input type="number" min="0" max="99.99" step="0.5" className={ctl} value={mn} onChange={(e) => setMn(e.target.value)} /></Field>

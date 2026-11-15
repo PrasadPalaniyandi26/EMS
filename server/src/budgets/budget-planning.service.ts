@@ -682,13 +682,14 @@ export class BudgetPlanningService {
 
   async project(id: number) {
     const p = await this.projectOrThrow(id);
-    const [est, milestones, spend, lk, rates, baseRows] = await Promise.all([
+    const [est, milestones, spend, lk, rates, baseRows, priceRows] = await Promise.all([
       this.prisma.costEstimate.findFirst({ where: { projectId: id }, orderBy: { version: 'desc' }, include: { lines: { orderBy: { id: 'asc' } } } }),
       this.prisma.projectMilestone.findMany({ where: { projectId: id }, orderBy: { plannedDate: 'asc' } }),
       this.budgets.partsWhere({ status: 'APPROVED', projectId: id }),
       this.prisma.categoryType.findMany({ select: { id: true, name: true, code: true } }),
       this.rates(),
       this.prisma.estimateBaseline.findMany({ where: { projectId: id }, orderBy: { id: 'desc' } }),
+      this.prisma.projectPriceChange.findMany({ where: { projectId: id }, orderBy: { id: 'desc' } }),
     ]);
     const types = new Map(lk.map((t) => [t.id, t]));
     const lines = (est?.lines ?? []).map((l) => ({
@@ -716,6 +717,7 @@ export class BudgetPlanningService {
       estimate: est ? { id: est.id, version: est.version, contingency_pct: n(est.contingencyPct), warranty_pct: n(est.warrantyPct), note: est.note } : null,
       baselines, baseline: approved, changed_since_baseline: approved ? approved.total !== t.total : false,
       lines, phases, totals: t, margin, actual,
+      price_changes: priceRows.map((c) => ({ id: c.id, old_value: c.oldValue == null ? null : n(c.oldValue), new_value: c.newValue == null ? null : n(c.newValue), reason: c.reason, changed_by_name: c.changedByName, changed_at: c.changedAt })),
       milestones: milestones.map((m) => ({ id: m.id, name: m.name, planned_date: m.plannedDate, done_date: m.doneDate })),
       rate_cards: rates.cards,
       suggested_contingency_pct: p.riskRating === 'HIGH' ? 20 : p.riskRating === 'LOW' ? 5 : 10,
@@ -723,12 +725,20 @@ export class BudgetPlanningService {
   }
 
   async saveProjectSettings(id: number, b: any, user: Actor) {
-    await this.projectOrThrow(id);
+    const project = await this.projectOrThrow(id);
     const data: any = {};
     const blank = (v: any) => v === '' || v === null;
+    let priceChange: { oldValue: number | null; newValue: number | null; reason: string | null } | null = null;
     if (b.contract_value !== undefined) {
       data.contractValue = blank(b.contract_value) ? null : Number(b.contract_value);
       if (data.contractValue != null && (!Number.isFinite(data.contractValue) || data.contractValue < 0)) throw bad('Contract value must be zero or more.');
+      const was = project.contractValue == null ? null : n(project.contractValue);
+      if (r2(data.contractValue ?? 0) !== r2(was ?? 0) || (data.contractValue == null) !== (was == null)) {
+        const reason = String(b.price_reason ?? '').trim().slice(0, 300);
+        // The first price needs no reason; changing a price that was already agreed does
+        if (was != null && !reason) throw bad('Give a reason for changing the contract price.');
+        priceChange = { oldValue: was, newValue: data.contractValue, reason: reason || null };
+      }
     }
     if (b.target_margin_pct !== undefined) {
       data.targetMarginPct = blank(b.target_margin_pct) ? null : Number(b.target_margin_pct);
@@ -752,6 +762,7 @@ export class BudgetPlanningService {
       data.riskRating = b.risk_rating || null;
     }
     await this.prisma.project.update({ where: { id }, data });
+    if (priceChange) await this.prisma.projectPriceChange.create({ data: { projectId: id, ...priceChange, changedById: user.id, changedByName: user.username ?? null } });
     const est = await this.currentEstimate(id, false);
     if (est && (b.contingency_pct !== undefined || b.warranty_pct !== undefined)) {
       await this.prisma.costEstimate.update({ where: { id: est.id }, data: {
@@ -807,14 +818,18 @@ export class BudgetPlanningService {
     if (latest && n(latest.total) === t.total) {
       throw bad(`The estimate is unchanged since ${latest.status === 'APPROVED' ? 'the approved baseline' : 'the latest proposal'}. Change a line first.`, HttpStatus.CONFLICT);
     }
-    const row = await this.prisma.estimateBaseline.create({
+    // Only one proposal waits for approval at a time: a new one replaces any older pending one
+    const [, row] = await this.prisma.$transaction([
+      this.prisma.estimateBaseline.updateMany({ where: { projectId, status: 'PROPOSED' }, data: { status: 'SUPERSEDED' } }),
+      this.prisma.estimateBaseline.create({
       data: {
         projectId, direct: t.direct, contingency: t.contingency, warranty: t.warranty, total: t.total,
         contingencyPct: full.contingencyPct, warrantyPct: full.warrantyPct,
         lines: full.lines.map((l) => ({ phase: l.phase, type_id: l.typeId, description: l.description, quantity: n(l.quantity), unit: l.unit, rate: n(l.rate), basis: l.basis })),
         proposedById: user.id, proposedByName: user.username ?? null,
       },
-    });
+      }),
+    ]);
     this.log('estimate_baselines', row.id, 'INSERT', user.id, t);
     return { id: row.id };
   }

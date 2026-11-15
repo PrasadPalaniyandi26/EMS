@@ -189,7 +189,26 @@ export default function ProjectBudgetPage() {
           <DetailField label="Waiting for approval" value={data.baselines.filter((b) => b.status === 'PROPOSED').length} />
         </DetailGrid>
       </DetailSection>
-      <p className="text-[12px] text-[var(--shell-text-muted)]">{proposed ? 'Select the proposed baseline in the table to approve or reject it.' : est ? 'Propose a baseline to fix the estimate as the reference.' : 'Build an estimate first.'}</p>
+      <DetailSection title="Contract price">
+        <DetailGrid>
+          <DetailField label="Contract price" value={m?.contract_value != null ? money(m.contract_value, currency) : 'Not set'} />
+          <DetailField label="Margin at estimate" value={m?.estimate_margin_pct != null ? `${m.estimate_margin_pct.toFixed(1)}%` : '–'} tone={marginTone} />
+        </DetailGrid>
+        {data.price_changes.length === 0
+          ? <p className="text-[12px] text-[var(--shell-text-muted)]">No price changes yet. Change the price under Price and costing, and the reason is kept here.</p>
+          : (
+            <ul className="space-y-2">
+              {data.price_changes.map((c) => (
+                <li key={c.id} className="text-[13px]">
+                  <span className="tabular-nums">{c.old_value != null ? `${money(c.old_value, currency)} to ` : 'Set to '}{c.new_value != null ? money(c.new_value, currency) : 'not set'}</span>
+                  <span className="text-[var(--shell-text-muted)]"> on {formatDate(c.changed_at)}{c.changed_by_name ? ` by ${c.changed_by_name}` : ''}</span>
+                  {c.reason && <p className="text-[12px] text-[var(--shell-text-muted)]">{c.reason}</p>}
+                </li>
+              ))}
+            </ul>
+          )}
+      </DetailSection>
+      <p className="text-[12px] text-[var(--shell-text-muted)]">{proposed ? 'Select the proposed baseline in the table to approve or reject it.' : est ? 'Propose a baseline to fix the estimate as the reference. If the scope grows, raise the contract price under Price and costing, then propose a new baseline.' : 'Build an estimate first.'}</p>
     </div>
   );
 

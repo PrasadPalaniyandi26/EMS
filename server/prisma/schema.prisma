@@ -813,6 +813,21 @@ model EstimateBaseline {
   @@map("estimate_baselines")
 }
 
+// Every change to a project's contract price, with the reason; the first price set needs none
+model ProjectPriceChange {
+  id            Int      @id @default(autoincrement())
+  projectId     Int      @map("project_id")
+  oldValue      Decimal? @map("old_value") @db.Decimal(14, 2)
+  newValue      Decimal? @map("new_value") @db.Decimal(14, 2)
+  reason        String?  @db.VarChar(300)
+  changedById   Int?     @map("changed_by_id")
+  changedByName String?  @map("changed_by_name") @db.VarChar(100)
+  changedAt     DateTime @default(now()) @map("changed_at")
+
+  @@index([projectId])
+  @@map("project_price_changes")
+}
+
 model ProjectMilestone {
   id          Int       @id @default(autoincrement())
   projectId   Int       @map("project_id")

@@ -59,6 +59,7 @@ describe('Costing flows (e2e)', () => {
     await prisma.estimateLine.deleteMany({ where: { estimate: { projectId: { in: projects } } } });
     await prisma.costEstimate.deleteMany({ where: { projectId: { in: projects } } });
     await prisma.projectMilestone.deleteMany({ where: { projectId: { in: projects } } });
+    await prisma.projectPriceChange.deleteMany({ where: { projectId: { in: projects } } });
     await prisma.product.deleteMany({ where: { id: { in: products } } });
     await prisma.project.deleteMany({ where: { id: { in: projects } } });
     await prisma.itemPriceLog.deleteMany({ where: { item: { partNo: { startsWith: 'ZZ-' } } } });
@@ -220,6 +221,35 @@ describe('Costing flows (e2e)', () => {
       expect((await call('post', `/budgets/baselines/${baselineId}/approve`, finance)).status).toBe(201);
       const row = await prisma.estimateBaseline.findUniqueOrThrow({ where: { id: baselineId } });
       expect(row.status).toBe('APPROVED');
+    });
+
+    it('a new proposal replaces the pending one, so only one waits for approval', async () => {
+      const before = baselineId;
+      await call('post', `/budgets/projects/${projectId}/estimate-lines`, finance, { phase: 'Delivery', description: 'ZZ extra scope', quantity: 1, rate: 500, unit: 'nos' });
+      const next = data(await call('post', `/budgets/projects/${projectId}/baseline`, operations)).id;
+      expect(next).not.toBe(before);
+      expect((await prisma.estimateBaseline.findUniqueOrThrow({ where: { id: next } })).status).toBe('PROPOSED');
+      await call('post', `/budgets/projects/${projectId}/estimate-lines`, finance, { phase: 'Delivery', description: 'ZZ more scope', quantity: 1, rate: 700, unit: 'nos' });
+      const last = data(await call('post', `/budgets/projects/${projectId}/baseline`, operations)).id;
+      expect((await prisma.estimateBaseline.findUniqueOrThrow({ where: { id: next } })).status).toBe('SUPERSEDED');
+      expect((await prisma.estimateBaseline.findUniqueOrThrow({ where: { id: last } })).status).toBe('PROPOSED');
+      expect((await prisma.estimateBaseline.findUniqueOrThrow({ where: { id: before } })).status).toBe('APPROVED');
+      expect((await call('post', `/budgets/baselines/${last}/approve`, finance)).status).toBe(201);
+      expect((await prisma.estimateBaseline.findUniqueOrThrow({ where: { id: before } })).status).toBe('SUPERSEDED');
+    });
+
+    it('changing an agreed contract price needs a reason and is kept as history', async () => {
+      const put = (b: Record<string, unknown>) => call('put', `/budgets/projects/${projectId}/settings`, finance, b);
+      await prisma.project.update({ where: { id: projectId }, data: { contractValue: null } });
+      expect((await put({ contract_value: 1000000 })).status).toBe(200);
+      expect((await put({ contract_value: 1200000 })).status).toBe(400);
+      expect((await put({ contract_value: 1200000, price_reason: '   ' })).status).toBe(400);
+      expect((await put({ contract_value: 1200000, price_reason: 'ZZ extra scope agreed' })).status).toBe(200);
+      expect((await put({ contract_value: 1200000, risk_rating: 'LOW' })).status).toBe(200);
+      const changes = data(await call('get', `/budgets/projects/${projectId}`, finance)).price_changes;
+      expect(changes.length).toBeGreaterThanOrEqual(2);
+      expect(changes[0]).toMatchObject({ old_value: 1000000, new_value: 1200000, reason: 'ZZ extra scope agreed' });
+      expect(changes[1]).toMatchObject({ old_value: null, new_value: 1000000, reason: null });
     });
 
     it('milestones need a name and real dates, and show on the project', async () => {

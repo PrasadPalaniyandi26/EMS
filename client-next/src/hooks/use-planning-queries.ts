@@ -42,6 +42,7 @@ export interface ProjectBudget {
   project: { id: number; code: string | null; name: string; client_name: string | null; contract_value: number | null; target_margin_pct: number | null; min_margin_pct: number | null; risk_rating: string | null; start_date: string | null; end_date: string | null; type_code: string | null; has_job_bom: boolean };
   estimate: { id: number; version: number; contingency_pct: number; warranty_pct: number; note: string | null } | null;
   baselines: BaselineRow[]; baseline: BaselineRow | null; changed_since_baseline: boolean;
+  price_changes: { id: number; old_value: number | null; new_value: number | null; reason: string | null; changed_by_name: string | null; changed_at: string }[];
   lines: EstimateLineRow[]; phases: { phase: string; amount: number }[];
   totals: { direct: number; contingency: number; warranty: number; total: number };
   margin: { contract_value: number | null; target_pct: number | null; min_pct: number | null; estimate_margin_pct: number | null; projected_margin_pct: number | null };
