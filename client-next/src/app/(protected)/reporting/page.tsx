@@ -19,7 +19,6 @@ import {
   CalendarRange, FileWarning, Boxes, Percent, Ruler, Hourglass, BookText,
   FileSpreadsheet, ScrollText, Coins, Landmark, Calculator, ClipboardList, Briefcase, Clock, Play,
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { RecordLink, TabBar, useTabParam } from '@/components/budgets/budget-ui';
@@ -355,26 +354,32 @@ export default function ReportingPage() {
     return out;
   };
 
-  const exportExcel = () => {
+  const exportExcel = async () => {
     if (!result) return;
     const words = filterWords();
     const head: string[][] = [[result.title], [`Period: ${periodText}`], ...(words.length ? [[`Filters: ${words.join('; ')}`]] : []), [`Generated: ${new Date().toLocaleString()}`], []];
     const body: unknown[][] = filteredRows.map((row) => result.columns.map((c) => row[c] ?? ''));
     if (withTotals) body.push(result.columns.map((c, ci) => totalCell(c, ci)));
-    const sheetData: unknown[][] = [...head, result.columns, ...body, ...(result.note ? [[], [result.note]] : [])];
-    const ws = XLSX.utils.aoa_to_sheet(sheetData);
     // Numbers stay numbers, with a format: two decimals and separators for money, a percent sign for percentages
-    const first = head.length + 1;
-    for (let r = first; r < first + body.length; r++) {
-      result.columns.forEach((col, c) => {
-        const cell = ws[XLSX.utils.encode_cell({ r, c })];
-        if (cell && typeof cell.v === 'number') cell.z = CURRENCY_COLS.has(col) ? '#,##0.00' : isPctCol(col) ? '0.00"%"' : '#,##0.##';
-      });
+    const asCell = (col: string, v: unknown) => {
+      if (v === null || v === undefined || v === '') return null;
+      if (typeof v === 'number') return { value: v, format: CURRENCY_COLS.has(col) ? '#,##0.00' : isPctCol(col) ? '0.00"%"' : '#,##0.##' };
+      return String(v);
+    };
+    const sheetData = [
+      ...head,
+      result.columns,
+      ...body.map((r) => r.map((v, i) => asCell(result.columns[i], v))),
+      ...(result.note ? [[], [result.note]] : []),
+    ];
+    const columns = result.columns.map((c) => ({ width: Math.min(42, Math.max(c.length, ...filteredRows.slice(0, 200).map((row) => shownText(c, row[c]).length)) + 2) }));
+    try {
+      // Loaded on demand so it is not part of the page's first download
+      const { default: writeExcelFile } = await import('write-excel-file/browser');
+      await writeExcelFile(sheetData, { sheet: result.title.replace(/[\\/?*[\]:]/g, ' ').slice(0, 31), columns }).toFile(`${result.title.replace(/\s+/g, '_')}.xlsx`);
+    } catch {
+      toast.error('The Excel file could not be created. Try the CSV export instead.');
     }
-    ws['!cols'] = result.columns.map((c) => ({ wch: Math.min(42, Math.max(c.length, ...filteredRows.slice(0, 200).map((row) => shownText(c, row[c]).length)) + 2) }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, result.title.replace(/[\\/?*[\]:]/g, ' ').slice(0, 31));
-    XLSX.writeFile(wb, `${result.title.replace(/\s+/g, '_')}.xlsx`);
   };
 
   const exportPDF = () => {
