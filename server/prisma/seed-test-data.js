@@ -1,17 +1,17 @@
 /**
  * Test-data seed for local development and UI review.
- * Run AFTER prisma/seed.js:  node prisma/seed-test-data.js
+ * Run AFTER prisma/seed.js:  npx tsx prisma/seed-test-data.js
  *
  * Creates sample users (every role), clients, projects, products, ~100 transactions
- * in every workflow state, budgets, recurring schedules, approvals, notifications
+ * in every workflow state, recurring schedules, approvals, notifications
  * and audit entries. All test users share the password below.
  * Idempotent: exits without changes if the test users already exist.
  * Data is deterministic (seeded RNG), so every run produces the same dataset.
  */
-const { PrismaClient } = require('@prisma/client');
+const { newPrisma } = require('./seed-client');
 const bcrypt = require('bcryptjs');
 
-const prisma = new PrismaClient();
+const prisma = newPrisma();
 const TEST_PASSWORD = 'Test@1234';
 
 // ── deterministic RNG ──
@@ -232,29 +232,6 @@ async function main() {
   }
   console.log(`  transactions: ${created}`);
 
-  // ── Budgets (current + previous month; some intentionally tight) ──
-  let budgets = 0;
-  const budgetOwners = ['emp1', 'emp2', 'emp3', 'emp4', 'mgr1', 'mgr2', 'fin1', 'admin'];
-  for (const [mIdx, month] of [[0, 10], [1, 9]]) {
-    for (const uname of budgetOwners) {
-      for (const cat of expCats.slice(0, 4)) {
-        const limit = pick([3000, 8000, 15000, 40000]);
-        await prisma.budget.create({
-          data: {
-            userId: users[uname].id, categoryId: cat, monthlyLimit: limit, amount: limit, periodMonth: month, periodYear: 2026,
-            code: `BUD-${month}-${users[uname].id}-${cat}`, name: `${uname} category ${cat} - ${month}/2026`,
-            department: users[uname].department, owner_id: users[uname].managerId || users.fin1.id, financial_year: 2026,
-            start_date: new Date(Date.UTC(2026, month - 1, 1)), end_date: new Date(Date.UTC(2026, month, 0)),
-            strict_enforcement: mIdx === 0 ? rnd() > 0.5 : false, auto_rollover: rnd() > 0.7,
-          },
-        });
-        budgets++;
-      }
-      await prisma.monthlyBudgetSetting.create({ data: { userId: users[uname].id, periodMonth: month, periodYear: 2026, additionalAllocation: between(0, 5) * 1000, rolloverEnabled: rnd() > 0.5 } });
-    }
-  }
-  console.log(`  budgets: ${budgets}`);
-
   // ── Recurring schedules ──
   const rec = async (data) => prisma.recurringTransaction.create({ data: { currency: 'INR', contextType: 'project', ...data } });
   const acme = clients[0];
@@ -280,7 +257,7 @@ async function main() {
   for (const [u, type, title, message] of notif) await prisma.notification.create({ data: { userId: u.id, type, title, message, isRead: rnd() > 0.6 } });
 
   // ── Reset sequences ──
-  for (const [t, c] of [['users', 'id'], ['clients', 'id'], ['projects', 'id'], ['products', 'id'], ['transactions', 'id'], ['budgets', 'id'], ['recurring_transactions', 'id'], ['approval_requests', 'request_id']]) {
+  for (const [t, c] of [['users', 'id'], ['clients', 'id'], ['projects', 'id'], ['products', 'id'], ['transactions', 'id'], ['recurring_transactions', 'id'], ['approval_requests', 'request_id']]) {
     await prisma.$executeRawUnsafe(`SELECT setval(pg_get_serial_sequence('${t}', '${c}'), COALESCE(MAX(${c}), 1)) FROM ${t}`);
   }
 

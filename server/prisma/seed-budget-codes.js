@@ -7,9 +7,9 @@
  * OVERHEAD); it is enforced when an expense is entered and when a budget line is added.
  * Today's categories are left untouched; they are re-pointed once the mapping is confirmed.
  */
-const { PrismaClient } = require('@prisma/client');
+const { newPrisma } = require('./seed-client');
 
-const prisma = new PrismaClient();
+const prisma = newPrisma();
 
 const EXPENSE = [
   ['E100', 'General Administration', 'PROJECT,OVERHEAD', [

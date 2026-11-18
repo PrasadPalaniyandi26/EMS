@@ -235,7 +235,24 @@ describe('Part master (e2e)', () => {
   });
 
   describe('project-only parts', () => {
-    const JOB_PROJECT = 10;
+    // Any project whose type uses a job BOM; one is made for the run (and removed) when the database has none
+    let JOB_PROJECT = 0;
+    let madeJobProject = false;
+    beforeAll(async () => {
+      const existing = await prisma.project.findFirst({ where: { isActive: true, type: { hasJobBom: true } } });
+      if (existing) { JOB_PROJECT = existing.id; return; }
+      const type = await prisma.projectType.findFirstOrThrow({ where: { hasJobBom: true } });
+      const client = await prisma.client.findFirstOrThrow({ where: { isActive: true, isSystem: false } });
+      JOB_PROJECT = (await prisma.project.create({ data: { clientId: client.id, typeId: type.id, name: 'ZZ Job project' } })).id;
+      madeJobProject = true;
+    });
+    afterAll(async () => {
+      if (!madeJobProject) return;
+      await cleanup();
+      await prisma.bomLine.deleteMany({ where: { bom: { projectId: JOB_PROJECT } } });
+      await prisma.bom.deleteMany({ where: { projectId: JOB_PROJECT } });
+      await prisma.project.delete({ where: { id: JOB_PROJECT } });
+    });
 
     it('is created from the job BOM, listed for that project and the Part master only', async () => {
       const made = await call('post', `/budgets/projects/${JOB_PROJECT}/job-bom/parts`, admin, { part_no: 'ZZ-P1', name: 'One-off', sourcing: 'BUY', standard_price: 50, uom: 'nos', oem_part_no: 'OEM-P1' });

@@ -6,6 +6,7 @@
 # Dependencies & build output
 node_modules/
 server/dist/
+server/src/generated/
 client-next/.next/
 client-next/out/
 

@@ -1,5 +1,5 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { cleanText } from '../common/helpers/master-data';
@@ -391,8 +391,8 @@ export class InvoicingService {
 
     await this.prisma.$transaction(async (tx) => {
       // The counter row is locked by this update until the transaction ends, so two invoices can never take the same number
-      const next = await tx.$queryRaw<{ last_seq: number }[]>`UPDATE invoice_counter SET last_seq = last_seq + 1 WHERE id = 1 RETURNING last_seq`;
-      const seq = next[0]?.last_seq;
+      const counter = await tx.invoiceCounter.update({ where: { id: 1 }, data: { lastSeq: { increment: 1 } } }).catch(() => null);
+      const seq = counter?.lastSeq;
       if (!seq) throw bad('The invoice counter is missing.', HttpStatus.INTERNAL_SERVER_ERROR);
       await tx.invoiceLine.deleteMany({ where: { invoiceId: id } });
       await tx.invoice.update({

@@ -272,27 +272,21 @@ export class UsersService {
 
   async findManagersAndAdmins(viewer?: { id: number; role_name?: string }) {
     const showEmail = (viewer?.role_name || '').toUpperCase() === ROLES.ADMIN;
-    const rows = await this.prisma.$queryRaw<any[]>`
-      SELECT DISTINCT u.id, u.username, u.email, u.role, def_r.role_name
-      FROM users u
-      LEFT JOIN roles def_r ON u.role_id = def_r.role_id
-      WHERE u.user_status != 'INACTIVE'
-        AND (
-          def_r.role_name IN ('MANAGER', 'ADMIN')
-          OR EXISTS (
-            SELECT 1 FROM user_roles ur
-            JOIN roles r ON ur.role_id = r.role_id
-            WHERE ur.user_id = u.id AND r.role_name IN ('MANAGER', 'ADMIN')
-          )
-        )
-      ORDER BY u.username
-    `;
+    const names = { in: ['MANAGER', 'ADMIN'] };
+    const rows = await this.prisma.user.findMany({
+      where: {
+        userStatus: { not: 'INACTIVE' },
+        OR: [{ roleRelation: { name: names } }, { userRoles: { some: { role: { name: names } } } }],
+      },
+      select: { id: true, username: true, email: true, role: true, roleRelation: { select: { name: true } } },
+      orderBy: { username: 'asc' },
+    });
     return rows.map((u) => ({
       id: u.id,
       username: u.username,
       email: showEmail || !viewer ? u.email : undefined,
       role: u.role,
-      role_name: u.role_name,
+      role_name: u.roleRelation?.name ?? null,
     }));
   }
 
@@ -333,22 +327,13 @@ export class UsersService {
   }
 
   async setPermissions(userId: number, data: any) {
-    // Raw SQL needed: Prisma doesn't support ON CONFLICT upsert with ::jsonb cast cleanly
-    await this.prisma.$executeRawUnsafe(
-      `INSERT INTO user_permissions (user_id, permissions, single_limit, monthly_limit, data_scope)
-       VALUES ($1, $2::jsonb, $3, $4, $5)
-       ON CONFLICT (user_id) DO UPDATE SET
-         permissions = EXCLUDED.permissions,
-         single_limit = EXCLUDED.single_limit,
-         monthly_limit = EXCLUDED.monthly_limit,
-         data_scope = EXCLUDED.data_scope,
-         updated_at = NOW()`,
-      userId,
-      JSON.stringify(data.permissions || {}),
-      Number(data.single_limit) || 10000,
-      Number(data.monthly_limit) || 50000,
-      data.data_scope || 'Department',
-    );
+    const fields = {
+      permissions: data.permissions || {},
+      singleLimit: Number(data.single_limit) || 10000,
+      monthlyLimit: Number(data.monthly_limit) || 50000,
+      dataScope: data.data_scope || 'Department',
+    };
+    await this.prisma.userPermission.upsert({ where: { userId }, create: { userId, ...fields }, update: fields });
     return this.getPermissions(userId);
   }
 

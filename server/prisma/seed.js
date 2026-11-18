@@ -3,10 +3,10 @@
  * Seeds the PostgreSQL database with essential initial data.
  * Run with: npx prisma db seed
  */
-const { PrismaClient } = require('@prisma/client');
+const { newPrisma } = require('./seed-client');
 const bcrypt = require('bcryptjs');
 
-const prisma = new PrismaClient();
+const prisma = newPrisma();
 
 async function main() {
   console.log('🌱 Seeding database...\n');
@@ -21,12 +21,12 @@ async function main() {
     { id: 6, name: 'OPERATIONS', description: 'Prepares budget plans, project estimates, build plans and build orders' },
   ];
 
+  // Matched by name. The intended id is kept when it is free; on a fresh database a migration may already
+  // have used it for CONFIGURATOR / OPERATIONS, so the role then takes the next free id. Nothing depends on the numbers.
   for (const role of coreRoles) {
-    await prisma.role.upsert({
-      where: { name: role.name },
-      update: {},
-      create: role,
-    });
+    if (await prisma.role.findUnique({ where: { name: role.name } })) continue;
+    const idTaken = await prisma.role.findUnique({ where: { id: role.id } });
+    await prisma.role.create({ data: idTaken ? { name: role.name, description: role.description } : role });
   }
   console.log('  ✓ Roles seeded (ADMIN, FINANCE, MANAGER, EMPLOYEE, CONFIGURATOR, OPERATIONS)');
 
@@ -131,6 +131,7 @@ async function main() {
 
   // ── 8. Admin User ──
   const passwordHash = await bcrypt.hash('admin123', 12);
+  const adminRole = await prisma.role.findUniqueOrThrow({ where: { name: 'ADMIN' } });
   await prisma.user.upsert({
     where: { username: 'admin' },
     update: { loginName: 'admin' },
@@ -140,7 +141,7 @@ async function main() {
       email: 'admin@fmh.local',
       passwordHash: passwordHash,
       role: 'admin',
-      roleId: 1,
+      roleId: adminRole.id,
       isActive: true,
       currency: 'INR',
     },

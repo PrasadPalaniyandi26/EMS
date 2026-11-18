@@ -104,8 +104,14 @@ describe('Settings and system (e2e)', () => {
       const before = await prisma.auditLog.count({ where: { tableName: 'users', recordId: emp.id } });
       const r = await put(token, '/users/me/profile', { password: 'Test@1234', currentPassword: 'Test@1234' });
       expect(r.status).toBe(200);
+      // The server writes the audit entry in the background, so wait for it before reading it
+      let count = before;
+      for (let i = 0; i < 30 && count < before + 1; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        count = await prisma.auditLog.count({ where: { tableName: 'users', recordId: emp.id } });
+      }
+      expect(count).toBe(before + 1);
       const logs = await prisma.auditLog.findMany({ where: { tableName: 'users', recordId: emp.id }, orderBy: { id: 'desc' }, take: 1 });
-      expect(await prisma.auditLog.count({ where: { tableName: 'users', recordId: emp.id } })).toBe(before + 1);
       expect(logs[0].newValues).toContain('password_changed');
       expect(JSON.stringify(logs[0])).not.toMatch(/\$2[aby]\$/);
     });

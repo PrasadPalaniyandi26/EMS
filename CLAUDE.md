@@ -71,8 +71,10 @@ cd client-next && npm run build && npm run start
 docker compose up -d                  # starts ems-db on 127.0.0.1:5437
 cd server
 npx prisma migrate deploy             # applies prisma/migrations
-node prisma/seed.js                   # roles, categories, Internal client, admin
-node prisma/seed-test-data.js         # optional: sample users, clients, 117 transactions, budgets, recurring
+npx tsx prisma/seed.js                # roles, categories, Internal client, admin
+npx tsx prisma/seed-budget-codes.js    # NTEMS cost codes: expense, product and project types and categories
+npx tsx prisma/seed-costing-setup.js  # rate cards, overhead pools, item categories and the current-year budget plan (the e2e tests need these)
+npx tsx prisma/seed-test-data.js      # optional: sample users, clients, ~130 transactions, recurring schedules (budget plans are created in the app)
 node prisma/seed-test-orders.js       # optional, API running: 10 customer orders (delivered, late, in build, at risk, cancelled), created through the API
 ```
 Test users (password `Test@1234`): `fin1`, `fin2`, `mgr1`, `mgr2`, `emp1`–`emp4`, `emp5` (ON_HOLD). `admin` / `admin123` is unchanged. `seed-test-data.js` is idempotent; to reseed from scratch run `docker compose down -v` first.
@@ -80,24 +82,29 @@ Test users (password `Test@1234`): `fin1`, `fin2`, `mgr1`, `mgr2`, `emp1`–`emp
 ### Seed
 ```bash
 cd server
-node prisma/seed.js     # NOT npx prisma db seed (not configured in package.json)
+npx tsx prisma/seed.js  # NOT npx prisma db seed (not configured in package.json); tsx loads the generated client
 ```
 
+### Prisma 7
+- The client is **generated into `server/src/generated/prisma`** (git-ignored). `npm run build`, `start`, `start:dev` and `test:e2e` run `prisma generate` first; run `npm run prisma:generate` yourself after pulling a schema change or after `prisma migrate dev` (Prisma 7 no longer generates automatically).
+- Import the client and `Prisma` namespace from `../generated/prisma/client`, never from `@prisma/client`.
+- `PrismaService` builds the client with the `@prisma/adapter-pg` adapter and `DATABASE_URL`. Prisma 7 does **not** read `.env` by itself: the app loads it through `ConfigModule`, `prisma.config.ts` and the seeds through `dotenv/config`, and Jest through `setupFiles`.
+- The datasource URL lives in `server/prisma.config.ts`, not in `schema.prisma`.
+- Jest needs `--experimental-vm-modules` (the query compiler is loaded with a dynamic `import()`); the `test` and `test:e2e` scripts already pass it. Use them instead of calling `npx jest` directly, or set `NODE_OPTIONS=--experimental-vm-modules`.
+- Seeds are plain Node scripts that use `prisma/seed-client.js`; run them with `npx tsx`.
+
 ### Migrations
-- **If the server is running, stop it first** (`npx kill-port 5000`) before running any Prisma commands — DLL lock on Windows prevents engine file replacement.
+- **If the server is running, stop it first** (`npx kill-port 5000`) before running any Prisma commands, and always before `npm install`: the watch process restarts on every file change.
 - **Always prefer Prisma schema + `prisma migrate dev`** over raw SQL migration scripts. When a new column or model is needed:
   1. Stop the server
   2. Add the field to `schema.prisma`
   3. Run `npx prisma migrate dev --name describe-change`
-  4. Restart the server
-- `prisma generate` can be run with `--no-engine` if the server must stay up (types only; full engine still needs server stopped):
-  ```bash
-  npx prisma generate --no-engine
-  ```
+  4. Run `npm run prisma:generate`
+  5. Restart the server
 - All legacy raw SQL `.cjs` migration scripts have been deleted. Everything is now in `schema.prisma` and tracked under `prisma/migrations/0_init/`.
 
 ### Prisma Raw Query Rules
-- Use `$queryRawUnsafe` / `$executeRawUnsafe` when passing arrays or jsonb casts
+- Use the normal Prisma API wherever it can express the query. Raw SQL is kept only for reporting and dashboard aggregates (group by year and month, `UNION` of split-transaction parts, multi-table totals, the recursive manager tree) and the health check. Use `$queryRawUnsafe` / `$executeRawUnsafe` when passing arrays or jsonb casts
 - `$executeRaw` template literals **cannot** use `::jsonb` casts — use `$executeRawUnsafe` with `$1::jsonb` syntax
 
 ---
@@ -189,19 +196,17 @@ Modules: `auth`, `users`, `roles`, `categories`, `clients`, `projects`, `product
 - Role name check: use `user?.roles?.some(r => r.role_name === 'ADMIN')` — NOT `user?.role === 'admin'`
 - Role colors: Admin=Red, Finance=Emerald, Manager=Orange, Employee=Blue
 
-### Transaction Workflow Audit Fields (added via raw SQL, not in Prisma schema)
-Columns on `transactions` added by migration scripts:
+### Transaction Workflow Audit Fields
+Columns on `transactions`, all in `schema.prisma` (camelCase fields, e.g. `approvedById`):
 - `approved_by_id`, `approved_by_name`, `approved_by_role`, `approved_at` — final approver (set on APPROVED)
 - `rejected_by_id`, `rejected_by_name`, `rejected_by_role`, `rejected_at` — rejector info (set on REJECTED)
 - `submitted_by_id`, `submitted_by_name` — who submitted/recorded the transaction (set on submit for expense; set on create for income)
 - `sent_back_by_id`, `sent_back_by_name`, `sent_back_by_role`, `sent_back_at` — who sent it back (set on SENT_BACK)
-- These are fetched via `$queryRawUnsafe`; Prisma client types don't include them
 - Shown in "Approval Trail" section of the right panel in expense/income pages
 
-### Extended User Fields (added via raw SQL, not in Prisma schema)
-Columns on `users`: `contact_no`, `house_apt`, `address`, `city`, `country`, `postal_code`, `user_status`, `date_of_birth`
+### Extended User Fields
+Columns on `users`, all in `schema.prisma`: `contact_no`, `house_apt`, `address`, `city`, `country`, `postal_code`, `user_status`, `date_of_birth`
 - `user_status` values: `ACTIVE`, `ON_HOLD`, `INACTIVE`
-- These are fetched via `$queryRawUnsafe`; Prisma client types don't include them
 
 ### Permissions
 - Stored in `user_permissions` table (JSON permissions, `single_limit`, `monthly_limit`, `data_scope`)
