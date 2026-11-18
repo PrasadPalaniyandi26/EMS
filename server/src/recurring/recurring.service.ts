@@ -492,7 +492,8 @@ export class RecurringService {
   async processDue() {
     const now = new Date();
     const due = await this.prisma.recurringTransaction.findMany({
-      where: { isActive: true, nextRunDate: { lte: now }, OR: [{ endDate: null }, { endDate: { gte: now } }] },
+      // Only an approved schedule posts spend: a draft or one waiting for approval must not run
+      where: { isActive: true, status: 'APPROVED', nextRunDate: { lte: now }, OR: [{ endDate: null }, { endDate: { gte: now } }] },
     });
     let processed = 0;
     for (const r of due) {

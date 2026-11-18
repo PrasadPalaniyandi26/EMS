@@ -61,12 +61,6 @@ export const columns = (currency: string, costOf: (id: number) => ProjectRow | u
     ),
   },
   {
-    accessorKey: "end_date",
-    header: "Ends",
-    cell: ({ row }) => <DateCell value={(row.original as any).end_date} />,
-    size: 110,
-  },
-  {
     id: "status",
     header: "Status",
     size: 110,
@@ -82,6 +76,12 @@ export const columns = (currency: string, costOf: (id: number) => ProjectRow | u
     size: 120,
     accessorFn: (row) => { const c = costOf(row.id); return c ? VERDICT_RANK[verdictOf(c, currency).label] : 9 },
     cell: ({ row }) => { const c = costOf(row.original.id); if (!c) return <TextCell value="" />; const v = verdictOf(c, currency); return <span title={v.reason}><ToneText label={v.label} tone={v.tone} /></span> },
+  },
+  {
+    accessorKey: "end_date",
+    header: "Ends",
+    cell: ({ row }) => <DateCell value={(row.original as any).end_date} />,
+    size: 110,
   },
   {
     id: "projected_margin_pct",

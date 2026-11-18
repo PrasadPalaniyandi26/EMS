@@ -26,6 +26,7 @@ import {
 import { ReimbursementsTab } from '@/components/reimbursements/reimbursements-tab';
 import { Badge } from '@/components/ui/badge';
 import { getStatusConfig } from '@/lib/status';
+import { todayIso, workingDaysBetween } from '@/lib/working-days';
 
 
 import { ApproveModal, RejectModal, SendBackModal, VoidModal } from '@/components/approvals/approvals-modals';
@@ -53,14 +54,14 @@ import { TabBar, UtilBar, money, useTabParam } from '@/components/budgets/budget
 
 // ─── Column definitions ─────────────────────────────────────────────────────
 
-const ageDays = (v: string | null | undefined) => (v ? Math.max(0, Math.floor((Date.now() - new Date(v).getTime()) / 86400000)) : 0);
+const ageDays = (v: string | null | undefined) => (v ? Math.max(0, workingDaysBetween(v, todayIso())) : 0);
 
 function buildColumns(role: string, currency: string, impact: Record<number, ExpenseImpact>, view: string, meId?: number): ColumnDef<any>[] {
   const isEmployee = role === 'EMPLOYEE';
   return [
     {
       accessorKey: 'code',
-      header: 'ID',
+      header: 'Code',
       cell: ({ row }: any) => <IdCell value={row.original.code || row.original.reference_id || `#${row.original.id}`} />,
       size: 100,
     },
@@ -68,6 +69,18 @@ function buildColumns(role: string, currency: string, impact: Record<number, Exp
       accessorKey: 'description',
       header: 'Description',
       cell: ({ row }) => <TextCell value={row.getValue('description') as string} className="block max-w-[160px] truncate" />,
+    },
+    {
+      accessorKey: 'transaction_status',
+      header: view === 'pending' ? 'Waiting on' : 'Status',
+      // On the pending list the stage is one word: whose turn it is
+      cell: ({ row }) => {
+        const s = String(row.getValue('transaction_status') || '').toUpperCase();
+        if (view === 'pending' && s === 'PENDING_MANAGER') return <ToneText tone="warning" label="Manager" />;
+        if (view === 'pending' && s === 'PENDING_FINANCE') return <ToneText tone="warning" label="Finance" />;
+        return <StatusText status={s} />;
+      },
+      size: 110,
     },
     ...(isEmployee
       ? []
@@ -89,12 +102,12 @@ function buildColumns(role: string, currency: string, impact: Record<number, Exp
     // On the pending list the date is how long it has been waiting, oldest first
     {
       accessorKey: 'created_at',
-      header: view === 'pending' ? headerRight('Waiting') : 'Date',
+      header: view === 'pending' ? headerRight('Waiting (days)') : 'Date',
       cell: ({ row }) => {
         const v = row.original.date_recorded || row.getValue('created_at');
         if (view !== 'pending') return <DateCell value={v} />;
         const d = ageDays(v);
-        return <div className="text-right"><ToneText tone={d >= 14 ? 'danger' : d >= 7 ? 'warning' : 'muted'} label={`${d} d`} /></div>;
+        return <div className="text-right"><ToneText tone={d >= 14 ? 'danger' : d >= 7 ? 'warning' : 'muted'} label={String(d)} /></div>;
       },
     },
     {
@@ -102,18 +115,6 @@ function buildColumns(role: string, currency: string, impact: Record<number, Exp
       header: headerRight('Amount'),
       cell: ({ row }) => <MoneyCell value={row.getValue('amount')} currency={currency} />,
       size: 120,
-    },
-    {
-      accessorKey: 'transaction_status',
-      header: view === 'pending' ? 'Waiting on' : 'Status',
-      // On the pending list the stage is one word: whose turn it is
-      cell: ({ row }) => {
-        const s = String(row.getValue('transaction_status') || '').toUpperCase();
-        if (view === 'pending' && s === 'PENDING_MANAGER') return <ToneText tone="warning" label="Manager" />;
-        if (view === 'pending' && s === 'PENDING_FINANCE') return <ToneText tone="warning" label="Finance" />;
-        return <StatusText status={s} />;
-      },
-      size: 110,
     },
     ...(isEmployee
       ? []

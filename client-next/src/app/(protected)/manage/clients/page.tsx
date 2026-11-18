@@ -55,7 +55,7 @@ export default function ClientsPage() {
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const { data: owingData } = useInvoiceSummary(canBill);
   const owing = useMemo(() => new Map((owingData?.rows ?? []).map((r) => [r.client_id, r])), [owingData]);
-  const cols = useMemo(() => (canBill ? [...columns.slice(0, -1), ...owingColumns(owing), columns[columns.length - 1]] : columns), [canBill, owing]);
+  const cols = useMemo(() => (canBill ? [...columns, ...owingColumns(owing)] : columns), [canBill, owing]);
   const [sectorsOpen, setSectorsOpen] = useState(false);
   const { confirm: confirmDialog, dialog: confirmDialogEl } = useConfirm();
 

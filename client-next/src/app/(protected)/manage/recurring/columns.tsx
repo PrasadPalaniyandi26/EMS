@@ -2,6 +2,7 @@
 
 import { ColumnDef } from "@tanstack/react-table";
 import type { RecurringTransaction } from "@/lib/types";
+import { STATUS_LIST } from "@/lib/status";
 import { IdCell, TextCell, DateCell, MoneyCell, ToneText, headerRight } from "@/components/data-table/cells";
 
 // One wording for how often a schedule runs, used in the table, the panel and the dialogs
@@ -14,9 +15,9 @@ const startOfToday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); retur
 const daysUntil = (v?: string | null) => (v ? Math.round((new Date(String(v).slice(0, 10) + 'T00:00:00').getTime() - startOfToday().getTime()) / 86400000) : null);
 
 // One word for where a schedule stands, the ones that need a look first
-export type RecurringState = 'Overdue' | 'Due soon' | 'Active' | 'Pending' | 'Sent back' | 'Draft' | 'Paused' | 'Ended' | 'Rejected';
-const RANK: Record<RecurringState, number> = { Overdue: 0, 'Due soon': 1, Active: 2, Pending: 3, 'Sent back': 4, Draft: 5, Paused: 6, Ended: 7, Rejected: 8 };
-const TONE: Record<RecurringState, 'success' | 'warning' | 'danger' | 'muted'> = { Overdue: 'danger', 'Due soon': 'warning', Active: 'success', Pending: 'warning', 'Sent back': 'warning', Draft: 'muted', Paused: 'muted', Ended: 'muted', Rejected: 'danger' };
+export type RecurringState = 'Overdue' | 'Due soon' | 'Active' | 'With Manager' | 'With Finance' | 'Sent Back' | 'Draft' | 'Paused' | 'Ended' | 'Rejected';
+const RANK: Record<RecurringState, number> = { Overdue: 0, 'Due soon': 1, Active: 2, 'With Manager': 3, 'With Finance': 4, 'Sent Back': 5, Draft: 6, Paused: 7, Ended: 8, Rejected: 9 };
+const TONE: Record<RecurringState, 'success' | 'warning' | 'danger' | 'muted'> = { Overdue: 'danger', 'Due soon': 'warning', Active: 'success', 'With Manager': 'warning', 'With Finance': 'warning', 'Sent Back': 'warning', Draft: 'muted', Paused: 'muted', Ended: 'muted', Rejected: 'danger' };
 export const recurringState = (r: any): RecurringState => {
   const st = String(r.status ?? 'DRAFT').toUpperCase();
   if (st === 'APPROVED') {
@@ -28,9 +29,10 @@ export const recurringState = (r: any): RecurringState => {
     if (d != null && d <= 7) return 'Due soon';
     return 'Active';
   }
-  if (st === 'PENDING_MANAGER' || st === 'PENDING_FINANCE') return 'Pending';
-  if (st === 'SENT_BACK') return 'Sent back';
-  if (st === 'REJECTED') return 'Rejected';
+  if (st === 'PENDING_MANAGER') return STATUS_LIST.PENDING_MANAGER.label;
+  if (st === 'PENDING_FINANCE') return STATUS_LIST.PENDING_FINANCE.label;
+  if (st === 'SENT_BACK') return STATUS_LIST.SENT_BACK.label;
+  if (st === 'REJECTED') return STATUS_LIST.REJECTED.label;
   return 'Draft';
 };
 export const recurringTone = (s: RecurringState) => TONE[s];
@@ -48,6 +50,13 @@ export const columns = (currency: string): ColumnDef<RecurringTransaction>[] => 
     header: "Name",
     cell: ({ row }) => <TextCell value={row.getValue("description") || "Unknown"} strong className="block max-w-[200px] truncate" />,
     size: 200,
+  },
+  {
+    id: "status",
+    accessorFn: (row) => RANK[recurringState(row)],
+    header: "Status",
+    cell: ({ row }) => { const s = recurringState(row.original); return <ToneText label={s} tone={TONE[s]} />; },
+    size: 110,
   },
   {
     accessorKey: "category_name",
@@ -69,13 +78,6 @@ export const columns = (currency: string): ColumnDef<RecurringTransaction>[] => 
       return late ? <ToneText label={new Date(String(r.next_run_date).slice(0, 10) + 'T00:00:00').toLocaleDateString('en-GB')} tone="danger" /> : <DateCell value={row.getValue("next_run_date") as string} />;
     },
     size: 130,
-  },
-  {
-    id: "status",
-    accessorFn: (row) => RANK[recurringState(row)],
-    header: "Status",
-    cell: ({ row }) => { const s = recurringState(row.original); return <ToneText label={s} tone={TONE[s]} />; },
-    size: 110,
   },
   {
     accessorKey: "total_amount",

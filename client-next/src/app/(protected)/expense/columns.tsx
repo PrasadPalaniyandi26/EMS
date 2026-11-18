@@ -10,7 +10,7 @@ export const EXPENSE_STATUS_RANK: Record<string, number> = { SENT_BACK: 0, REJEC
 export const columns = (currency: string): ColumnDef<any>[] => [
   {
     accessorKey: "reference_id",
-    header: "ID",
+    header: "Code",
     cell: ({ row }) => (
       <span className="inline-flex items-center gap-1.5">
         <IdCell value={row.getValue("reference_id") || `#${row.original.id}`} />
@@ -23,6 +23,12 @@ export const columns = (currency: string): ColumnDef<any>[] => [
     accessorKey: "description",
     header: "Description",
     cell: ({ row }) => <TextCell value={row.getValue("description")} strong className="block max-w-[130px] truncate" />,
+  },
+  {
+    accessorKey: "status",
+    header: "Status",
+    sortingFn: (a, b) => (EXPENSE_STATUS_RANK[String(a.original.status || "").toUpperCase()] ?? 9) - (EXPENSE_STATUS_RANK[String(b.original.status || "").toUpperCase()] ?? 9),
+    cell: ({ row }) => <StatusText status={row.getValue("status") as string} />,
   },
   {
     id: "code",
@@ -50,14 +56,8 @@ export const columns = (currency: string): ColumnDef<any>[] => [
     cell: ({ row }) => <DateCell value={row.getValue("date_recorded")} />,
   },
   {
-    accessorKey: "status",
-    header: "Status",
-    sortingFn: (a, b) => (EXPENSE_STATUS_RANK[String(a.original.status || "").toUpperCase()] ?? 9) - (EXPENSE_STATUS_RANK[String(b.original.status || "").toUpperCase()] ?? 9),
-    cell: ({ row }) => <StatusText status={row.getValue("status") as string} />,
-  },
-  {
     accessorKey: "total_amount",
-    header: headerRight("Total amount"),
+    header: headerRight("Amount"),
     cell: ({ row }) => <MoneyCell value={row.getValue("total_amount")} currency={currency} />,
   },
 ]

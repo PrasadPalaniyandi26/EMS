@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { TXN_STATUS } from '../common/constants/transaction-status';
+import { addWorkingDays } from '../common/helpers/working-days';
 import { financeSelfApprovalAllowed } from '../common/config/approval-policy';
 
 const PENDING = [TXN_STATUS.PENDING_MANAGER, TXN_STATUS.PENDING_FINANCE] as string[];
@@ -937,7 +938,7 @@ export class BudgetsService {
 
     if (rule('APPROVAL_WAIT')?.enabled) {
       const days = n(rule('APPROVAL_WAIT')?.threshold) || 5;
-      const cutoff = new Date(today.getTime() - days * 1.4 * 86400000);
+      const cutoff = addWorkingDays(today, -days);
       const waiting = await this.prisma.transaction.findMany({ where: { type: 'expense', status: { in: PENDING }, submittedAt: { lt: cutoff } }, select: { id: true, amount: true, totalAmount: true } });
       if (waiting.length) {
         wanted.set(key('APPROVAL_WAIT', null), {
@@ -1019,6 +1020,9 @@ export class BudgetsService {
       this.lookups(),
     ]);
     const { unmatched } = this.computeUsage(lines, parts);
+    // An expense charged to an order is listed with the order's code
+    const orderIds = [...new Set(unmatched.map((p) => p.buildOrderId).filter((x): x is number => x != null))];
+    const orderCode = new Map((orderIds.length ? await this.prisma.buildOrder.findMany({ where: { id: { in: orderIds } }, select: { id: true, code: true } }) : []).map((o) => [o.id, o.code]));
     const kindName: Record<string, string> = { PROJECT: 'Project', PRODUCT: 'Product', DEPARTMENT: 'Overhead' };
     const words = (x: string) => x.toLowerCase().replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
     const rows = unmatched.map((p) => {
@@ -1026,13 +1030,13 @@ export class BudgetsService {
       const t = p.typeId != null ? lk.types.get(p.typeId) : null;
       const c = p.categoryId != null ? lk.categories.get(p.categoryId) : null;
       return {
-        Reference: p.ref || `#${p.txnId}`, Month: `${MON[p.month - 1]} ${p.year}`, 'Charged To': kindName[p.costObject] ?? p.costObject, 'Cost Object': obj ?? '',
+        Reference: p.ref || `#${p.txnId}`, Month: `${MON[p.month - 1]} ${p.year}`, 'Charged To': kindName[p.costObject] ?? p.costObject, 'Cost Object': obj ?? '', Order: p.buildOrderId != null ? orderCode.get(p.buildOrderId) ?? '' : '',
         Type: t ? [t.code, t.name].filter(Boolean).join(' ') : '', Category: c?.name ?? '', Status: words(p.status ?? ''), 'Submitted By': p.submitterName ?? '', Amount: r2(p.amount),
       };
     }).sort((a, b) => b.Amount - a.Amount);
     return {
       title: `Unbudgeted Spend ${this.fyLabel(useFy, s.fyStartMonth)}`,
-      columns: ['Reference', 'Month', 'Charged To', 'Cost Object', 'Type', 'Category', 'Status', 'Submitted By', 'Amount'],
+      columns: ['Reference', 'Month', 'Charged To', 'Cost Object', 'Order', 'Type', 'Category', 'Status', 'Submitted By', 'Amount'],
       rows, totals: { Amount: r2(rows.reduce((a, r) => a + r.Amount, 0)) },
     };
   }
@@ -1040,10 +1044,23 @@ export class BudgetsService {
   async budgetVsActual(fy?: number, scope: { ownerId?: number } = {}) {
     const m = await this.monitor(fy, scope);
     const rows = (m.lines as any[]).filter((l) => !l.is_contingency && l.cost_object !== 'RESERVE').map((l) => ({
-      'Cost object': l.object_name, Type: l.category_label ? `${l.type_label} / ${l.category_label}` : l.type_label,
+      'Cost Object': l.object_name, Type: l.category_label ? `${l.type_label} / ${l.category_label}` : l.type_label,
       Budget: l.total, Actual: l.actual, Committed: l.committed, Remaining: l.available, '% Used': l.pct,
     }));
-    return { title: `Budget vs Actual ${m.label}`, columns: ['Cost object', 'Type', 'Budget', 'Actual', 'Committed', 'Remaining', '% Used'], rows, totals: m.kpis ? { Budget: m.kpis.approved, Actual: m.kpis.actual, Committed: m.kpis.committed } : {} };
+    // The totals add up the rows shown. The plan's own approved total also holds the reserve and held contingency, which have no row here.
+    const sum = (k: 'Budget' | 'Actual' | 'Committed' | 'Remaining') => r2(rows.reduce((a, r) => a + (Number(r[k]) || 0), 0));
+    const used = sum('Actual') + sum('Committed');
+    return {
+      title: `Budget vs Actual ${m.label}`, columns: ['Cost Object', 'Type', 'Budget', 'Actual', 'Committed', 'Remaining', '% Used'], rows,
+      totals: { Budget: sum('Budget'), Actual: sum('Actual'), Committed: sum('Committed'), Remaining: sum('Remaining'), '% Used': sum('Budget') > 0 ? r2((used / sum('Budget')) * 100) : null },
+      note: 'One row for each budget line. Reserve and held contingency are not listed, so the totals match Budget by Month rather than the plan total.',
+    };
+  }
+
+  // The month the financial year starts, for the date presets on every page; open to every signed-in user
+  async fiscalYear() {
+    const s = await this.getSettings();
+    return { start_month: s.fyStartMonth, current_fy: this.fyOf(new Date(), s.fyStartMonth) };
   }
 
   // Top lines by utilisation for the dashboard card

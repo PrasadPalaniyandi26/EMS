@@ -71,7 +71,7 @@ export class ClientsService {
     text('businessType', 'Business type', 100, 'businessType', 'business_type');
     // Tax invoices: the GSTIN (15 characters, checked against the state it names) and the days a client has to pay
     if (data.gstin !== undefined) {
-      const g = String(data.gstin ?? '').trim().toUpperCase().replace(/s+/g, '');
+      const g = String(data.gstin ?? '').trim().toUpperCase().replace(/\s+/g, '');
       if (g && !GSTIN_RE.test(g)) throw new HttpException('The GSTIN is not valid. It has 15 characters, for example 33ABCDE1234F1Z5.', HttpStatus.BAD_REQUEST);
       out.gstin = g || null;
     }

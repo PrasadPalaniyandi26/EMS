@@ -215,7 +215,7 @@ export class BudgetPlanningService {
     const hasLast = !(b.last_price === '' || b.last_price == null);
     if (hasLast && !(Number(b.last_price) >= 0)) throw bad('Last paid price must be a number, zero or more.');
     // Every part carries the days it takes to arrive (or to make), so a build order can be checked against its dates
-    if (b.lead_time_days === '' || b.lead_time_days == null) throw bad('Enter the lead time in days. Zero means it is on hand.');
+    if (b.lead_time_days === '' || b.lead_time_days == null) throw bad('Enter the lead time in working days. Zero means it is on hand.');
     if (!(Number.isInteger(Number(b.lead_time_days)) && Number(b.lead_time_days) >= 0 && Number(b.lead_time_days) <= 3650)) throw bad('Lead time must be a whole number of days, zero or more.');
     if (make && (!(material >= 0) || !(manufacturing >= 0))) throw bad('Material and manufacturing costs must be zero or more.');
     const clash = await this.prisma.item.findFirst({ where: { partNo, ...(id ? { NOT: { id } } : {}) } });

@@ -217,7 +217,8 @@ Columns on `users`: `contact_no`, `house_apt`, `address`, `city`, `country`, `po
 - Expenses: `DRAFT` → submit → `PENDING_MANAGER` → `PENDING_FINANCE` → `APPROVED` / `REJECTED`
 - Submitting creates `ApprovalRequest` records in the manager chain
 - Send Back resets to `DRAFT` and cancels all pending approval requests
-- Income transactions are auto-approved (no workflow)
+- Income: created as DRAFT; Manager, Admin or Finance submits it (→ `PENDING_FINANCE`), Finance approves (→ `APPROVED`). Employees cannot submit income.
+- Recurring schedules follow the same chain (Employee → Manager → Finance) and only `APPROVED` schedules post transactions when due; each run is created as `APPROVED`.
 - Manager-level steps (approve, reject, send back) belong to the requester's direct manager. If the requester has no manager (or theirs lacks the Manager role), any Manager may act.
 - Finance cannot approve their own expense unless they are the only active Finance user (`FINANCE_SELF_APPROVAL`, default `block`; set `allow` to restore the old behavior).
 - Role-based page access lives in `client-next/src/lib/route-access.ts`; the API's `@Roles()` remains the source of truth for data.
@@ -260,6 +261,7 @@ Columns on `users`: `contact_no`, `house_apt`, `address`, `city`, `country`, `po
   - Shell scripts: keep `.bat` for Windows and `.sh` for Linux in sync when logic changes
   - Do not use `os.platform()` or `process.platform` guards as a substitute for writing portable code
 - **UI changes must follow `client-next/DESIGN.md`** (tokens, type scale, shared components for tables, panels, dialogs and forms). Run `npm run check:design` in `client-next/` before finishing a UI change; it must pass.
+- **Schedule day counts are working days (Monday to Friday)**: milestones, build-order lead times, build days and delivery windows, days late or spare, approval waiting. Use `server/src/common/helpers/working-days.ts` and `client-next/src/lib/working-days.ts`; never subtract dates by `86400000`. Public holidays are not modelled. Money terms (invoice due dates, payment terms, ageing) stay calendar days.
 - Do not refactor working code unless explicitly asked
 - Do not add comments, docstrings, or type annotations to code you didn't change
 - Prefer editing existing files over creating new ones

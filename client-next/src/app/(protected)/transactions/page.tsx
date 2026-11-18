@@ -14,7 +14,7 @@ import { Field } from '@/components/shared/modal-primitives';
 import { getStatusConfig } from '@/lib/status';
 import { formatCurrency, formatDate, getDateRange, toLocalYMD } from '@/lib/currency';
 import { toast } from 'sonner';
-import { TextCell, DateCell, MoneyCell, StatusText, headerRight } from '@/components/data-table/cells';
+import { IdCell, TextCell, DateCell, MoneyCell, StatusText, headerRight } from '@/components/data-table/cells';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { ChargedToSection } from '@/components/transactions/charged-to';
@@ -115,12 +115,13 @@ export default function TransactionsPage() {
   const selectedTxn = displayedTxns.find((t: any) => String(t.id) === Object.keys(selection)[0]) ?? null;
 
   const columns = useMemo<ColumnDef<any, any>[]>(() => [
-    { accessorKey: 'date_recorded', header: 'Date', size: 112, cell: ({ row }) => <DateCell value={row.original.date_recorded} /> },
+    { accessorKey: 'reference_id', header: 'Code', size: 110, cell: ({ row }) => <IdCell value={row.original.reference_id || `#${row.original.id}`} /> },
     { accessorKey: 'description', header: 'Description', cell: ({ row }) => <TextCell value={row.original.description} strong className="block max-w-[350px] truncate" /> },
+    { accessorKey: 'status', header: 'Status', size: 150, cell: ({ row }) => <StatusText status={row.original.status} /> },
+    { id: 'type', header: 'Type', size: 100, cell: ({ row }) => <TextCell value={row.original.type === 'income' ? 'Income' : 'Expense'} /> },
     { accessorKey: 'category_name', header: 'Category', size: 140, cell: ({ row }) => <TextCell value={row.original.category_name} /> },
     { accessorKey: 'client_name', header: 'Client', size: 140, cell: ({ row }) => <TextCell value={row.original.client_name} /> },
-    { id: 'type', header: 'Type', size: 100, cell: ({ row }) => <TextCell value={row.original.type === 'income' ? 'Income' : 'Expense'} /> },
-    { accessorKey: 'status', header: 'Status', size: 150, cell: ({ row }) => <StatusText status={row.original.status} /> },
+    { accessorKey: 'date_recorded', header: 'Date', size: 112, cell: ({ row }) => <DateCell value={row.original.date_recorded} /> },
     { accessorKey: 'amount', header: headerRight('Amount'), size: 130, cell: ({ row }) => <MoneyCell value={row.original.amount} currency={currency} /> },
   ], [currency]);
 

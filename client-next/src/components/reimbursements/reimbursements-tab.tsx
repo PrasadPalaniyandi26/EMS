@@ -69,7 +69,7 @@ export function ReimbursementsTab() {
   const columns: ColumnDef<any>[] = useMemo(() => [
     {
       accessorKey: 'reference_id',
-      header: 'Reference',
+      header: 'Code',
       cell: ({ row }) => <IdCell value={row.getValue('reference_id') || `#${row.original.id}`} />,
       size: 110,
     },
@@ -79,13 +79,26 @@ export function ReimbursementsTab() {
       cell: ({ row }) => <TextCell value={row.getValue('employee_name') || 'Unknown'} strong />,
     },
     {
+      id: 'reimb_status',
+      header: 'Status',
+      cell: ({ row }) => {
+        const status = row.original.reimbursement_status;
+        return status === 'PAID'
+          ? <ToneText label="Paid" tone="success" />
+          : status === 'ON_HOLD'
+          ? <ToneText label="On hold" tone="warning" />
+          : <ToneText label="Pending" tone="warning" />;
+      },
+      size: 110,
+    },
+    {
       accessorKey: 'category_name',
       header: 'Category',
       cell: ({ row }) => <TextCell value={(row.getValue('category_name') as string) || 'General'} />,
     },
     {
       id: 'project',
-      header: 'Project / product',
+      header: 'Charged to',
       cell: ({ row }) => {
         const o = row.original;
         const code = o.project_name
@@ -100,19 +113,6 @@ export function ReimbursementsTab() {
       accessorKey: 'date_recorded',
       header: 'Date',
       cell: ({ row }) => <DateCell value={row.getValue('date_recorded') as string} />,
-      size: 110,
-    },
-    {
-      id: 'reimb_status',
-      header: 'Status',
-      cell: ({ row }) => {
-        const status = row.original.reimbursement_status;
-        return status === 'PAID'
-          ? <ToneText label="Paid" tone="success" />
-          : status === 'ON_HOLD'
-          ? <ToneText label="On hold" tone="warning" />
-          : <ToneText label="Pending" tone="warning" />;
-      },
       size: 110,
     },
     {

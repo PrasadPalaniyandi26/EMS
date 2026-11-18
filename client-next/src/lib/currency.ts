@@ -73,6 +73,10 @@ export function parseOcrDate(raw: string) {
   return isNaN(free.getTime()) ? '' : fmt(free);
 }
 
+// The month the financial year starts (1 to 12), from Budget settings. April until the setting has loaded.
+let fyStartMonth = 4;
+export function setFyStartMonth(month: number) { if (Number.isInteger(month) && month >= 1 && month <= 12) fyStartMonth = month; }
+
 export function getDateRange(preset: DatePreset): { from: string; to: string } {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -103,16 +107,17 @@ export function getDateRange(preset: DatePreset): { from: string; to: string } {
       return { from: fmt(s), to: fmt(e) };
     }
     case 'thisQuarter': {
-      const q = Math.floor(today.getMonth() / 3);
-      return { from: fmt(new Date(today.getFullYear(), q * 3, 1)), to: fmt(new Date(today.getFullYear(), q * 3 + 3, 0)) };
+      // A quarter of the financial year: it starts every three months from the month the year starts
+      const intoYear = (today.getMonth() - (fyStartMonth - 1) + 12) % 12;
+      const s = new Date(today.getFullYear(), today.getMonth() - (intoYear % 3), 1);
+      return { from: fmt(s), to: fmt(new Date(s.getFullYear(), s.getMonth() + 3, 0)) };
     }
     case 'calYear': {
       return { from: fmt(new Date(today.getFullYear(), 0, 1)), to: fmt(new Date(today.getFullYear(), 11, 31)) };
     }
     case 'finYear': {
-      const m = today.getMonth();
-      const sy = m < 3 ? today.getFullYear() - 1 : today.getFullYear();
-      return { from: fmt(new Date(sy, 3, 1)), to: fmt(new Date(sy + 1, 2, 31)) };
+      const sy = today.getMonth() < fyStartMonth - 1 ? today.getFullYear() - 1 : today.getFullYear();
+      return { from: fmt(new Date(sy, fyStartMonth - 1, 1)), to: fmt(new Date(sy + 1, fyStartMonth - 1, 0)) };
     }
     default:
       return { from: '', to: '' };

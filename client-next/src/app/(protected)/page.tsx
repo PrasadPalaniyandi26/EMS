@@ -118,7 +118,7 @@ export default function HomePage() {
           {t && t.expenses_pending > 0 && <p className="mt-0.5 text-[12px] tabular-nums text-[var(--shell-text-muted)]">{money(t.expenses_pending, currency)} not yet approved</p>}
         </Figure>
         <Figure label="Awaiting approval" loading={loading} onClick={() => router.push('/approvals')} value={data ? money(data.approvals.pending_amount, currency) : ''}>
-          <p className="mt-1 text-[12px] tabular-nums text-[var(--shell-text-muted)]">{data?.approvals.pending_count ?? 0} {data?.approvals.pending_count === 1 ? 'expense' : 'expenses'}{data?.approvals.oldest_days != null ? `, oldest ${data.approvals.oldest_days} d` : ''}</p>
+          <p className="mt-1 text-[12px] tabular-nums text-[var(--shell-text-muted)]">{data?.approvals.pending_count ?? 0} {data?.approvals.pending_count === 1 ? 'expense' : 'expenses'}{data?.approvals.oldest_days != null ? `, oldest ${data.approvals.oldest_days} ${data.approvals.oldest_days === 1 ? 'day' : 'days'}` : ''}</p>
           <p className={cn('mt-0.5 text-[13px] font-medium', (data?.approvals.mine ?? 0) > 0 ? 'text-[var(--shell-accent)]' : 'text-[var(--shell-text-muted)]')}>
             {(data?.approvals.mine ?? 0) > 0 ? `${data!.approvals.mine} waiting for you` : 'Nothing waiting for you'}
           </p>
@@ -338,7 +338,7 @@ export default function HomePage() {
                         <span className="block truncate text-[12px] text-[var(--shell-text-muted)]">{o.customer}</span>
                       </span>
                       <span className="shrink-0 text-right">
-                        <span className={cn('block text-[13px] font-medium tabular-nums', o.late ? TONE_TEXT.danger : 'text-[var(--shell-text)]')}>{o.late ? 'Late' : o.days < 0 ? `${Math.abs(o.days)} d overdue` : o.days === 0 ? 'Today' : `in ${o.days} d`}</span>
+                        <span className={cn('block text-[13px] font-medium tabular-nums', o.late ? TONE_TEXT.danger : 'text-[var(--shell-text)]')}>{o.late ? 'Late' : o.days < 0 ? `${Math.abs(o.days)} ${Math.abs(o.days) === 1 ? 'day' : 'days'} overdue` : o.days === 0 ? 'Today' : `in ${o.days} ${o.days === 1 ? 'day' : 'days'}`}</span>
                         <span className="block text-[12px] tabular-nums text-[var(--shell-text-muted)]">{formatDate(o.delivery_date)}</span>
                       </span>
                     </button>

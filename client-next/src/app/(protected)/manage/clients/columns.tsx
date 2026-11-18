@@ -8,14 +8,24 @@ import type { ClientOwing } from "@/hooks/use-invoicing"
 export const columns: ColumnDef<Client>[] = [
   {
     accessorKey: "code",
-    header: "ID",
+    header: "Code",
     cell: ({ row }) => <IdCell value={(row.original as any).code || ""} />,
-    size: 140,
+    size: 100,
   },
   {
     accessorKey: "name",
     header: "Name",
     cell: ({ row }) => <TextCell value={row.getValue("name") as string} strong className="block max-w-[220px] truncate" />,
+  },
+  {
+    accessorKey: "is_active",
+    header: "Status",
+    size: 110,
+    cell: ({ row }) => {
+      const v = row.getValue("is_active")
+      const isActive = v === 1 || v === true
+      return <ToneText label={isActive ? "Active" : "Inactive"} tone={isActive ? "success" : "muted"} />
+    },
   },
   {
     accessorKey: "business_type",
@@ -34,20 +44,6 @@ export const columns: ColumnDef<Client>[] = [
           {(o.contact_email || o.contact_phone) && <TextCell value={o.contact_email || o.contact_phone} muted className="block truncate text-[12px]" />}
         </div>
       )
-    },
-  },
-  {
-    id: "country",
-    header: "Country",
-    cell: ({ row }) => <TextCell value={(row.original as any).country} muted />,
-  },
-  {
-    accessorKey: "is_active",
-    header: "Status",
-    cell: ({ row }) => {
-      const v = row.getValue("is_active")
-      const isActive = v === 1 || v === true
-      return <ToneText label={isActive ? "Active" : "Inactive"} tone={isActive ? "success" : "muted"} />
     },
   },
 ]

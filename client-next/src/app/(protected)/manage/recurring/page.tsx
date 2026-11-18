@@ -471,7 +471,7 @@ export default function RecurringPage() {
             <DetailField label="Due in 7 days" value={count('Due soon')} tone={count('Due soon') ? 'warning' : 'muted'} />
             <DetailField label="Active" value={count('Active')} />
             <DetailField label="Paused" value={count('Paused')} />
-            <DetailField label="Waiting for approval" value={count('Pending', 'Draft', 'Sent back')} wide />
+            <DetailField label="Waiting for approval" value={count('With Manager', 'With Finance', 'Draft', 'Sent Back')} wide />
           </DetailGrid>
         </DetailSection>
         <p className="text-[12px] text-[var(--shell-text-muted)]">Per month converts each schedule to a monthly amount. Paused and ended schedules are left out.</p>

@@ -44,6 +44,10 @@ export class BudgetsController {
     return this.suggestions.suggest({ cost_object: costObject, object_id: objectId, type_id: typeId, fy });
   }
 
+  // Open to every signed-in user: where the financial year starts, so date presets follow it
+  @Get('fiscal-year')
+  fiscalYear() { return this.service.fiscalYear(); }
+
   @Get('impact')
   @Roles('admin', 'finance', 'manager')
   impact(@Query('ids') ids?: string) {

@@ -190,7 +190,7 @@ function InvoiceModalForPo({ po, onClose }: { po: ClientPo | null; onClose: () =
 type InvShow = 'ALL' | 'UNPAID' | 'OVERDUE' | InvoiceStatus;
 // Overdue first, then part paid, issued, draft, paid, cancelled
 const rankOf = (i: Invoice) => (i.overdue ? 0 : i.status === 'PART_PAID' ? 1 : i.status === 'ISSUED' ? 2 : i.status === 'DRAFT' ? 3 : i.status === 'PAID' ? 4 : 5);
-const statusOf = (i: Invoice) => (i.overdue ? { label: `Overdue ${i.days_overdue} d`, tone: 'danger' as const } : INVOICE_STATUS[i.status]);
+const statusOf = (i: Invoice) => (i.overdue ? { label: `Overdue ${i.days_overdue} ${i.days_overdue === 1 ? 'day' : 'days'}`, tone: 'danger' as const } : INVOICE_STATUS[i.status]);
 
 export function InvoicesView({ clientId, onClientChange }: { clientId?: number | null; onClientChange?: (id: number | null) => void }) {
   const router = useRouter();

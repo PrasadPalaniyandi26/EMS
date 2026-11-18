@@ -10,6 +10,12 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 export class ReportingController {
   constructor(private service: ReportingService) {}
 
+  // The people whose records this user can report on, for the person filter; empty when it is only themselves
+  @Get('people')
+  people(@CurrentUser('id') userId: number, @CurrentUser('role_name') roleName: string) {
+    return this.service.people(userId, roleName);
+  }
+
   @Get('generate')
   generate(
     @CurrentUser('id') userId: number,

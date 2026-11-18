@@ -5,6 +5,7 @@ import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from './../src/prisma/prisma.service';
 import { ResponseInterceptor } from './../src/common/interceptors/response.interceptor';
+import { addWorkingDays } from './../src/common/helpers/working-days';
 import { HttpExceptionFilter } from './../src/common/filters/http-exception.filter';
 
 // Build orders on the real database: create, import of the standard BOM, the lock, swap to an alternate,
@@ -328,7 +329,8 @@ describe('Build orders (e2e)', () => {
       expect(late.lead.longest_lead_days).toBe(50);
       expect(late.lead.late).toBe(true);
       expect(late.lead.late_lines).toContain(line1.id);
-      expect(late.lead.earliest_delivery.slice(0, 10)).toBe(inDays(50));
+      // The longest lead time is 50 working days from the start
+      expect(late.lead.earliest_delivery.slice(0, 10)).toBe(addWorkingDays(new Date(`${inDays(0)}T00:00:00.000Z`), 50).toISOString().slice(0, 10));
       const listed = (data(await call('get', '/build-orders', admin)) as any[]).find((x) => x.id === id);
       expect(listed.late).toBe(true);
     });

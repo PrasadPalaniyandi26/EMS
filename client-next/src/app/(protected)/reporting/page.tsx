@@ -13,13 +13,17 @@ import api from '@/lib/api-client';
 import { useBudgetPlans, fyLabel } from '@/hooks/use-budget-queries';
 import { formatCurrency, getDateRange } from '@/lib/currency';
 import {
-  BarChart3, FileText, TrendingDown, TrendingUp, Scale, Target,
+  BarChart3, FileText, TrendingDown, TrendingUp, Scale, Target, ListFilter,
   ArrowLeftRight, Users, Download, Sheet,
   ChevronDown, Loader2, Search, Receipt, Wallet, AlertTriangle,
   CalendarRange, FileWarning, Boxes, Percent, Ruler, Hourglass, BookText,
+  FileSpreadsheet, ScrollText, Coins, Landmark, Calculator, ClipboardList, Briefcase, Clock, Play,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { PageFrame } from '@/components/shared/module/page-frame';
+import { toast } from 'sonner';
+import { useQuery } from '@tanstack/react-query';
+import { RecordLink, TabBar, useTabParam } from '@/components/budgets/budget-ui';
+import { useCategories, useClients, useProducts, useProjects } from '@/hooks/use-queries';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const escapeHtml = (v: unknown): string => {
@@ -39,28 +43,54 @@ interface ReportResult {
 
 // ── Report catalogue ─────────────────────────────────────────────────────────
 const REPORTS = [
-  { id: 'expense-summary', label: 'Expense Summary', icon: TrendingDown, desc: 'Total spend grouped by category', color: 'text-[var(--danger)]', bg: 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)]' },
-  { id: 'income-summary', label: 'Income Summary', icon: TrendingUp, desc: 'Total income grouped by category', color: 'text-[var(--success)]', bg: 'bg-[color-mix(in_srgb,var(--success)_10%,transparent)]' },
-  { id: 'pl-statement', label: 'P&L Statement', icon: Scale, desc: 'Monthly income vs expenses, net balance', color: 'text-[var(--info)]', bg: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]' },
-  { id: 'budget-vs-actual', label: 'Budget vs Actual', icon: Target, desc: 'Budget allocation vs real spend per category', color: 'text-[var(--warning)]', bg: 'bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]' },
-  { id: 'transaction-ledger', label: 'Transaction Ledger', icon: ArrowLeftRight, desc: 'Full list of all transactions with all fields', color: 'text-[var(--info)]', bg: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]' },
-  { id: 'client-summary', label: 'Client Summary', icon: Users, desc: 'Expense & Income for Project & Product', color: 'text-[var(--info)]', bg: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]' },
-  { id: 'claimable-gst', label: 'Claimable GST', icon: Receipt, desc: 'GST claimable on expense transactions by category', color: 'text-[var(--warning)]', bg: 'bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]' },
-  { id: 'reimbursement-register', label: 'Reimbursement Register', icon: Wallet, desc: 'All reimbursed expenses with payment details, by employee', color: 'text-[var(--info)]', bg: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]' },
-  { id: 'budget-by-month', label: 'Budget by Month', icon: CalendarRange, desc: 'Budget, actual and committed for each month of the year, with running totals', color: 'text-[var(--success)]', bg: '' },
-  { id: 'unbudgeted-spend', label: 'Unbudgeted Spend', icon: FileWarning, desc: 'Expenses that no budget line covers', color: 'text-[var(--danger)]', bg: '' },
-  { id: 'order-costing', label: 'Order Costing', icon: Boxes, desc: 'Orders: planned cost, order value, budget and spend', color: 'text-[var(--warning)]', bg: '' },
-  { id: 'product-margin', label: 'Product Margin', icon: Percent, desc: 'Price against standard cost, and the margin against its goals', color: 'text-[var(--success)]', bg: '' },
-  { id: 'project-estimate', label: 'Project Estimate vs Actual', icon: Ruler, desc: 'Approved project estimate against spend so far', color: 'text-[var(--info)]', bg: '' },
-  { id: 'receivables-ageing', label: 'Receivables Ageing', icon: Hourglass, desc: 'What each client owes, by how long it has been due', color: 'text-[var(--danger)]', bg: '' },
-  { id: 'gst-sales-register', label: 'GST Sales Register', icon: BookText, desc: 'Invoices issued in the period, with CGST, SGST and IGST', color: 'text-[var(--success)]', bg: '' },
+  { id: 'expense-summary', group: 'spend', label: 'Expense Summary', icon: TrendingDown, desc: 'Spend by category: net, GST, total, share and claimable GST', color: 'text-[var(--danger)]', bg: 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)]' },
+  { id: 'income-summary', group: 'spend', label: 'Income Summary', icon: TrendingUp, desc: 'Income by category: net, GST, total and share', color: 'text-[var(--success)]', bg: 'bg-[color-mix(in_srgb,var(--success)_10%,transparent)]' },
+  { id: 'pl-statement', group: 'spend', label: 'P&L Statement', icon: Scale, desc: 'Income and spend for every month, on the total including GST', color: 'text-[var(--info)]', bg: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]' },
+  { id: 'budget-vs-actual', group: 'budget', label: 'Budget vs Actual', icon: Target, desc: 'Budget against real spend for each budget line', color: 'text-[var(--warning)]', bg: 'bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]' },
+  { id: 'transaction-ledger', group: 'spend', label: 'Transaction Ledger', icon: ArrowLeftRight, desc: 'Every record one by one, with status, approver and split parts, and what the rows come to', color: 'text-[var(--info)]', bg: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]' },
+  { id: 'client-summary', group: 'spend', label: 'Client Summary', icon: Users, desc: 'Spend and income by client and category, with no-client spend listed too', color: 'text-[var(--info)]', bg: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]' },
+  { id: 'claimable-gst', group: 'tax', label: 'Claimable GST', icon: Receipt, desc: 'GST claimable on expense transactions by category', color: 'text-[var(--warning)]', bg: 'bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]' },
+  { id: 'reimbursement-register', group: 'claims', label: 'Reimbursement Register', icon: Wallet, desc: 'Expenses to be paid back to employees: pending, on hold and paid', color: 'text-[var(--info)]', bg: 'bg-[color-mix(in_srgb,var(--info)_10%,transparent)]' },
+  { id: 'budget-by-month', group: 'budget', label: 'Budget by Month', icon: CalendarRange, desc: 'Budget, actual and committed for each month of the year, with running totals', color: 'text-[var(--success)]', bg: '' },
+  { id: 'unbudgeted-spend', group: 'budget', label: 'Unbudgeted Spend', icon: FileWarning, desc: 'Expenses that no budget line covers', color: 'text-[var(--danger)]', bg: '' },
+  { id: 'order-costing', group: 'operations', label: 'Order Costing', icon: Boxes, desc: 'Orders: dates, days late, planned cost, value, budget, spend, invoiced and received', color: 'text-[var(--warning)]', bg: '' },
+  { id: 'product-margin', group: 'operations', label: 'Product Margin', icon: Percent, desc: 'Every product: price against standard cost, margin against goals, and planned units', color: 'text-[var(--success)]', bg: '' },
+  { id: 'project-estimate', group: 'operations', label: 'Project Estimate vs Actual', icon: Ruler, desc: 'Approved estimate against spend, with invoiced and received', color: 'text-[var(--info)]', bg: '' },
+  { id: 'receivables-ageing', group: 'receivables', label: 'Receivables Ageing', icon: Hourglass, desc: 'What each client owes, by how long it has been due', color: 'text-[var(--danger)]', bg: '' },
+  { id: 'gst-sales-register', group: 'receivables', label: 'GST Sales Register', icon: BookText, desc: 'Invoices issued in the period, with CGST, SGST and IGST', color: 'text-[var(--success)]', bg: '' },
+  { id: 'invoice-register', group: 'receivables', label: 'Invoice Register', icon: FileSpreadsheet, desc: 'Every invoice raised in the period, with received, tax deducted, balance and days overdue', color: 'text-[var(--info)]', bg: '' },
+  { id: 'client-statement', group: 'receivables', label: 'Client Statement', icon: ScrollText, desc: "One client's account: invoices, payments and the balance after each line", color: 'text-[var(--success)]', bg: '' },
+  { id: 'collections', group: 'receivables', label: 'Collections', icon: Coins, desc: 'Money received in the period, with method, reference and tax deducted', color: 'text-[var(--warning)]', bg: '' },
+  { id: 'tds-register', group: 'tax', label: 'TDS Register', icon: Landmark, desc: 'Tax clients deducted before paying us, to match against their certificates', color: 'text-[var(--danger)]', bg: '' },
+  { id: 'gst-position', group: 'tax', label: 'GST Position', icon: Calculator, desc: 'GST charged on invoices against GST claimable on expenses, month by month', color: 'text-[var(--info)]', bg: '' },
+  { id: 'client-po-status', group: 'operations', label: 'Client PO Status', icon: ClipboardList, desc: 'Each client PO: value, billed so far, what is left and whether it has expired', color: 'text-[var(--success)]', bg: '' },
+  { id: 'project-billing', group: 'operations', label: 'Project Billing', icon: Briefcase, desc: 'Each project billed against its contract and client POs, with received and outstanding', color: 'text-[var(--warning)]', bg: '' },
+  { id: 'outstanding-reimbursements', group: 'claims', label: 'Outstanding Reimbursements', icon: Clock, desc: 'Claims still to pay for each employee, with how long the oldest has waited', color: 'text-[var(--danger)]', bg: '' },
 ];
+
+// Report groups, one tab each; a tab shows only when the user can open at least one of its reports
+const GROUPS = [
+  { value: 'spend', label: 'Spend' },
+  { value: 'budget', label: 'Budget' },
+  { value: 'receivables', label: 'Receivables' },
+  { value: 'tax', label: 'Tax' },
+  { value: 'operations', label: 'Operations' },
+  { value: 'claims', label: 'Claims' },
+] as const;
+type Group = typeof GROUPS[number]['value'];
 
 // Reports driven by a financial year rather than a date range
 const FY_REPORTS = new Set(['budget-vs-actual', 'budget-by-month', 'unbudgeted-spend', 'product-margin']);
 // Costing figures are for Finance and Admin; a manager sees the generic reports and the budgets they own
-const FINANCE_ONLY = new Set(['unbudgeted-spend', 'order-costing', 'product-margin', 'project-estimate', 'receivables-ageing', 'gst-sales-register']);
-const NO_PERIOD = new Set(['project-estimate', 'receivables-ageing']);
+const FINANCE_ONLY = new Set(['unbudgeted-spend', 'order-costing', 'product-margin', 'project-estimate', 'receivables-ageing', 'gst-sales-register', 'invoice-register', 'client-statement', 'collections', 'tds-register', 'gst-position', 'client-po-status', 'project-billing']);
+const NO_PERIOD = new Set(['project-estimate', 'receivables-ageing', 'client-po-status', 'project-billing', 'outstanding-reimbursements']);
+// Invoice reports can be narrowed to one client; the statement needs one
+const CLIENT_REPORTS = new Set(['invoice-register', 'client-statement', 'collections', 'tds-register', 'client-po-status']);
+// Reports built from transactions can be narrowed by client, project, product, category and person; some can be set against the period before
+const FILTERABLE = new Set(['expense-summary', 'income-summary', 'pl-statement', 'claimable-gst', 'client-summary', 'transaction-ledger']);
+const COMPARABLE = new Set(['expense-summary', 'income-summary', 'pl-statement', 'client-summary']);
+const EMPTY_FILTERS = { clientId: '', projectId: '', productId: '', categoryId: '', personId: '' };
+type Filters = typeof EMPTY_FILTERS;
 
 const DATE_PRESETS = [
   { label: 'This Month', key: 'thisMonth' },
@@ -75,12 +105,15 @@ const CURRENCY_COLS = new Set([
   'Amount', 'Income', 'Expenses', 'Net', 'Budget', 'Actual', 'Committed', 'Spent', 'Remaining', 'Net Amount', 'Total Amount', 'GST Amount',
   'Cumulative Budget', 'Cumulative Used', 'Unit Cost', 'Planned Cost', 'Order Value', 'Price', 'Standard Cost', 'Margin', 'Contract Value', 'Estimate',
   'Not Due', '1-30 Days', '31-60 Days', '61-90 Days', 'Over 90 Days', 'Outstanding', 'Taxable', 'CGST', 'SGST', 'IGST', 'Round Off', 'Invoice Value',
+  'Average', 'Claimable GST', 'Invoiced', 'Received', 'Estimate Total', 'Extended Margin',
+  'Debit', 'Credit', 'Balance', 'TDS', 'Total Credited', 'TDS Deducted', 'Output GST', 'Input GST', 'Net Payable', 'PO Value', 'Client PO Value', 'Unbilled', 'Pending', 'On Hold',
 ]);
-const isPctCol = (c: string) => c === '% Used' || c.endsWith(' %');
+const isPctCol = (c: string) => c === '% Used' || c === '% Billed' || c.endsWith(' %');
 
 // ── Number util ───────────────────────────────────────────────────────────────
+// A column is numeric when any row has a number in it, so a null in the first row does not decide it
 function isNumericCol(col: string, rows: Record<string, any>[]) {
-  return rows.length > 0 && typeof rows[0][col] === 'number';
+  return rows.some((r) => typeof r[col] === 'number');
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
@@ -91,19 +124,25 @@ export default function ReportingPage() {
   // The API checks the active role, so the list does too
   const isFinanceUser = ['ADMIN', 'FINANCE'].includes(String(user?.role_name ?? '').toUpperCase());
   const role = String(user?.role_name ?? '').toUpperCase();
-  // The API limits transaction reports the same way
-  const scopeNote = isFinanceUser ? 'Covers everyone\'s approved records.' : role === 'MANAGER' ? 'Covers your records and those of people whose requests you have decided.' : 'Covers your own records.';
   const reports = REPORTS.filter((r) => isFinanceUser || !FINANCE_ONLY.has(r.id));
   const fmt = (n: number) => formatCurrency(n, currency);
 
   useEffect(() => { setHeader('Reports', 'Generate, view & export financial reports'); }, [setHeader]);
 
+  const groups = GROUPS.filter((g) => reports.some((r) => r.group === g.value));
+  const [group, setGroup] = useTabParam<Group>(groups.map((g) => g.value), 'spend');
   const [selectedType, setSelectedType] = useState('expense-summary');
   const [datePreset, setDatePreset] = useState('This Month');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [txnType, setTxnType] = useState('');
+  const [ledgerStatus, setLedgerStatus] = useState('');
   const [categoryType, setCategoryType] = useState('all');
+  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [showFilters, setShowFilters] = useState(false);
+  const [compare, setCompare] = useState(false);
+  const [asOf, setAsOf] = useState('');
+  const [resultType, setResultType] = useState('');
   const [fy, setFy] = useState('');
   const { data: plansData } = useBudgetPlans();
   const fyOptions = Array.from(new Set([...(plansData?.plans ?? []).map((p) => p.fy), ...(plansData ? [plansData.current_fy] : [])])).sort((a, b) => b - a);
@@ -117,10 +156,18 @@ export default function ReportingPage() {
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     const wanted = q.get('report');
-    if (wanted && REPORTS.some((r) => r.id === wanted)) { setSelectedType(wanted); setResult(null); }
+    const hit = REPORTS.find((r) => r.id === wanted);
+    if (hit) { setSelectedType(hit.id); setGroup(hit.group as Group); setResult(null); }
     const y = q.get('year');
     if (y && /^\d{4}$/.test(y)) setFy(y);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The selected report always belongs to the open tab: opening a tab, or a tab in the link, picks its first report
+  useEffect(() => {
+    if (REPORTS.find((r) => r.id === selectedType)?.group === group) return;
+    const first = reports.find((r) => r.group === group);
+    if (first) { setSelectedType(first.id); setResult(null); }
+  }, [group]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Init date range to This Month
   useEffect(() => {
@@ -130,7 +177,16 @@ export default function ReportingPage() {
   }, []);
 
   // A result belongs to the filters it was made with, so changing one clears it
-  useEffect(() => { setResult(null); }, [dateFrom, dateTo, txnType, categoryType, activeFy]);
+  useEffect(() => { setResult(null); }, [dateFrom, dateTo, txnType, ledgerStatus, categoryType, activeFy, filters, compare, asOf]);
+
+  // What a report can be narrowed to
+  const { data: clientList } = useClients(true);
+  const { data: projectList } = useProjects();
+  const { data: productList } = useProducts();
+  const { data: categoryList } = useCategories();
+  const { data: people } = useQuery({ queryKey: ['reporting', 'people'], queryFn: () => api.get<{ id: number; username: string }[]>('/reporting/people').then((r) => r.data), staleTime: 5 * 60 * 1000 });
+  const activeFilterCount = Object.values(filters).filter(Boolean).length;
+  const nameOf = (list: { id: number; name?: string; code?: string | null }[] | undefined, id: string) => { const x = list?.find((i) => String(i.id) === id); return x ? [x.code, x.name].filter(Boolean).join(' ') : id; };
 
   const handlePreset = (label: string, key: string) => {
     setDatePreset(label);
@@ -141,37 +197,84 @@ export default function ReportingPage() {
     }
   };
 
-  const generate = useCallback(async () => {
+  // What goes to the API for a report: the period or year, and the filters that report understands. A drill-through passes its own values.
+  const buildParams = (type: string, o: { dateFrom?: string; dateTo?: string; txnType?: string; status?: string; filters?: Filters; compare?: boolean } = {}) => {
+    const params: Record<string, string> = { type };
+    const f = o.filters ?? filters;
+    if (FY_REPORTS.has(type)) {
+      if (activeFy) params.year = activeFy;
+    } else if (type === 'receivables-ageing') {
+      if (asOf) params.asOf = asOf;
+    } else if (!NO_PERIOD.has(type)) {
+      const from = o.dateFrom ?? dateFrom; const to = o.dateTo ?? dateTo;
+      if (from) params.dateFrom = from;
+      if (to) params.dateTo = to;
+      const tt = o.txnType ?? txnType;
+      if (type === 'transaction-ledger') { if (tt) params.txnType = tt; const st = o.status ?? ledgerStatus; if (st) params.status = st; }
+      if (type === 'client-summary') { params.categoryType = categoryType; if (tt) params.txnType = tt; }
+      if (FILTERABLE.has(type)) for (const [k, v] of Object.entries(f)) if (v) params[k] = v;
+      if (COMPARABLE.has(type) && (o.compare ?? compare)) params.compare = '1';
+    }
+    if (CLIENT_REPORTS.has(type) && f.clientId) params.clientId = f.clientId;
+    return params;
+  };
+
+  const run = async (params: Record<string, string>) => {
     setLoading(true);
     setResult(null);
     try {
-      const params: Record<string, string> = { type: selectedType };
-      if (FY_REPORTS.has(selectedType)) {
-        if (activeFy) params.year = activeFy;
-      } else if (!NO_PERIOD.has(selectedType)) {
-        if (dateFrom) params.dateFrom = dateFrom;
-        if (dateTo) params.dateTo = dateTo;
-        if (selectedType === 'transaction-ledger' && txnType) params.txnType = txnType;
-        if (selectedType === 'client-summary') {
-          params.categoryType = categoryType;
-          if (txnType) params.txnType = txnType;
-        }
-      }
       const qs = new URLSearchParams(params).toString();
       const res = await api.get<ReportResult>(`/reporting/generate?${qs}`);
+      setResultType(params.type);
       setResult((res as any).data ?? res);
     } catch {
       // toast handled by api client
     } finally {
       setLoading(false);
     }
-  }, [selectedType, dateFrom, dateTo, txnType, categoryType, activeFy]);
+  };
+  const generate = () => {
+    if (selectedType === 'client-statement' && !filters.clientId) { toast.error('Choose a client for the statement.'); return; }
+    run(buildParams(selectedType));
+  };
+
+  // From a row of a summary to the records behind it: the Transaction Ledger with the same period and filters, narrowed to that row
+  const showRecords = (patch: { dateFrom?: string; dateTo?: string; txnType?: string; filters?: Partial<Filters> }) => {
+    const next = { ...filters, ...patch.filters };
+    const tt = patch.txnType ?? '';
+    setSelectedType('transaction-ledger'); setGroup('spend'); setTxnType(tt); setLedgerStatus('approved'); setFilters(next); setCompare(false);
+    if (patch.dateFrom && patch.dateTo) { setDateFrom(patch.dateFrom); setDateTo(patch.dateTo); setDatePreset('Custom'); }
+    run(buildParams('transaction-ledger', { dateFrom: patch.dateFrom, dateTo: patch.dateTo, txnType: tt, status: 'approved', filters: next, compare: false }));
+  };
 
   const filteredRows = useMemo(() => (result
     ? result.rows.filter((row) =>
-        !search || Object.values(row).some((v) => String(v).toLowerCase().includes(search.toLowerCase()))
+        !search || Object.entries(row).some(([k, v]) => !k.startsWith('_') && String(v).toLowerCase().includes(search.toLowerCase()))
       )
     : []), [result, search]);
+
+  // The last column of a report whose rows can be followed to the records or the page behind them
+  function drillColumn(): ColumnDef<Record<string, any>, any>[] {
+    const month = (m: string) => { const [y, mo] = m.split('-').map(Number); const last = new Date(y, mo, 0).getDate(); return { dateFrom: `${m}-01`, dateTo: `${m}-${String(last).padStart(2, '0')}` }; };
+    const btn = (label: string, onClick: () => void) => (
+      <button type="button" onClick={onClick} className="rounded-md px-1 text-[13px] font-medium text-[var(--shell-accent)] hover:underline focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]">{label}</button>
+    );
+    const cell = (row: Record<string, any>) => {
+      switch (resultType) {
+        case 'expense-summary': case 'income-summary':
+          return row._categoryId != null ? btn('Records', () => showRecords({ txnType: resultType === 'income-summary' ? 'income' : 'expense', filters: { categoryId: String(row._categoryId) } })) : null;
+        case 'client-summary':
+          return row._clientId != null ? btn('Records', () => showRecords({ txnType: row._type, filters: { clientId: String(row._clientId), ...(row._categoryId != null ? { categoryId: String(row._categoryId) } : {}) } })) : null;
+        case 'pl-statement': return btn('Records', () => showRecords({ ...month(String(row.Month)), txnType: '' }));
+        case 'order-costing': return <RecordLink href={`/business/orders/${row._orderId}`}>Open</RecordLink>;
+        case 'project-estimate': case 'project-billing': return <RecordLink href={`/business/projects/${row._projectId}`}>Open</RecordLink>;
+        case 'product-margin': return <RecordLink href={`/business/products/${row._productId}`}>Open</RecordLink>;
+        default: return null;
+      }
+    };
+    if (!['expense-summary', 'income-summary', 'client-summary', 'pl-statement', 'order-costing', 'project-estimate', 'project-billing', 'product-margin'].includes(resultType)) return [];
+    return [{ id: '_open', header: '', enableSorting: false, size: 90, accessorFn: () => '', cell: ({ row }: { row: { original: Record<string, any> } }) => cell(row.original) } as ColumnDef<Record<string, any>, any>];
+  }
 
   // The columns come with the report, so the table is built from them; numbers sit right, in the same cell style as every table
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -194,7 +297,7 @@ export default function ReportingPage() {
         );
       },
     } as ColumnDef<Record<string, any>, any>;
-  }), [result, currency]);
+  }).concat(drillColumn()), [result, currency, resultType, filters]);
 
   const table = useDataTable({
     data: filteredRows, columns, state: { sorting }, onSortingChange: setSorting,
@@ -215,6 +318,11 @@ export default function ReportingPage() {
   ) : null;
 
   // ── Export ──────────────────────────────────────────────────────────────────
+  // What the table shows is what is exported. While a search is active the totals describe the whole report, so they are left out.
+  const withTotals = !search && !!result && Object.keys(result.totals).length > 0;
+  const totalCell = (col: string, ci: number) => (result!.totals[col] != null ? result!.totals[col] : ci === 0 ? 'Total' : '');
+  const shownText = (col: string, v: unknown) =>
+    typeof v === 'number' && CURRENCY_COLS.has(col) ? formatCurrency(v, currency) : isPctCol(col) && v != null && v !== '' ? `${v}%` : v == null ? '' : String(v);
   const csvCell = (v: unknown) => JSON.stringify(typeof v === 'string' && /^[=+\-@\t\r]/.test(v) ? `'${v}` : v ?? '');
   const exportCSV = () => {
     if (!result) return;
@@ -222,39 +330,64 @@ export default function ReportingPage() {
     for (const row of filteredRows) {
       lines.push(result.columns.map((c) => csvCell(row[c])).join(','));
     }
-    if (Object.keys(result.totals).length > 0) {
-      lines.push(result.columns.map((c) => result.totals[c] != null ? csvCell(result.totals[c]) : '').join(','));
-    }
+    if (withTotals) lines.push(result.columns.map((c, ci) => csvCell(totalCell(c, ci))).join(','));
     const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
     a.download = `${result.title.replace(/\s+/g, '_')}.csv`; a.click();
   };
 
+  // What the report was narrowed to, in words, for the head of an export
+  const periodText = FY_REPORTS.has(selectedType) ? (activeFy ? fyLabel(Number(activeFy)) : '—') : selectedType === 'receivables-ageing' ? `As of ${asOf || 'today'}` : NO_PERIOD.has(selectedType) ? 'Now' : `${dateFrom || '—'} to ${dateTo || '—'}`;
+  const filterWords = (): string[] => {
+    const out: string[] = [];
+    if (selectedType === 'transaction-ledger') { if (txnType) out.push(`Type: ${txnType}`); if (ledgerStatus) out.push(`Status: ${ledgerStatus}`); }
+    if (selectedType === 'client-summary') { if (txnType) out.push(`Type: ${txnType}`); if (categoryType !== 'all') out.push(`Charged to: ${categoryType}s`); }
+    if (FILTERABLE.has(selectedType)) {
+      if (filters.clientId) out.push(`Client: ${nameOf(clientList, filters.clientId)}`);
+      if (filters.projectId) out.push(`Project: ${nameOf(projectList, filters.projectId)}`);
+      if (filters.productId) out.push(`Product: ${nameOf(productList, filters.productId)}`);
+      if (filters.categoryId) out.push(`Category: ${nameOf(categoryList, filters.categoryId)}`);
+      if (filters.personId) out.push(`Person: ${people?.find((p) => String(p.id) === filters.personId)?.username ?? filters.personId}`);
+    }
+    if (CLIENT_REPORTS.has(selectedType) && filters.clientId) out.push(`Client: ${nameOf(clientList, filters.clientId)}`);
+    if (COMPARABLE.has(selectedType) && compare) out.push('Compared with the period before');
+    if (search) out.push(`Rows containing "${search}" only`);
+    return out;
+  };
+
   const exportExcel = () => {
     if (!result) return;
-    const sheetData = [
-      result.columns,
-      ...filteredRows.map((row) => result.columns.map((c) => row[c] ?? '')),
-    ];
-    if (Object.keys(result.totals).length > 0) {
-      sheetData.push(result.columns.map((c) => result.totals[c] != null ? result.totals[c] : ''));
-    }
+    const words = filterWords();
+    const head: string[][] = [[result.title], [`Period: ${periodText}`], ...(words.length ? [[`Filters: ${words.join('; ')}`]] : []), [`Generated: ${new Date().toLocaleString()}`], []];
+    const body: unknown[][] = filteredRows.map((row) => result.columns.map((c) => row[c] ?? ''));
+    if (withTotals) body.push(result.columns.map((c, ci) => totalCell(c, ci)));
+    const sheetData: unknown[][] = [...head, result.columns, ...body, ...(result.note ? [[], [result.note]] : [])];
     const ws = XLSX.utils.aoa_to_sheet(sheetData);
+    // Numbers stay numbers, with a format: two decimals and separators for money, a percent sign for percentages
+    const first = head.length + 1;
+    for (let r = first; r < first + body.length; r++) {
+      result.columns.forEach((col, c) => {
+        const cell = ws[XLSX.utils.encode_cell({ r, c })];
+        if (cell && typeof cell.v === 'number') cell.z = CURRENCY_COLS.has(col) ? '#,##0.00' : isPctCol(col) ? '0.00"%"' : '#,##0.##';
+      });
+    }
+    ws['!cols'] = result.columns.map((c) => ({ wch: Math.min(42, Math.max(c.length, ...filteredRows.slice(0, 200).map((row) => shownText(c, row[c]).length)) + 2) }));
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, result.title.slice(0, 31));
+    XLSX.utils.book_append_sheet(wb, ws, result.title.replace(/[\\/?*[\]:]/g, ' ').slice(0, 31));
     XLSX.writeFile(wb, `${result.title.replace(/\s+/g, '_')}.xlsx`);
   };
 
   const exportPDF = () => {
     if (!tableRef.current || !result) return;
-    const win = window.open('', '_blank')!;
+    const win = window.open('', '_blank');
+    if (!win) { toast.error('The print window was blocked. Allow pop-ups for this site and try again.'); return; }
     win.document.write(`
       <html><head><title>${escapeHtml(result.title)}</title>
       <style>
         body { font-family: Arial, sans-serif; font-size: 12px; margin: 24px; color: #111; }
         h2 { margin-bottom: 16px; }
         table { border-collapse: collapse; width: 100%; }
-        th { background: #f1f5f9; text-align: left; padding: 6px 10px; border: 1px solid #e2e8f0; font-size: 11px; text-transform:; }
+        th { background: #f1f5f9; text-align: left; padding: 6px 10px; border: 1px solid #e2e8f0; font-size: 11px; }
         td { padding: 6px 10px; border: 1px solid #e2e8f0; }
         tr:nth-child(even) td { background: #f8fafc; }
         .totals td { font-weight: bold; background: #eff6ff; }
@@ -262,14 +395,16 @@ export default function ReportingPage() {
         .meta { color: #64748b; font-size: 11px; margin-bottom: 12px; }
       </style></head><body>
       <h2>${escapeHtml(result.title)}</h2>
-      <p class="meta">Generated: ${escapeHtml(new Date().toLocaleString())} &nbsp;|&nbsp; Period: ${escapeHtml(FY_REPORTS.has(selectedType) ? (activeFy ? fyLabel(Number(activeFy)) : '—') : NO_PERIOD.has(selectedType) ? 'Now' : `${dateFrom || '—'} to ${dateTo || '—'}`)} &nbsp;|&nbsp; ${filteredRows.length} records</p>
+      <p class="meta">Generated: ${escapeHtml(new Date().toLocaleString())} &nbsp;|&nbsp; Period: ${escapeHtml(periodText)} &nbsp;|&nbsp; ${filteredRows.length} records</p>
+      ${filterWords().length ? `<p class="meta">Filters: ${escapeHtml(filterWords().join('; '))}</p>` : ''}
       <table>
         <thead><tr>${result.columns.map((c) => `<th class="${isNumericCol(c, result.rows) ? 'right' : ''}">${escapeHtml(c)}</th>`).join('')}</tr></thead>
         <tbody>
-          ${filteredRows.map((row) => `<tr>${result.columns.map((c) => { const v = row[c]; const isPct = isPctCol(c); return `<td class="${typeof v === 'number' ? 'right' : ''}">${isPct && v != null ? escapeHtml(v) + '%' : escapeHtml(v)}</td>`; }).join('')}</tr>`).join('')}
-          ${Object.keys(result.totals).length > 0 ? `<tr class="totals">${result.columns.map((c) => `<td class="${result.totals[c] != null ? 'right' : ''}">${result.totals[c] != null ? escapeHtml(result.totals[c]) : ''}</td>`).join('')}</tr>` : ''}
+          ${filteredRows.map((row) => `<tr>${result.columns.map((c) => `<td class="${isNumericCol(c, result.rows) ? 'right' : ''}">${escapeHtml(shownText(c, row[c]))}</td>`).join('')}</tr>`).join('')}
+          ${withTotals ? `<tr class="totals">${result.columns.map((c, ci) => `<td class="${isNumericCol(c, result.rows) ? 'right' : ''}">${escapeHtml(shownText(c, totalCell(c, ci)))}</td>`).join('')}</tr>` : ''}
         </tbody>
       </table>
+      ${result.note ? `<p class="meta" style="margin-top:12px">${escapeHtml(result.note)}</p>` : ''}
       </body></html>
     `);
     win.document.close();
@@ -286,14 +421,15 @@ export default function ReportingPage() {
   const selectClass = 'rounded-lg px-3 py-2 text-[13px] font-medium border outline-none focus:ring-2 focus:ring-[var(--shell-accent)]';
 
   return (
-    <PageFrame label="Reports">
-    <div className="h-full overflow-y-auto custom-scrollbar px-4 py-4 space-y-4">
+    <div className="flex h-full min-h-0 flex-col bg-[var(--shell-surface)]">
+    <TabBar tabs={groups as unknown as { value: Group; label: string }[]} value={group} onChange={setGroup} />
+    <div role="tabpanel" id="tabpanel" aria-labelledby={`tab-${group}`} className="min-h-0 flex-1 overflow-y-auto custom-scrollbar px-4 py-4 space-y-4">
 
       {/* Filters */}
       <div className="rounded-lg overflow-hidden" style={surface}>
         {/* Row 1: Report type selector */}
         <div className="px-4 pt-3 pb-2 flex flex-wrap items-center gap-2" style={{ borderBottom: '1px solid var(--shell-border)' }}>
-          {reports.map((r) => {
+          {reports.filter((r) => r.group === group).map((r) => {
             const Icon = r.icon;
             const active = selectedType === r.id;
             return (
@@ -358,6 +494,17 @@ export default function ReportingPage() {
                 </select>
               )}
 
+              {selectedType === 'transaction-ledger' && (
+                <select aria-label="Status" value={ledgerStatus} onChange={(e) => setLedgerStatus(e.target.value)}
+                  className={selectClass} style={selectStyle}>
+                  <option value="">All Statuses</option>
+                  <option value="approved">Approved</option>
+                  <option value="waiting">Waiting For Approval</option>
+                  <option value="draft">Draft</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+              )}
+
               {isClientSummary && (
                 <select aria-label="Category type" value={categoryType} onChange={(e) => setCategoryType(e.target.value)}
                   className={selectClass} style={selectStyle}>
@@ -369,20 +516,72 @@ export default function ReportingPage() {
             </>
           )}
 
-          {!isBudgetReport && !NO_PERIOD.has(selectedType) && !FINANCE_ONLY.has(selectedType) && (
-            <span className="text-[12px] text-[var(--shell-text-muted)]">{scopeNote}</span>
+          {selectedType === 'receivables-ageing' && (
+            <label className="flex items-center gap-2 text-[12px] text-[var(--shell-text-muted)]">
+              As of
+              <input type="date" aria-label="As of date" value={asOf} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setAsOf(e.target.value)}
+                className="rounded-lg px-3 py-1.5 text-[12px] border outline-none" style={inputStyle} />
+              {!asOf && <span>today</span>}
+            </label>
+          )}
+
+          {CLIENT_REPORTS.has(selectedType) && (
+            <select aria-label="Client" value={filters.clientId} onChange={(e) => setFilters((f) => ({ ...f, clientId: e.target.value }))}
+              className={`${selectClass} max-w-[240px]`} style={selectStyle}>
+              <option value="">{selectedType === 'client-statement' ? 'Choose a client' : 'All Clients'}</option>
+              {(clientList ?? []).map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
           )}
 
           <button
             onClick={generate}
             disabled={loading}
             className="flex items-center gap-2 px-5 py-2 rounded-lg font-semibold text-[13px] transition-all disabled:opacity-60"
-            style={{ background: 'var(--shell-accent)', color: 'var(--shell-accent-fg)' }}
+            style={{ background: 'var(--nav-emerald)', color: 'var(--shell-surface)' }}
           >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <BarChart3 className="h-4 w-4" />}
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4 fill-current" />}
             Generate
           </button>
         </div>
+
+        {/* Row 3: narrow the report, and set it against the period before */}
+        {(FILTERABLE.has(selectedType) || COMPARABLE.has(selectedType)) && (
+          <div className="border-t border-[var(--shell-border)] px-4 py-2.5">
+            <div className="flex flex-wrap items-center gap-4">
+              {FILTERABLE.has(selectedType) && (
+                <button type="button" aria-expanded={showFilters} onClick={() => setShowFilters((v) => !v)}
+                  className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] font-medium text-[var(--shell-text-muted)] hover:text-[var(--shell-text)] focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]">
+                  <ListFilter className="h-3.5 w-3.5" /> Filters{activeFilterCount ? ` (${activeFilterCount})` : ''}
+                </button>
+              )}
+              {COMPARABLE.has(selectedType) && (
+                <label className="flex cursor-pointer items-center gap-2 text-[12px] text-[var(--shell-text-muted)]">
+                  <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} /> Compare with the period before
+                </label>
+              )}
+              {activeFilterCount > 0 && (
+                <button type="button" onClick={() => setFilters(EMPTY_FILTERS)} className="rounded-md px-1 text-[12px] font-medium text-[var(--shell-accent)] hover:underline focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]">Clear filters</button>
+              )}
+            </div>
+            {FILTERABLE.has(selectedType) && showFilters && (
+              <div className="mt-2.5 flex flex-wrap items-center gap-3">
+                {([
+                  ['clientId', 'Client', (clientList ?? []).map((c: any) => ({ id: c.id, name: c.name }))],
+                  ['projectId', 'Project', (projectList ?? []).map((p: any) => ({ id: p.id, name: p.code ? `${p.code} ${p.name}` : p.name }))],
+                  ['productId', 'Product', (productList ?? []).map((p: any) => ({ id: p.id, name: p.code ? `${p.code} ${p.name}` : p.name }))],
+                  ['categoryId', 'Category', (categoryList ?? []).filter((c: any) => selectedType === 'pl-statement' || selectedType === 'client-summary' || !(selectedType === 'income-summary' ? c.type !== 'income' : c.type !== 'expense')).map((c: any) => ({ id: c.id, name: c.name }))],
+                  ...((people ?? []).length ? [['personId', 'Person', (people ?? []).map((p) => ({ id: p.id, name: p.username }))] as const] : []),
+                ] as const).map(([key, label, options]) => (
+                  <select key={key} aria-label={label} value={filters[key as keyof Filters]} onChange={(e) => setFilters((f) => ({ ...f, [key]: e.target.value }))}
+                    className={`${selectClass} max-w-[220px]`} style={selectStyle}>
+                    <option value="">{`All ${label}s`.replace('Categorys', 'Categories')}</option>
+                    {(options as { id: number; name: string }[]).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                  </select>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Results */}
@@ -412,17 +611,17 @@ export default function ReportingPage() {
                 />
               </div>
               {/* Export buttons */}
-              <button onClick={exportCSV} title="Export CSV"
+              <button onClick={exportCSV} title={search ? 'Export CSV (the rows shown, without totals)' : 'Export CSV'}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all hover:opacity-80"
                 style={{ background: 'var(--shell-hover)', color: 'var(--shell-text)' }}>
                 <FileText className="h-3.5 w-3.5" /> CSV
               </button>
-              <button onClick={exportExcel} title="Export Excel"
+              <button onClick={exportExcel} title={search ? 'Export Excel (the rows shown, without totals)' : 'Export Excel'}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all hover:opacity-80"
                 style={{ background: 'color-mix(in srgb, var(--success) 12%, transparent)', color: 'var(--success)' }}>
                 <Sheet className="h-3.5 w-3.5" /> Excel
               </button>
-              <button onClick={exportPDF} title="Print / Save as PDF"
+              <button onClick={exportPDF} title={search ? 'Print / Save as PDF (the rows shown, without totals)' : 'Print / Save as PDF'}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all hover:opacity-80"
                 style={{ background: 'color-mix(in srgb, var(--danger) 12%, transparent)', color: 'var(--danger)' }}>
                 <Download className="h-3.5 w-3.5" /> PDF
@@ -458,6 +657,6 @@ export default function ReportingPage() {
         </div>
       )}
     </div>
-    </PageFrame>
+    </div>
   );
 }

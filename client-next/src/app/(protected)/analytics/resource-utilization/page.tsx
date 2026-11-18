@@ -6,7 +6,7 @@ import { PeriodBar } from '@/components/shared/period-bar';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { formatCurrency, formatDate, getDateRange } from '@/lib/currency';
-import { useBudgetMonitor } from '@/hooks/use-budget-queries';
+import { useBudgetMonitor, useFiscalYear } from '@/hooks/use-budget-queries';
 import { RecordLink, TabBar, useTabParam } from '@/components/budgets/budget-ui';
 import { detailHref, kindOfLine, objectIdOf } from '@/components/budgets/planner-objects';
 import {
@@ -283,11 +283,12 @@ export default function AnalyticsPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo]     = useState('');
 
+  const { data: fiscal } = useFiscalYear();
   useEffect(() => {
     const r = getDateRange('finYear');
     setDateFrom(r.from);
     setDateTo(r.to);
-  }, []);
+  }, [fiscal?.start_month]);
 
   // The header says which period the figures cover, when the tab is about a period
   useEffect(() => {

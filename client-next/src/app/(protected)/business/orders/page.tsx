@@ -9,6 +9,7 @@ import { ColumnDef, getCoreRowModel, getFilteredRowModel, getPaginationRowModel,
 import api from '@/lib/api-client';
 import { downloadCsv, toCsv } from '@/lib/csv';
 import { formatDate } from '@/lib/currency';
+import { workingDaysBetween } from '@/lib/working-days';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useInvalidate } from '@/hooks/use-queries';
@@ -54,7 +55,7 @@ const orderVerdict = (r: BuildOrderRow): { label: string; tone: 'success' | 'war
   return { label: ORDER_STATUS[r.status].label, tone: 'muted', rank: r.status === 'IN_BUILD' ? 4 : 5, reason: '' };
 };
 // Days between the earliest the parts allow and the promised date. Negative means the promise cannot be kept.
-const spareDays = (r: BuildOrderRow): number | null => (!OPEN.includes(r.status) || !r.has_bom || !r.earliest_delivery ? null : Math.round((new Date(r.delivery_date).getTime() - new Date(r.earliest_delivery).getTime()) / 86400000));
+const spareDays = (r: BuildOrderRow): number | null => (!OPEN.includes(r.status) || !r.has_bom || !r.earliest_delivery ? null : workingDaysBetween(r.earliest_delivery, r.delivery_date));
 
 export default function OrdersPage() {
   const setHeader = useHeaderStore((s) => s.setHeader);
@@ -82,7 +83,7 @@ export default function OrdersPage() {
     && (customer === 'ALL' || r.client_name === customer)), [data, show, product, customer]);
 
   const columns = useMemo<ColumnDef<BuildOrderRow, any>[]>(() => [
-    { accessorKey: 'code', header: 'Order', cell: ({ row }) => <IdCell value={row.original.code} />, size: 100 },
+    { accessorKey: 'code', header: 'Code', cell: ({ row }) => <IdCell value={row.original.code} />, size: 100 },
     {
       accessorKey: 'product_name', header: 'Product',
       // Customer and PO as the second line: the table stays within the space beside the panel
@@ -93,30 +94,26 @@ export default function OrdersPage() {
         </div>
       ),
     },
-    { accessorKey: 'quantity', header: headerRight('Units'), cell: ({ row }) => <div className="text-right"><TextCell value={row.original.quantity} /></div>, size: 70 },
+    {
+      id: 'status', header: 'Status', size: 110, accessorFn: (r) => Object.keys(ORDER_STATUS).indexOf(r.status),
+      cell: ({ row }) => <ToneText label={ORDER_STATUS[row.original.status].label} tone={ORDER_STATUS[row.original.status].tone} />,
+    },
+    {
+      id: 'verdict', header: 'Delivery', size: 120, accessorFn: (r) => orderVerdict(r).rank,
+      // Loss, Late, No BOM or On time while the order is open; blank once it is delivered or cancelled
+      cell: ({ row }) => { const v = orderVerdict(row.original); return v.rank >= 4 ? <TextCell value="" /> : <span title={v.reason}><ToneText label={v.label} tone={v.tone} /></span>; },
+    },
     { accessorKey: 'delivery_date', header: 'Promised', cell: ({ row }) => <DateCell value={row.original.delivery_date} />, size: 110 },
     {
-      id: 'spare', header: headerRight('Days spare'), size: 100, sortUndefined: 'last', accessorFn: (r) => spareDays(r) ?? undefined,
-      cell: ({ row }) => { const n = spareDays(row.original); return <div className="text-right"><ToneText label={n == null ? '—' : `${n} d`} tone={n != null && n < 0 ? 'danger' : 'muted'} /></div>; },
+      id: 'spare', header: headerRight('Spare (days)'), size: 100, sortUndefined: 'last', accessorFn: (r) => spareDays(r) ?? undefined,
+      cell: ({ row }) => { const n = spareDays(row.original); return <div className="text-right"><ToneText label={n == null ? '' : String(n)} tone={n != null && n < 0 ? 'danger' : 'muted'} /></div>; },
     },
-    { accessorKey: 'total_value', header: headerRight('Order value'), cell: ({ row }) => <WholeCell symbol value={row.original.total_value} currency={currency} />, size: 120 },
     {
       accessorKey: 'margin_pct', header: headerRight('Margin'), size: 90, sortUndefined: 'last',
-      cell: ({ row }) => { const m = row.original.margin_pct; return <div className="text-right"><ToneText label={m == null ? '—' : `${m.toFixed(1)}%`} tone={m != null && m < 0 ? 'danger' : 'muted'} /></div>; },
+      cell: ({ row }) => { const m = row.original.margin_pct; return <div className="text-right"><ToneText label={m == null ? '' : `${m.toFixed(1)}%`} tone={m != null && m < 0 ? 'danger' : 'muted'} /></div>; },
     },
-    {
-      id: 'verdict', header: 'Status', size: 120, accessorFn: (r) => orderVerdict(r).rank,
-      // The verdict leads for open orders; the lifecycle step sits under it
-      cell: ({ row }) => {
-        const v = orderVerdict(row.original);
-        return (
-          <div>
-            <ToneText label={v.label} tone={v.tone} />
-            {OPEN.includes(row.original.status) && <span className="block text-[12px] text-[var(--shell-text-muted)]">{ORDER_STATUS[row.original.status].label}</span>}
-          </div>
-        );
-      },
-    },
+    { accessorKey: 'quantity', header: headerRight('Units'), cell: ({ row }) => <div className="text-right"><TextCell value={row.original.quantity} /></div>, size: 70 },
+    { accessorKey: 'total_value', header: headerRight('Order value'), cell: ({ row }) => <WholeCell value={row.original.total_value} currency={currency} />, size: 120 },
   ], [currency]);
 
   const table = useDataTable({
@@ -188,7 +185,7 @@ export default function OrdersPage() {
           <DetailField label="Margin on open orders" value={openMargin != null ? `${openMargin.toFixed(1)}%` : undefined} tone={openMargin != null && openMargin < 0 ? 'danger' : 'muted'} wide />
         </DetailGrid>
       </DetailSection>
-      <p className="text-[12px] text-[var(--shell-text-muted)]">Select an order to act on it, or open it for its parts, cost and cash timing. Days spare is how long the promised date can slip before parts are late.</p>
+      <p className="text-[12px] text-[var(--shell-text-muted)]">Select an order to act on it, or open it for its parts, cost and cash timing. Spare is how many working days the promised date can slip before parts are late.</p>
     </div>
   );
 
@@ -214,9 +211,9 @@ export default function OrdersPage() {
       {d && OPEN.includes(d.status) && d.has_bom && (
         <DetailSection title="Parts and dates">
           {d.lead.late ? (
-            <p className="text-[13px] text-[var(--danger)]">The parts cannot all arrive in time. The longest lead time is {d.lead.longest_lead_days} days and the build needs about {d.lead.assembly_days}, against {d.lead.window_days} days between the dates. The earliest delivery is {formatDate(d.lead.earliest_delivery)}.</p>
+            <p className="text-[13px] text-[var(--danger)]">The parts cannot all arrive in time. The longest lead time is {d.lead.longest_lead_days} working days and the build needs about {d.lead.assembly_days}, against {d.lead.window_days} working days between the dates. The earliest delivery is {formatDate(d.lead.earliest_delivery)}.</p>
           ) : (
-            <p className="text-[13px] text-[var(--shell-text)]">The parts can arrive in time: longest lead time {d.lead.longest_lead_days} days, build about {d.lead.assembly_days} days, {d.lead.window_days} days available.</p>
+            <p className="text-[13px] text-[var(--shell-text)]">The parts can arrive in time: longest lead time {d.lead.longest_lead_days} working days, build about {d.lead.assembly_days} working days, {d.lead.window_days} working days available.</p>
           )}
           {d.lead.late_lines.length > 0 && (
             <ul className="space-y-1">

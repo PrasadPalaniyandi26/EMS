@@ -10,6 +10,7 @@ import { Sidebar } from '@/components/layout/sidebar';
 import { Footer } from '@/components/layout/footer';
 import { TopBar } from '@/components/layout/topbar';
 import { BottomNav } from '@/components/layout/bottom-nav';
+import { useFiscalYear } from '@/hooks/use-budget-queries';
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const { user, isAuthenticated, isLoading, refreshSession } = useAuthStore();
@@ -31,6 +32,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
       router.replace('/login');
     }
   }, [isLoading, isAuthenticated, router]);
+
+  // The financial year's first month, so the Financial Year and This Quarter presets are right on every page
+  useFiscalYear(isAuthenticated);
 
   const roleName = user?.role_name;
   const routeAllowed = canAccessRoute(pathname, roleName);

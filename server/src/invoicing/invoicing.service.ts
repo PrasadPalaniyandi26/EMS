@@ -593,19 +593,34 @@ export class InvoicingService {
     return { outstanding: r2(outstanding), overdue: r2(overdue), overdue_count: overdueCount, oldest_overdue_days: oldest, drafts, expiring_pos: expiring, received_this_month: r2(n(received._sum.amount)), clients_owing: owed.size, top };
   }
 
-  // Money owed by each client, by how long it has been due
-  async ageingReport() {
+  // Money owed by each client, by how long it has been due, as of today or as of an earlier date.
+  // As of an earlier date it counts the invoices issued by then and the payments made by then.
+  async ageingReport(asOf?: Date) {
+    const day = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
     const today = todayUtc().getTime();
-    const invoices = await this.prisma.invoice.findMany({ where: { status: { in: ['ISSUED', 'PART_PAID'] } }, select: { clientId: true, total: true, paid: true, tds: true, dueDate: true, client: { select: { name: true } } } });
-    type Row = { Client: string; Invoices: number; 'Not Due': number; '1-30 Days': number; '31-60 Days': number; '61-90 Days': number; 'Over 90 Days': number; Outstanding: number };
+    const at = asOf ? Math.min(day(asOf), today) : today;
+    const past = at < today;
+    type Open = { clientId: number; bal: number; dueDate: Date; clientName: string };
+    const open: Open[] = [];
+    if (!past) {
+      const invoices = await this.prisma.invoice.findMany({ where: { status: { in: ['ISSUED', 'PART_PAID'] } }, select: { clientId: true, total: true, paid: true, tds: true, dueDate: true, client: { select: { name: true } } } });
+      for (const i of invoices) open.push({ clientId: i.clientId, bal: r2(n(i.total) - n(i.paid) - n(i.tds)), dueDate: i.dueDate, clientName: i.client?.name ?? '' });
+    } else {
+      const cutoff = new Date(at);
+      const invoices = await this.prisma.invoice.findMany({
+        where: { status: { not: 'DRAFT' }, invoiceDate: { lte: cutoff }, OR: [{ status: { not: 'CANCELLED' } }, { cancelledAt: { gt: new Date(at + DAY) } }] },
+        select: { clientId: true, total: true, dueDate: true, client: { select: { name: true } }, payments: { where: { paidOn: { lte: cutoff } }, select: { amount: true, tds: true } } },
+      });
+      for (const i of invoices) open.push({ clientId: i.clientId, bal: r2(n(i.total) - i.payments.reduce((a, p) => a + n(p.amount) + n(p.tds), 0)), dueDate: i.dueDate, clientName: i.client?.name ?? '' });
+    }
+    type Row = { Client: string; Invoices: number; 'Not Due': number; '1-30 Days': number; '31-60 Days': number; '61-90 Days': number; 'Over 90 Days': number; Outstanding: number; _clientId?: number };
     const by = new Map<number, Row>();
-    for (const i of invoices) {
-      const bal = r2(n(i.total) - n(i.paid) - n(i.tds));
-      if (bal <= 0.005) continue;
-      const late = Math.floor((today - i.dueDate.getTime()) / DAY);
+    for (const i of open) {
+      if (i.bal <= 0.005) continue;
+      const late = Math.floor((at - i.dueDate.getTime()) / DAY);
       const col = late <= 0 ? 'Not Due' : late <= 30 ? '1-30 Days' : late <= 60 ? '31-60 Days' : late <= 90 ? '61-90 Days' : 'Over 90 Days';
-      const r = by.get(i.clientId) ?? { Client: i.client?.name ?? '', Invoices: 0, 'Not Due': 0, '1-30 Days': 0, '31-60 Days': 0, '61-90 Days': 0, 'Over 90 Days': 0, Outstanding: 0 };
-      r.Invoices += 1; r[col] = r2(r[col] + bal); r.Outstanding = r2(r.Outstanding + bal);
+      const r = by.get(i.clientId) ?? { Client: i.clientName, Invoices: 0, 'Not Due': 0, '1-30 Days': 0, '31-60 Days': 0, '61-90 Days': 0, 'Over 90 Days': 0, Outstanding: 0, _clientId: i.clientId };
+      r.Invoices += 1; r[col] = r2(r[col] + i.bal); r.Outstanding = r2(r.Outstanding + i.bal);
       by.set(i.clientId, r);
     }
     const rows = [...by.values()].sort((a, b) => b.Outstanding - a.Outstanding);
@@ -615,7 +630,7 @@ export class InvoicingService {
       columns: ['Client', 'Invoices', 'Not Due', '1-30 Days', '31-60 Days', '61-90 Days', 'Over 90 Days', 'Outstanding'],
       rows,
       totals: { Invoices: sum('Invoices'), 'Not Due': sum('Not Due'), '1-30 Days': sum('1-30 Days'), '31-60 Days': sum('31-60 Days'), '61-90 Days': sum('61-90 Days'), 'Over 90 Days': sum('Over 90 Days'), Outstanding: sum('Outstanding') },
-      note: 'Counted from the due date, as of today. The tax a client deducts (TDS) counts as received.',
+      note: `Counted from the due date, as of ${past ? new Date(at).toISOString().slice(0, 10) : 'today'}. The tax a client deducts (TDS) counts as received.${past ? ' Invoices issued and payments made after that date are left out.' : ''}`,
     };
   }
 
@@ -642,6 +657,148 @@ export class InvoicingService {
       rows,
       totals: { Taxable: sum('taxable'), CGST: sum('cgst'), SGST: sum('sgst'), IGST: sum('igst'), 'Round Off': sum('roundOff'), 'Invoice Value': sum('total') },
       note: 'By invoice date. Cancelled invoices stay listed with no value so the number series has no gaps.',
+    };
+  }
+  private static readonly METHOD_LABEL: Record<string, string> = { BANK: 'Bank', UPI: 'UPI', CASH: 'Cash', CHEQUE: 'Cheque' };
+  private static pay(m: string | null) { return m ? (InvoicingService.METHOD_LABEL[m.toUpperCase()] ?? m) : ''; }
+  private static readonly STATUS_LABEL: Record<string, string> = { ISSUED: 'Issued', PART_PAID: 'Part Paid', PAID: 'Paid', CANCELLED: 'Cancelled' };
+
+  private periodWhere(field: string, dateFrom?: Date, dateTo?: Date) {
+    return dateFrom || dateTo ? { [field]: { ...(dateFrom ? { gte: dateFrom } : {}), ...(dateTo ? { lte: dateTo } : {}) } } : {};
+  }
+
+  // Every invoice raised in the period with what has been received and what is still due
+  async invoiceRegister(dateFrom?: Date, dateTo?: Date, clientId?: number) {
+    const today = todayUtc().getTime();
+    const invoices = await this.prisma.invoice.findMany({
+      where: { status: { in: [...ISSUED, 'CANCELLED'] }, number: { not: null }, ...(clientId ? { clientId } : {}), ...this.periodWhere('invoiceDate', dateFrom, dateTo) },
+      orderBy: [{ invoiceDate: 'asc' }, { number: 'asc' }],
+      include: { client: { select: { name: true } }, po: { select: { poNumber: true } }, project: { select: { name: true } }, buildOrder: { select: { code: true } } },
+    });
+    const rows = invoices.map((i) => {
+      const gone = i.status === 'CANCELLED';
+      const balance = gone ? 0 : r2(n(i.total) - n(i.paid) - n(i.tds));
+      const late = !gone && balance > 0.005 ? Math.floor((today - i.dueDate.getTime()) / DAY) : 0;
+      return {
+        'Invoice No': i.number, Date: iso(i.invoiceDate), 'Due Date': iso(i.dueDate), Client: i.client?.name ?? '', 'Client PO': i.po?.poNumber ?? '',
+        Against: i.project?.name ?? i.buildOrder?.code ?? '', 'Invoice Value': gone ? 0 : n(i.total), Received: gone ? 0 : n(i.paid), TDS: gone ? 0 : n(i.tds), Balance: balance,
+        'Days Overdue': late > 0 ? late : null, Status: InvoicingService.STATUS_LABEL[i.status] ?? i.status, _clientId: i.clientId,
+      };
+    });
+    const sum = (k: 'Invoice Value' | 'Received' | 'TDS' | 'Balance') => r2(rows.reduce((a, r) => a + r[k], 0));
+    return {
+      title: 'Invoice Register',
+      columns: ['Invoice No', 'Date', 'Due Date', 'Client', 'Client PO', 'Against', 'Invoice Value', 'Received', 'TDS', 'Balance', 'Days Overdue', 'Status'],
+      rows,
+      totals: { 'Invoice Value': sum('Invoice Value'), Received: sum('Received'), TDS: sum('TDS'), Balance: sum('Balance') },
+      note: 'By invoice date. Balance is the invoice value less money received and tax deducted at source. Days Overdue counts from the due date to today for invoices with a balance. Cancelled invoices stay listed with no value.',
+    };
+  }
+
+  // One client's account for the period: invoices raised, money received, and the balance after each line
+  async clientStatement(clientId: number | undefined, dateFrom?: Date, dateTo?: Date) {
+    if (!clientId) throw bad('Choose a client for the statement.');
+    const client = await this.prisma.client.findUnique({ where: { id: clientId }, select: { name: true } });
+    if (!client) throw bad('That client was not found.', HttpStatus.NOT_FOUND);
+    const invoices = await this.prisma.invoice.findMany({
+      where: { clientId, status: { in: ISSUED } }, orderBy: [{ invoiceDate: 'asc' }, { number: 'asc' }],
+      select: { id: true, number: true, invoiceDate: true, total: true, payments: { select: { paidOn: true, amount: true, tds: true, method: true, reference: true }, orderBy: { paidOn: 'asc' } } },
+    });
+    type Line = { date: Date; order: number; type: string; ref: string; detail: string; debit: number; credit: number };
+    const all: Line[] = [];
+    for (const i of invoices) {
+      all.push({ date: i.invoiceDate, order: 0, type: 'Invoice', ref: i.number ?? '', detail: '', debit: n(i.total), credit: 0 });
+      for (const p of i.payments) {
+        const how = [InvoicingService.pay(p.method), p.reference].filter(Boolean).join(' ');
+        all.push({ date: p.paidOn, order: 1, type: 'Payment', ref: i.number ?? '', detail: [how, n(p.tds) > 0 ? `TDS ${n(p.tds).toFixed(2)}` : ''].filter(Boolean).join(', '), debit: 0, credit: r2(n(p.amount) + n(p.tds)) });
+      }
+    }
+    all.sort((a, b) => a.date.getTime() - b.date.getTime() || a.order - b.order);
+    let balance = r2(all.filter((l) => dateFrom && l.date < dateFrom).reduce((a, l) => a + l.debit - l.credit, 0));
+    const inPeriod = all.filter((l) => (!dateFrom || l.date >= dateFrom) && (!dateTo || l.date <= dateTo));
+    const rows: Record<string, unknown>[] = [{ Date: dateFrom ? iso(dateFrom) : '', Type: 'Opening', Reference: '', Details: 'Balance brought forward', Debit: null, Credit: null, Balance: balance }];
+    for (const l of inPeriod) {
+      balance = r2(balance + l.debit - l.credit);
+      rows.push({ Date: iso(l.date), Type: l.type, Reference: l.ref, Details: l.detail, Debit: l.debit || null, Credit: l.credit || null, Balance: balance });
+    }
+    const sum = (k: 'debit' | 'credit') => r2(inPeriod.reduce((a, l) => a + l[k], 0));
+    return {
+      title: `Client Statement: ${client.name}`,
+      columns: ['Date', 'Type', 'Reference', 'Details', 'Debit', 'Credit', 'Balance'],
+      rows,
+      totals: { Debit: sum('debit'), Credit: sum('credit'), Balance: balance },
+      note: 'Debit is the invoice value and credit is money received plus tax deducted at source. Balance is what the client owes after each line, and the total row shows the closing balance. Cancelled invoices are left out.',
+    };
+  }
+
+  // Money received in the period, one line per payment
+  async collections(dateFrom?: Date, dateTo?: Date, clientId?: number) {
+    const payments = await this.prisma.invoicePayment.findMany({
+      where: { invoice: { status: { in: [...ISSUED] }, ...(clientId ? { clientId } : {}) }, ...this.periodWhere('paidOn', dateFrom, dateTo) },
+      orderBy: [{ paidOn: 'asc' }, { id: 'asc' }],
+      include: { invoice: { select: { number: true, clientId: true, client: { select: { name: true } } } } },
+    });
+    const rows = payments.map((p) => ({
+      Date: iso(p.paidOn), Client: p.invoice.client?.name ?? '', 'Invoice No': p.invoice.number ?? '', Method: InvoicingService.pay(p.method), Reference: p.reference ?? '',
+      Received: n(p.amount), TDS: n(p.tds), 'Total Credited': r2(n(p.amount) + n(p.tds)), 'Recorded By': p.createdByName ?? '', _clientId: p.invoice.clientId,
+    }));
+    const sum = (k: 'Received' | 'TDS' | 'Total Credited') => r2(rows.reduce((a, r) => a + r[k], 0));
+    return {
+      title: 'Collections',
+      columns: ['Date', 'Client', 'Invoice No', 'Method', 'Reference', 'Received', 'TDS', 'Total Credited', 'Recorded By'],
+      rows,
+      totals: { Received: sum('Received'), TDS: sum('TDS'), 'Total Credited': sum('Total Credited') },
+      note: 'By the date the money was received. Received is what reached the bank; Total Credited adds the tax the client deducted at source, which is what clears the invoice.',
+    };
+  }
+
+  // Tax the clients deducted before paying us, to match against the TDS certificates
+  async tdsRegister(dateFrom?: Date, dateTo?: Date, clientId?: number) {
+    const payments = await this.prisma.invoicePayment.findMany({
+      where: { tds: { gt: 0 }, invoice: { status: { in: [...ISSUED] }, ...(clientId ? { clientId } : {}) }, ...this.periodWhere('paidOn', dateFrom, dateTo) },
+      orderBy: [{ paidOn: 'asc' }, { id: 'asc' }],
+      include: { invoice: { select: { number: true, clientId: true, buyer: true, client: { select: { name: true } } } } },
+    });
+    const rows = payments.map((p) => {
+      const buyer = (p.invoice.buyer ?? {}) as { gstin?: string | null };
+      const pan = buyer.gstin && buyer.gstin.length >= 12 ? buyer.gstin.slice(2, 12) : '';
+      return { Date: iso(p.paidOn), Client: p.invoice.client?.name ?? '', PAN: pan, 'Invoice No': p.invoice.number ?? '', 'TDS Deducted': n(p.tds), Received: n(p.amount), _clientId: p.invoice.clientId };
+    });
+    const sum = (k: 'TDS Deducted' | 'Received') => r2(rows.reduce((a, r) => a + r[k], 0));
+    return {
+      title: 'TDS Register',
+      columns: ['Date', 'Client', 'PAN', 'Invoice No', 'TDS Deducted', 'Received'],
+      rows,
+      totals: { 'TDS Deducted': sum('TDS Deducted'), Received: sum('Received') },
+      note: 'Payments where the client held back tax at source, by the date received, to match against their TDS certificates. PAN is taken from the client GSTIN on the invoice, so it is blank for an unregistered client.',
+    };
+  }
+
+  // Each client PO: what it is worth, what has been billed against it and how much is left
+  async clientPoStatus(clientId?: number) {
+    const today = todayUtc().getTime();
+    const pos = await this.prisma.clientPo.findMany({
+      where: clientId ? { clientId } : {}, orderBy: [{ poDate: 'desc' }, { id: 'desc' }],
+      include: { client: { select: { name: true } }, project: { select: { name: true } }, buildOrder: { select: { code: true } }, invoices: { where: { status: { in: [...ISSUED] } }, select: { taxable: true } } },
+    });
+    const rows = pos.map((p) => {
+      const value = n(p.value);
+      const billed = r2(p.invoices.reduce((a, i) => a + n(i.taxable), 0));
+      const expired = p.status === 'OPEN' && p.validUntil != null && p.validUntil.getTime() < today;
+      return {
+        'PO No': p.poNumber, Client: p.client?.name ?? '', 'PO Date': iso(p.poDate), 'Valid Until': iso(p.validUntil), Against: p.project?.name ?? p.buildOrder?.code ?? '',
+        'PO Value': value, Invoiced: billed, Remaining: r2(value - billed), '% Billed': value > 0 ? r2((billed / value) * 100) : null,
+        Status: expired ? 'Expired' : p.status === 'OPEN' ? 'Open' : p.status === 'CLOSED' ? (p.autoClosed ? 'Closed, fully billed' : 'Closed') : 'Cancelled', _clientId: p.clientId,
+      };
+    });
+    const live = rows.filter((r) => r.Status !== 'Cancelled');
+    const sum = (k: 'PO Value' | 'Invoiced' | 'Remaining') => r2(live.reduce((a, r) => a + r[k], 0));
+    return {
+      title: 'Client PO Status',
+      columns: ['PO No', 'Client', 'PO Date', 'Valid Until', 'Against', 'PO Value', 'Invoiced', 'Remaining', '% Billed', 'Status'],
+      rows,
+      totals: { 'PO Value': sum('PO Value'), Invoiced: sum('Invoiced'), Remaining: sum('Remaining') },
+      note: 'Invoiced is the taxable value of issued invoices raised against the PO, compared with the PO value. Cancelled POs are listed but not added up. Open POs past their valid-until date show as Expired.',
     };
   }
 }

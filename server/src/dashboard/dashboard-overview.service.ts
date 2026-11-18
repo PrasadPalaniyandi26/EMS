@@ -9,6 +9,7 @@ import { InvoicingService } from '../invoicing/invoicing.service';
 import { DashboardService } from './dashboard.service';
 import { COMMITTED_STATUSES, committedStatusSql } from '../common/constants/transaction-status';
 import { parseRange } from '../common/helpers/dates';
+import { workingDaysBetween } from '../common/helpers/working-days';
 
 const DAY = 86400000;
 const r2 = (v: number) => Math.round(v * 100) / 100;
@@ -100,7 +101,7 @@ export class DashboardOverviewService {
     const approvalsBlock = {
       mine, drafts,
       pending_count: pendingAgg._count, pending_amount: r2(num(pendingAgg._sum.amount)),
-      oldest_days: oldestPending?.submittedAt ? Math.max(0, Math.floor((Date.now() - oldestPending.submittedAt.getTime()) / DAY)) : null,
+      oldest_days: oldestPending?.submittedAt ? Math.max(0, workingDaysBetween(oldestPending.submittedAt, new Date())) : null,
     };
     const reimbursements = { due_count: reimb._count, due_amount: r2(num(reimb._sum.amount)) };
 
@@ -218,7 +219,7 @@ export class DashboardOverviewService {
     const cost = costed.reduce((a, o) => a + o.total_cost, 0);
     const next = [...open].sort((a, b) => String(a.delivery_date).localeCompare(String(b.delivery_date))).slice(0, 4).map((o) => ({
       id: o.id, code: o.code, product: o.product_name, customer: o.client_name, delivery_date: o.delivery_date, status: o.status, value: o.total_value,
-      days: Math.round((new Date(o.delivery_date).getTime() - today.getTime()) / DAY), late: !!o.late,
+      days: workingDaysBetween(today, new Date(o.delivery_date)), late: !!o.late,
     }));
     return {
       projects: {

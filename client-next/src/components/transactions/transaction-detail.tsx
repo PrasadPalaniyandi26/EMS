@@ -48,8 +48,8 @@ export function TransactionDetail({ kind, txn, currency, approvalTrail, split, n
   if (txn.rejected_at) trail.push({ title: `Rejected by ${withRole(txn.rejected_by_name, txn.rejected_by_role)}`, meta: [formatDate(txn.rejected_at), comment('REJECTED') && `“${comment('REJECTED')}”`].filter(Boolean).join(' · '), tone: 'danger' });
   // The next step, so the employee knows who it is waiting for
   const stNow = (txn.status || '').toUpperCase();
-  if (kind === 'expense' && stNow === 'PENDING_MANAGER') trail.push({ title: 'Waiting for the manager', meta: 'Next step', tone: 'warning' });
-  if (kind === 'expense' && stNow === 'PENDING_FINANCE') trail.push({ title: 'Waiting for finance', meta: 'Next step', tone: 'warning' });
+  if (kind === 'expense' && stNow === 'PENDING_MANAGER') trail.push({ title: 'With the manager', meta: 'Next step', tone: 'warning' });
+  if (kind === 'expense' && stNow === 'PENDING_FINANCE') trail.push({ title: 'With finance', meta: 'Next step', tone: 'warning' });
   if (txn.voided_at) trail.push({ title: `Voided by ${txn.voided_by_name || ''}`, meta: [formatDate(txn.voided_at), txn.void_reason && `“${txn.void_reason}”`].filter(Boolean).join(' · '), tone: 'muted' });
 
   const reimb = txn.reimbursement_status;

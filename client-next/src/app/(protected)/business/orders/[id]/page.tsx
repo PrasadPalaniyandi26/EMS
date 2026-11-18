@@ -8,9 +8,11 @@ import { ArrowLeftRight, Ban, CircleCheck, Hammer, PackageOpen, Pencil, Plus, Re
 import { ColumnDef, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, getSortedRowModel, SortingState } from '@tanstack/react-table';
 import api from '@/lib/api-client';
 import { formatDate } from '@/lib/currency';
+import { addWorkingDays } from '@/lib/working-days';
 import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useInvalidate } from '@/hooks/use-queries';
+import { statusWord } from '@/lib/status';
 import { ORDER_STATUS, useBuildOrder, type OrderLine, type OrderOperation } from '@/hooks/use-build-orders';
 import { useDataTable } from '@/hooks/use-data-table';
 import { DataTable } from '@/components/data-table/data-table';
@@ -40,10 +42,6 @@ const EMPTY: Record<Tab, string> = {
   standard: 'The standard BOM has not been imported yet, so there is nothing to compare.',
   timeline: 'The standard BOM has not been imported yet, so there is nothing to put on the timeline.',
   variances: 'No expenses are charged to this order yet. Choose this order as the Order when you record a product expense.',
-};
-const EXPENSE_STATUS: Record<string, { label: string; tone: 'success' | 'warning' | 'muted' | 'danger' }> = {
-  APPROVED: { label: 'Approved', tone: 'success' }, PENDING_MANAGER: { label: 'Waiting for manager', tone: 'warning' }, PENDING_FINANCE: { label: 'Waiting for finance', tone: 'warning' },
-  DRAFT: { label: 'Draft', tone: 'muted' }, SENT_BACK: { label: 'Sent back', tone: 'muted' }, REJECTED: { label: 'Rejected', tone: 'danger' }, VOID: { label: 'Void', tone: 'danger' },
 };
 const TONE_CLASS = { success: 'text-[var(--success)]', warning: 'text-[var(--warning)]', danger: 'text-[var(--danger)]', info: 'text-[var(--info)]', muted: 'text-[var(--shell-text-muted)]' } as const;
 
@@ -94,7 +92,7 @@ export default function BuildOrderDetailPage() {
   const timelineRows = useMemo(() => {
     if (!o || !o.has_bom) return [];
     const start = o.start_date.slice(0, 10);
-    const at = (day: number) => { const [y, m, d] = start.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + day)).toISOString().slice(0, 10); };
+    const at = (day: number) => addWorkingDays(start, day);
     const lateLines = new Set(o.lead.late_lines);
     const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
     const out: { date: string; day: number; event: string; detail: string; status: string; tone: 'danger' | 'success' | 'muted' }[] = [];
@@ -127,8 +125,8 @@ export default function BuildOrderDetailPage() {
       { accessorKey: 'unit_cost', header: headerRight('Unit cost'), cell: ({ row }) => <NumCell>{unitPrice(row.original.unit_cost, currency)}</NumCell>, size: 110 },
       { accessorKey: 'amount', header: headerRight('Amount'), cell: ({ row }) => <NumCell strong>{unitPrice(row.original.amount, currency)}</NumCell>, size: 110 },
       {
-        accessorKey: 'lead_time_days', header: headerRight('Lead time'), size: 100,
-        cell: ({ row }) => { const l = row.original as OrderLine; if (l.item_id == null) return <NumCell>—</NumCell>; const late = !!o?.lead.late_lines.includes(l.id); return <div className="text-right">{l.lead_time_days == null ? <ToneText label="Not set" tone="warning" /> : <ToneText label={`${l.lead_time_days} d`} tone={late ? 'danger' : 'muted'} />}</div>; },
+        accessorKey: 'lead_time_days', header: headerRight('Lead time (days)'), size: 130,
+        cell: ({ row }) => { const l = row.original as OrderLine; if (l.item_id == null) return <NumCell>—</NumCell>; const late = !!o?.lead.late_lines.includes(l.id); return <div className="text-right">{l.lead_time_days == null ? <ToneText label="Not set" tone="warning" /> : <ToneText label={String(l.lead_time_days)} tone={late ? 'danger' : 'muted'} />}</div>; },
       },
       {
         id: 'alternate', header: 'Alternate', size: 170,
@@ -139,7 +137,7 @@ export default function BuildOrderDetailPage() {
       { accessorKey: 'date', header: 'Date', cell: ({ row }) => <DateCell value={row.original.date} />, size: 120 },
       { accessorKey: 'event', header: 'What happens', cell: ({ row }) => <TextCell value={row.original.event} strong /> },
       { accessorKey: 'detail', header: 'Detail', cell: ({ row }) => <TextCell value={row.original.detail} muted />, size: 260 },
-      { accessorKey: 'day', header: headerRight('Day'), cell: ({ row }) => <NumCell>{row.original.day}</NumCell>, size: 80 },
+      { accessorKey: 'day', header: headerRight('Working day'), cell: ({ row }) => <NumCell>{row.original.day}</NumCell>, size: 80 },
       { accessorKey: 'status', header: 'Status', cell: ({ row }) => <ToneText label={row.original.status} tone={row.original.tone} />, size: 110 },
     ];
     if (tab === 'variances') return [
@@ -149,7 +147,7 @@ export default function BuildOrderDetailPage() {
       { accessorKey: 'category_name', header: 'Category', cell: ({ row }) => <TextCell value={row.original.category_name} muted />, size: 170 },
       { accessorKey: 'is_e200', header: 'Counts as', cell: ({ row }) => <TextCell value={row.original.is_e200 ? 'Materials and production' : 'Other'} muted />, size: 170 },
       { accessorKey: 'amount', header: headerRight('Amount'), cell: ({ row }) => <NumCell strong>{unitPrice(row.original.amount, currency)}</NumCell>, size: 120 },
-      { accessorKey: 'status', header: 'Status', cell: ({ row }) => { const s = EXPENSE_STATUS[row.original.status ?? ''] ?? { label: row.original.status ?? '', tone: 'muted' as const }; return <ToneText label={s.label} tone={s.tone} />; }, size: 160 },
+      { accessorKey: 'status', header: 'Status', cell: ({ row }) => { const s = statusWord(row.original.status); return <ToneText label={s.label} tone={s.tone} />; }, size: 160 },
     ];
     if (tab === 'operations') return [
       { accessorKey: 'sequence', header: headerRight('Seq'), cell: ({ row }) => <NumCell>{row.original.sequence}</NumCell>, size: 60 },
@@ -220,8 +218,8 @@ export default function BuildOrderDetailPage() {
   const panelActions = [...itemActions, ...alwaysActions.filter((a) => a.variant === 'primary')].slice(0, 3);
 
   const lateText = o?.lead.late
-    ? `The parts cannot all arrive in time. The longest lead time is ${o.lead.longest_lead_days} days and the build needs about ${o.lead.assembly_days}, against ${o.lead.window_days} days between the dates. The earliest delivery is ${formatDate(o.lead.earliest_delivery)}.`
-    : o ? `The parts can arrive in time: longest lead time ${o.lead.longest_lead_days} days, build about ${o.lead.assembly_days} days, ${o.lead.window_days} days available.` : '';
+    ? `The parts cannot all arrive in time. The longest lead time is ${o.lead.longest_lead_days} working days and the build needs about ${o.lead.assembly_days}, against ${o.lead.window_days} working days between the dates. The earliest delivery is ${formatDate(o.lead.earliest_delivery)}.`
+    : o ? `The parts can arrive in time: longest lead time ${o.lead.longest_lead_days} working days, build about ${o.lead.assembly_days} working days, ${o.lead.window_days} working days available.` : '';
   const margin = o?.margin_pct ?? null;
 
   const summary = !o ? null : (
@@ -378,7 +376,7 @@ export default function BuildOrderDetailPage() {
     if (!selected || !o) return null;
     if (tab === 'variances') {
       const x = selected as { reference_id: string | null; date_recorded: string; description: string | null; category_name: string | null; is_e200: boolean; amount: number; status: string | null; submitted_by_name: string | null };
-      const st = EXPENSE_STATUS[x.status ?? ''] ?? { label: x.status ?? '', tone: 'muted' as const };
+      const st = statusWord(x.status);
       return (
         <div className="space-y-4">
           <DetailSummary title={x.reference_id ?? 'Expense'} subtitle={x.description ?? undefined} status={st.label} statusClass={TONE_CLASS[st.tone]} figure={unitPrice(x.amount, currency)} figureLabel="Amount" />
@@ -419,7 +417,7 @@ export default function BuildOrderDetailPage() {
                 {l.alternates.map((a) => (
                   <li key={a.id} className="flex items-baseline justify-between gap-3 text-[13px]">
                     <span className="min-w-0 truncate text-[var(--shell-text)]">{a.part_no}{a.id === l.source_item_id ? <span className="text-[var(--shell-text-muted)]"> · original</span> : null}</span>
-                    <span className="shrink-0 tabular-nums text-[var(--shell-text-muted)]">{a.lead_time_days != null ? `${a.lead_time_days} d · ` : ''}{late ? `${(a.lead_time_days ?? 0) + l.tail_days <= o.lead.window_days ? 'in time' : 'too late'} · ` : ''}{a.cost_change > 0 ? '+' : ''}{unitPrice(a.cost_change, currency)}</span>
+                    <span className="shrink-0 tabular-nums text-[var(--shell-text-muted)]">{a.lead_time_days != null ? `${a.lead_time_days} days · ` : ''}{late ? `${(a.lead_time_days ?? 0) + l.tail_days <= o.lead.window_days ? 'in time' : 'too late'} · ` : ''}{a.cost_change > 0 ? '+' : ''}{unitPrice(a.cost_change, currency)}</span>
                   </li>
                 ))}
               </ul>

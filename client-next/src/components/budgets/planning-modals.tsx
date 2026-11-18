@@ -298,7 +298,7 @@ export function ItemModal({ isOpen, onClose, editing, project, onSaved }: Base &
   // Build orders are checked against how long parts take to arrive, so every part needs a lead time (zero means on hand)
   const leadOk = f.lead_time_days !== '' && Number.isInteger(Number(f.lead_time_days)) && Number(f.lead_time_days) >= 0;
   const leadField = (
-    <Field label="Lead time (days)" required hint="Days from order to arrival, or to make it. Update it when a closer supplier is found." error={f.lead_time_days !== '' && !leadOk ? 'Enter whole days, zero or more.' : undefined}>
+    <Field label="Lead time (working days)" required hint="Working days (Monday to Friday) from order to arrival, or to make it. Update it when a closer supplier is found." error={f.lead_time_days !== '' && !leadOk ? 'Enter whole working days, zero or more.' : undefined}>
       <Input type="number" min="0" step="1" className={ctl} value={f.lead_time_days} onChange={(e) => set('lead_time_days')(e.target.value)} />
     </Field>
   );
@@ -1308,7 +1308,7 @@ export function PartAlternatesModal({ isOpen, onClose, item, items, canEdit }: B
                   { id: 'supplier', header: 'Supplier', cell: ({ row }: any) => <span className="text-[var(--shell-text-muted)]">{row.original.supplier ?? '—'}</span> },
                   { id: 'price', header: headerRight('Standard price'), size: 130, cell: ({ row }: any) => <div className="text-right tabular-nums text-[var(--shell-text)]">{unitPrice(row.original.standard_price)}</div> },
                   { id: 'last', header: headerRight('Last paid'), size: 120, cell: ({ row }: any) => <div className="text-right tabular-nums text-[var(--shell-text)]">{row.original.last_price != null ? unitPrice(row.original.last_price) : '—'}</div> },
-                  { id: 'lead', header: headerRight('Lead time'), size: 100, cell: ({ row }: any) => <div className="text-right tabular-nums text-[var(--shell-text-muted)]">{row.original.lead_time_days != null ? `${row.original.lead_time_days} d` : '—'}</div> },
+                  { id: 'lead', header: headerRight('Lead time (days)'), size: 130, cell: ({ row }: any) => <div className="text-right tabular-nums text-[var(--shell-text-muted)]">{row.original.lead_time_days != null ? row.original.lead_time_days : '—'}</div> },
                   { id: 'default', header: 'Default', size: 90, cell: ({ row }: any) => <span className={row.original.is_default ? 'font-medium text-[var(--success)]' : 'text-[var(--shell-text-muted)]'}>{row.original.is_default ? 'Default' : ''}</span> },
                 ] as ColumnDef<any, any>[]} />
             </div>

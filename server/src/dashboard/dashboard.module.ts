@@ -6,5 +6,5 @@ import { AnalyticsService } from './analytics.service';
 import { BudgetsModule } from '../budgets/budgets.module';
 import { ApprovalsModule } from '../approvals/approvals.module';
 import { InvoicingModule } from '../invoicing/invoicing.module';
-@Module({ imports: [BudgetsModule, ApprovalsModule, InvoicingModule], controllers: [DashboardController], providers: [DashboardService, DashboardOverviewService, AnalyticsService] })
+@Module({ imports: [BudgetsModule, ApprovalsModule, InvoicingModule], controllers: [DashboardController], providers: [DashboardService, DashboardOverviewService, AnalyticsService], exports: [DashboardService] })
 export class DashboardModule {}

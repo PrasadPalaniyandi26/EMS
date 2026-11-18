@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api-client';
+import { setFyStartMonth } from '@/lib/currency';
 
 // Budget control: plans per financial year, their lines, live usage, alerts and settings.
 // Every key starts with 'budgets' so invalidate('budgets') refreshes all of them.
@@ -96,6 +97,17 @@ export function useLineSuggestion(costObject: CostObject, objectId: string, type
     queryFn: () => api.get<LineSuggestion>(`/budgets/line-suggestion?${qs}`).then((r) => r.data),
     enabled: enabled && !!objectId && fy != null, staleTime: LIVE,
   });
+}
+
+// Where the financial year starts. Open to every signed-in user; loading it also tells the date presets (Financial Year, This Quarter) on every page.
+export function useFiscalYear(enabled = true) {
+  const q = useQuery({
+    queryKey: [KEY, 'fiscal-year'],
+    queryFn: () => api.get<{ start_month: number; current_fy: number }>('/budgets/fiscal-year').then((r) => r.data),
+    enabled, staleTime: 60 * 60 * 1000,
+  });
+  if (q.data) setFyStartMonth(q.data.start_month);
+  return q;
 }
 
 export function useBudgetPlan(fy: number | null) {

@@ -91,6 +91,8 @@ function MonitorLines({ onOpenAlerts }: { onOpenAlerts: () => void }) {
       ),
       size: 210,
     },
+    // One word here; whether the forecast runs over, and when the line runs out, are in the panel
+    { accessorKey: 'status', header: 'Status', size: 100, cell: ({ row }) => <LineStatusText status={row.original.status} /> },
     { accessorKey: 'owner_name', header: 'Owner', cell: ({ row }) => <TextCell value={row.original.owner_name} muted />, size: 80 },
     { accessorKey: 'total', header: headerRight('Budget'), cell: ({ row }) => <WholeCell value={row.original.total} currency={currency} />, size: 100 },
     { accessorKey: 'used', header: headerRight('Used'), cell: ({ row }) => <WholeCell value={row.original.used} currency={currency} />, size: 100 },
@@ -104,8 +106,6 @@ function MonitorLines({ onOpenAlerts }: { onOpenAlerts: () => void }) {
       ),
     },
     { accessorKey: 'forecast', header: headerRight('Forecast'), cell: ({ row }) => (row.original.forecast != null ? <WholeCell value={row.original.forecast} currency={currency} /> : <div className="text-right"><TextCell value="" /></div>), size: 100 },
-    // One word here; whether the forecast runs over, and when the line runs out, are in the panel
-    { accessorKey: 'status', header: 'Status', size: 90, cell: ({ row }) => <LineStatusText status={row.original.status} /> },
   ], [currency]);
 
   const table = useDataTable({

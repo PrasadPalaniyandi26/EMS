@@ -64,21 +64,14 @@ export const columns = (currency: string, costOf: (id: number) => ProductRow | u
     header: "Status",
     cell: ({ row }) => {
       const status = ((row.original as any).status || (row.original.is_active ? "Active" : "Inactive")) as string
-      const c = costOf(row.original.id)
-      const note = c && !c.bom_lines ? "No BOM" : c && c.standard_cost == null ? "No standard cost" : ""
-      return (
-        <div>
-          <ToneText label={status} tone={STATUS_TONE[status] || 'muted'} />
-          {note && <span className="block text-[12px] text-[var(--warning)]">{note}</span>}
-        </div>
-      )
+      return <ToneText label={status} tone={STATUS_TONE[status] || 'muted'} />
     },
-    size: 130,
+    size: 110,
   },
   {
     id: "cost_status",
-    header: "Cost status",
-    size: 150,
+    header: "Costing",
+    size: 130,
     accessorFn: (row) => { const c = costOf(row.id); return c ? costStatus(c).label : '' },
     cell: ({ row }) => { const c = costOf(row.original.id); if (!c) return <TextCell value="" />; const s = costStatus(c); return <ToneText label={s.label} tone={s.tone} /> },
   },
@@ -91,7 +84,7 @@ export const columns = (currency: string, costOf: (id: number) => ProductRow | u
     cell: ({ row }) => {
       const c = costOf(row.original.id)
       const m = c?.margin_pct ?? null
-      return <div className="text-right"><ToneText label={m == null ? '—' : `${m.toFixed(1)}%`} tone={c ? marginTone(m, c.target_margin_pct, c.min_margin_pct) : 'muted'} /></div>
+      return <div className="text-right"><ToneText label={m == null ? '' : `${m.toFixed(1)}%`} tone={c ? marginTone(m, c.target_margin_pct, c.min_margin_pct) : 'muted'} /></div>
     },
   },
   {

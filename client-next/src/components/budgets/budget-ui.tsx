@@ -37,7 +37,7 @@ export function LineStatusText({ status }: { status: LineStatus }) {
 
 const PLAN_STATUS: Record<PlanStatus, { label: string; cls: string }> = {
   DRAFT: { label: 'Draft', cls: 'text-[var(--shell-text-muted)]' },
-  SUBMITTED: { label: 'Waiting for approval', cls: 'text-[var(--warning)]' },
+  SUBMITTED: { label: 'With Finance', cls: 'text-[var(--warning)]' },
   APPROVED: { label: 'Approved', cls: 'text-[var(--success)]' },
   ACTIVE: { label: 'Active', cls: 'text-[var(--success)]' },
   CLOSED: { label: 'Closed', cls: 'text-[var(--shell-text-muted)]' },

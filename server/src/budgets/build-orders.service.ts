@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { BudgetsService } from './budgets.service';
 import { BudgetPlanningService } from './budget-planning.service';
+import { addWorkingDays, workingDaysBetween } from '../common/helpers/working-days';
 
 const n = (v: any) => (v == null ? 0 : Number(v));
 const r2 = (v: number) => Math.round(v * 100) / 100;
@@ -10,7 +11,7 @@ const bad = (msg: string, code = HttpStatus.BAD_REQUEST) => new HttpException(ms
 type Actor = { id: number; username?: string; role_name?: string };
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-// Build hours are spread over working days of this length, and a working week is five of the seven calendar days
+// Build hours are spread over working days of this length. Every day count here (lead times, build, the window to delivery) is working days, Monday to Friday
 const HOURS_PER_DAY = 8;
 const DAY = 86400000;
 // Orders in these states can still change their dates, quantity and parts
@@ -41,8 +42,8 @@ export class BuildOrdersService {
     return d;
   }
 
-  private days(from: Date, to: Date) { return Math.round((to.getTime() - from.getTime()) / DAY); }
-  private buildDays(hours: number) { return Math.ceil((hours / HOURS_PER_DAY) * (7 / 5)); }
+  private days(from: Date, to: Date) { return workingDaysBetween(from, to); }
+  private buildDays(hours: number) { return Math.ceil(hours / HOURS_PER_DAY); }
 
   // How long each part takes to arrive, step by step. A step is a sequence number: its parts are bought from the start of the order, and its work begins
   // once the previous step is built and its own parts have arrived.
@@ -80,7 +81,7 @@ export class BuildOrdersService {
       finish = begins + days; build += days;
       return { sequence: s.sequence, lead_days: s.lead, begins_day: begins, build_days: days, finish_day: finish };
     });
-    return { window_days: window, longest_lead_days: model.longest, assembly_days: build, needed_days: finish, late: finish > window, earliest_delivery: new Date(start.getTime() + finish * DAY), missing_lead_time: model.missing, stages };
+    return { window_days: window, longest_lead_days: model.longest, assembly_days: build, needed_days: finish, late: finish > window, earliest_delivery: addWorkingDays(start, finish), missing_lead_time: model.missing, stages };
   }
 
   // The build plan for the month the order starts in: what was planned, what orders have taken and what is left
@@ -141,7 +142,7 @@ export class BuildOrdersService {
       standard_cost: std ? n(std.total) : null, unit_cost: roll ? roll.cost.total : null,
       has_bom: hasBom, bom_version: bom?.version ?? null, bom_lines: bom?._count.lines ?? 0,
       longest_lead_days: lead?.longest_lead_days ?? null, assembly_days: lead?.assembly_days ?? null, missing_lead_time: lead?.missing_lead_time ?? 0,
-      suggested_delivery: lead ? new Date(start.getTime() + lead.needed_days * DAY).toISOString().slice(0, 10) : null,
+      suggested_delivery: lead ? addWorkingDays(start, lead.needed_days).toISOString().slice(0, 10) : null,
     };
   }
 
@@ -202,15 +203,15 @@ export class BuildOrdersService {
         const m = model.per.get(l.id);
         const perUnit = l.item_id != null ? l.amount * (1 + freightPct) : l.amount;
         scheduled += perUnit;
-        put(new Date(o.startDate.getTime() + (m?.lead ?? 0) * DAY), 'materials', perUnit * o.quantity);
+        put(addWorkingDays(o.startDate, m?.lead ?? 0), 'materials', perUnit * o.quantity);
       }
       // What is left of the unit cost is the order's own build: labour, overhead, fixed and outsourced work
       const rest = Math.max(0, roll.cost.total - roll.cost.warranty - scheduled) * o.quantity;
       // The build is spread over the days each step is being assembled; with no build days it falls on the day the last part arrives
-      const start = o.startDate.getTime();
+
       if (lead.assembly_days > 0) {
-        for (const st of lead.stages) for (let i = 0; i < st.build_days; i++) put(new Date(start + (st.begins_day + i) * DAY), 'assembly', rest / lead.assembly_days);
-      } else put(new Date(start + lead.needed_days * DAY), 'assembly', rest);
+        for (const st of lead.stages) for (let i = 0; i < st.build_days; i++) put(addWorkingDays(o.startDate, st.begins_day + i), 'assembly', rest / lead.assembly_days);
+      } else put(addWorkingDays(o.startDate, lead.needed_days), 'assembly', rest);
     }
     if (o.unitPrice != null) put(o.deliveredOn ?? o.deliveryDate, 'revenue', n(o.unitPrice) * o.quantity);
     return [...buckets.values()].sort((a, b) => a.year * 12 + a.month - (b.year * 12 + b.month)).map((b) => ({

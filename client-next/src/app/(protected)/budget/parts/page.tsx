@@ -64,9 +64,9 @@ export default function PartMasterPage() {
     && (category === 'ALL' || (category === 'NONE' ? i.category_id == null : String(i.category_id) === category))), [data, life, sourcing, price, use, category]);
 
   const columns = useMemo<ColumnDef<Item, any>[]>(() => [
-    { accessorKey: 'part_no', header: 'Part', cell: ({ row }) => <IdCell value={row.original.part_no} />, size: 120 },
-    { id: 'life', header: 'Status', size: 110, accessorFn: (i) => lifeWord(i).rank, cell: ({ row }) => { const w = lifeWord(row.original); return <span title={lifeText(row.original) || undefined}><ToneText label={w.label} tone={w.tone} /></span>; } },
+    { accessorKey: 'part_no', header: 'Code', cell: ({ row }) => <IdCell value={row.original.part_no} />, size: 120 },
     { accessorKey: 'name', header: 'Name', cell: ({ row }) => <TextCell value={row.original.name} strong className="block max-w-[220px] truncate" /> },
+    { id: 'life', header: 'Status', size: 110, accessorFn: (i) => lifeWord(i).rank, cell: ({ row }) => { const w = lifeWord(row.original); return <span title={lifeText(row.original) || undefined}><ToneText label={w.label} tone={w.tone} /></span>; } },
     { accessorKey: 'oem_part_no', header: 'OEM part number' },
     { accessorKey: 'category_name', header: 'Category', cell: ({ row }) => <TextCell value={row.original.category_name} muted className="block max-w-[130px] truncate" />, size: 130 },
     { accessorKey: 'sourcing', header: 'Make / Buy', cell: ({ row }) => <TextCell value={row.original.sourcing === 'MAKE' ? 'Make' : 'Buy'} />, size: 90 },
@@ -75,7 +75,7 @@ export default function PartMasterPage() {
       accessorKey: 'price_drift_pct', header: headerRight('Drift'), size: 90,
       cell: ({ row }) => { const d = row.original.price_drift_pct; return <div className="text-right">{d ? <ToneText label={`${d > 0 ? '+' : ''}${d.toFixed(1)}%`} tone={Math.abs(d) >= 5 ? 'warning' : 'muted'} /> : <TextCell value="" />}</div>; },
     },
-    { accessorKey: 'lead_time_days', header: headerRight('Lead time'), sortUndefined: 'last', accessorFn: (i) => i.lead_time_days ?? undefined, cell: ({ row }) => <div className="text-right">{row.original.lead_time_days != null ? <TextCell value={`${row.original.lead_time_days} d`} muted /> : <ToneText label="Not set" tone="warning" />}</div>, size: 90 },
+    { accessorKey: 'lead_time_days', header: headerRight('Lead time (days)'), sortUndefined: 'last', accessorFn: (i) => i.lead_time_days ?? undefined, cell: ({ row }) => <div className="text-right">{row.original.lead_time_days != null ? <TextCell value={String(row.original.lead_time_days)} muted /> : <ToneText label="Not set" tone="warning" />}</div>, size: 90 },
     { accessorKey: 'used_in', header: headerRight('In BOMs'), cell: ({ row }) => <div className="text-right"><TextCell value={row.original.used_in || ''} /></div>, size: 80 },
   ], [currency]);
 
@@ -194,7 +194,7 @@ export default function PartMasterPage() {
           {selected.project_id != null && <DetailField label="Used on" value={`${selected.project_code ?? 'One project'} only`} wide />}
           <DetailField label="Category" value={selected.category_name ?? undefined} />
           <DetailField label="Supplier" value={selected.supplier ?? undefined} />
-          <DetailField label="Lead time" value={selected.lead_time_days != null ? `${selected.lead_time_days} days` : undefined} />
+          <DetailField label="Lead time" value={selected.lead_time_days != null ? `${selected.lead_time_days} working days` : undefined} />
         </DetailGrid>
       </DetailSection>
       <DetailSection title="History" action={<button type="button" onClick={() => setHistoryFor(selected)} className="text-[12px] font-medium text-[var(--shell-accent)] hover:underline focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]">See all</button>}>
@@ -247,7 +247,7 @@ export default function PartMasterPage() {
       <RecordPurchaseModal isOpen={!!buyFor} onClose={() => setBuyFor(null)} item={buyFor} />
       <ImportModal isOpen={impOpen} onClose={() => setImpOpen(false)} title="Import parts" endpoint="/budgets/items/import" templateName="part-master-template.csv" headers={PART_HEADERS}
         sample={[['CONN-24', '24-pin terminal block', 'Electronics', 'Buy', 'nos', '95', '', '', '102', 'Phoenix', '10', '1757019'], ['SUB-FRAME', 'Welded frame', 'Mechanical', 'Make', 'nos', '', '4200', '1800', '', '', '21', '']]}
-        notes="One row per part, matched by part_no. Category must match a name under Part categories. A new part is added and an existing one is updated. Blank cells keep the current value, except lead_time_days: every part needs one (zero means on hand). Make_or_buy is Buy or Make; a bought part needs its oem_part_no (the manufacturer's number); a made part is priced from its material and manufacturing cost." />
+        notes="One row per part, matched by part_no. Category must match a name under Part categories. A new part is added and an existing one is updated. Blank cells keep the current value, except lead_time_days: every part needs one, in working days (zero means on hand). Make_or_buy is Buy or Make; a bought part needs its oem_part_no (the manufacturer's number); a made part is priced from its material and manufacturing cost." />
     </ModuleShell>
     </PageFrame>
   );

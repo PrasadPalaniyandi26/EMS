@@ -24,6 +24,7 @@ import { JobBomImportModal } from '@/components/budgets/job-bom-import-modal';
 import { BomLineModal, BomSettingsModal, BuildStepModal, EstimateLineModal, EstimatePhasesModal, MilestoneModal, ProjectSettingsModal, RejectBaselineModal, StepTypesModal } from '@/components/budgets/planning-modals';
 import { TabBar, money, projectVerdict, TONE_CLASS } from '@/components/budgets/budget-ui';
 import { formatDate } from '@/lib/currency';
+import { todayIso, workingDaysBetween } from '@/lib/working-days';
 import { cn } from '@/lib/utils';
 
 type Tab = 'estimate' | 'baselines' | 'jobbom' | 'jobsteps' | 'milestones';
@@ -38,18 +39,16 @@ const EMPTY: Record<Tab, string> = {
   milestones: 'No milestones yet. Add the key phases of the project with a planned date, and mark each done when it is finished.',
 };
 
-const dayNo = (iso: string) => { const [y, mo, d] = iso.slice(0, 10).split('-').map(Number); return Date.UTC(y, mo - 1, d) / 86400000; };
-const todayNo = () => { const t = new Date(); return Date.UTC(t.getFullYear(), t.getMonth(), t.getDate()) / 86400000; };
+// Milestone days are working days, Monday to Friday
 const days = (n: number) => `${n} day${n === 1 ? '' : 's'}`;
 type MsTone = 'success' | 'warning' | 'danger' | 'muted';
 // Done on or before the planned date is green, done after it is red, and still open past its date is orange
 const milestoneState = (m: Milestone): { status: string; tone: MsTone; days: string | null; diff: number | null } => {
-  const planned = dayNo(m.planned_date);
   if (m.done_date) {
-    const diff = dayNo(m.done_date) - planned;
+    const diff = workingDaysBetween(m.planned_date, m.done_date);
     return diff > 0 ? { status: 'Done late', tone: 'danger', days: `${days(diff)} late`, diff } : { status: 'Done', tone: 'success', days: diff === 0 ? 'On time' : `${days(-diff)} early`, diff };
   }
-  const over = todayNo() - planned;
+  const over = workingDaysBetween(m.planned_date, todayIso());
   return over > 0 ? { status: 'Overdue', tone: 'warning', days: `${days(over)} overdue`, diff: over } : { status: 'Open', tone: 'muted', days: null, diff: null };
 };
 const late = (m: Milestone) => milestoneState(m).status === 'Overdue';
@@ -147,8 +146,8 @@ export default function ProjectBudgetPage() {
       { accessorKey: 'name', header: 'Milestone', cell: ({ row }) => <TextCell value={row.original.name} strong /> },
       { accessorKey: 'planned_date', header: 'Planned', cell: ({ row }) => <DateCell value={row.original.planned_date} />, size: 120 },
       { accessorKey: 'done_date', header: 'Completed', cell: ({ row }) => <DateCell value={row.original.done_date} />, size: 120 },
-      { id: 'days', header: headerRight('Days'), accessorFn: (m: Milestone) => milestoneState(m).diff ?? undefined, size: 140,
-        cell: ({ row }) => { const st = milestoneState(row.original); return <div className="text-right"><ToneText label={st.days} tone={st.tone} /></div>; } },
+      { id: 'days', header: headerRight('Variance (days)'), accessorFn: (m: Milestone) => milestoneState(m).diff ?? undefined, size: 140,
+        cell: ({ row }) => { const st = milestoneState(row.original); return <div className="text-right">{st.diff == null ? <NumCell>—</NumCell> : <ToneText label={st.diff > 0 ? `+${st.diff}` : String(st.diff)} tone={st.tone} />}</div>; } },
       { id: 'status', header: 'Status', size: 110, accessorFn: (m: Milestone) => milestoneState(m).status,
         cell: ({ row }) => { const st = milestoneState(row.original); return <ToneText label={st.status} tone={st.tone} />; } },
     ];
@@ -416,7 +415,7 @@ export default function ProjectBudgetPage() {
           <DetailGrid>
             <DetailField label="Planned" value={formatDate(x.planned_date)} />
             <DetailField label="Completed" value={x.done_date ? formatDate(x.done_date) : undefined} />
-            <DetailField label="Days" value={milestoneState(x).days ?? undefined} tone={milestoneState(x).tone} />
+            <DetailField label="Working days" value={milestoneState(x).days ?? undefined} tone={milestoneState(x).tone} />
           </DetailGrid>
         </DetailSection>
       </div>

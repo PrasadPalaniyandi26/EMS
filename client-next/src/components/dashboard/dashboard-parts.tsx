@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
+import { STATUS_LIST } from '@/lib/status';
 
 // Small pieces of the Home dashboard. Colour is a role: income is the success colour, spending is the series blue,
 // and red is kept for what is wrong. Statuses are plain coloured text, never a chip.
@@ -76,7 +77,4 @@ export function BudgetBar({ pct, elapsed, label }: { pct: number; elapsed?: numb
   );
 }
 
-export const STATUS_WORD: Record<string, { label: string; tone: Tone }> = {
-  APPROVED: { label: 'Approved', tone: 'success' }, PENDING_MANAGER: { label: 'Waiting for manager', tone: 'warning' }, PENDING_FINANCE: { label: 'Waiting for finance', tone: 'warning' },
-  DRAFT: { label: 'Draft', tone: 'muted' }, SENT_BACK: { label: 'Sent back', tone: 'muted' }, REJECTED: { label: 'Rejected', tone: 'danger' },
-};
+export const STATUS_WORD: Record<string, { label: string; tone: Tone }> = STATUS_LIST;

@@ -143,7 +143,7 @@ export function SwapPartModal({ isOpen, onClose, order, lineId: startLine }: Bas
             {line && (
               <div role="radiogroup" aria-label="Alternate" className="overflow-hidden rounded-md border border-[var(--shell-border)]">
                 <div className="grid grid-cols-[minmax(0,1fr)_110px_90px_120px] gap-3 border-b border-[var(--shell-border)] bg-[var(--table-header)] px-3 py-2 text-[12px] font-semibold text-[var(--shell-text-muted)]">
-                  <span>Alternate</span><span className="text-right">Price</span><span className="text-right">Lead time</span><span className="text-right">Change per unit</span>
+                  <span>Alternate</span><span className="text-right">Price</span><span className="text-right">Lead time (days)</span><span className="text-right">Change per unit</span>
                 </div>
                 {line.alternates.map((a) => (
                   <label key={a.id} className={cn('grid cursor-pointer grid-cols-[minmax(0,1fr)_110px_90px_120px] items-baseline gap-3 border-b border-[var(--shell-border)] px-3 py-2 text-[13px] last:border-b-0 hover:bg-[var(--shell-hover)]', pick === String(a.id) && 'bg-[var(--shell-hover)]')}>
@@ -157,7 +157,7 @@ export function SwapPartModal({ isOpen, onClose, order, lineId: startLine }: Bas
                       </span>
                     </span>
                     <span className="text-right tabular-nums">{unitPrice(a.standard_price)}</span>
-                    <span className={cn('text-right tabular-nums', fits(a.lead_time_days) ? 'text-[var(--shell-text-muted)]' : 'font-medium text-[var(--warning)]')}>{a.lead_time_days != null ? `${a.lead_time_days} d` : '—'}</span>
+                    <span className={cn('text-right tabular-nums', fits(a.lead_time_days) ? 'text-[var(--shell-text-muted)]' : 'font-medium text-[var(--warning)]')}>{a.lead_time_days != null ? a.lead_time_days : '—'}</span>
                     <span className={cn('text-right tabular-nums', a.cost_change > 0 ? 'text-[var(--danger)]' : a.cost_change < 0 ? 'text-[var(--success)]' : 'text-[var(--shell-text-muted)]')}>{a.cost_change > 0 ? '+' : ''}{unitPrice(a.cost_change)}</span>
                   </label>
                 ))}
@@ -165,7 +165,7 @@ export function SwapPartModal({ isOpen, onClose, order, lineId: startLine }: Bas
             )}
             {line && (
               <p className="text-[12px] text-[var(--shell-text-muted)]">
-                Now on the order: {line.part_no}, lead time {line.lead_time_days != null ? `${line.lead_time_days} days` : 'not set'}. This part has {Math.max(0, order.lead.window_days - (line.tail_days ?? order.lead.assembly_days))} days to arrive before the build it belongs to must start. A lead time in amber does not fit.
+                Now on the order: {line.part_no}, lead time {line.lead_time_days != null ? `${line.lead_time_days} working days` : 'not set'}. This part has {Math.max(0, order.lead.window_days - (line.tail_days ?? order.lead.assembly_days))} working days to arrive before the build it belongs to must start. A lead time in amber does not fit.
               </p>
             )}
           </>

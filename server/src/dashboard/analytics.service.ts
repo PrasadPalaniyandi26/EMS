@@ -6,8 +6,8 @@ import { InvoicingService } from '../invoicing/invoicing.service';
 import { DashboardService } from './dashboard.service';
 import { COMMITTED_STATUSES } from '../common/constants/transaction-status';
 import { parseRange } from '../common/helpers/dates';
+import { workingDaysBetween } from '../common/helpers/working-days';
 
-const DAY = 86400000;
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const n = (v: unknown) => (v == null ? 0 : Number(v));
 const r2 = (v: number) => Math.round(v * 100) / 100;
@@ -85,20 +85,20 @@ export class AnalyticsService {
     const all = (await this.orders.list()).filter((o: any) => o.status !== 'CANCELLED');
     const today = dayOf(todayUtc());
     const delivered = all.filter((o: any) => o.status === 'DELIVERED' && o.delivered_on);
-    const lateBy = (o: any) => Math.round((dayOf(o.delivered_on) - dayOf(o.delivery_date)) / DAY);
+    const lateBy = (o: any) => workingDaysBetween(new Date(o.delivery_date), new Date(o.delivered_on));
     const onTime = delivered.filter((o: any) => lateBy(o) <= 0);
     const lateOnes = delivered.filter((o: any) => lateBy(o) > 0);
     const open = all.filter((o: any) => OPEN.includes(o.status));
     const atRisk = open.map((o: any) => {
       const overdue = dayOf(o.delivery_date) < today;
-      const short = o.late && o.earliest_delivery ? Math.round((dayOf(o.earliest_delivery) - dayOf(o.delivery_date)) / DAY) : 0;
+      const short = o.late && o.earliest_delivery ? workingDaysBetween(new Date(o.delivery_date), new Date(o.earliest_delivery)) : 0;
       return { o, overdue, short };
     }).filter((x: any) => x.overdue || x.short > 0)
       .map(({ o, overdue, short }: any) => ({
         id: o.id, code: o.code, client_name: o.client_name, product_name: o.product_name, status: o.status, quantity: o.quantity,
         delivery_date: o.delivery_date, earliest_delivery: o.earliest_delivery,
         reason: overdue ? 'Past the promised date' : 'Parts and build cannot make the date',
-        days: overdue ? Math.round((today - dayOf(o.delivery_date)) / DAY) : short,
+        days: overdue ? workingDaysBetween(new Date(o.delivery_date), new Date(today)) : short,
       }))
       .sort((a: any, b: any) => b.days - a.days);
 

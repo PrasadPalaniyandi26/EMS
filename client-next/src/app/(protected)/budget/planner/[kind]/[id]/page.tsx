@@ -106,7 +106,7 @@ export default function PlannerObjectPage() {
     { accessorKey: 'total', header: headerRight('Budget'), cell: ({ row }) => <WholeCell value={row.original.total} currency={currency} />, size: 120 },
     { accessorKey: 'used', header: headerRight('Used'), cell: ({ row }) => <WholeCell value={row.original.used} currency={currency} />, size: 120 },
     {
-      accessorKey: 'pct', header: 'Utilisation', size: 150,
+      accessorKey: 'pct', header: 'Used %', size: 150,
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
           <UtilBar pct={row.original.pct} className="w-16" />

@@ -19,7 +19,7 @@ export const columns = (users: User[]): ColumnDef<User>[] => [
   {
     id: "employee_id",
     accessorFn: (row) => `NT${10000 + row.id}`,
-    header: "ID",
+    header: "Code",
     cell: ({ row }) => <IdCell value={`NT${10000 + row.original.id}`} />,
     size: 110,
   },
@@ -27,6 +27,16 @@ export const columns = (users: User[]): ColumnDef<User>[] => [
     accessorKey: "username",
     header: "Name",
     cell: ({ row }) => <TextCell value={row.original.username} strong />,
+  },
+  {
+    id: "status",
+    accessorFn: (row) => (STATUS[userStatus(row)] ?? { rank: 9 }).rank,
+    header: "Status",
+    size: 110,
+    cell: ({ row }) => {
+      const cfg = STATUS[userStatus(row.original)] || { label: userStatus(row.original), tone: 'muted' as const }
+      return <ToneText label={cfg.label} tone={cfg.tone} />
+    },
   },
   {
     accessorKey: "department",
@@ -54,15 +64,6 @@ export const columns = (users: User[]): ColumnDef<User>[] => [
       const managerId = row.getValue("manager_id") as number
       const managerName = row.original.manager_name || users.find(u => u.id === managerId)?.username
       return <TextCell value={managerName} muted />
-    },
-  },
-  {
-    id: "status",
-    accessorFn: (row) => (STATUS[userStatus(row)] ?? { rank: 9 }).rank,
-    header: "Status",
-    cell: ({ row }) => {
-      const cfg = STATUS[userStatus(row.original)] || { label: userStatus(row.original), tone: 'muted' as const }
-      return <ToneText label={cfg.label} tone={cfg.tone} />
     },
   },
 ]

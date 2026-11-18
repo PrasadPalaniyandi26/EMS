@@ -146,9 +146,9 @@ describe('Build order money (e2e)', () => {
       expect(d.bom_lines).toBe(2);
       expect(d.unit_cost).toBeGreaterThan(0);
       expect(d.longest_lead_days).toBe(30);
-      expect(d.assembly_days).toBe(3);
-      // The start plus the longest lead time plus the build: 10 Jan + 33 days
-      expect(d.suggested_delivery).toBe('2027-02-12');
+      expect(d.assembly_days).toBe(2);
+      // The start plus the longest lead time plus the build, in working days: 10 Jan (a Sunday) + 32 working days
+      expect(d.suggested_delivery).toBe('2027-02-23');
       // The price comes from the product's price for the year the order starts in
       await call('put', `/budgets/products/${prod}/price`, admin, { price: 1234, target_margin_pct: 30, min_margin_pct: 20 });
       const priced = data(await call('get', `/build-orders/product-defaults?product_id=${prod}&quantity=1&start_date=${localDate(new Date())}`, admin));
@@ -160,18 +160,18 @@ describe('Build order money (e2e)', () => {
     });
 
     it('a later sequence waits for the one before it, so early work overlaps the wait for late parts', async () => {
-      // 2 units, 8 hours each step: 16 hours is 3 days of building. Part A arrives on day 10, part C on day 40.
+      // 2 units, 8 hours each step: 16 hours is 2 working days of building. Part A arrives on day 10, part C on day 40.
       const inSteps = await newOrder(seqProd);
       expect((await call('post', `/build-orders/${inSteps}/import-bom`, admin, {})).status).toBe(201);
       const o = await get(inSteps);
       expect(o.lead.longest_lead_days).toBe(40);
-      expect(o.lead.assembly_days).toBe(6);
-      // Step 1 is built on days 10 to 13 while part C is on its way; step 2 starts when C arrives on day 40 and ends on day 43
-      expect(o.lead.stages.map((s: any) => [s.sequence, s.begins_day, s.finish_day])).toEqual([[1, 10, 13], [2, 40, 43]]);
-      expect(o.lead.needed_days).toBe(43);
+      expect(o.lead.assembly_days).toBe(4);
+      // Step 1 is built on days 10 to 12 while part C is on its way; step 2 starts when C arrives on day 40 and ends on day 42
+      expect(o.lead.stages.map((s: any) => [s.sequence, s.begins_day, s.finish_day])).toEqual([[1, 10, 12], [2, 40, 42]]);
+      expect(o.lead.needed_days).toBe(42);
       // Part A has to arrive early enough for both steps; part C only for the second
-      expect(o.lines.find((l: any) => l.sequence === 1).tail_days).toBe(6);
-      expect(o.lines.find((l: any) => l.sequence === 2).tail_days).toBe(3);
+      expect(o.lines.find((l: any) => l.sequence === 1).tail_days).toBe(4);
+      expect(o.lines.find((l: any) => l.sequence === 2).tail_days).toBe(2);
       expect(o.lines.find((l: any) => l.sequence === 1).group_name).toBe('Arm');
     });
 
@@ -180,7 +180,7 @@ describe('Build order money (e2e)', () => {
       expect((await call('post', `/build-orders/${id}/import-bom`, admin, {})).status).toBe(201);
       const o = await get(id);
       expect(o.lead.stages).toHaveLength(1);
-      expect(o.lead.needed_days).toBe(46);
+      expect(o.lead.needed_days).toBe(44);
     });
   });
 
