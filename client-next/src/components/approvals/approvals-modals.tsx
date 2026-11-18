@@ -7,6 +7,9 @@ import { InlineAlert } from '@/components/shared/inline-alert';
 import { DecisionModal } from './decision-modal';
 import { useAuthStore } from '@/stores/auth-store';
 
+// What the request is, in words, so the dialogs name it correctly
+const kindOf = (r?: any) => (r?.record_type === 'recurring' ? 'recurring schedule' : r?.type === 'income' ? 'income' : 'expense');
+
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -28,7 +31,7 @@ export function ApproveModal({ isOpen, onClose, onConfirm, selectedRequest }: Mo
       isOpen={isOpen}
       onClose={onClose}
       request={selectedRequest}
-      title="Approve expense request"
+      title={`Approve ${kindOf(selectedRequest)} request`}
       icon={<CheckCircle2 className="h-4 w-4" />}
       confirmLabel="Confirm approval"
       field={{ id: 'approve-comment', label: 'Approval comments (optional)', placeholder: 'Enter any notes or justification for this approval...' }}
@@ -36,8 +39,8 @@ export function ApproveModal({ isOpen, onClose, onConfirm, selectedRequest }: Mo
       top={(
         <>
           {selectedRequest?.submitted_by_id != null && selectedRequest.submitted_by_id === meId && (
-            <InlineAlert tone="warning" title="You submitted this expense">
-              Approving your own expense may be blocked by policy.
+            <InlineAlert tone="warning" title={`You submitted this ${kindOf(selectedRequest)}`}>
+              Approving your own {kindOf(selectedRequest)} may be blocked by policy.
             </InlineAlert>
           )}
           {selectedRequest && !selectedRequest.receipt_path && (
@@ -75,13 +78,13 @@ export function RejectModal({ isOpen, onClose, onConfirm, selectedRequest }: Mod
       isOpen={isOpen}
       onClose={onClose}
       request={selectedRequest}
-      title="Reject expense request"
+      title={`Reject ${kindOf(selectedRequest)} request`}
       icon={<XCircle className="h-4 w-4" />}
       tone="danger"
       confirmLabel="Confirm rejection"
       field={{ id: 'reject-reason', label: 'Rejection reason', required: true, requiredMessage: 'Rejection reason is required.', placeholder: 'Provide a detailed reason for rejecting this request...' }}
       onConfirm={(comment) => onConfirm({ comment })}
-      top={<InlineAlert tone="danger">The employee is notified and the expense is closed. They can see your reason.</InlineAlert>}
+      top={<InlineAlert tone="danger">The submitter is notified and the {kindOf(selectedRequest)} is closed. They can see your reason.</InlineAlert>}
     />
   );
 }
@@ -122,7 +125,7 @@ export function SendBackModal({ isOpen, onClose, onConfirm, selectedRequest }: M
       onConfirm={(comment) => onConfirm({ comment })}
     >
       <InlineAlert tone="info">
-        The expense returns to <strong>draft</strong> and the employee can edit and resubmit it.
+        The {kindOf(selectedRequest)} returns to <strong>draft</strong> and the employee can edit and resubmit it.
       </InlineAlert>
     </DecisionModal>
   );

@@ -99,7 +99,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
 
   // Budget line this expense lands on, and what is left on it
   const headroomOn = isExpense && !!categoryId && !!codeId && !!contextType && !!dateRecorded && Number(amount) > 0;
-  const { data: headroom } = useHeadroom({
+  const { data: headroom, isFetching: headroomLoading } = useHeadroom({
     date: dateRecorded, contextType, categoryId,
     projectId: contextType === 'project' ? codeId : undefined,
     productId: contextType === 'product' ? codeId : undefined,
@@ -347,7 +347,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
       title={isAdd ? `Add New ${isExpense ? 'Expense' : 'Income'}` : `Edit ${isExpense ? 'Expense' : 'Income'}`}
       icon={editing ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
       onSave={() => handleSave()}
-      canSave={!!amount && !isNaN(Number(amount)) && Number(amount) > 0 && !!dateRecorded && (!isExpense || (!!categoryId && !!contextType && !!codeId)) && !gate.blocked && !(gate.needsReason && !overBudgetReason.trim())}
+      canSave={!!amount && !isNaN(Number(amount)) && Number(amount) > 0 && !!dateRecorded && (!isExpense || (!!categoryId && !!contextType && !!codeId)) && !(headroomOn && headroomLoading) && !gate.blocked && !(gate.needsReason && !overBudgetReason.trim())}
       saveLabel={editing ? `Update ${isExpense ? 'Expense' : 'Income'}` : `Add ${isExpense ? 'Expense' : 'Income'}`}
       size="xl"
     >

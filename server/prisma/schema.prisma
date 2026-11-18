@@ -78,6 +78,7 @@ model User {
   roleRelation                     Role?                  @relation(fields: [roleId], references: [id])
 
   @@index([userStatus])
+  @@index([managerId])
   @@map("users")
 }
 
@@ -210,6 +211,7 @@ model Transaction {
   @@index([departmentId])
   @@index([contextType])
   @@index([userId, status, type])
+  @@index([recurringTransactionId])
   @@map("transactions")
 }
 
@@ -242,6 +244,8 @@ model TransactionSplit {
   transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
 
   @@index([transactionId])
+  @@index([projectId])
+  @@index([productId])
   @@map("transaction_splits")
 }
 
@@ -905,6 +909,7 @@ model PartReplacement {
 
   @@index([itemId])
   @@index([status, effectiveFrom])
+  @@index([successorId])
   @@map("part_replacements")
 }
 
@@ -1015,6 +1020,7 @@ model BomOperation {
   bom             Bom            @relation(fields: [bomId], references: [id], onDelete: Cascade)
 
   @@index([bomId])
+  @@index([operationTypeId])
   @@map("bom_operations")
 }
 
@@ -1205,6 +1211,8 @@ model ClientPo {
 
   @@unique([clientId, poNumber])
   @@index([status])
+  @@index([projectId])
+  @@index([buildOrderId])
   @@map("client_pos")
 }
 
@@ -1252,6 +1260,9 @@ model Invoice {
 
   @@index([status, dueDate])
   @@index([clientId])
+  @@index([poId])
+  @@index([projectId])
+  @@index([buildOrderId])
   @@map("invoices")
 }
 

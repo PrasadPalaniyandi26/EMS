@@ -90,6 +90,8 @@ npx tsx prisma/seed.js  # NOT npx prisma db seed (not configured in package.json
 - Import the client and `Prisma` namespace from `../generated/prisma/client`, never from `@prisma/client`.
 - `PrismaService` builds the client with the `@prisma/adapter-pg` adapter and `DATABASE_URL`. Prisma 7 does **not** read `.env` by itself: the app loads it through `ConfigModule`, `prisma.config.ts` and the seeds through `dotenv/config`, and Jest through `setupFiles`.
 - The datasource URL lives in `server/prisma.config.ts`, not in `schema.prisma`.
+- The pool has a 10 s connection timeout and a 30 s statement timeout (`DB_CONNECT_TIMEOUT_MS`, `DB_STATEMENT_TIMEOUT_MS`, `DB_POOL_MAX`, `DB_IDLE_TIMEOUT_MS` in `.env`). `HttpExceptionFilter` turns a timeout into `503 DB_BUSY`; other unexpected errors return a generic message and the detail goes to the server log only.
+- Schema changes that need only SQL review can be made with `npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script` into a new `prisma/migrations/<timestamp>_<name>/migration.sql`, then `npx prisma migrate deploy`. This avoids `migrate dev` offering a reset on drift.
 - Jest needs `--experimental-vm-modules` (the query compiler is loaded with a dynamic `import()`); the `test` and `test:e2e` scripts already pass it. Use them instead of calling `npx jest` directly, or set `NODE_OPTIONS=--experimental-vm-modules`.
 - Seeds are plain Node scripts that use `prisma/seed-client.js`; run them with `npx tsx`.
 

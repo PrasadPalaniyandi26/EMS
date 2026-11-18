@@ -13,6 +13,10 @@ const STATUS_CODES: Record<number, string> = {
   400: 'BAD_REQUEST', 401: 'UNAUTHORIZED', 403: 'FORBIDDEN', 404: 'NOT_FOUND', 409: 'CONFLICT', 422: 'UNPROCESSABLE',
 };
 
+// The database gave up on the request: a query passed statement_timeout (Postgres 57014), or no pool connection came free in time
+const isDbTimeout = (e: any) =>
+  /\b57014\b|statement timeout|timeout exceeded when trying to connect|connection timeout/i.test(`${e?.message ?? ''} ${JSON.stringify(e?.meta ?? {})}`);
+
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger('ExceptionFilter');
@@ -62,13 +66,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
       statusCode = HttpStatus.NOT_FOUND;
       message = 'Record not found.';
       code = 'NOT_FOUND';
-    } else {
-      message = exception?.message || 'Internal server error.';
+    } else if (isDbTimeout(exception)) {
+      statusCode = HttpStatus.SERVICE_UNAVAILABLE;
+      message = 'The database is busy. Try again in a moment.';
+      code = 'DB_BUSY';
     }
+    // Anything else keeps the generic message: raw errors can carry SQL, file paths and code, so they go to the log only
 
     // Log based on severity
     if (statusCode >= 500) {
-      this.logger.error(`${request.method} ${request.url}: ${message}`, exception?.stack);
+      this.logger.error(`${request.method} ${request.url}: ${exception?.message || message}`, exception?.stack);
     } else if (statusCode === 401) {
       this.logger.debug(`${request.method} ${request.url}: ${message}`);
     } else {

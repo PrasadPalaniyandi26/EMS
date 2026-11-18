@@ -423,7 +423,7 @@ export class ApprovalsService {
     if (isOwnSubmission && !isSelfFinanceApproval) {
       throw new HttpException(
         isFinanceStage
-          ? 'Finance self-approval is disabled. This expense must be approved by another Finance user.'
+          ? 'Finance self-approval is disabled. It must be approved by another Finance user.'
           : 'Cannot approve your own submission.',
         HttpStatus.FORBIDDEN,
       );
