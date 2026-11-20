@@ -78,7 +78,8 @@ describe('Client invoicing (e2e)', () => {
   afterAll(async () => {
     await cleanup();
     await prisma.invoiceCounter.update({ where: { id: 1 }, data: { lastSeq: savedCounter } });
-    if (savedCompany) await prisma.companyProfile.update({ where: { id: 1 }, data: { legalName: savedCompany.legalName, gstin: savedCompany.gstin, pan: savedCompany.pan, addressLine: savedCompany.addressLine, city: savedCompany.city, state: savedCompany.state, postalCode: savedCompany.postalCode, email: savedCompany.email, phone: savedCompany.phone, bankName: savedCompany.bankName, bankAccount: savedCompany.bankAccount, bankIfsc: savedCompany.bankIfsc, terms: savedCompany.terms, signatory: savedCompany.signatory } });
+    // Put back every column, including any added later, so a test run never wipes the real company details
+    if (savedCompany) { const { id: _id, updatedAt: _u, ...rest } = savedCompany; await prisma.companyProfile.update({ where: { id: 1 }, data: rest }); }
     else await prisma.companyProfile.deleteMany({ where: { id: 1 } });
     await app.close();
   });
@@ -107,6 +108,36 @@ describe('Client invoicing (e2e)', () => {
       expect((await call('put', finance, '/company-profile', { legal_name: 'X', gstin: '33AAAAA0000A1Z5', state: 'Karnataka' })).status).toBe(400);
       expect((await call('put', finance, '/company-profile', { legal_name: 'X', bank_ifsc: 'bad' })).status).toBe(400);
       expect((await call('get', manager, '/company-profile')).status).toBe(200);
+    });
+    describe('what the invoice template prints', () => {
+      let standard: any;
+      const png = `data:image/png;base64,${Buffer.from('a tiny logo for the test').toString('base64')}`;
+      const put = (o: object) => call('put', finance, '/company-profile', { ...standard, logo: '', ...o });
+      beforeAll(async () => { standard = (await call('get', finance, '/company-profile')).body.data; });
+      // Whatever a test changes, the details go back to the ones the rest of the suite expects
+      afterEach(async () => { await put({}); });
+
+      it('keeps the bank branch, bank address, account name, closing line and logo', async () => {
+        const r = await put({ bank_branch: 'Main Branch', bank_address: '5 Bank Road', bank_account_name: 'ZZ Test Company', footer_note: 'Thank you.', logo: png });
+        expect(r.status).toBe(200);
+        expect(r.body.data).toMatchObject({ bank_branch: 'Main Branch', bank_address: '5 Bank Road', bank_account_name: 'ZZ Test Company', footer_note: 'Thank you.', logo: png });
+        expect((await call('get', manager, '/company-profile')).body.data.logo).toBe(png);
+        expect((await put({})).body.data.logo).toBe('');
+      });
+      it('refuses a logo that is not a PNG, JPEG or WebP image, or is too large', async () => {
+        expect((await put({ logo: 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=' })).status).toBe(400);
+        expect((await put({ logo: 'data:text/html;base64,PGI+eDwvYj4=' })).status).toBe(400);
+        expect((await put({ logo: 'not a data url' })).status).toBe(400);
+        // Over the 200 KB limit. The real server takes up to 1 MB and answers 400; this test app takes 100 KB and answers 413. Neither is a 500.
+        expect([400, 413]).toContain((await put({ logo: `data:image/png;base64,${'A'.repeat(300_001)}` })).status);
+        expect(await prisma.companyProfile.count({ where: { logo: { not: null } } })).toBe(0);
+      });
+      it('leaves the logo image out of the audit trail', async () => {
+        await put({ logo: `data:image/png;base64,${'A'.repeat(5000)}` });
+        const last = JSON.stringify(await prisma.auditLog.findFirst({ where: { tableName: 'company_profile' }, orderBy: { id: 'desc' } }));
+        expect(last).toContain('(logo set)');
+        expect(last).not.toContain('AAAAAAAAAA');
+      });
     });
     it('refuses a bad client GSTIN or payment terms, or a state that does not match', async () => {
       expect((await call('put', admin, `/clients/${tnClient}`, { gstin: '123' })).status).toBe(400);
@@ -157,6 +188,11 @@ describe('Client invoicing (e2e)', () => {
       expect((await draft(tnClient, { lines: [] })).status).toBe(400);
       expect((await draft(tnClient, { lines: [line({ quantity: 0 })] })).status).toBe(400);
       expect((await draft(tnClient, { lines: [line({ gst_rate: 40 })] })).status).toBe(400);
+      // Only the standard slabs: 12% is fine (6% + 6%), 15% is not
+      expect((await draft(tnClient, { lines: [line({ gst_rate: 12 })] })).status).toBe(201);
+      const odd = await draft(tnClient, { lines: [line({ gst_rate: 15 })] });
+      expect(odd.status).toBe(400);
+      expect(odd.body.error.message).toMatch(/GST rate must be one of/);
       expect((await draft(tnClient, { lines: [line({ hsn: 'ABC' })] })).status).toBe(400);
       expect((await draft(tnClient, { due_date: '2018-06-01' })).status).toBe(400);
     });
@@ -183,12 +219,55 @@ describe('Client invoicing (e2e)', () => {
       expect(x.seller.gstin).toBe('33AAAAA0000A1Z5'); expect(x.buyer.gstin).toBe('33ABCDE1234F1Z5');
       expect(y.supply_type).toBe('INTER');
     });
+    it('uses a number typed at issue, refuses a duplicate or a bad one, and leaves the running number alone', async () => {
+      const typed = `ZZ-${Date.now().toString(36).toUpperCase()}`.slice(0, 16);
+      const a = (await draft(tnClient)).body.data.id; const b = (await draft(tnClient)).body.data.id; const c = (await draft(tnClient)).body.data.id;
+      const bad = await call('post', finance, `/invoices/${a}/issue`, { number: 'has space!' });
+      expect(bad.status).toBe(400);
+      const ok = await call('post', finance, `/invoices/${a}/issue`, { number: `  ${typed}  ` });
+      expect(ok.status).toBe(201); expect(ok.body.data.number).toBe(typed);
+      const dup = await call('post', finance, `/invoices/${b}/issue`, { number: typed.toLowerCase() });
+      expect(dup.status).toBe(409);
+      const auto = (await call('post', finance, `/invoices/${b}/issue`, { number: '   ' })).body.data;
+      expect(auto.number).toMatch(/^NTIN-1806-\d{5}$/);
+      const next = (await call('post', finance, `/invoices/${c}/issue`)).body.data;
+      expect(Number(next.number.slice(-5))).toBe(Number(auto.number.slice(-5)) + 1);
+    });
     it('never gives the same number twice when two are issued at the same moment', async () => {
       const ids = await Promise.all([1, 2, 3, 4].map(async () => (await draft(tnClient)).body.data.id));
       const out = await Promise.all(ids.map((id) => call('post', finance, `/invoices/${id}/issue`)));
       expect(out.every((r) => r.status === 201)).toBe(true);
       const numbers = out.map((r) => r.body.data.number);
       expect(new Set(numbers).size).toBe(4);
+    });
+    it('keeps the bank branch, bank address, account name and closing line as they were when it was issued', async () => {
+      const standard = (await call('get', finance, '/company-profile')).body.data;
+      const put = (o: object) => call('put', finance, '/company-profile', { ...standard, logo: '', ...o });
+      try {
+        expect((await put({ bank_branch: 'Branch One', bank_address: '1 Bank Lane', bank_account_name: 'Name One', footer_note: 'Note one' })).status).toBe(200);
+        const id = (await draft(tnClient)).body.data.id;
+        const issued = (await call('post', finance, `/invoices/${id}/issue`)).body.data;
+        expect(issued.seller).toMatchObject({ bank_branch: 'Branch One', bank_address: '1 Bank Lane', bank_account_name: 'Name One', footer_note: 'Note one' });
+        expect((await put({ bank_branch: 'Branch Two', footer_note: 'Note two' })).status).toBe(200);
+        const again = (await call('get', finance, `/invoices/${id}`)).body.data;
+        expect([again.seller.bank_branch, again.seller.footer_note]).toEqual(['Branch One', 'Note one']);
+      } finally {
+        await put({});
+      }
+    });
+    it('keeps the template header fields on a draft, clears them when left empty, and leaves them out when not sent', async () => {
+      const id = (await draft(tnClient, { consignee: 'Stores, Gate 2', delivery_note: 'DN-77', delivery_note_date: '2018-06-02', reference_no: 'REF-9', reference_date: '2018-06-03', despatch_doc_no: 'DS-4', mode_of_payment: 'RTGS', despatch_through: 'Own van', destination: 'Chennai', terms_of_delivery: 'Ex works' })).body.data.id;
+      const saved = (await call('get', finance, `/invoices/${id}`)).body.data;
+      expect(saved).toMatchObject({ consignee: 'Stores, Gate 2', delivery_note: 'DN-77', delivery_note_date: '2018-06-02', reference_no: 'REF-9', reference_date: '2018-06-03', despatch_doc_no: 'DS-4', mode_of_payment: 'RTGS', despatch_through: 'Own van', destination: 'Chennai', terms_of_delivery: 'Ex works' });
+      const edited = await call('put', finance, `/invoices/${id}`, { delivery_note: '', terms_of_delivery: 'FOB' });
+      expect(edited.status).toBe(200);
+      expect(edited.body.data).toMatchObject({ delivery_note: null, terms_of_delivery: 'FOB', consignee: 'Stores, Gate 2' });
+    });
+    it('carries the date of the PO with its number, for the printed invoice', async () => {
+      const po = (await call('post', ops, '/client-pos', { client_id: tnClient, po_number: 'ZZ-PO-DATE', po_date: '2018-05-20', value: 5000 })).body.data;
+      const inv = (await draft(tnClient, { po_id: po.id })).body.data;
+      expect([inv.po_number, inv.po_date]).toEqual(['ZZ-PO-DATE', '2018-05-20']);
+      expect((await call('get', finance, `/invoices/${inv.id}`)).body.data.po_date).toBe('2018-05-20');
     });
     it('freezes the invoice: no edit, no delete, and the client can change without changing it', async () => {
       const id = (await draft(tnClient)).body.data.id;
@@ -373,7 +452,7 @@ describe('Client invoicing (e2e)', () => {
       expect(r.status).toBe(200);
       const rows = r.body.data.rows as any[];
       expect(rows.length).toBeGreaterThan(0);
-      expect(rows.every((x) => /^NTIN-1806-\d{5}$/.test(x['Invoice No']))).toBe(true);
+      expect(rows.every((x) => /^(NTIN-1806-\d{5}|ZZ-[A-Z0-9]+)$/.test(x['Invoice No']))).toBe(true);
       const live = rows.filter((x) => x.Status === 'Issued');
       expect(r.body.data.totals.Taxable).toBeCloseTo(live.reduce((a, x) => a + x.Taxable, 0), 2);
       expect(r.body.data.totals['Invoice Value']).toBeCloseTo(live.reduce((a, x) => a + x['Invoice Value'], 0), 2);

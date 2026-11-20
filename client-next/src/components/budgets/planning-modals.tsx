@@ -64,7 +64,7 @@ export function ProjectSettingsModal({ isOpen, onClose, data }: Base & { data: P
   const [cv, setCv] = useState(''); const [tm, setTm] = useState(''); const [mn, setMn] = useState(''); const [risk, setRisk] = useState('');
   const [cont, setCont] = useState(''); const [war, setWar] = useState(''); const [reason, setReason] = useState('');
   // Fill the fields when the dialog opens only, so a refresh in the background never wipes what is being typed
-  const latest = useRef(data); latest.current = data;
+  const latest = useRef(data); useEffect(() => { latest.current = data; });
   useEffect(() => {
     const d = latest.current;
     if (!isOpen || !d) return;
@@ -466,7 +466,7 @@ export function OverheadBaseModal({ isOpen, onClose, fy, current }: Base & { fy:
       canSave={!saving && Number(hours) > 0} saveLabel="Save base hours"
       onSave={() => run(() => api.put(`/budgets/overhead-base/${fy}`, { base_hours: Number(hours) }), 'Base hours saved.')}>
       <div className="space-y-3">
-        <p className="text-[12px] text-[var(--shell-text-muted)]">The in-house hours the year's overhead is spread over. Every pool is recovered over these hours, so one figure is used for all of them.</p>
+        <p className="text-[12px] text-[var(--shell-text-muted)]">The in-house hours the year&apos;s overhead is spread over. Every pool is recovered over these hours, so one figure is used for all of them.</p>
         <Field label="Base hours for the year" required hint={Number(hours) > 0 ? `Each pool's rate is its cost divided by ${Number(hours).toLocaleString('en-IN')} hours.` : undefined}><Input type="number" min="1" className={ctl} value={hours} onChange={(e) => setHours(e.target.value)} /></Field>
       </div>
     </ModuleModal>
@@ -736,7 +736,7 @@ export function PartUsageModal({ isOpen, onClose, item }: Base & { item: Item | 
             <DataTable columns={usageColumns} data={rows} fullHeight emptyMessage="Not in any BOM." />
           </div>
         )}
-        {rows.length > 0 && <p className="text-[12px] text-[var(--shell-text-muted)]">Cost per unit is the quantity, with scrap, at the part's standard price. A product that lists the part on more than one line is shown once, with the lines added together.</p>}
+        {rows.length > 0 && <p className="text-[12px] text-[var(--shell-text-muted)]">Cost per unit is the quantity, with scrap, at the part&apos;s standard price. A product that lists the part on more than one line is shown once, with the lines added together.</p>}
       </div>
     </ModuleModal>
   );
@@ -754,7 +754,7 @@ export function ProductPricingModal({ isOpen, onClose, data }: Base & { data: Pr
   const c = data?.cost ?? null; const bom = data?.bom ?? null;
   const dOh = c?.default_overhead_rate ?? 0; const dFr = c?.default_freight_pct ?? 2; const dWa = c?.default_warranty_pct ?? 1.5;
   // Fill the fields when the dialog opens only, so a refresh in the background never wipes what is being typed
-  const latest = useRef(data); latest.current = data;
+  const latest = useRef(data); useEffect(() => { latest.current = data; });
   useEffect(() => {
     const d = latest.current;
     if (!isOpen || !d) return;
@@ -1211,7 +1211,7 @@ export function PartReplaceModal({ isOpen, onClose, item, items }: Base & { item
   const [mode, setMode] = useState<'REPLACE' | 'RETIRE'>('REPLACE');
   const [succ, setSucc] = useState(''); const [when, setWhen] = useState(''); const [why, setWhy] = useState('');
   // Fill the fields when the dialog opens only, so a refresh in the background never wipes what is being typed
-  const latest = useRef(item); latest.current = item;
+  const latest = useRef(item); useEffect(() => { latest.current = item; });
   useEffect(() => {
     const it = latest.current;
     if (!isOpen || !it) return;

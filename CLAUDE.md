@@ -230,6 +230,12 @@ Columns on `users`, all in `schema.prisma`: `contact_no`, `house_apt`, `address`
 - Finance cannot approve their own expense unless they are the only active Finance user (`FINANCE_SELF_APPROVAL`, default `block`; set `allow` to restore the old behavior).
 - Role-based page access lives in `client-next/src/lib/route-access.ts`; the API's `@Roles()` remains the source of truth for data.
 
+## Tax Invoice Sheet
+- The printed invoice (Open on the Invoices tab, then Print or save as PDF) follows the company's Word template, `E:\Apps\Artifacts\NTEMS\Nilatech_Invoice_2603-001.pdf`: ruled box, logo and company block on top, invoice and order details side by side, item grid, tax lines per GST rate, amount in words, payment instructions, notes, signature and a closing line.
+- Layout lives in `client-next/src/app/(protected)/manage/clients/invoices/[id]/page.tsx` and `client-next/src/lib/invoice-sheet-css.ts` (A4, black on white, one page for a short invoice). `lib/amount-words.ts` writes the amount as "Rupees ... and Ninety Six only".
+- Seller details come from Company (Organization, Company tab): legal name, GSTIN, address, phone, email, bank, branch, bank address, account name, account number, IFSC, notes, closing line. They are copied onto the invoice when it is issued, so later edits never change an issued invoice. The logo is the exception: it is the current company logo (PNG, JPEG or WebP under about 200 KB), not a copy.
+- The invoice number rule (`invoiceNumber` in `server/src/invoicing/gst.ts`) is still the old one; the template's `NILAINV-2603-001` format is to be confirmed.
+
 ## File Uploads (Receipts)
 - `POST /api/v1/receipts/upload` — multipart, returns `{ filename }`; stored in `UPLOAD_DIR/Receipts/`
 - `GET /api/v1/receipts/:filename` — protected by JWT guard; **cannot use `window.open()` directly** (no auth header). Use `fetch(url, { credentials: 'include', headers: { Authorization: 'Bearer <token>' } })` → blob → `URL.createObjectURL()` → `window.open()`

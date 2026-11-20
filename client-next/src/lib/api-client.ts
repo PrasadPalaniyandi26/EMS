@@ -124,3 +124,22 @@ export const api = {
 };
 
 export default api;
+
+// Downloads a file behind the sign-in (a PDF or image) and returns it as a Blob, with the same token refresh as other requests
+export async function fetchBlob(endpoint: string): Promise<Blob> {
+  const url = `${API_BASE}${endpoint}`;
+  const send = () => fetch(url, { credentials: 'include', headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {} });
+  let res = await send();
+  if (res.status === 401) {
+    try {
+      await refreshAccessToken();
+      res = await send();
+    } catch {
+      clearAccessToken();
+      if (typeof window !== 'undefined') window.location.href = '/login';
+      throw new Error('Session expired');
+    }
+  }
+  if (!res.ok) throw new Error(`Request failed (${res.status})`);
+  return res.blob();
+}

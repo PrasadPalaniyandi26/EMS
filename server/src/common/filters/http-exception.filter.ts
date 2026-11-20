@@ -66,6 +66,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
       statusCode = HttpStatus.NOT_FOUND;
       message = 'Record not found.';
       code = 'NOT_FOUND';
+    } else if (exception?.status === 413 || exception?.type === 'entity.too.large') {
+      // The request body parser refused a body over the size limit
+      statusCode = HttpStatus.PAYLOAD_TOO_LARGE;
+      message = 'The request is too large.';
+      code = 'PAYLOAD_TOO_LARGE';
+    } else if (exception?.status === 400 && exception?.type === 'entity.parse.failed') {
+      statusCode = HttpStatus.BAD_REQUEST;
+      message = 'The request could not be read as JSON.';
+      code = 'BAD_REQUEST';
     } else if (isDbTimeout(exception)) {
       statusCode = HttpStatus.SERVICE_UNAVAILABLE;
       message = 'The database is busy. Try again in a moment.';

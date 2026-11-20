@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Ban, CreditCard, FileText, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Ban, CreditCard, FileText, ImagePlus, Pencil, Plus, Send, Trash2 } from 'lucide-react';
 import api from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 import { formatDate } from '@/lib/currency';
 import { money } from '@/lib/money';
-import { invoiceTotals, stateCodeOf, GST_RATES, GST_STATES } from '@/lib/invoice-gst';
+import { INVOICE_GST_RATE, invoiceTotals, stateCodeOf, GST_RATES, GST_STATES, halfRate } from '@/lib/invoice-gst';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ModuleModal } from '@/components/shared/module/module-modal';
@@ -127,16 +127,28 @@ export function InvoiceModal({ isOpen, onClose, editing, clientId, poId }: Base 
   const { data: pos } = useClientPos(isOpen);
   const { data: projects } = useProjects();
   const { data: orders } = useBuildOrders();
-  const blank = { client_id: '', po_id: '', project_id: '', build_order_id: '', invoice_date: '', due_date: '', notes: '' };
+  const blank = {
+    client_id: '', po_id: '', project_id: '', build_order_id: '', invoice_date: '', due_date: '', notes: '',
+    consignee: '', delivery_note: '', delivery_note_date: '', reference_no: '', reference_date: '', despatch_doc_no: '', mode_of_payment: '', despatch_through: '', destination: '', terms_of_delivery: '',
+  };
   const [f, setF] = useState(blank);
   const [lines, setLines] = useState<Line[]>([{ ...NEW_LINE }]);
   const [dueTouched, setDueTouched] = useState(false);
+  // One GST rate for the whole invoice; CGST and SGST are each half of it (9% and 9% at the usual 18%)
+  const [gstRate, setGstRate] = useState(INVOICE_GST_RATE);
   useEffect(() => {
     if (!isOpen) return;
     setDueTouched(!!editing);
+    setGstRate(editing?.lines[0] && GST_RATES.includes(Number(editing.lines[0].gst_rate)) ? Number(editing.lines[0].gst_rate) : INVOICE_GST_RATE);
     if (editing) {
-      setF({ client_id: String(editing.client_id), po_id: editing.po_id ? String(editing.po_id) : '', project_id: editing.project_id ? String(editing.project_id) : '', build_order_id: editing.build_order_id ? String(editing.build_order_id) : '', invoice_date: day(editing.invoice_date), due_date: day(editing.due_date), notes: editing.notes ?? '' });
+      setF({ ...blank, client_id: String(editing.client_id), po_id: editing.po_id ? String(editing.po_id) : '', project_id: editing.project_id ? String(editing.project_id) : '', build_order_id: editing.build_order_id ? String(editing.build_order_id) : '', invoice_date: day(editing.invoice_date), due_date: day(editing.due_date), notes: editing.notes ?? '' });
       setLines(editing.lines.map((l) => ({ description: l.description, hsn: l.hsn ?? '', quantity: String(l.quantity), unit: l.unit, rate: String(l.rate), gst_rate: String(l.gst_rate) })));
+      setF((x) => ({
+        ...x,
+        consignee: editing.consignee ?? '', delivery_note: editing.delivery_note ?? '', delivery_note_date: day(editing.delivery_note_date), reference_no: editing.reference_no ?? '',
+        reference_date: day(editing.reference_date), despatch_doc_no: editing.despatch_doc_no ?? '', mode_of_payment: editing.mode_of_payment ?? '', despatch_through: editing.despatch_through ?? '',
+        destination: editing.destination ?? '', terms_of_delivery: editing.terms_of_delivery ?? '',
+      }));
     } else {
       const po = poId ? (pos ?? []).find((p) => p.id === poId) : null;
       setF({ ...blank, client_id: po ? String(po.client_id) : clientId ? String(clientId) : '', po_id: po ? String(po.id) : '', invoice_date: todayStr() });
@@ -160,7 +172,7 @@ export function InvoiceModal({ isOpen, onClose, editing, clientId, poId }: Base 
   const toCode = client ? stateCodeOf(client.gstin, client.state) : null;
   const known = !!fromCode && !!toCode;
   const supply: 'INTRA' | 'INTER' = known && fromCode !== toCode ? 'INTER' : 'INTRA';
-  const nums = lines.map((l) => ({ quantity: Number(l.quantity) || 0, rate: Number(l.rate) || 0, gst_rate: Number(l.gst_rate) || 0 }));
+  const nums = lines.map((l) => ({ quantity: Number(l.quantity) || 0, rate: Number(l.rate) || 0, gst_rate: gstRate }));
   const t = useMemo(() => invoiceTotals(nums, supply), [lines, supply]); // eslint-disable-line react-hooks/exhaustive-deps
   const over = po ? t.taxable > po.balance + 0.005 + (editing?.po_id === po.id ? editing.taxable : 0) : false;
   const linesOk = lines.length > 0 && lines.every((l) => l.description.trim() && Number(l.quantity) > 0 && Number(l.rate) >= 0 && l.rate !== '' && (!l.hsn || /^\d{4,8}$/.test(l.hsn)));
@@ -175,7 +187,11 @@ export function InvoiceModal({ isOpen, onClose, editing, clientId, poId }: Base 
         const body = {
           client_id: cid, po_id: f.po_id ? Number(f.po_id) : null, project_id: f.project_id ? Number(f.project_id) : null, build_order_id: f.build_order_id ? Number(f.build_order_id) : null,
           invoice_date: f.invoice_date, due_date: f.due_date, notes: f.notes || null,
-          lines: lines.map((l) => ({ description: l.description, hsn: l.hsn || null, quantity: Number(l.quantity), unit: l.unit || 'nos', rate: Number(l.rate), gst_rate: Number(l.gst_rate) })),
+          consignee: f.consignee.trim() || null, delivery_note: f.delivery_note.trim() || null, delivery_note_date: f.delivery_note_date || null,
+          reference_no: f.reference_no.trim() || null, reference_date: f.reference_date || null, despatch_doc_no: f.despatch_doc_no.trim() || null,
+          mode_of_payment: f.mode_of_payment.trim() || null, despatch_through: f.despatch_through.trim() || null, destination: f.destination.trim() || null,
+          terms_of_delivery: f.terms_of_delivery.trim() || null,
+          lines: lines.map((l) => ({ description: l.description, hsn: l.hsn || null, quantity: Number(l.quantity), unit: l.unit || 'nos', rate: Number(l.rate), gst_rate: gstRate })),
         };
         if (editing) await api.put(`/invoices/${editing.id}`, body); else await api.post('/invoices', body);
       }, 'Draft saved. Issue it when it is ready to send; it gets its number then.')}>
@@ -211,6 +227,22 @@ export function InvoiceModal({ isOpen, onClose, editing, clientId, poId }: Base 
           </Field>
           <div className="md:col-span-2"><Field label="Notes"><Input className={inp} maxLength={500} placeholder="Shown on the invoice" value={f.notes} onChange={(e) => set('notes')(e.target.value)} /></Field></div>
         </div>
+        <details className="mt-4 rounded-md border border-input p-3">
+          <summary className="cursor-pointer text-[13px] font-medium text-[var(--shell-text)]">Delivery and reference details (optional)</summary>
+          <p className="mt-1 text-[12px] text-[var(--shell-text-muted)]">Printed in the invoice header only when filled in. Leave the consignee blank to show the buyer&apos;s address.</p>
+          <div className="mt-3 grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-2">
+            <div className="md:col-span-2"><Field label="Consignee (ship to)"><Textarea className={cn(ctl, 'h-[72px] resize-none py-2')} maxLength={500} rows={3} value={f.consignee} onChange={(e) => set('consignee')(e.target.value)} /></Field></div>
+            <Field label="Delivery note"><Input className={inp} maxLength={60} value={f.delivery_note} onChange={(e) => set('delivery_note')(e.target.value)} /></Field>
+            <Field label="Delivery note date"><Input className={inp} type="date" value={f.delivery_note_date} onChange={(e) => set('delivery_note_date')(e.target.value)} /></Field>
+            <Field label="Reference no."><Input className={inp} maxLength={60} value={f.reference_no} onChange={(e) => set('reference_no')(e.target.value)} /></Field>
+            <Field label="Reference date"><Input className={inp} type="date" value={f.reference_date} onChange={(e) => set('reference_date')(e.target.value)} /></Field>
+            <Field label="Despatch document no."><Input className={inp} maxLength={60} value={f.despatch_doc_no} onChange={(e) => set('despatch_doc_no')(e.target.value)} /></Field>
+            <Field label="Mode / terms of payment" hint="Left blank, it prints the payment days from the due date."><Input className={inp} maxLength={100} value={f.mode_of_payment} onChange={(e) => set('mode_of_payment')(e.target.value)} /></Field>
+            <Field label="Despatch through"><Input className={inp} maxLength={100} value={f.despatch_through} onChange={(e) => set('despatch_through')(e.target.value)} /></Field>
+            <Field label="Destination"><Input className={inp} maxLength={100} value={f.destination} onChange={(e) => set('destination')(e.target.value)} /></Field>
+            <div className="md:col-span-2"><Field label="Terms of delivery"><Input className={inp} maxLength={300} value={f.terms_of_delivery} onChange={(e) => set('terms_of_delivery')(e.target.value)} /></Field></div>
+          </div>
+        </details>
 
         {client && !known && <p role="alert" className="text-[13px] text-[var(--warning)]">{!fromCode ? 'The company state is not set yet (Organization, Company), ' : `${client.name} has no state or GSTIN on the Clients page, `}so the tax is shown as CGST and SGST for now. The invoice cannot be issued until it is set.</p>}
         {client && known && <p className="text-[13px] text-[var(--shell-text-muted)]">{supply === 'INTRA' ? `Both are in ${GST_STATES[fromCode!]}, so tax is CGST and SGST.` : `Supply from ${GST_STATES[fromCode!]} to ${GST_STATES[toCode!]}, so tax is IGST.`}{client && !client.gstin ? ' This client has no GSTIN, so it is a consumer (B2C) invoice.' : ''}</p>}
@@ -221,7 +253,7 @@ export function InvoiceModal({ isOpen, onClose, editing, clientId, poId }: Base 
             <thead>
               <tr className="border-b border-[var(--shell-border)] text-left text-[12px] text-[var(--shell-text-muted)]">
                 <th className="px-3 py-2 font-medium">Description</th><th className="w-[96px] px-2 py-2 font-medium">HSN or SAC</th><th className="w-[84px] px-2 py-2 text-right font-medium">Qty</th>
-                <th className="w-[76px] px-2 py-2 font-medium">Unit</th><th className="w-[120px] px-2 py-2 text-right font-medium">Rate</th><th className="w-[84px] px-2 py-2 text-right font-medium">GST %</th>
+                <th className="w-[76px] px-2 py-2 font-medium">Unit</th><th className="w-[120px] px-2 py-2 text-right font-medium">Rate</th>
                 <th className="w-[120px] px-3 py-2 text-right font-medium">Amount</th><th className="w-10" />
               </tr>
             </thead>
@@ -233,11 +265,6 @@ export function InvoiceModal({ isOpen, onClose, editing, clientId, poId }: Base 
                   <td className="px-2 py-1.5"><Input aria-label={`Line ${i + 1} quantity`} className={cn(ctl, 'text-right tabular-nums')} type="number" min="0" step="0.001" value={l.quantity} onChange={(e) => setLine(i, 'quantity', e.target.value)} /></td>
                   <td className="px-2 py-1.5"><Input aria-label={`Line ${i + 1} unit`} className={ctl} maxLength={12} value={l.unit} onChange={(e) => setLine(i, 'unit', e.target.value)} /></td>
                   <td className="px-2 py-1.5"><Input aria-label={`Line ${i + 1} rate`} className={cn(ctl, 'text-right tabular-nums')} type="number" min="0" step="0.01" value={l.rate} onChange={(e) => setLine(i, 'rate', e.target.value)} /></td>
-                  <td className="px-2 py-1.5">
-                    <NativeSelect aria-label={`Line ${i + 1} GST rate`} className="h-9 text-right" value={l.gst_rate} onChange={(e) => setLine(i, 'gst_rate', e.target.value)}>
-                      {[...new Set([...GST_RATES, Number(l.gst_rate)])].sort((a, b) => a - b).map((r) => <option key={r} value={r}>{r}</option>)}
-                    </NativeSelect>
-                  </td>
                   <td className="px-3 py-1.5 text-right font-medium tabular-nums text-[var(--shell-text)]">{money(t.taxed[i]?.taxable ?? 0, 'INR')}</td>
                   <td className="px-1 py-1.5">
                     <button type="button" aria-label={`Remove line ${i + 1}`} disabled={lines.length === 1} onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}
@@ -252,14 +279,33 @@ export function InvoiceModal({ isOpen, onClose, editing, clientId, poId }: Base 
           </div>
         </div>
 
-        <dl className="ml-auto w-full max-w-[340px] space-y-1.5 text-[13px]">
+        <dl className="ml-auto w-full max-w-[380px] space-y-1.5 text-[13px]">
           <div className="flex justify-between"><dt className="text-[var(--shell-text-muted)]">Taxable value</dt><dd className="tabular-nums text-[var(--shell-text)]">{money(t.taxable, 'INR')}</dd></div>
           {supply === 'INTRA' ? (
             <>
-              <div className="flex justify-between"><dt className="text-[var(--shell-text-muted)]">CGST</dt><dd className="tabular-nums text-[var(--shell-text)]">{money(t.cgst, 'INR')}</dd></div>
-              <div className="flex justify-between"><dt className="text-[var(--shell-text-muted)]">SGST</dt><dd className="tabular-nums text-[var(--shell-text)]">{money(t.sgst, 'INR')}</dd></div>
+              {(['CGST', 'SGST'] as const).map((name) => (
+                <div key={name} className="flex items-center justify-between gap-3">
+                  <dt className="text-[var(--shell-text-muted)]">{name}</dt>
+                  <dd className="flex items-center gap-2 tabular-nums text-[var(--shell-text)]">
+                    <NativeSelect aria-label={`${name} %`} className="h-8 w-[84px] text-right" value={String(gstRate)} onChange={(e) => setGstRate(Number(e.target.value))}>
+                      {GST_RATES.map((r) => <option key={r} value={r}>{halfRate(r)}%</option>)}
+                    </NativeSelect>
+                    <span className="w-[110px] text-right">{money(name === 'CGST' ? t.cgst : t.sgst, 'INR')}</span>
+                  </dd>
+                </div>
+              ))}
             </>
-          ) : <div className="flex justify-between"><dt className="text-[var(--shell-text-muted)]">IGST</dt><dd className="tabular-nums text-[var(--shell-text)]">{money(t.igst, 'INR')}</dd></div>}
+          ) : (
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-[var(--shell-text-muted)]">IGST</dt>
+              <dd className="flex items-center gap-2 tabular-nums text-[var(--shell-text)]">
+                <NativeSelect aria-label="IGST %" className="h-8 w-[84px] text-right" value={String(gstRate)} onChange={(e) => setGstRate(Number(e.target.value))}>
+                  {GST_RATES.map((r) => <option key={r} value={r}>{r}%</option>)}
+                </NativeSelect>
+                <span className="w-[110px] text-right">{money(t.igst, 'INR')}</span>
+              </dd>
+            </div>
+          )}
           <div className="flex justify-between"><dt className="text-[var(--shell-text-muted)]">Round-off</dt><dd className="tabular-nums text-[var(--shell-text)]">{t.round_off.toFixed(2)}</dd></div>
           <div className="flex justify-between border-t border-[var(--shell-border)] pt-2 text-[15px] font-semibold"><dt className="text-[var(--shell-text)]">Total</dt><dd className="tabular-nums text-[var(--shell-text)]">{money(t.total, 'INR')}</dd></div>
         </dl>
@@ -300,6 +346,37 @@ export function PaymentModal({ isOpen, onClose, invoice }: Base & { invoice: Inv
   );
 }
 
+// ── Issue a draft ───────────────────────────────────────────────────────────────
+
+export function IssueInvoiceModal({ isOpen, onClose, invoice }: Base & { invoice: Invoice | null }) {
+  const { saving, run } = useSaver(onClose);
+  const [no, setNo] = useState('');
+  useEffect(() => { if (isOpen) setNo(''); }, [isOpen]);
+  if (!invoice) return null;
+  const rate = Number(invoice.lines[0]?.gst_rate ?? INVOICE_GST_RATE);
+  const gst = invoice.supply_type === 'INTER' ? `IGST ${rate}%` : `CGST ${halfRate(rate)}% and SGST ${halfRate(rate)}%`;
+  const typed = no.trim();
+  const bad = typed !== '' && !/^[A-Za-z0-9][A-Za-z0-9\-/]{0,15}$/.test(typed);
+  const row = (k: string, v: string, strong = false) => <div className="flex justify-between gap-4"><dt className="text-[var(--shell-text-muted)]">{k}</dt><dd className={cn('text-right tabular-nums text-[var(--shell-text)]', strong && 'font-semibold')}>{v}</dd></div>;
+  return (
+    <ModuleModal isOpen={isOpen} onClose={onClose} size="md" title="Issue invoice" icon={<Send className="h-4 w-4" />} canSave={!saving && !bad} saveLabel="Issue"
+      onSave={() => run(() => api.post(`/invoices/${invoice.id}/issue`, { number: typed || undefined }), 'Invoice issued.')}>
+      <div className="space-y-4">
+        <p className="text-[13px] text-[var(--shell-text-muted)]">Check these before issuing. Once issued the invoice cannot be edited, only cancelled.</p>
+        <dl className="space-y-1.5 rounded-md border border-[var(--shell-border)] p-3 text-[13px]">
+          {row('Client', invoice.client_name ?? '')}
+          {row('Invoice date', formatDate(invoice.invoice_date))}
+          {row('GST', gst)}
+          {row('Total amount', money(invoice.total, 'INR'), true)}
+        </dl>
+        <Field label="Invoice number (optional)" hint="Leave blank to use the next automatic number." error={bad ? 'Up to 16 characters: letters, digits, dash or slash.' : undefined}>
+          <Input className={inp} maxLength={16} placeholder="Automatic" value={no} onChange={(e) => setNo(e.target.value)} />
+        </Field>
+      </div>
+    </ModuleModal>
+  );
+}
+
 // ── Cancel an issued invoice ────────────────────────────────────────────────────
 
 export function CancelInvoiceModal({ isOpen, onClose, invoice }: Base & { invoice: Invoice | null }) {
@@ -320,6 +397,26 @@ export function CancelInvoiceModal({ isOpen, onClose, invoice }: Base & { invoic
 
 // ── Company details (on the Organization page) ──────────────────────────────────
 
+// Shrinks a picked image to at most 600 x 200 px and returns it as a PNG data URL, so a large logo never reaches the server
+function shrinkLogo(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (!/^image\/(png|jpeg|webp)$/.test(file.type)) { reject(new Error('Choose a PNG, JPEG or WebP image.')); return; }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, 600 / img.width, 200 / img.height);
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
+      c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      const out = c.toDataURL('image/png');
+      if (out.length > 280_000) reject(new Error('The logo is too detailed to store. Use a simpler image or a smaller one.')); else resolve(out);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('That image could not be read.')); };
+    img.src = url;
+  });
+}
+
 export function CompanyForm({ company, canEdit }: { company: CompanyProfile; canEdit: boolean }) {
   const invalidate = useInvalidate();
   const [f, setF] = useState<CompanyProfile>(company);
@@ -337,8 +434,9 @@ export function CompanyForm({ company, canEdit }: { company: CompanyProfile; can
     catch (e: any) { toast.error(e?.message || 'Could not save.'); } finally { setSaving(false); }
   };
   const ro = !canEdit;
-  const Row = ({ label, k, hint, ...rest }: { label: string; k: keyof CompanyProfile; hint?: string } & React.ComponentProps<'input'>) => (
-    <Field label={label} hint={hint}><Input className={inp} disabled={ro} value={(f[k] as string) ?? ''} onChange={(e) => set(k)(e.target.value)} {...rest} /></Field>
+  // A plain function, not a component: a component created inside render remounts its input on every keystroke.
+  const row = ({ label, k, hint, ...rest }: { label: string; k: keyof CompanyProfile; hint?: string } & React.ComponentProps<'input'>) => (
+    <Field key={k} label={label} hint={hint}><Input className={inp} disabled={ro} value={(f[k] as string) ?? ''} onChange={(e) => set(k)(e.target.value)} {...rest} /></Field>
   );
   return (
     <div className="h-full overflow-y-auto">
@@ -347,25 +445,52 @@ export function CompanyForm({ company, canEdit }: { company: CompanyProfile; can
         {canEdit && <button type="button" onClick={save} disabled={!canSave || !dirty} className="btn-action btn-action-primary">Save details</button>}
       </div>
       <div className="grid max-w-[920px] grid-cols-1 gap-x-6 gap-y-4 px-6 py-6 md:grid-cols-2">
-        <Row label="Legal name" k="legal_name" maxLength={150} required />
+        {row({ label: "Legal name", k: "legal_name", maxLength: 150, required: true })}
         <Field label="GSTIN" error={!gstinOk ? 'A GSTIN has 15 characters, for example 33ABCDE1234F1Z5.' : undefined}><Input className={inp} disabled={ro} maxLength={15} value={f.gstin} onChange={(e) => set('gstin')(e.target.value.toUpperCase())} /></Field>
-        <Row label="PAN" k="pan" maxLength={10} />
+        {row({ label: "PAN", k: "pan", maxLength: 10 })}
         <Field label="State" error={stateMismatch ? 'Does not match the first two digits of the GSTIN.' : undefined}>
           <NativeSelect aria-label="State" disabled={ro} value={f.state} onChange={(e) => set('state')(e.target.value)}>
             <option value="">Select state</option>
             {Object.values(GST_STATES).map((s) => <option key={s} value={s}>{s}</option>)}
           </NativeSelect>
         </Field>
-        <Row label="Address" k="address_line" maxLength={300} />
-        <Row label="City" k="city" maxLength={100} />
-        <Row label="Postal code" k="postal_code" maxLength={20} />
-        <Row label="Email" k="email" type="email" maxLength={200} />
-        <Row label="Phone" k="phone" type="tel" maxLength={30} placeholder="+91 98765 43210" />
-        <Row label="Authorised signatory" k="signatory" maxLength={100} hint="Printed under the signature line." />
-        <Row label="Bank name" k="bank_name" maxLength={100} />
-        <Row label="Account number" k="bank_account" maxLength={30} />
-        <Row label="IFSC" k="bank_ifsc" maxLength={15} />
-        <div className="md:col-span-2"><Field label="Terms printed on the invoice" hint="For example payment terms or a late-payment note."><Textarea className={cn(ctl, 'h-[84px] resize-none py-2')} disabled={ro} rows={3} maxLength={1000} value={f.terms} onChange={(e) => set('terms')(e.target.value)} /></Field></div>
+        <Field label="Address" hint="Press Enter to start a new line. City, postal code and state follow the last line on the invoice."><Textarea className={cn(ctl, 'h-[64px] resize-none py-2')} disabled={ro} rows={2} maxLength={300} value={f.address_line} onChange={(e) => set('address_line')(e.target.value)} /></Field>
+        {row({ label: "City", k: "city", maxLength: 100 })}
+        {row({ label: "Postal code", k: "postal_code", maxLength: 20 })}
+        {row({ label: "Email", k: "email", type: "email", maxLength: 200 })}
+        {row({ label: "Phone", k: "phone", type: "tel", maxLength: 30, placeholder: "+91 98765 43210" })}
+        {row({ label: "Authorised signatory", k: "signatory", maxLength: 100, hint: "Printed under the signature line." })}
+        {row({ label: "Bank name", k: "bank_name", maxLength: 100 })}
+        {row({ label: "Bank branch", k: "bank_branch", maxLength: 100 })}
+        <div className="md:col-span-2">{row({ label: "Bank address", k: "bank_address", maxLength: 300 })}</div>
+        {row({ label: "Account name", k: "bank_account_name", maxLength: 150, hint: "As the bank holds it. Printed under Payment Instructions." })}
+        {row({ label: "Account number", k: "bank_account", maxLength: 30 })}
+        {row({ label: "IFSC", k: "bank_ifsc", maxLength: 15 })}
+        <div className="md:col-span-2"><Field label="Notes printed on the invoice" hint="One note per line, for example payment terms."><Textarea className={cn(ctl, 'h-[84px] resize-none py-2')} disabled={ro} rows={3} maxLength={1000} value={f.terms} onChange={(e) => set('terms')(e.target.value)} /></Field></div>
+        <div className="md:col-span-2">{row({ label: "Closing line", k: "footer_note", maxLength: 300, hint: "Printed in italics at the foot of every invoice." })}</div>
+        <div className="md:col-span-2">
+          <Field label="Logo" hint="PNG, JPEG or WebP. Shown at the top left of every invoice and shrunk to fit.">
+            <div className="flex items-center gap-4">
+              <div className="flex h-[72px] w-[216px] items-center justify-center rounded-md border border-input bg-white p-2">
+                {f.logo ? <img src={f.logo} alt="Company logo" className="max-h-full max-w-full object-contain" /> : <span className="text-[12px] text-black/60">No logo yet</span>}
+              </div>
+              {canEdit && (
+                <div className="flex gap-2">
+                  <label className="btn-action cursor-pointer focus-within:outline-2 focus-within:outline-[var(--shell-accent)]">
+                    <ImagePlus aria-hidden className="h-4 w-4" />{f.logo ? 'Change logo' : 'Choose logo'}
+                    <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={async (e) => {
+                      const file = e.target.files?.[0]; e.target.value = '';
+                      if (!file) return;
+                      try { setF((x) => ({ ...x, logo: '' })); const logo = await shrinkLogo(file); setF((x) => ({ ...x, logo })); }
+                      catch (err: any) { setF((x) => ({ ...x, logo: company.logo })); toast.error(err?.message || 'Could not use that image.'); }
+                    }} />
+                  </label>
+                  {f.logo && <button type="button" className="btn-action" onClick={() => setF((x) => ({ ...x, logo: '' }))}><Trash2 aria-hidden className="h-4 w-4" />Remove</button>}
+                </div>
+              )}
+            </div>
+          </Field>
+        </div>
       </div>
     </div>
   );

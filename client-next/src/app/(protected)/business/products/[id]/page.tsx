@@ -251,7 +251,7 @@ export default function ProductCostingDetailPage() {
                 <DetailField label="Target margin" value={pr.target_margin_pct != null ? `${pr.target_margin_pct}%` : 'Not set'} />
                 <DetailField label="Minimum margin" value={pr.min_margin_pct != null ? `${pr.min_margin_pct}%` : 'Not set'} />
                 {pr.margin_at_rolled_pct != null && pr.rolled_cost != null && Math.abs(pr.rolled_cost - pr.unit_cost) > 0.5 && (
-                  <DetailField wide label="Margin at today's cost" value={`${pr.margin_at_rolled_pct.toFixed(1)}% (cost ${money(pr.rolled_cost, currency)})`} tone={marginTone(pr.margin_at_rolled_pct, pr.target_margin_pct, pr.min_margin_pct)} />
+                  <DetailField wide label="Margin at today&apos;s cost" value={`${pr.margin_at_rolled_pct.toFixed(1)}% (cost ${money(pr.rolled_cost, currency)})`} tone={marginTone(pr.margin_at_rolled_pct, pr.target_margin_pct, pr.min_margin_pct)} />
                 )}
                 {pr.price_for_target != null && (pr.price == null || Math.abs(pr.price - pr.price_for_target) > 0.5) && (
                   <DetailField wide label="Price for the target margin" value={money(pr.price_for_target, currency)} />
@@ -265,7 +265,7 @@ export default function ProductCostingDetailPage() {
                 <p className="text-[12px] text-[var(--warning)]">Margin is below the target of {pr.target_margin_pct}%.{pr.price_for_target != null ? ` A price of ${money(pr.price_for_target, currency)} would reach it.` : ''}</p>
               )}
               {pr.margin_at_rolled_pct != null && pr.margin_pct != null && pr.margin_at_rolled_pct < pr.margin_pct - 0.05 && pr.rolled_cost != null && Math.abs(pr.rolled_cost - pr.unit_cost) > 0.5 && (
-                <p className="text-[12px] text-[var(--warning)]">Parts or rates have moved since the standard cost was approved. At today's cost of {money(pr.rolled_cost, currency)} the margin would be {pr.margin_at_rolled_pct.toFixed(1)}%. The selling price stays as set.</p>
+                <p className="text-[12px] text-[var(--warning)]">Parts or rates have moved since the standard cost was approved. At today&apos;s cost of {money(pr.rolled_cost, currency)} the margin would be {pr.margin_at_rolled_pct.toFixed(1)}%. The selling price stays as set.</p>
               )}
               <p className="text-[12px] text-[var(--shell-text-muted)]">Margin is the profit per unit as a share of the selling price. {pr.basis === 'STANDARD' ? 'Cost is the approved standard cost.' : 'No standard cost is approved yet, so cost is the current rolled-up cost.'}</p>
             </>

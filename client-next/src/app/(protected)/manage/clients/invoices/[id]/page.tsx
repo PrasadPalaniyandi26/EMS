@@ -1,26 +1,75 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, Printer } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Printer } from 'lucide-react';
 import { useHeaderStore } from '@/stores/header-store';
 import { useClients } from '@/hooks/use-queries';
-import { useCompanyProfile, useInvoice, type Invoice, type Party } from '@/hooks/use-invoicing';
+import { useCompanyProfile, useInvoice, type Invoice, type InvoiceLine, type Party } from '@/hooks/use-invoicing';
 import { rupeesInWords } from '@/lib/amount-words';
-import { stateCodeOf } from '@/lib/invoice-gst';
-import { formatDate } from '@/lib/currency';
+import { invoiceTotals, r2, stateCodeOf } from '@/lib/invoice-gst';
 import { SHEET_CSS } from '@/lib/invoice-sheet-css';
 import { Skeleton } from '@/components/dashboard/dashboard-parts';
 
-const inr = (n: number) => new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+const inr = (n: number) => `₹${new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)}`;
 const qty = (n: number) => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 3 }).format(n);
-
+const dmy = (v?: string | null) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v ?? ''); return m ? `${m[3]}-${m[2]}-${m[1]}` : ''; };
+const DAY = 86400000;
+// How long the client has to pay, in calendar days (a money term, not a schedule)
+const termsText = (from: string, to: string) => {
+  const d = Math.round((Date.parse(to.slice(0, 10)) - Date.parse(from.slice(0, 10))) / DAY);
+  return d > 0 ? `Net ${d} days` : 'Due on receipt';
+};
+// Rows in the item grid before it stops padding with empty lines, so a short invoice still fills the box
+const GRID_ROWS = 10;
 
 // A draft has no snapshot yet, so it is shown with the company details and client as they are now
 function partyFromCompany(c?: ReturnType<typeof useCompanyProfile>['data']): Party | null {
   if (!c) return null;
-  return { legal_name: c.legal_name, gstin: c.gstin, pan: c.pan, address_line: c.address_line, city: c.city, state: c.state, state_code: c.state_code, postal_code: c.postal_code, email: c.email, phone: c.phone, bank_name: c.bank_name, bank_account: c.bank_account, bank_ifsc: c.bank_ifsc, terms: c.terms, signatory: c.signatory };
+  return {
+    legal_name: c.legal_name, gstin: c.gstin, pan: c.pan, address_line: c.address_line, city: c.city, state: c.state, state_code: c.state_code, postal_code: c.postal_code, email: c.email, phone: c.phone,
+    bank_name: c.bank_name, bank_account: c.bank_account, bank_ifsc: c.bank_ifsc, bank_branch: c.bank_branch, bank_address: c.bank_address, bank_account_name: c.bank_account_name,
+    terms: c.terms, signatory: c.signatory, footer_note: c.footer_note,
+  };
+}
+
+// The company address as printed: the address lines as typed (a new line stays a new line), with the city, postal code and
+// state joined onto the last one, e.g. "Krishnarayapuram Taluk, Karur District, 639102. Tamil Nadu."
+function sellerAddressLines(p: Party): string[] {
+  const lines = String(p.address_line ?? '').split('\n').map((s) => s.trim()).filter(Boolean);
+  const place = [p.city, p.postal_code].filter(Boolean).join(', ');
+  const tail = `${place}${p.state ? `${place ? '. ' : ''}${p.state}.` : ''}`;
+  if (!lines.length) return tail ? [tail] : [];
+  const last = lines.pop()!;
+  lines.push(tail ? `${last}, ${tail}` : last);
+  return lines;
+}
+
+// Repaints the logo in one colour, keeping its shape: white paper becomes transparent, and each stroke keeps its darkness
+function recolorLogo(src: string, [R, G, B]: number[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      const g = c.getContext('2d');
+      if (!g) { reject(new Error('no canvas')); return; }
+      g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, c.width, c.height);
+      const p = d.data;
+      for (let i = 0; i < p.length; i += 4) {
+        const lum = 0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2];
+        const ink = (255 - lum) / 255;
+        p[i] = R; p[i + 1] = G; p[i + 2] = B;
+        p[i + 3] = Math.round(p[i + 3] * Math.min(1, ink * 1.4));
+      }
+      g.putImageData(d, 0, 0);
+      resolve(c.toDataURL('image/png'));
+    };
+    img.onerror = () => reject(new Error('logo could not be read'));
+    img.src = src;
+  });
 }
 
 function Address({ p }: { p: Party }) {
@@ -28,96 +77,144 @@ function Address({ p }: { p: Party }) {
   return <>{lines.map((l, i) => <div key={i}>{l}</div>)}</>;
 }
 
-function InvoiceSheet({ inv, seller, buyer }: { inv: Invoice; seller: Party | null; buyer: Party | null }) {
+// The tax shown under the grid: one pair of lines (CGST and SGST) or one line (IGST) for each GST rate on the invoice
+function taxBlock(inv: Invoice) {
   const inter = inv.supply_type === 'INTER';
+  const draft = inv.supply_type == null;
+  // A draft is not taxed yet, so it is worked out here the same way it will be when issued
+  const calc = invoiceTotals(inv.lines, inter ? 'INTER' : 'INTRA');
+  const lines: InvoiceLine[] = inv.lines.map((l, i) => (draft ? { ...l, ...calc.taxed[i] } : l));
+  const byRate = new Map<number, { cgst: number; sgst: number; igst: number }>();
+  for (const l of lines) {
+    if (!l.gst_rate) continue;
+    const g = byRate.get(l.gst_rate) ?? { cgst: 0, sgst: 0, igst: 0 };
+    g.cgst += l.cgst ?? 0; g.sgst += l.sgst ?? 0; g.igst += l.igst ?? 0;
+    byRate.set(l.gst_rate, g);
+  }
+  const rows = [...byRate.entries()].sort((a, b) => a[0] - b[0]).flatMap(([rate, g]) => (inter
+    ? [{ label: 'IGST', rate: `${rate}%`, value: r2(g.igst) }]
+    : [{ label: 'CGST', rate: `${rate / 2}%`, value: r2(g.cgst) }, { label: 'SGST', rate: `${rate / 2}%`, value: r2(g.sgst) }]));
+  return { rows, taxable: draft ? calc.taxable : inv.taxable, roundOff: draft ? calc.round_off : inv.round_off, total: draft ? calc.total : inv.total };
+}
+
+function InvoiceSheet({ inv, seller, buyer, logo }: { inv: Invoice; seller: Party | null; buyer: Party | null; logo?: string }) {
   const draft = inv.status === 'DRAFT'; const cancelled = inv.status === 'CANCELLED';
+  const { rows: taxRows, taxable, roundOff, total } = taxBlock(inv);
+  const filler = Math.max(0, GRID_ROWS - inv.lines.length);
+  const notes = [...String(seller?.terms ?? '').split('\n'), ...String(inv.notes ?? '').split('\n')].map((s) => s.trim()).filter(Boolean);
+  const reference = [inv.project_name, inv.build_order_code && `Order ${inv.build_order_code}`].filter(Boolean).join(' / ');
+  const buyerCode = buyer?.state_code ?? stateCodeOf(buyer?.gstin, buyer?.state);
+  const received = inv.paid + inv.tds;
+  const pay: [string, string | null | undefined][] = [
+    ['Bank', seller?.bank_name], ['Account Name', seller?.bank_account_name || seller?.legal_name], ['IFSC Code', seller?.bank_ifsc], ['Account Number', seller?.bank_account],
+    ['Branch', seller?.bank_branch], ['Address', seller?.bank_address],
+  ];
   return (
     <article className="inv" aria-label={inv.number ? `Tax invoice ${inv.number}` : 'Draft tax invoice'}>
       {(draft || cancelled) && <div className="mark" aria-hidden>{draft ? 'DRAFT' : 'CANCELLED'}</div>}
-      <div className="top">
-        <div className="seller">
-          <h1>TAX INVOICE</h1>
-          <div className="name">{seller?.legal_name || 'Your company'}</div>
-          {seller && <Address p={seller} />}
-          {seller?.gstin && <div>GSTIN: <b>{seller.gstin}</b>{seller.pan ? <> · PAN: {seller.pan}</> : null}</div>}
-          {(seller?.email || seller?.phone) && <div className="muted">{[seller.email, seller.phone].filter(Boolean).join(' · ')}</div>}
-        </div>
-        <div className="meta">
-          <div><span>Invoice no.</span><b>{inv.number ?? 'Not issued yet'}</b></div>
-          <div><span>Invoice date</span><b>{formatDate(inv.invoice_date)}</b></div>
-          <div><span>Due date</span><b>{formatDate(inv.due_date)}</b></div>
-          {inv.po_number && <div><span>Client&apos;s PO</span><b>{inv.po_number}</b></div>}
-          {inv.place_of_supply && <div><span>Place of supply</span><b>{inv.place_of_supply}{inv.supply_type ? ` (${stateCodeOf(buyer?.gstin, buyer?.state) ?? ''})` : ''}</b></div>}
-        </div>
-      </div>
+      <div className="sheet">
+        <div className="title">Tax Invoice</div>
 
-      <div className="parties">
-        <div className="box">
-          <h2>Bill to</h2>
-          <div><b>{buyer?.name ?? inv.client_name}</b></div>
-          {buyer && <Address p={buyer} />}
-          <div>{buyer?.gstin ? <>GSTIN: <b>{buyer.gstin}</b></> : <span className="muted">GSTIN: unregistered</span>}</div>
+        <div className={`head${logo ? '' : ' nologo'}`}>
+          {logo && <div className="logo"><img src={logo} alt={seller?.legal_name ? `${seller.legal_name} logo` : 'Company logo'} /></div>}
+          <div className="from">
+            <div className="co">{seller?.legal_name || 'Your company'}</div>
+            {seller && sellerAddressLines(seller).map((l, i) => <div key={i}>{l}</div>)}
+            {seller?.gstin && <div>GSTIN/UIN: {seller.gstin}</div>}
+            {(seller?.phone || seller?.email) && (
+              <div className="contact">
+                {seller.phone && <><Phone size={11} strokeWidth={2.5} className="ico" role="img" aria-label="Phone" /> {seller.phone}</>}
+                {seller.phone && seller.email && '  '}
+                {seller.email && <><Mail size={11} strokeWidth={2.5} className="ico" role="img" aria-label="Email" /> {seller.email}</>}
+              </div>
+            )}
+          </div>
         </div>
-        <div className="box">
-          <h2>Supply</h2>
-          <div>{inv.supply_type == null ? <span className="muted">The tax is worked out when the invoice is issued.</span> : inter ? 'Interstate supply: IGST' : 'Within the state: CGST and SGST'}</div>
-          {inv.project_name && <div>Project: {inv.project_name}</div>}
-          {inv.build_order_code && <div>Order: {inv.build_order_code}</div>}
-        </div>
-      </div>
 
-      <table>
-        <thead>
-          <tr>
-            <th style={{ width: '4%' }}>#</th><th>Description</th><th style={{ width: '10%' }}>HSN/SAC</th><th className="r" style={{ width: '9%' }}>Qty</th>
-            <th className="r" style={{ width: '11%' }}>Rate</th><th className="r" style={{ width: '12%' }}>Taxable</th><th className="r" style={{ width: '6%' }}>GST %</th>
-            {inter ? <th className="r" style={{ width: '11%' }}>IGST</th> : <><th className="r" style={{ width: '9%' }}>CGST</th><th className="r" style={{ width: '9%' }}>SGST</th></>}
-          </tr>
-        </thead>
-        <tbody>
-          {inv.lines.map((l, i) => (
-            <tr key={l.id ?? i}>
-              <td>{i + 1}</td><td>{l.description}</td><td>{l.hsn ?? ''}</td><td className="r">{qty(l.quantity)} {l.unit}</td><td className="r">{inr(l.rate)}</td><td className="r">{inr(l.taxable ?? 0)}</td><td className="r">{l.gst_rate}</td>
-              {inter ? <td className="r">{inr(l.igst ?? 0)}</td> : <><td className="r">{inr(l.cgst ?? 0)}</td><td className="r">{inr(l.sgst ?? 0)}</td></>}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <div className="totals">
-        <div className="words"><div className="muted small">Amount in words</div><b>{rupeesInWords(inv.total)}</b></div>
-        <div className="sum">
-          <div><span>Taxable value</span><span className="r">{inr(inv.taxable)}</span></div>
-          {inter ? <div><span>IGST</span><span className="r">{inr(inv.igst)}</span></div> : <><div><span>CGST</span><span className="r">{inr(inv.cgst)}</span></div><div><span>SGST</span><span className="r">{inr(inv.sgst)}</span></div></>}
-          <div><span>Round-off</span><span className="r">{inv.round_off.toFixed(2)}</span></div>
-          <div className="grand"><span>Total</span><span className="r">₹ {inr(inv.total)}</span></div>
-          {inv.paid > 0 || inv.tds > 0 ? <div><span>Received</span><span className="r">{inr(inv.paid + inv.tds)}</span></div> : null}
-          {inv.paid > 0 || inv.tds > 0 ? <div><span>Balance due</span><span className="r">{inr(inv.balance)}</span></div> : null}
+        <div className="info">
+          <div className="l">
+            <div className="c">Invoice No : <b>{inv.number ?? 'Not issued yet'}</b></div>
+            <div className="c">Invoice Date : <b>{dmy(inv.invoice_date)}</b></div>
+            <div className="buyer">
+              <span className="lab">Buyer (Bill to) :</span>
+              <b>{buyer?.name ?? inv.client_name}</b>
+              {buyer?.address_line && <div>{buyer.address_line}</div>}
+              {(buyer?.city || buyer?.postal_code) && <div>{[buyer.city, buyer.postal_code].filter(Boolean).join(', ')}</div>}
+              <div>{buyer?.gstin ? <>GSTIN/UIN : <b>{buyer.gstin}</b></> : <span className="muted">GSTIN/UIN : unregistered</span>}</div>
+              {buyer?.state && <div>State : {buyer.state}{buyerCode ? `, Code : ${buyerCode}` : ''}</div>}
+            </div>
+            <div className="consignee">
+              <span className="lab">Consignee (Ship to) :</span>
+              {inv.consignee
+                ? <div style={{ whiteSpace: 'pre-line' }}>{inv.consignee}</div>
+                : <div className="muted">Same as buyer</div>}
+            </div>
+          </div>
+          <div className="side">
+            <div className="c"><span className="lab">Buyer Order No.</span><span className="val">{inv.po_number ?? ''}</span></div>
+            <div className="c"><span className="lab">Buyer Order Date</span><span className="val">{dmy(inv.po_date)}</span></div>
+            <div className="c"><span className="lab">Delivery Note</span><span className="val">{inv.delivery_note ?? ''}</span></div>
+            <div className="c"><span className="lab">Delivery Date</span><span className="val">{dmy(inv.delivery_note_date)}</span></div>
+            <div className="c"><span className="lab">Reference No.</span><span className="val">{inv.reference_no ?? reference}</span></div>
+            <div className="c"><span className="lab">Reference Date</span><span className="val">{dmy(inv.reference_date)}</span></div>
+            <div className="c"><span className="lab">Despatch Doc No.</span><span className="val">{inv.despatch_doc_no ?? ''}</span></div>
+            <div className="c"><span className="lab">Mode / Terms of Payment</span><span className="val">{inv.mode_of_payment || termsText(inv.invoice_date, inv.due_date)}</span></div>
+            <div className="c"><span className="lab">Despatch Through</span><span className="val">{inv.despatch_through ?? ''}</span></div>
+            <div className="c"><span className="lab">Destination</span><span className="val">{inv.destination ?? ''}</span></div>
+            <div className="c wide"><span className="lab">Terms of Delivery</span><span className="val">{inv.terms_of_delivery ?? ''}</span></div>
+          </div>
         </div>
-      </div>
+        <table>
+          <colgroup><col style={{ width: '7%' }} /><col style={{ width: '43%' }} /><col style={{ width: '11%' }} /><col style={{ width: '10%' }} /><col style={{ width: '14%' }} /><col style={{ width: '15%' }} /></colgroup>
+          <thead>
+            <tr><th>Sl. No</th><th>Item/Service Description</th><th>HSN/SAC</th><th>Quantity</th><th>Rate (₹)</th><th>Line Total (₹)</th></tr>
+          </thead>
+          <tbody>
+            {inv.lines.map((l, i) => (
+              <tr key={l.id ?? i}>
+                <td className="c-sl">{i + 1}</td><td>{l.description}</td><td className="c-sl">{l.hsn ?? ''}</td>
+                <td className="r">{qty(l.quantity)} {l.unit}</td><td className="r"><b>{inr(l.rate)}</b></td><td className="r"><b>{inr(l.quantity * l.rate)}</b></td>
+              </tr>
+            ))}
+            {Array.from({ length: filler }).map((_, i) => <tr key={`f${i}`} aria-hidden><td /><td /><td /><td /><td /><td /></tr>)}
+          </tbody>
+          <tbody className="totals">
+            <tr><td colSpan={4} className="r">Sub Total</td><td /><td className="r">{inr(taxable)}</td></tr>
+            {taxRows.map((t) => <tr key={`${t.label}-${t.rate}`}><td colSpan={4} className="r">{t.label}</td><td className="r">{t.rate}</td><td className="r">{inr(t.value)}</td></tr>)}
+            {roundOff !== 0 && <tr><td colSpan={4} className="r">Round off</td><td /><td className="r">{inr(roundOff)}</td></tr>}
+            <tr className="sep-above"><td colSpan={4} className="r">Grand Total</td><td /><td className="r">{inr(total)}</td></tr>
+            {received > 0 && <tr><td colSpan={4} className="r">Received (including TDS)</td><td /><td className="r">{inr(received)}</td></tr>}
+            {received > 0 && <tr><td colSpan={4} className="r">Balance due</td><td /><td className="r">{inr(inv.balance)}</td></tr>}
+            <tr className="words-row"><td colSpan={4}>Amount Chargeable (in words)</td><td colSpan={2} className="r">E. &amp; O.E</td></tr>
+            <tr className="words-row"><td colSpan={6} className="words-text">{rupeesInWords(total)}</td></tr>
+            <tr className="total-row"><td colSpan={4} className="r">TOTAL</td><td /><td className="r">{inr(total)}</td></tr>
+          </tbody>
+        </table>
 
-      <div className="foot small">
-        <div>
-          {(seller?.bank_name || seller?.bank_account) && (
-            <>
-              <b>Bank details</b>
-              <div>{seller?.bank_name}</div>
-              <div>A/c no. {seller?.bank_account}</div>
-              <div>IFSC {seller?.bank_ifsc}</div>
-            </>
-          )}
-          {inv.notes && <div style={{ marginTop: 8 }}><b>Notes</b><div>{inv.notes}</div></div>}
-        </div>
-        <div>
-          {seller?.terms && <><b>Terms</b><div style={{ whiteSpace: 'pre-line' }}>{seller.terms}</div></>}
-          {cancelled && inv.cancel_reason && <div style={{ marginTop: 8 }}><b>Cancelled</b><div>{inv.cancel_reason}</div></div>}
-        </div>
-      </div>
 
-      <div className="sign small">
-        <div>For <b>{seller?.legal_name}</b></div>
-        <div style={{ height: 44 }} />
-        <div className="line">{seller?.signatory ? `${seller.signatory}, ` : ''}Authorised signatory</div>
+        {pay.some(([, v]) => v) && (
+          <div className="pay">
+            <h2>Payment Instructions</h2>
+            <div className="pay-cols">
+              <div>{pay.filter(([k, v]) => v && !['Branch', 'Address'].includes(k)).map(([k, v]) => <div key={k}>{k}: <b>{v}</b></div>)}</div>
+              <div>{pay.filter(([k, v]) => v && ['Branch', 'Address'].includes(k)).map(([k, v]) => <div key={k}>{k}: <b style={{ whiteSpace: 'pre-line' }}>{v}</b></div>)}</div>
+            </div>
+          </div>
+        )}
+
+        <div className="foot">
+          <div className="notes">
+            <h2>Notes</h2>
+            {notes.map((n, i) => <div key={i}>{n.startsWith('-') ? n : `- ${n}`}</div>)}
+            {cancelled && inv.cancel_reason && <div>- Cancelled: {inv.cancel_reason}</div>}
+          </div>
+          <div className="sign">
+            <div>For <b>{seller?.legal_name}</b></div>
+            <div className="gap" />
+            <div>{seller?.signatory ? `${seller.signatory}, ` : ''}Authorised Signatory</div>
+          </div>
+        </div>
+        {seller?.footer_note && <div className="tag">&ldquo;{seller.footer_note}&rdquo;</div>}
       </div>
     </article>
   );
@@ -128,6 +225,14 @@ export default function InvoicePage() {
   const setHeader = useHeaderStore((s) => s.setHeader);
   const { data: inv, isLoading, isError } = useInvoice(id);
   const { data: company } = useCompanyProfile();
+  // The logo is shown in deep royal green on the sheet; the stored logo itself is not changed
+  const [emeraldLogo, setEmeraldLogo] = useState<string | undefined>();
+  useEffect(() => {
+    let live = true;
+    if (!company?.logo) { setEmeraldLogo(undefined); return; }
+    recolorLogo(company.logo, [11, 90, 60]).then((u) => { if (live) setEmeraldLogo(u); }).catch(() => { if (live) setEmeraldLogo(company.logo); });
+    return () => { live = false; };
+  }, [company?.logo]);
   const { data: clients } = useClients(true);
   const sheet = useRef<HTMLDivElement>(null);
 
@@ -143,7 +248,7 @@ export default function InvoicePage() {
     if (!el || !inv) return;
     const w = window.open('', '_blank', 'width=900,height=1100');
     if (!w) return;
-    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${(inv.number ?? 'Draft invoice').replace(/[<>&]/g, '')}</title><style>${SHEET_CSS}body{margin:0}</style></head><body>${el.outerHTML}</body></html>`);
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${(inv.number ?? 'Draft invoice').replace(/[<>&]/g, '')}</title><style>${SHEET_CSS}html,body{width:210mm;margin:0;padding:0;background:#fff}.inv{margin:0;box-shadow:none}</style></head><body>${el.outerHTML}</body></html>`);
     w.document.close(); w.focus();
     setTimeout(() => w.print(), 300);
   };
@@ -158,7 +263,7 @@ export default function InvoicePage() {
         {isLoading ? <Skeleton h="400px" /> : isError || !inv ? <p className="text-center text-[13px] text-[var(--shell-text-muted)]">This invoice could not be found.</p> : (
           <>
             <style>{SHEET_CSS}</style>
-            <div ref={sheet} className="mx-auto w-fit shadow-md"><InvoiceSheet inv={inv} seller={seller} buyer={buyer} /></div>
+            <div ref={sheet} className="mx-auto w-fit shadow-md"><InvoiceSheet inv={inv} seller={seller} buyer={buyer} logo={emeraldLogo} /></div>
           </>
         )}
       </div>

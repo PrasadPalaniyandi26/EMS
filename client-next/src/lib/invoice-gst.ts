@@ -40,4 +40,8 @@ export function invoiceTotals(lines: { quantity: number; rate: number; gst_rate:
   return { taxed, taxable, cgst, sgst, igst, round_off: r2(total - exact), total };
 }
 
+// The usual rate is 18%: CGST and SGST are 9% each (IGST 18% across states). Matches the server's slabs.
+export const INVOICE_GST_RATE = 18;
 export const GST_RATES = [0, 5, 12, 18, 28];
+// CGST % (= SGST %) for each slab
+export const halfRate = (rate: number) => rate / 2;

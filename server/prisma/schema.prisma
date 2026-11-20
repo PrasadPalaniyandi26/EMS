@@ -1170,8 +1170,14 @@ model CompanyProfile {
   bankName    String?  @map("bank_name") @db.VarChar(100)
   bankAccount String?  @map("bank_account") @db.VarChar(30)
   bankIfsc    String?  @map("bank_ifsc") @db.VarChar(15)
+  bankBranch  String?  @map("bank_branch") @db.VarChar(100)
+  bankAddress String?  @map("bank_address") @db.VarChar(300)
+  bankAccountName String? @map("bank_account_name") @db.VarChar(150)
   terms       String?  @db.VarChar(1000)
   signatory   String?  @db.VarChar(100)
+  footerNote  String?  @map("footer_note") @db.VarChar(300)
+  // The company logo as a small image data URL; shown at the head of every invoice
+  logo        String?
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("company_profile")
@@ -1240,6 +1246,17 @@ model Invoice {
   // DRAFT, ISSUED, PART_PAID, PAID or CANCELLED
   status          String           @default("DRAFT") @db.VarChar(10)
   notes           String?          @db.VarChar(500)
+  // What the printed template shows in its header block; all optional and printed only when filled in
+  consignee       String?          @db.VarChar(500)
+  deliveryNote    String?          @map("delivery_note") @db.VarChar(60)
+  deliveryNoteDate DateTime?       @map("delivery_note_date") @db.Date
+  referenceNo     String?          @map("reference_no") @db.VarChar(60)
+  referenceDate   DateTime?        @map("reference_date") @db.Date
+  despatchDocNo   String?          @map("despatch_doc_no") @db.VarChar(60)
+  modeOfPayment   String?          @map("mode_of_payment") @db.VarChar(100)
+  despatchThrough String?          @map("despatch_through") @db.VarChar(100)
+  destination     String?          @db.VarChar(100)
+  termsOfDelivery String?          @map("terms_of_delivery") @db.VarChar(300)
   seller          Json?
   buyer           Json?
   issuedAt        DateTime?        @map("issued_at")

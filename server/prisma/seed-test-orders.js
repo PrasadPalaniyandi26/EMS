@@ -9,6 +9,10 @@
  * Needs products that already have a BOM, so it uses whichever of PRD-001 to PRD-005 exist.
  * API address and admin login can be changed with API_URL, SEED_ADMIN_USER and SEED_ADMIN_PASSWORD.
  */
+if (process.env.NODE_ENV === "production") {
+  console.error("Refusing to run test data in production. This seed is for local development only.");
+  process.exit(1);
+}
 const API = (process.env.API_URL || 'http://localhost:5000') + '/api/v1';
 
 const call = async (token, method, path, body) => {

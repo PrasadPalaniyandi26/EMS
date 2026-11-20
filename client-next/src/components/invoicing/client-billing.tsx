@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Ban, CircleCheck, CreditCard, FileText, FolderOpen, Paperclip, Pencil, Plus, Send, Trash2, Undo2 } from 'lucide-react';
 import { ColumnDef, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, getSortedRowModel, SortingState } from '@tanstack/react-table';
-import api, { API_BASE, getAccessToken } from '@/lib/api-client';
+import api, { fetchBlob } from '@/lib/api-client';
 import { downloadCsv, toCsv } from '@/lib/csv';
 import { formatDate } from '@/lib/currency';
 import { money } from '@/lib/money';
@@ -23,18 +23,22 @@ import { ModuleIntelligencePanel } from '@/components/shared/module/module-intel
 import { ConfirmDialog } from '@/components/shared/modal-primitives';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import { RecordLink } from '@/components/budgets/budget-ui';
-import { CancelInvoiceModal, InvoiceModal, PaymentModal, PoModal } from '@/components/invoicing/invoicing-modals';
+import { CancelInvoiceModal, InvoiceModal, IssueInvoiceModal, PaymentModal, PoModal } from '@/components/invoicing/invoicing-modals';
 
 const TONE_CLASS = { success: 'text-[var(--success)]', warning: 'text-[var(--warning)]', danger: 'text-[var(--danger)]', info: 'text-[var(--info)]', muted: 'text-[var(--shell-text-muted)]' } as const;
 
 // The client's PO file is behind the sign-in, so it is fetched with the token and opened from memory
 async function openFile(name: string) {
+  // The tab is opened from the click itself, so the browser does not block it; the file then loads into it
+  const win = window.open('', '_blank');
   try {
-    const token = getAccessToken();
-    const res = await fetch(`${API_BASE}/receipts/${name}`, { credentials: 'include', headers: token ? { Authorization: `Bearer ${token}` } : {} });
-    if (!res.ok) throw new Error();
-    window.open(URL.createObjectURL(await res.blob()), '_blank');
-  } catch { toast.error('The file could not be opened.'); }
+    const blob = await fetchBlob(`/receipts/${name}`);
+    const url = URL.createObjectURL(blob);
+    if (win) win.location.href = url; else window.open(url, '_blank');
+  } catch {
+    win?.close();
+    toast.error('The file could not be opened.');
+  }
 }
 
 function useRoles() {
@@ -342,8 +346,7 @@ export function InvoicesView({ clientId, onClientChange }: { clientId?: number |
       <CancelInvoiceModal isOpen={!!cancelFor} onClose={() => setCancelFor(null)} invoice={cancelFor} />
       <ConfirmDialog open={!!del} destructive title="Delete draft invoice" confirmLabel="Delete" message="Delete this draft? It has no number yet, so nothing is lost from the invoice sequence." onCancel={() => setDel(null)}
         onConfirm={() => { const r = del; setDel(null); if (!r) return; setSelection({}); act(() => api.delete(`/invoices/${r.id}`), 'Draft deleted.'); }} />
-      <ConfirmDialog open={!!issue} title="Issue invoice" confirmLabel="Issue" message={`Issue this invoice to ${issue?.client_name}? It gets the next number and can no longer be edited, only cancelled. The tax is worked out from the states of both parties.`} onCancel={() => setIssue(null)}
-        onConfirm={() => { const r = issue; setIssue(null); if (r) act(() => api.post(`/invoices/${r.id}/issue`, {}), 'Invoice issued.'); }} />
+      <IssueInvoiceModal isOpen={!!issue} onClose={() => setIssue(null)} invoice={issue} />
       <ConfirmDialog open={!!unpay} destructive title="Remove payment" confirmLabel="Remove" message="Remove this payment? The income entry it made is voided and the invoice balance goes back up." onCancel={() => setUnpay(null)}
         onConfirm={() => { const r = unpay; setUnpay(null); if (r) act(() => api.delete(`/invoices/${r.inv.id}/payments/${r.id}`), 'Payment removed.'); }} />
     </ModuleShell>

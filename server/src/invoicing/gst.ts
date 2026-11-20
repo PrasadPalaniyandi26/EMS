@@ -28,6 +28,11 @@ export function stateCodeOf(gstin?: string | null, state?: string | null): strin
 
 export const r2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
 
+// The usual rate on an invoice line: CGST and SGST are half of it (9% each) inside the state
+export const INVOICE_GST_RATE = 18;
+// The GST slabs a line may use; CGST and SGST are always equal halves of one (0, 2.5, 6, 9 or 14% each)
+export const GST_SLABS = [0, 5, 12, 18, 28];
+
 export type LineIn = { quantity: number; rate: number; gstRate: number };
 export type LineOut = { taxable: number; cgst: number; sgst: number; igst: number };
 

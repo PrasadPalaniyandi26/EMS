@@ -77,4 +77,4 @@ export function ToneText({ label, tone = 'muted' }: { label?: string | null; ton
   return <span className={cn('text-[13px] font-medium', TONES[tone])}>{label || EMPTY}</span>;
 }
 
-export const headerRight = (label: string) => () => <div className="text-right">{label}</div>;
+export const headerRight = (label: string) => function HeaderRight() { return <div className="text-right">{label}</div>; };

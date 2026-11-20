@@ -11,6 +11,10 @@
 const { newPrisma } = require('./seed-client');
 const bcrypt = require('bcryptjs');
 
+if (process.env.NODE_ENV === "production") {
+  console.error("Refusing to run test data in production. This seed is for local development only.");
+  process.exit(1);
+}
 const prisma = newPrisma();
 const TEST_PASSWORD = 'Test@1234';
 

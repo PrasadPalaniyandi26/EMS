@@ -49,7 +49,7 @@ export class InvoicesController {
   @Post() @Roles(...WRITE) create(@Body() b: any, @CurrentUser() u: any) { return this.s.createInvoice(b, u); }
   @Put(':id') @Roles(...WRITE) update(@Param('id', ParseIntPipe) id: number, @Body() b: any, @CurrentUser() u: any) { return this.s.updateInvoice(id, b, u); }
   @Delete(':id') @Roles(...WRITE) remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() u: any) { return this.s.deleteInvoice(id, u); }
-  @Post(':id/issue') @Roles(...MONEY) issue(@Param('id', ParseIntPipe) id: number, @CurrentUser() u: any) { return this.s.issueInvoice(id, u); }
+  @Post(':id/issue') @Roles(...MONEY) issue(@Param('id', ParseIntPipe) id: number, @Body() b: any, @CurrentUser() u: any) { return this.s.issueInvoice(id, u, b?.number); }
   @Post(':id/cancel') @Roles(...MONEY) cancel(@Param('id', ParseIntPipe) id: number, @Body('reason') reason: string, @CurrentUser() u: any) { return this.s.cancelInvoice(id, reason, u); }
   @Post(':id/payments') @Roles(...MONEY) pay(@Param('id', ParseIntPipe) id: number, @Body() b: any, @CurrentUser() u: any) { return this.s.addPayment(id, b, u); }
   @Delete(':id/payments/:pid') @Roles(...MONEY) unpay(@Param('id', ParseIntPipe) id: number, @Param('pid', ParseIntPipe) pid: number, @CurrentUser() u: any) { return this.s.removePayment(id, pid, u); }

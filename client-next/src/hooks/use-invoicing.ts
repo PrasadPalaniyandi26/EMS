@@ -21,13 +21,16 @@ export interface InvoicePayment { id: number; paid_on: string; amount: number; t
 export interface Party {
   legal_name?: string; name?: string; code?: string | null; gstin: string | null; pan?: string | null; address_line: string | null; city: string | null; state: string | null; state_code: string | null; postal_code: string | null;
   email?: string | null; phone?: string | null; bank_name?: string | null; bank_account?: string | null; bank_ifsc?: string | null; terms?: string | null; signatory?: string | null;
+  bank_branch?: string | null; bank_address?: string | null; bank_account_name?: string | null; footer_note?: string | null;
 }
 export interface Invoice {
-  id: number; number: string | null; client_id: number; client_name: string | null; po_id: number | null; po_number: string | null;
+  id: number; number: string | null; client_id: number; client_name: string | null; po_id: number | null; po_number: string | null; po_date: string | null;
   project_id: number | null; project_name: string | null; build_order_id: number | null; build_order_code: string | null;
   invoice_date: string; due_date: string; supply_type: 'INTRA' | 'INTER' | null; place_of_supply: string | null;
   taxable: number; cgst: number; sgst: number; igst: number; round_off: number; total: number; paid: number; tds: number; balance: number;
   status: InvoiceStatus; overdue: boolean; days_overdue: number; notes: string | null; seller: Party | null; buyer: Party | null;
+  consignee: string | null; delivery_note: string | null; delivery_note_date: string | null; reference_no: string | null; reference_date: string | null;
+  despatch_doc_no: string | null; mode_of_payment: string | null; despatch_through: string | null; destination: string | null; terms_of_delivery: string | null;
   issued_at: string | null; issued_by_name: string | null; cancel_reason: string | null; cancelled_at: string | null; cancelled_by_name: string | null; created_by_name: string | null; created_at: string;
   lines: InvoiceLine[]; payments: InvoicePayment[];
 }
@@ -35,7 +38,8 @@ export interface ClientOwing { client_id: number; billed: number; received: numb
 export interface InvoiceSummary { rows: ClientOwing[]; totals: { billed: number; received: number; outstanding: number; overdue: number; overdue_count: number } }
 export interface CompanyProfile {
   legal_name: string; gstin: string; pan: string; address_line: string; city: string; state: string; postal_code: string; email: string; phone: string;
-  bank_name: string; bank_account: string; bank_ifsc: string; terms: string; signatory: string; configured: boolean; state_code: string | null;
+  bank_name: string; bank_account: string; bank_ifsc: string; bank_branch: string; bank_address: string; bank_account_name: string; terms: string; signatory: string;
+  footer_note: string; logo: string; configured: boolean; state_code: string | null;
 }
 
 export const INVOICE_STATUS: Record<InvoiceStatus, { label: string; tone: 'success' | 'warning' | 'danger' | 'info' | 'muted' }> = {

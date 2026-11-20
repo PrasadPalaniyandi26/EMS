@@ -3,7 +3,7 @@ import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { cleanText } from '../common/helpers/master-data';
-import { GSTIN_RE, GST_STATES, IFSC_RE, PAN_RE, invoiceNumber, r2, stateCodeOf, taxOf, totalsOf, type LineOut } from './gst';
+import { GSTIN_RE, GST_SLABS, GST_STATES, IFSC_RE, PAN_RE, invoiceNumber, r2, stateCodeOf, taxOf, totalsOf, type LineOut } from './gst';
 
 type Actor = { id: number; username?: string; role_name?: string };
 const bad = (m: string, status: number = HttpStatus.BAD_REQUEST) => new HttpException(m, status);
@@ -49,8 +49,19 @@ export class InvoicingService {
     return {
       legal_name: c?.legalName ?? '', gstin: c?.gstin ?? '', pan: c?.pan ?? '', address_line: c?.addressLine ?? '', city: c?.city ?? '', state: c?.state ?? '', postal_code: c?.postalCode ?? '',
       email: c?.email ?? '', phone: c?.phone ?? '', bank_name: c?.bankName ?? '', bank_account: c?.bankAccount ?? '', bank_ifsc: c?.bankIfsc ?? '', terms: c?.terms ?? '', signatory: c?.signatory ?? '',
+      bank_branch: c?.bankBranch ?? '', bank_address: c?.bankAddress ?? '', bank_account_name: c?.bankAccountName ?? '', footer_note: c?.footerNote ?? '', logo: c?.logo ?? '',
       configured: !!c, state_code: c ? stateCodeOf(c.gstin, c.state) : null,
     };
+  }
+
+  // The logo is kept in the database as a small image data URL. Only PNG, JPEG and WebP are accepted (SVG can carry scripts),
+  // and it has to stay small because it travels with every company-profile request.
+  private cleanLogo(v: unknown): string | null {
+    const s = typeof v === 'string' ? v.trim() : '';
+    if (!s) return null;
+    if (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/.test(s)) throw bad('The logo must be a PNG, JPEG or WebP image.');
+    if (s.length > 300_000) throw bad('The logo is too large. Use an image under 200 KB.');
+    return s;
   }
 
   async getCompany() {
@@ -73,11 +84,16 @@ export class InvoicingService {
       legalName: cleanText(b.legal_name, 'Legal name', 150, true)!, gstin, pan, addressLine: cleanText(b.address_line, 'Address', 300), city: cleanText(b.city, 'City', 100), state,
       postalCode: cleanText(b.postal_code, 'Postal code', 20), email, phone, bankName: cleanText(b.bank_name, 'Bank name', 100), bankAccount: cleanText(b.bank_account, 'Account number', 30),
       bankIfsc: ifsc, terms: cleanText(b.terms, 'Terms', 1000), signatory: cleanText(b.signatory, 'Signatory', 100),
+      bankBranch: cleanText(b.bank_branch, 'Bank branch', 100), bankAddress: cleanText(b.bank_address, 'Bank address', 300),
+      bankAccountName: cleanText(b.bank_account_name, 'Account name', 150), footerNote: cleanText(b.footer_note, 'Closing line', 300),
+      logo: this.cleanLogo(b.logo),
     };
     if (gstin && state && stateCodeOf(gstin, null) !== stateCodeOf(null, state)) throw bad('The state does not match the first two digits of the GSTIN.');
     const before = await this.prisma.companyProfile.findUnique({ where: { id: 1 } });
     const saved = await this.prisma.companyProfile.upsert({ where: { id: 1 }, update: data, create: { id: 1, ...data } });
-    this.log('company_profile', 1, before ? 'UPDATE' : 'INSERT', user.id, null, before ? this.mapCompany(before) : null, this.mapCompany(saved));
+    // The logo is an image, so the audit trail only notes that one is set
+    const forAudit = (c: any) => ({ ...this.mapCompany(c), logo: c?.logo ? '(logo set)' : '' });
+    this.log('company_profile', 1, before ? 'UPDATE' : 'INSERT', user.id, null, before ? forAudit(before) : null, forAudit(saved));
     return this.mapCompany(saved);
   }
 
@@ -234,7 +250,7 @@ export class InvoicingService {
   // ── Invoices ───────────────────────────────────────────────────────────────
 
   private INV_INCLUDE = {
-    client: { select: { name: true, code: true } }, po: { select: { poNumber: true } }, project: { select: { name: true } }, buildOrder: { select: { code: true } },
+    client: { select: { name: true, code: true } }, po: { select: { poNumber: true, poDate: true } }, project: { select: { name: true } }, buildOrder: { select: { code: true } },
     lines: { orderBy: { sequence: 'asc' as const } }, payments: { orderBy: [{ paidOn: 'asc' as const }, { id: 'asc' as const }] },
   };
 
@@ -244,11 +260,13 @@ export class InvoicingService {
     const due = i.dueDate as Date;
     const overdue = ['ISSUED', 'PART_PAID'].includes(i.status) && balance > 0.005 && due.getTime() < todayUtc().getTime();
     return {
-      id: i.id, number: i.number, client_id: i.clientId, client_name: i.client?.name ?? null, po_id: i.poId, po_number: i.po?.poNumber ?? null,
+      id: i.id, number: i.number, client_id: i.clientId, client_name: i.client?.name ?? null, po_id: i.poId, po_number: i.po?.poNumber ?? null, po_date: iso(i.po?.poDate),
       project_id: i.projectId, project_name: i.project?.name ?? null, build_order_id: i.buildOrderId, build_order_code: i.buildOrder?.code ?? null,
       invoice_date: iso(i.invoiceDate), due_date: iso(due), supply_type: i.supplyType, place_of_supply: i.placeOfSupply,
       taxable: n(i.taxable), cgst: n(i.cgst), sgst: n(i.sgst), igst: n(i.igst), round_off: n(i.roundOff), total, paid, tds, balance,
       status: i.status, overdue, days_overdue: overdue ? Math.floor((todayUtc().getTime() - due.getTime()) / DAY) : 0, notes: i.notes,
+      consignee: i.consignee ?? null, delivery_note: i.deliveryNote ?? null, delivery_note_date: iso(i.deliveryNoteDate), reference_no: i.referenceNo ?? null, reference_date: iso(i.referenceDate),
+      despatch_doc_no: i.despatchDocNo ?? null, mode_of_payment: i.modeOfPayment ?? null, despatch_through: i.despatchThrough ?? null, destination: i.destination ?? null, terms_of_delivery: i.termsOfDelivery ?? null,
       seller: i.seller ?? null, buyer: i.buyer ?? null, issued_at: i.issuedAt, issued_by_name: i.issuedByName,
       cancel_reason: i.cancelReason, cancelled_at: i.cancelledAt, cancelled_by_name: i.cancelledByName, created_by_name: i.createdByName, created_at: i.createdAt,
       lines: (i.lines ?? []).map((l: any) => ({ id: l.id, sequence: l.sequence, description: l.description, hsn: l.hsn, quantity: n(l.quantity), unit: l.unit, rate: n(l.rate), gst_rate: n(l.gstRate), taxable: n(l.taxable), cgst: n(l.cgst), sgst: n(l.sgst), igst: n(l.igst) })),
@@ -290,7 +308,7 @@ export class InvoicingService {
       const quantity = Number(l.quantity); const rate = Number(l.rate); const gstRate = Number(l.gst_rate ?? 0);
       if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 9_999_999) throw bad(`Line ${i + 1}: the quantity must be more than zero.`);
       if (!Number.isFinite(rate) || rate < 0 || rate > MONEY_MAX) throw bad(`Line ${i + 1}: the rate must be zero or more.`);
-      if (!Number.isFinite(gstRate) || gstRate < 0 || gstRate > 28) throw bad(`Line ${i + 1}: the GST rate must be between 0 and 28.`);
+      if (!GST_SLABS.includes(gstRate)) throw bad(`Line ${i + 1}: the GST rate must be one of ${GST_SLABS.join(', ')}%. CGST and SGST are half of it each; 18% gives 9% and 9%.`);
       const hsn = cleanText(l.hsn, `Line ${i + 1} HSN or SAC`, 10);
       if (hsn && !/^\d{4,8}$/.test(hsn)) throw bad(`Line ${i + 1}: the HSN or SAC code has 4 to 8 digits.`);
       return { sequence: i + 1, description: cleanText(l.description, `Line ${i + 1} description`, 300, true)!, hsn, quantity: Math.round(quantity * 1000) / 1000, unit: cleanText(l.unit, 'Unit', 12) ?? 'nos', rate: r2(rate), gstRate: r2(gstRate) };
@@ -300,6 +318,24 @@ export class InvoicingService {
   private priced(lines: ReturnType<InvoicingService['cleanLines']>, supply: 'INTRA' | 'INTER') {
     const taxed = lines.map((l) => ({ ...l, ...taxOf({ quantity: l.quantity, rate: l.rate, gstRate: l.gstRate }, supply) }));
     return { taxed, totals: totalsOf(taxed as LineOut[]) };
+  }
+
+  // The optional header fields of the printed template. A field that is left out of the request keeps its value; an empty one clears it.
+  private headerFields(b: any, cur?: any) {
+    const text = (key: string, col: string, label: string, max: number) => (b[key] !== undefined ? cleanText(b[key], label, max) : cur ? cur[col] ?? null : null);
+    const date = (key: string, col: string, label: string) => (b[key] !== undefined ? (b[key] ? day(b[key], label) : null) : cur ? cur[col] ?? null : null);
+    return {
+      consignee: text('consignee', 'consignee', 'Consignee', 500),
+      deliveryNote: text('delivery_note', 'deliveryNote', 'Delivery note', 60),
+      deliveryNoteDate: date('delivery_note_date', 'deliveryNoteDate', 'Delivery note date'),
+      referenceNo: text('reference_no', 'referenceNo', 'Reference number', 60),
+      referenceDate: date('reference_date', 'referenceDate', 'Reference date'),
+      despatchDocNo: text('despatch_doc_no', 'despatchDocNo', 'Despatch document number', 60),
+      modeOfPayment: text('mode_of_payment', 'modeOfPayment', 'Mode or terms of payment', 100),
+      despatchThrough: text('despatch_through', 'despatchThrough', 'Despatch through', 100),
+      destination: text('destination', 'destination', 'Destination', 100),
+      termsOfDelivery: text('terms_of_delivery', 'termsOfDelivery', 'Terms of delivery', 300),
+    };
   }
 
   private async header(b: any, current?: any) {
@@ -316,7 +352,7 @@ export class InvoicingService {
       if (po.status !== 'OPEN' && poId !== current?.poId) throw bad('That PO is not open.');
     }
     const link = await this.links(clientId, b.project_id !== undefined ? b.project_id : current?.projectId, b.build_order_id !== undefined ? b.build_order_id : current?.buildOrderId);
-    return { client, invoiceDate, dueDate, poId, ...link, notes: b.notes !== undefined ? cleanText(b.notes, 'Notes', 500) : current?.notes ?? null };
+    return { client, invoiceDate, dueDate, poId, ...link, notes: b.notes !== undefined ? cleanText(b.notes, 'Notes', 500) : current?.notes ?? null, ...this.headerFields(b, current) };
   }
 
   async createInvoice(b: any, user: Actor) {
@@ -327,6 +363,8 @@ export class InvoicingService {
     const inv = await this.prisma.invoice.create({
       data: {
         clientId: h.client.id, poId: h.poId, projectId: h.projectId, buildOrderId: h.buildOrderId, invoiceDate: h.invoiceDate, dueDate: h.dueDate, notes: h.notes,
+        consignee: h.consignee, deliveryNote: h.deliveryNote, deliveryNoteDate: h.deliveryNoteDate, referenceNo: h.referenceNo, referenceDate: h.referenceDate,
+        despatchDocNo: h.despatchDocNo, modeOfPayment: h.modeOfPayment, despatchThrough: h.despatchThrough, destination: h.destination, termsOfDelivery: h.termsOfDelivery,
         taxable: totals.taxable, cgst: totals.cgst, sgst: totals.sgst, igst: totals.igst, roundOff: totals.round_off, total: totals.total, status: 'DRAFT',
         createdBy: user.id, createdByName: user.username ?? null,
         lines: { create: taxed.map((l) => ({ sequence: l.sequence, description: l.description, hsn: l.hsn, quantity: l.quantity, unit: l.unit, rate: l.rate, gstRate: l.gstRate, taxable: l.taxable, cgst: l.cgst, sgst: l.sgst, igst: l.igst })) },
@@ -351,6 +389,8 @@ export class InvoicingService {
         where: { id },
         data: {
           poId: h.poId, projectId: h.projectId, buildOrderId: h.buildOrderId, invoiceDate: h.invoiceDate, dueDate: h.dueDate, notes: h.notes,
+          consignee: h.consignee, deliveryNote: h.deliveryNote, deliveryNoteDate: h.deliveryNoteDate, referenceNo: h.referenceNo, referenceDate: h.referenceDate,
+          despatchDocNo: h.despatchDocNo, modeOfPayment: h.modeOfPayment, despatchThrough: h.despatchThrough, destination: h.destination, termsOfDelivery: h.termsOfDelivery,
           taxable: totals.taxable, cgst: totals.cgst, sgst: totals.sgst, igst: totals.igst, roundOff: totals.round_off, total: totals.total,
           lines: { create: taxed.map((l) => ({ sequence: l.sequence, description: l.description, hsn: l.hsn, quantity: l.quantity, unit: l.unit, rate: l.rate, gstRate: l.gstRate, taxable: l.taxable, cgst: l.cgst, sgst: l.sgst, igst: l.igst })) },
         },
@@ -371,9 +411,20 @@ export class InvoicingService {
   }
 
   // Issuing gives the invoice its number and freezes it: who it is from, who it is to, and the tax that applies
-  async issueInvoice(id: number, user: Actor) {
+  // A number typed at issue: up to 16 letters, digits, dashes or slashes (the GST limit), and not used by another invoice
+  private async cleanNumber(raw: unknown, ownId: number): Promise<string | null> {
+    const s = typeof raw === 'string' ? raw.trim() : '';
+    if (!s) return null;
+    if (!/^[A-Za-z0-9][A-Za-z0-9\-/]{0,15}$/.test(s)) throw bad('The invoice number can have at most 16 characters: letters, digits, dash or slash.');
+    const used = await this.prisma.invoice.findFirst({ where: { number: { equals: s, mode: 'insensitive' }, id: { not: ownId } }, select: { id: true } });
+    if (used) throw bad('That invoice number is already used by another invoice.', HttpStatus.CONFLICT);
+    return s;
+  }
+
+  async issueInvoice(id: number, user: Actor, numberIn?: unknown) {
     const cur = await this.getInvoiceRow(id);
     if (cur.status !== 'DRAFT') throw bad('Only a draft invoice can be issued.', HttpStatus.CONFLICT);
+    const typedNumber = await this.cleanNumber(numberIn, id);
     const co = await this.prisma.companyProfile.findUnique({ where: { id: 1 } });
     if (!co || !co.legalName || !co.gstin || !co.state) throw bad('Fill in the company details (legal name, GSTIN and state) before issuing an invoice. They are on the Organization page.');
     const client = await this.prisma.client.findUnique({ where: { id: cur.clientId } });
@@ -385,20 +436,24 @@ export class InvoicingService {
     const lines = this.cleanLines(cur.lines.map((l: any) => ({ description: l.description, hsn: l.hsn, quantity: n(l.quantity), unit: l.unit, rate: n(l.rate), gst_rate: n(l.gstRate) })));
     const { taxed, totals } = this.priced(lines, sup.supply);
     if (totals.total <= 0) throw bad('The invoice total must be more than zero.');
-    const seller = { legal_name: co.legalName, gstin: co.gstin, pan: co.pan, address_line: co.addressLine, city: co.city, state: co.state, state_code: sup.from, postal_code: co.postalCode, email: co.email, phone: co.phone, bank_name: co.bankName, bank_account: co.bankAccount, bank_ifsc: co.bankIfsc, terms: co.terms, signatory: co.signatory };
+    const seller = { legal_name: co.legalName, gstin: co.gstin, pan: co.pan, address_line: co.addressLine, city: co.city, state: co.state, state_code: sup.from, postal_code: co.postalCode, email: co.email, phone: co.phone, bank_name: co.bankName, bank_account: co.bankAccount, bank_ifsc: co.bankIfsc, bank_branch: co.bankBranch, bank_address: co.bankAddress, bank_account_name: co.bankAccountName, terms: co.terms, signatory: co.signatory, footer_note: co.footerNote };
     const buyer = { name: client.name, code: client.code, gstin: client.gstin, address_line: [client.street, client.addressLine2].filter(Boolean).join(', ') || client.address, city: client.city, state: client.state ?? GST_STATES[sup.to!], state_code: sup.to, postal_code: client.postalCode };
     const before = this.mapInvoice(cur);
 
     await this.prisma.$transaction(async (tx) => {
       // The counter row is locked by this update until the transaction ends, so two invoices can never take the same number
-      const counter = await tx.invoiceCounter.update({ where: { id: 1 }, data: { lastSeq: { increment: 1 } } }).catch(() => null);
-      const seq = counter?.lastSeq;
-      if (!seq) throw bad('The invoice counter is missing.', HttpStatus.INTERNAL_SERVER_ERROR);
+      // A number typed by the user does not use up the running number, so the next automatic one follows on as before
+      let seq = 0;
+      if (!typedNumber) {
+        const counter = await tx.invoiceCounter.update({ where: { id: 1 }, data: { lastSeq: { increment: 1 } } }).catch(() => null);
+        seq = counter?.lastSeq ?? 0;
+        if (!seq) throw bad('The invoice counter is missing.', HttpStatus.INTERNAL_SERVER_ERROR);
+      }
       await tx.invoiceLine.deleteMany({ where: { invoiceId: id } });
       await tx.invoice.update({
         where: { id },
         data: {
-          number: invoiceNumber(cur.invoiceDate, seq), status: 'ISSUED', supplyType: sup.supply, placeOfSupply: buyer.state, seller, buyer, issuedAt: new Date(), issuedByName: user.username ?? null,
+          number: typedNumber ?? invoiceNumber(cur.invoiceDate, seq), status: 'ISSUED', supplyType: sup.supply, placeOfSupply: buyer.state, seller, buyer, issuedAt: new Date(), issuedByName: user.username ?? null,
           taxable: totals.taxable, cgst: totals.cgst, sgst: totals.sgst, igst: totals.igst, roundOff: totals.round_off, total: totals.total,
           lines: { create: taxed.map((l) => ({ sequence: l.sequence, description: l.description, hsn: l.hsn, quantity: l.quantity, unit: l.unit, rate: l.rate, gstRate: l.gstRate, taxable: l.taxable, cgst: l.cgst, sgst: l.sgst, igst: l.igst })) },
         },
