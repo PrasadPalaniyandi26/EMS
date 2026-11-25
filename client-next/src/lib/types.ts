@@ -134,6 +134,7 @@ export interface Transaction {
   receipt_number?: string;
   receipt_path?: string;
   context_type?: string;
+  stock_lines?: { item_id: number; part_no: string | null; name: string | null; uom: string | null; quantity: number; amount: number }[];
   department_id?: number | null;
   budget_line_id?: number | null;
   over_budget_reason?: string | null;

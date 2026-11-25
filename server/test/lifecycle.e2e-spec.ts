@@ -423,7 +423,7 @@ describe('Life cycle (e2e)', () => {
     });
 
     it('every report type answers for admin without an error', async () => {
-      const types = ['budget-by-month', 'budget-vs-actual', 'claimable-gst', 'client-po-status', 'client-statement', 'client-summary', 'collections', 'expense-summary', 'gst-position', 'gst-sales-register', 'income-summary', 'invoice-register', 'order-costing', 'outstanding-reimbursements', 'pl-statement', 'product-margin', 'project-billing', 'project-estimate', 'receivables-ageing', 'reimbursement-register', 'tds-register', 'transaction-ledger', 'unbudgeted-spend'];
+      const types = ['budget-by-month', 'budget-vs-actual', 'claimable-gst', 'client-po-status', 'client-statement', 'client-summary', 'collections', 'expense-summary', 'gst-position', 'gst-sales-register', 'income-summary', 'invoice-register', 'order-costing', 'outstanding-reimbursements', 'pl-statement', 'product-margin', 'project-billing', 'project-estimate', 'receivables-ageing', 'reimbursement-register', 'stock-by-job', 'stock-by-part', 'stock-value', 'tds-register', 'transaction-ledger', 'unbudgeted-spend'];
       const failed: string[] = [];
       for (const t of types) {
         const r = await call('get', `/reporting/generate?type=${t}&${range}&year=${new Date().getFullYear()}&clientId=${clientId}`, admin);

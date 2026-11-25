@@ -16,6 +16,7 @@ import {
   BarChart3, FileText, TrendingDown, TrendingUp, Scale, Target, ListFilter,
   ArrowLeftRight, Users, Download, Sheet,
   ChevronDown, Loader2, Search, Receipt, Wallet, AlertTriangle,
+  Warehouse, ArrowDownUp, PackageMinus,
   CalendarRange, FileWarning, Boxes, Percent, Ruler, Hourglass, BookText,
   FileSpreadsheet, ScrollText, Coins, Landmark, Calculator, ClipboardList, Briefcase, Clock, Play,
 } from 'lucide-react';
@@ -55,6 +56,9 @@ const REPORTS = [
   { id: 'order-costing', group: 'operations', label: 'Order Costing', icon: Boxes, desc: 'Orders: dates, days late, planned cost, value, budget, spend, invoiced and received', color: 'text-[var(--warning)]', bg: '' },
   { id: 'product-margin', group: 'operations', label: 'Product Margin', icon: Percent, desc: 'Every product: price against standard cost, margin against goals, and planned units', color: 'text-[var(--success)]', bg: '' },
   { id: 'project-estimate', group: 'operations', label: 'Project Estimate vs Actual', icon: Ruler, desc: 'Approved estimate against spend, with invoiced and received', color: 'text-[var(--info)]', bg: '' },
+  { id: 'stock-value', group: 'operations', label: 'Stock Value', icon: Warehouse, desc: 'What is in the Store and what it is worth, now or at a date', color: 'text-[var(--info)]', bg: '' },
+  { id: 'stock-by-part', group: 'operations', label: 'Stock In and Used', icon: ArrowDownUp, desc: 'For each part: quantity and value bought, used and adjusted in the period', color: 'text-[var(--success)]', bg: '' },
+  { id: 'stock-by-job', group: 'operations', label: 'Stock Used by Job', icon: PackageMinus, desc: 'What each project and order took from the Store in the period', color: 'text-[var(--warning)]', bg: '' },
   { id: 'receivables-ageing', group: 'receivables', label: 'Receivables Ageing', icon: Hourglass, desc: 'What each client owes, by how long it has been due', color: 'text-[var(--danger)]', bg: '' },
   { id: 'gst-sales-register', group: 'receivables', label: 'GST Sales Register', icon: BookText, desc: 'Invoices issued in the period, with CGST, SGST and IGST', color: 'text-[var(--success)]', bg: '' },
   { id: 'invoice-register', group: 'receivables', label: 'Invoice Register', icon: FileSpreadsheet, desc: 'Every invoice raised in the period, with received, tax deducted, balance and days overdue', color: 'text-[var(--info)]', bg: '' },
@@ -81,8 +85,8 @@ type Group = typeof GROUPS[number]['value'];
 // Reports driven by a financial year rather than a date range
 const FY_REPORTS = new Set(['budget-vs-actual', 'budget-by-month', 'unbudgeted-spend', 'product-margin']);
 // Costing figures are for Finance and Admin; a manager sees the generic reports and the budgets they own
-const FINANCE_ONLY = new Set(['unbudgeted-spend', 'order-costing', 'product-margin', 'project-estimate', 'receivables-ageing', 'gst-sales-register', 'invoice-register', 'client-statement', 'collections', 'tds-register', 'gst-position', 'client-po-status', 'project-billing']);
-const NO_PERIOD = new Set(['project-estimate', 'receivables-ageing', 'client-po-status', 'project-billing', 'outstanding-reimbursements']);
+const FINANCE_ONLY = new Set(['stock-value', 'stock-by-part', 'stock-by-job', 'unbudgeted-spend', 'order-costing', 'product-margin', 'project-estimate', 'receivables-ageing', 'gst-sales-register', 'invoice-register', 'client-statement', 'collections', 'tds-register', 'gst-position', 'client-po-status', 'project-billing']);
+const NO_PERIOD = new Set(['stock-value', 'project-estimate', 'receivables-ageing', 'client-po-status', 'project-billing', 'outstanding-reimbursements']);
 // Invoice reports can be narrowed to one client; the statement needs one
 const CLIENT_REPORTS = new Set(['invoice-register', 'client-statement', 'collections', 'tds-register', 'client-po-status']);
 // Reports built from transactions can be narrowed by client, project, product, category and person; some can be set against the period before
@@ -202,7 +206,7 @@ export default function ReportingPage() {
     const f = o.filters ?? filters;
     if (FY_REPORTS.has(type)) {
       if (activeFy) params.year = activeFy;
-    } else if (type === 'receivables-ageing') {
+    } else if (type === 'receivables-ageing' || type === 'stock-value') {
       if (asOf) params.asOf = asOf;
     } else if (!NO_PERIOD.has(type)) {
       const from = o.dateFrom ?? dateFrom; const to = o.dateTo ?? dateTo;
@@ -336,7 +340,7 @@ export default function ReportingPage() {
   };
 
   // What the report was narrowed to, in words, for the head of an export
-  const periodText = FY_REPORTS.has(selectedType) ? (activeFy ? fyLabel(Number(activeFy)) : '—') : selectedType === 'receivables-ageing' ? `As of ${asOf || 'today'}` : NO_PERIOD.has(selectedType) ? 'Now' : `${dateFrom || '—'} to ${dateTo || '—'}`;
+  const periodText = FY_REPORTS.has(selectedType) ? (activeFy ? fyLabel(Number(activeFy)) : '—') : selectedType === 'receivables-ageing' || selectedType === 'stock-value' ? `As of ${asOf || 'today'}` : NO_PERIOD.has(selectedType) ? 'Now' : `${dateFrom || '—'} to ${dateTo || '—'}`;
   const filterWords = (): string[] => {
     const out: string[] = [];
     if (selectedType === 'transaction-ledger') { if (txnType) out.push(`Type: ${txnType}`); if (ledgerStatus) out.push(`Status: ${ledgerStatus}`); }
@@ -521,7 +525,7 @@ export default function ReportingPage() {
             </>
           )}
 
-          {selectedType === 'receivables-ageing' && (
+          {(selectedType === 'receivables-ageing' || selectedType === 'stock-value') && (
             <label className="flex items-center gap-2 text-[12px] text-[var(--shell-text-muted)]">
               As of
               <input type="date" aria-label="As of date" value={asOf} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setAsOf(e.target.value)}

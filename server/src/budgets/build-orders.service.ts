@@ -222,10 +222,12 @@ export class BuildOrdersService {
   // What was actually charged to the order, against what its BOM says it should cost
   private async actuals(o: any, roll: any) {
     const e200 = await this.prisma.categoryType.findFirst({ where: { code: 'E200' } });
-    const [txns, parts] = await Promise.all([
+    const [txns, bought, fromStock] = await Promise.all([
       this.prisma.transaction.findMany({ where: { buildOrderId: o.id, type: 'expense', NOT: { status: 'DELETED' } }, include: { category: { select: { name: true, typeId: true } } }, orderBy: [{ dateRecorded: 'desc' }, { id: 'desc' }] }),
       this.budgets.partsWhere({ status: 'APPROVED', buildOrderId: o.id }),
+      this.budgets.stockParts({ kind: 'USED', buildOrderId: o.id }),
     ]);
+    const parts = [...bought, ...fromStock];
     const approved = parts.reduce((a, p) => a + p.amount, 0);
     const approvedE200 = parts.filter((p) => e200 && p.typeId === e200.id).reduce((a, p) => a + p.amount, 0);
     const amountOf = (t: any) => n(t.totalAmount ?? t.amount);
@@ -240,6 +242,7 @@ export class BuildOrdersService {
     const delivered = o.status === 'DELIVERED';
     const cost = approved + (labourStd ?? 0);
     return {
+      stock_used: r2(fromStock.reduce((a, p) => a + p.amount, 0)),
       approved: r2(approved), approved_e200: r2(approvedE200), approved_other: r2(approved - approvedE200), waiting: r2(waiting), drafts: txns.filter((t) => ['DRAFT', 'SENT_BACK'].includes(t.status ?? '')).length,
       expected_bought: expectedBought == null ? null : r2(expectedBought), labour_at_standard: labourStd == null ? null : r2(labourStd),
       remaining: expectedBought == null ? null : r2(expectedBought - approvedE200),

@@ -126,6 +126,8 @@ model Category {
 
   @@index([typeId])
   @@map("categories")
+  stockItems Item[]
+  stockMoves StockMove[]
 }
 
 model Transaction {
@@ -213,6 +215,8 @@ model Transaction {
   @@index([userId, status, type])
   @@index([recurringTransactionId])
   @@map("transactions")
+  stockLines StockPurchaseLine[]
+  stockMoves StockMove[]
 }
 
 model TransactionNote {
@@ -361,6 +365,7 @@ model Project {
   @@unique([clientId, name])
   @@index([typeId])
   @@map("projects")
+  stockMoves StockMove[]
 }
 
 model ProductType {
@@ -880,6 +885,19 @@ model Item {
   isDefaultAlternate Boolean @default(false) @map("is_default_alternate")
   // A one-off part for a single project's job BOM; other BOMs and pickers never offer it
   projectId         Int?     @map("project_id")
+  // DIRECT: charged to the job when bought. STOCK: bought into the Store, charged to a job when used
+  supplyMode        String   @default("DIRECT") @map("supply_mode") @db.VarChar(10)
+  purchaseUom       String?  @map("purchase_uom") @db.VarChar(12)
+  // Stock units in one purchase unit, for example 6 metres in a bar
+  purchaseFactor    Decimal? @map("purchase_factor") @db.Decimal(12, 4)
+  reorderLevel      Decimal? @map("reorder_level") @db.Decimal(14, 3)
+  // The expense category stock used is booked under, so it finds the job's budget line
+  stockCategoryId   Int?     @map("stock_category_id")
+  stockCategory     Category? @relation(fields: [stockCategoryId], references: [id])
+  stockBalance      StockBalance?
+  stockMoves        StockMove[]
+  purchaseLines     StockPurchaseLine[]
+  countLines        StockCountLine[]
   priceLog          ItemPriceLog[]
   replacements      PartReplacement[] @relation("ReplacedPart")
   successions       PartReplacement[] @relation("Successor")
@@ -984,6 +1002,7 @@ model BuildOrder {
   @@index([productId, startDate])
   @@index([status])
   @@map("build_orders")
+  stockMoves StockMove[]
 }
 
 model BomLine {
@@ -1320,4 +1339,109 @@ model InvoicePayment {
 
   @@index([invoiceId])
   @@map("invoice_payments")
+}
+
+// The parts on a stock purchase expense; they become stock when the expense is submitted
+model StockPurchaseLine {
+  id            Int         @id @default(autoincrement())
+  transactionId Int         @map("transaction_id")
+  itemId        Int         @map("item_id")
+  // In the part's purchase unit
+  quantity      Decimal     @db.Decimal(14, 3)
+  // Net of GST
+  amount        Decimal     @db.Decimal(14, 2)
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  item          Item        @relation(fields: [itemId], references: [id])
+
+  @@index([transactionId])
+  @@index([itemId])
+  @@map("stock_purchase_lines")
+}
+
+// Current balance per part, updated in the same database transaction as each ledger entry
+model StockBalance {
+  itemId   Int     @id @map("item_id")
+  quantity Decimal @default(0) @db.Decimal(14, 3)
+  value    Decimal @default(0) @db.Decimal(14, 2)
+  avgCost  Decimal @default(0) @map("avg_cost") @db.Decimal(14, 4)
+  item     Item    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("stock_balances")
+}
+
+// The stock ledger. quantity and value are the signed change to stock
+model StockMove {
+  id            Int          @id @default(autoincrement())
+  itemId        Int          @map("item_id")
+  // OPENING, IN (negative when a purchase is reversed), USED, ADJUST
+  kind          String       @db.VarChar(10)
+  quantity      Decimal      @db.Decimal(14, 3)
+  unitCost      Decimal      @map("unit_cost") @db.Decimal(14, 4)
+  value         Decimal      @db.Decimal(14, 2)
+  movedOn       DateTime     @map("moved_on") @db.Date
+  transactionId Int?         @map("transaction_id")
+  projectId     Int?         @map("project_id")
+  buildOrderId  Int?         @map("build_order_id")
+  departmentId  Int?         @map("department_id")
+  categoryId    Int?         @map("category_id")
+  // A correction to an entry in a closed month, at the same unit cost
+  correctsId    Int?         @map("corrects_id")
+  countId       Int?         @map("count_id")
+  reason        String?      @db.VarChar(300)
+  createdById   Int?         @map("created_by_id")
+  createdByName String?      @map("created_by_name") @db.VarChar(100)
+  createdAt     DateTime     @default(now()) @map("created_at")
+  item          Item         @relation(fields: [itemId], references: [id])
+  transaction   Transaction? @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  project       Project?     @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  buildOrder    BuildOrder?  @relation(fields: [buildOrderId], references: [id], onDelete: Restrict)
+  category      Category?    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  corrects      StockMove?   @relation("Correction", fields: [correctsId], references: [id])
+  corrections   StockMove[]  @relation("Correction")
+  count         StockCount?  @relation(fields: [countId], references: [id])
+
+  @@index([itemId, movedOn])
+  @@index([projectId])
+  @@index([buildOrderId])
+  @@index([transactionId])
+  @@index([categoryId])
+  @@index([correctsId])
+  @@index([countId])
+  @@index([kind, movedOn])
+  @@map("stock_moves")
+}
+
+// One count of the Store for a month: DRAFT, SUBMITTED, APPROVED
+model StockCount {
+  id              Int              @id @default(autoincrement())
+  year            Int              @db.SmallInt
+  month           Int              @db.SmallInt
+  status          String           @default("DRAFT") @db.VarChar(10)
+  createdByName   String?          @map("created_by_name") @db.VarChar(100)
+  createdAt       DateTime         @default(now()) @map("created_at")
+  submittedByName String?          @map("submitted_by_name") @db.VarChar(100)
+  submittedAt     DateTime?        @map("submitted_at")
+  approvedByName  String?          @map("approved_by_name") @db.VarChar(100)
+  approvedAt      DateTime?        @map("approved_at")
+  note            String?          @db.VarChar(300)
+  lines           StockCountLine[]
+  moves           StockMove[]
+
+  @@unique([year, month])
+  @@map("stock_counts")
+}
+
+model StockCountLine {
+  id          Int        @id @default(autoincrement())
+  countId     Int        @map("count_id")
+  itemId      Int        @map("item_id")
+  // The quantity on the books when the count was approved
+  expectedQty Decimal?   @map("expected_qty") @db.Decimal(14, 3)
+  countedQty  Decimal?   @map("counted_qty") @db.Decimal(14, 3)
+  count       StockCount @relation(fields: [countId], references: [id], onDelete: Cascade)
+  item        Item       @relation(fields: [itemId], references: [id])
+
+  @@unique([countId, itemId])
+  @@index([itemId])
+  @@map("stock_count_lines")
 }

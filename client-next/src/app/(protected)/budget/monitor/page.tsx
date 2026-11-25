@@ -181,6 +181,21 @@ function MonitorLines({ onOpenAlerts }: { onOpenAlerts: () => void }) {
                   </ul>
                 ) : <p className="text-[13px] text-[var(--shell-text-muted)]">No open alerts.</p>}
               </DetailSection>
+              {!!detail?.stock_entries?.length && (
+                <DetailSection title="Stock used">
+                  <ul className="divide-y divide-[var(--shell-border)]">
+                    {detail.stock_entries.slice(0, 8).map((e) => (
+                      <li key={e.id} className="flex items-center justify-between gap-2 py-1.5 text-[12px]">
+                        <div className="min-w-0">
+                          <p className="truncate text-[var(--shell-text)]">{e.part_no}{e.kind === 'ADJUST' ? ', count difference' : ''}</p>
+                          <p className="truncate text-[var(--shell-text-muted)]">{formatDate(e.moved_on)}, {e.quantity} {e.uom}</p>
+                        </div>
+                        <p className="shrink-0 tabular-nums text-[var(--shell-text)]">{plain(e.amount, currency)}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </DetailSection>
+              )}
               <DetailSection title="Latest expenses">
                 {detail?.expenses.length ? (
                   <ul className="divide-y divide-[var(--shell-border)]">
@@ -214,6 +229,11 @@ function MonitorLines({ onOpenAlerts }: { onOpenAlerts: () => void }) {
             <Kpi label="Open alerts" value={k?.open_alerts ? <button type="button" onClick={onOpenAlerts} className="hover:underline">{k.open_alerts}</button> : 0} />
           </KpiStrip>
         ) : null}
+        {!!k?.stock_used && (
+          <p className="shrink-0 border-b border-[var(--shell-border)] px-4 py-2 text-[13px] text-[var(--shell-text-muted)]">
+            Job lines include {money(k.stock_used, currency)} of stock used. The totals above leave it out, because its purchase is already counted.
+          </p>
+        )}
         {k && k.unbudgeted_count > 0 && (
           <p className="shrink-0 border-b border-[var(--shell-border)] px-4 py-2 text-[13px] text-[var(--warning)]">
             {k.unbudgeted_count} expense{k.unbudgeted_count === 1 ? '' : 's'} totalling {money(k.unbudgeted, currency)} match no budget line.

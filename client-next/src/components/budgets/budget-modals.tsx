@@ -266,7 +266,7 @@ export function BudgetLineModal({ isOpen, onClose, view, editing, canReserve, on
         : costObject === 'DEPARTMENT' ? (departments || []).map((d) => ({ id: String(d.id), name: d.name })) : [];
 
   const typeOptions = sortByCode(types || [])
-    .filter((t) => !t.applies_to?.length || t.applies_to.includes(KIND_OF[costObject]) || String(t.id) === typeId)
+    .filter((t) => (costObject === 'DEPARTMENT' && departments?.find((d) => String(d.id) === objectId)?.name === 'Store') || !t.applies_to?.length || t.applies_to.includes(KIND_OF[costObject]) || String(t.id) === typeId)
     .map((t) => ({ id: String(t.id), name: labelOf(t) }));
   const categoryOptions = sortByCode((categories || []).filter((c) => c.type === 'expense' && String(c.type_id ?? '') === typeId))
     .map((c) => ({ id: String(c.id), name: labelOf(c) }));

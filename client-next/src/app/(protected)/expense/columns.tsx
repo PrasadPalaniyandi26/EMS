@@ -39,6 +39,8 @@ export const columns = (currency: string): ColumnDef<any>[] => [
         ? (o.context_code || o.project_name)
         : o.product_name
         ? (o.context_code || o.product_name)
+        : o.context_type === "stock"
+        ? "Store"
         : o.context_type === "overhead"
         ? "Overhead"
         : ""

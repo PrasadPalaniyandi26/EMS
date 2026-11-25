@@ -48,7 +48,7 @@ export interface BuildOrder extends BuildOrderRow {
 export interface OrderScheduleMonth { year: number; month: number; label: string; materials: number; assembly: number; spend: number; revenue: number }
 export interface OrderExpense { id: number; reference_id: string | null; date_recorded: string; description: string | null; category_name: string | null; is_e200: boolean; amount: number; status: string | null; submitted_by_name: string | null }
 export interface OrderActuals {
-  approved: number; approved_e200: number; approved_other: number; waiting: number; drafts: number;
+  stock_used: number; approved: number; approved_e200: number; approved_other: number; waiting: number; drafts: number;
   expected_bought: number | null; labour_at_standard: number | null; remaining: number | null;
   spend_variance: number | null; price_variance: number; usage_variance: number | null; spent_pct: number | null;
   actual_cost: number | null; actual_profit: number | null; actual_margin_pct: number | null;

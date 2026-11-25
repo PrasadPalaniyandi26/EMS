@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ROLES } from '../common/constants/roles';
+import { StockService } from '../stock/stock.service';
 import { financeSelfApprovalAllowed } from '../common/config/approval-policy';
 
 // Approval levels:
@@ -21,6 +22,7 @@ export class ApprovalsService {
     private prisma: PrismaService,
     private audit: AuditService,
     private notifications: NotificationsService,
+    private stock: StockService,
   ) {}
 
   // Map a raw ApprovalRequest for a regular transaction
@@ -444,6 +446,10 @@ export class ApprovalsService {
       throw new HttpException(`This record is '${txStatus}', so there is nothing to approve.`, HttpStatus.BAD_REQUEST);
     }
     if (txStatus === 'PENDING_FINANCE') await this.assertMonthOpen(req.transaction?.dateRecorded);
+    // Stock was valued with or without GST when the purchase went in
+    if (isClaimable !== undefined && req.transaction?.contextType === 'stock' && isClaimable !== req.transaction.isClaimable) {
+      throw new HttpException('The GST claim decides the stock value. Send this stock purchase back to change it.', HttpStatus.BAD_REQUEST);
+    }
 
     if (txStatus === 'PENDING_MANAGER') {
       const financeUsers = await this.prisma.user.findMany({
@@ -594,6 +600,7 @@ export class ApprovalsService {
         data: { approverId, status: 'REJECTED', comments: comments || null, actionDate: new Date(), resolvedAt: new Date() },
       });
       if (claimed.count === 0) throw new HttpException('Request already processed.', HttpStatus.CONFLICT);
+      await this.stock.reversePurchase(tx, req.transactionId!, 'Expense rejected', approverId);
       await tx.transaction.update({
         where: { id: req.transactionId! },
         data: { status: 'REJECTED', rejectedById: rejectorInfo.id, rejectedByName: rejectorInfo.name, rejectedByRole: rejectorInfo.role, rejectedAt: new Date() },
@@ -673,6 +680,7 @@ export class ApprovalsService {
         where: { transactionId: req.transactionId!, status: 'PENDING' },
         data: { approverId, status: 'SENT_BACK', comments: comments || null, actionDate: new Date(), resolvedAt: new Date() },
       });
+      await this.stock.reversePurchase(tx, req.transactionId!, 'Expense sent back', approverId);
       await tx.transaction.update({
         where: { id: req.transactionId! },
         data: { status: 'SENT_BACK', sentBackById: actorInfo.id, sentBackByName: actorInfo.name, sentBackByRole: actorInfo.role, sentBackAt: new Date() },

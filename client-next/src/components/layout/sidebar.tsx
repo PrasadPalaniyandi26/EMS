@@ -14,7 +14,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import {
+import { Boxes,
   Home, ClipboardCheck, TrendingDown, TrendingUp,
   Users, Briefcase, Package, Building2, Target, RotateCcw,
   BarChart2, Settings, Shield, FileBarChart, Gauge, SlidersHorizontal, Layers, Percent, ClipboardList,
@@ -54,6 +54,7 @@ const NAV_GROUPS = [
     items: [
       { name: 'Part master', href: '/budget/parts', icon: Layers },
       { name: 'Cost rates', href: '/budget/rates', icon: Percent },
+      { name: 'Stock', href: '/budget/stock', icon: Boxes },
     ],
   },
   {

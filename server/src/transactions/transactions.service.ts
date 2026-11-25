@@ -6,10 +6,11 @@ import { ROLES } from '../common/constants/roles';
 import { COMMITTED_STATUSES } from '../common/constants/transaction-status';
 import { buildGstFields } from '../common/utils/gst';
 import { BudgetsService } from '../budgets/budgets.service';
+import { StockService } from '../stock/stock.service';
 
 // Upper bound for ?limit= on list endpoints; the client's largest request is 500.
 const MAX_PAGE_SIZE = 500;
-const INCLUDE = { category: true, client: true, project: true, product: true, department: true, buildOrder: { select: { code: true } } } as const;
+const INCLUDE = { category: true, client: true, project: true, product: true, department: true, buildOrder: { select: { code: true } }, stockLines: { include: { item: { select: { partNo: true, name: true, uom: true, purchaseUom: true } } }, orderBy: { id: 'asc' } } } as const;
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 // A record in one of these can no longer be removed by its owner: it is in the approval chain or is a decided record
 const KEPT = ['APPROVED', 'REJECTED', 'PENDING_MANAGER', 'PENDING_FINANCE', 'VOIDED'];
@@ -23,6 +24,7 @@ export class TransactionsService {
     private audit: AuditService,
     private notifications: NotificationsService,
     private budgets: BudgetsService,
+    private stock: StockService,
   ) {}
 
   private mapTransaction(t: any) {
@@ -42,6 +44,7 @@ export class TransactionsService {
       client_id: t.clientId, client_name: t.client?.name, project_id: t.projectId, project_name: t.project?.name,
       context_code: t.project?.code || t.product?.code || t.department?.name, department_name: t.department?.name ?? null, product_id: t.productId, product_name: t.product?.name,
       build_order_id: t.buildOrderId ?? null, build_order_code: t.buildOrder?.code ?? null, department_id: t.departmentId ?? null, budget_line_id: t.budgetLineId ?? null, over_budget_reason: t.overBudgetReason ?? null,
+      stock_lines: (t.stockLines ?? []).map((l: any) => ({ item_id: l.itemId, part_no: l.item?.partNo ?? null, name: l.item?.name ?? null, uom: l.item?.purchaseUom || l.item?.uom || null, quantity: Number(l.quantity), amount: Number(l.amount) })),
       context_type: t.contextType, is_split: t.isSplit ? 1 : 0, created_at: t.createdAt, updated_at: t.updatedAt, status: t.status,
       approved_by_id: t.approvedById ?? null,
       approved_by_name: t.approvedByName ?? null,
@@ -144,6 +147,11 @@ export class TransactionsService {
     // All users create transactions as DRAFT; Finance submits the same way as others
     const gstFields = buildGstFields(Number(data.amount), data.gstRate ?? null, !!data.gstIncluded);
     const buildOrderId = await this.resolveBuildOrder(data);
+    // A stock purchase goes into the Store: it is charged to no project or product
+    const isStock = data.contextType === 'stock';
+    if (isStock && data.type !== 'expense') throw new HttpException('Only an expense can buy stock.', HttpStatus.BAD_REQUEST);
+    const stockLines = isStock ? await this.stock.checkLines(data.stockLines ?? []) : [];
+    const storeId = isStock ? await this.stock.storeDepartmentId() : null;
 
     const t = await this.prisma.transaction.create({
       data: {
@@ -152,9 +160,10 @@ export class TransactionsService {
         dateRecorded: new Date(data.dateRecorded),
         categoryId: data.categoryId ? Number(data.categoryId) : null, description: data.description || null,
         paymentMethod: data.paymentMethod || 'cash', receiptPath: data.receiptPath || null,
-        clientId: data.clientId ? Number(data.clientId) : null, projectId: data.projectId ? Number(data.projectId) : null,
-        productId: data.productId ? Number(data.productId) : null, contextType: data.contextType || 'project', buildOrderId,
-        departmentId: data.contextType === 'overhead' && data.departmentId ? Number(data.departmentId) : null,
+        clientId: data.clientId ? Number(data.clientId) : null, projectId: !isStock && data.projectId ? Number(data.projectId) : null,
+        productId: !isStock && data.productId ? Number(data.productId) : null, contextType: data.contextType || 'project', buildOrderId,
+        departmentId: isStock ? storeId : data.contextType === 'overhead' && data.departmentId ? Number(data.departmentId) : null,
+        ...(stockLines.length ? { stockLines: { create: stockLines } } : {}),
         overBudgetReason: data.overBudgetReason?.trim() || null,
         receiptNumber: data.receiptNumber || null, currency: data.currency || 'INR',
         isClaimable: data.isClaimable !== undefined ? !!data.isClaimable : false,
@@ -252,6 +261,7 @@ export class TransactionsService {
       throw new HttpException(`Cannot submit transaction with status '${txn.status}'.`, HttpStatus.BAD_REQUEST);
     }
 
+    await this.stock.assertPurchaseReady(txn);
     await this.enforceSpendPolicy(txn, userId);
 
     const submitter = await this.prisma.user.findUnique({
@@ -268,6 +278,7 @@ export class TransactionsService {
     // ── Finance submits → PENDING_FINANCE (self-assigned, Finance can approve their own) ──
     if (submitterIsFinance) {
       await this.prisma.$transaction(async (tx) => {
+        await this.stock.postPurchase(tx, transactionId, userId);
         await tx.approvalRequest.deleteMany({ where: { transactionId } });
         await tx.approvalRequest.create({
           data: { transactionId, approverId: userId, levelNum: 1, status: 'PENDING' },
@@ -354,6 +365,7 @@ export class TransactionsService {
       if (!financeUser) throw new HttpException('No Finance user available to review this expense.', HttpStatus.BAD_REQUEST);
 
       await this.prisma.$transaction(async (tx) => {
+        await this.stock.postPurchase(tx, transactionId, userId);
         await tx.approvalRequest.deleteMany({ where: { transactionId } });
         await tx.approvalRequest.create({
           data: { transactionId, approverId: financeUser.id, levelNum: 1, status: 'PENDING' },
@@ -405,6 +417,7 @@ export class TransactionsService {
     if (!managerId) throw new HttpException('No manager available to approve this expense.', HttpStatus.BAD_REQUEST);
 
     await this.prisma.$transaction(async (tx) => {
+      await this.stock.postPurchase(tx, transactionId, userId);
       await tx.approvalRequest.deleteMany({ where: { transactionId } });
       await tx.approvalRequest.create({
         data: { transactionId, approverId: managerId!, levelNum: 1, status: 'PENDING' },
@@ -473,6 +486,11 @@ export class TransactionsService {
     };
     const gstFieldsUpd = buildGstFields(Number(data.amount), data.gstRate ?? null, !!data.gstIncluded);
     const buildOrderId = await this.resolveBuildOrder(data);
+    const isStock = data.contextType === 'stock';
+    if (isStock && data.type !== 'expense') throw new HttpException('Only an expense can buy stock.', HttpStatus.BAD_REQUEST);
+    if (isStock && existing.isSplit) throw new HttpException('A split expense cannot buy stock.', HttpStatus.BAD_REQUEST);
+    const stockLines = isStock && has('stockLines') ? await this.stock.checkLines(patch.stockLines) : null;
+    const storeId = isStock ? await this.stock.storeDepartmentId() : null;
 
     await this.prisma.transaction.updateMany({
       where: { id, userId },
@@ -482,15 +500,21 @@ export class TransactionsService {
         dateRecorded: new Date(data.dateRecorded),
         categoryId: data.categoryId ? Number(data.categoryId) : null, description: data.description || null,
         paymentMethod: data.paymentMethod || 'cash', receiptPath: data.receiptPath || null,
-        clientId: data.clientId ? Number(data.clientId) : null, projectId: data.projectId ? Number(data.projectId) : null,
-        productId: data.productId ? Number(data.productId) : null, contextType: data.contextType || 'project', buildOrderId,
-        departmentId: data.contextType === 'overhead' && data.departmentId ? Number(data.departmentId) : null,
+        clientId: data.clientId ? Number(data.clientId) : null, projectId: !isStock && data.projectId ? Number(data.projectId) : null,
+        productId: !isStock && data.productId ? Number(data.productId) : null, contextType: data.contextType || 'project', buildOrderId,
+        departmentId: isStock ? storeId : data.contextType === 'overhead' && data.departmentId ? Number(data.departmentId) : null,
         overBudgetReason: data.overBudgetReason?.trim() || null,
         receiptNumber: data.receiptNumber || null, currency: data.currency || 'INR',
         ...(data.isClaimable !== undefined ? { isClaimable: !!data.isClaimable } : {}),
         ...(data.needsReimbursement !== undefined ? { needsReimbursement: !!data.needsReimbursement } : {}),
       },
     });
+    if (!isStock || stockLines) {
+      await this.prisma.$transaction([
+        this.prisma.stockPurchaseLine.deleteMany({ where: { transactionId: id } }),
+        ...(stockLines?.length ? [this.prisma.stockPurchaseLine.createMany({ data: stockLines.map((l) => ({ ...l, transactionId: id })) })] : []),
+      ]);
+    }
     // A split is only valid for the amount it was made for: a different amount (or an income) drops the split, so budget lines never see stale parts
     if (existing.isSplit && (data.type !== 'expense' || Math.abs(Number(existing.amount) - gstFieldsUpd.totalAmount) > 0.01)) {
       await this.prisma.$transaction([
@@ -616,6 +640,7 @@ export class TransactionsService {
     if (!['DRAFT', 'SENT_BACK'].includes(original.status || '')) {
       throw new HttpException(`Cannot split a transaction with status '${original.status}'. Only DRAFT or SENT_BACK records can be split.`, HttpStatus.BAD_REQUEST);
     }
+    if (original.contextType === 'stock') throw new HttpException('A stock purchase is not split. Its parts are listed on the purchase.', HttpStatus.BAD_REQUEST);
     const categoryIds = [...new Set(splits.map((x) => Number(x.categoryId)))];
     const known = await this.prisma.category.count({ where: { id: { in: categoryIds }, isActive: true } });
     if (known !== categoryIds.length) throw new HttpException('One of the split categories does not exist or is inactive.', HttpStatus.BAD_REQUEST);
@@ -913,6 +938,7 @@ export class TransactionsService {
         clientId: original.clientId, projectId: original.projectId,
         productId: original.productId, contextType: original.contextType, departmentId: original.departmentId, buildOrderId: original.isSplit ? null : original.buildOrderId,
         currency: original.currency, status: 'DRAFT',
+        stockLines: { create: (await this.prisma.stockPurchaseLine.findMany({ where: { transactionId: id }, orderBy: { id: 'asc' } })).map((l) => ({ itemId: l.itemId, quantity: l.quantity, amount: l.amount })) },
       },
     });
     const referenceId = this.generateReferenceId(original.type, t.id);
@@ -998,15 +1024,18 @@ export class TransactionsService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     const voidedByName = user?.username || 'Unknown';
 
-    await this.prisma.transaction.update({
-      where: { id },
-      data: {
-        status: 'VOIDED',
-        voidedById: userId,
-        voidedByName: voidedByName,
-        voidedAt: new Date(),
-        voidReason: reason.trim(),
-      },
+    await this.prisma.$transaction(async (tx) => {
+      await this.stock.reversePurchase(tx, id, 'Expense voided', userId);
+      await tx.transaction.update({
+        where: { id },
+        data: {
+          status: 'VOIDED',
+          voidedById: userId,
+          voidedByName: voidedByName,
+          voidedAt: new Date(),
+          voidReason: reason.trim(),
+        },
+      });
     });
 
     this.audit.log({

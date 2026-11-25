@@ -6,6 +6,7 @@ import { COUNTABLE_STATUSES, COMMITTED_STATUSES, countableStatusSql } from '../c
 import { parseDay, parseRange, parseYear } from '../common/helpers/dates';
 import { workingDaysBetween } from '../common/helpers/working-days';
 import { DashboardService } from '../dashboard/dashboard.service';
+import { StockService } from '../stock/stock.service';
 
 // What a report can be narrowed to, on top of the period. Each is optional and they combine.
 export interface ReportFilters { clientId?: number; projectId?: number; productId?: number; categoryId?: number; departmentId?: number; personId?: number }
@@ -15,7 +16,7 @@ const FINANCE_ROLES = ['ADMIN', 'FINANCE'];
 
 @Injectable()
 export class ReportingService {
-  constructor(private prisma: PrismaService, private budgets: BudgetsService, private invoicing: InvoicingService, private dashboard: DashboardService) {}
+  constructor(private prisma: PrismaService, private budgets: BudgetsService, private invoicing: InvoicingService, private dashboard: DashboardService, private stock: StockService) {}
 
   // null = no filter (all users); number[] = restrict to these user IDs.
   // Admin and Finance report on everyone. Everyone else follows their data scope, the same rule as Analytics and Home:
@@ -50,6 +51,9 @@ export class ReportingService {
       case 'order-costing':      this.requireRoles(roleName, FINANCE_ROLES); return this.orderCosting(dateFrom, dateTo);
       case 'product-margin':     this.requireRoles(roleName, FINANCE_ROLES); return this.productMargin(year);
       case 'project-estimate':   this.requireRoles(roleName, FINANCE_ROLES); return this.projectEstimate();
+      case 'stock-value':        this.requireRoles(roleName, FINANCE_ROLES); return this.stock.valueReport(parseDay(params.asOf, 'The as-of date'));
+      case 'stock-by-part':      this.requireRoles(roleName, FINANCE_ROLES); return this.stock.byPartReport(dateFrom, dateTo);
+      case 'stock-by-job':       this.requireRoles(roleName, FINANCE_ROLES); return this.stock.byJobReport(dateFrom, dateTo);
       case 'receivables-ageing': this.requireRoles(roleName, FINANCE_ROLES); return this.invoicing.ageingReport(parseDay(params.asOf, 'The as-of date'));
       case 'gst-sales-register': this.requireRoles(roleName, FINANCE_ROLES); return this.invoicing.salesRegister(dateFrom, dateTo);
       case 'transaction-ledger': return this.transactionLedger(userId, userIds, dateFrom, dateTo, params.txnType as any, params.status, filters);
@@ -283,7 +287,7 @@ export class ReportingService {
     });
     const ids = orders.map((o) => o.id);
     const [parts, invoices] = await Promise.all([
-      ids.length ? this.budgets.partsWhere({ status: 'APPROVED', buildOrderId: { in: ids } }) : Promise.resolve([] as any[]),
+      ids.length ? Promise.all([this.budgets.partsWhere({ status: 'APPROVED', buildOrderId: { in: ids } }), this.budgets.stockParts({ kind: 'USED', buildOrderId: { in: ids } })]).then((x) => x.flat()) : Promise.resolve([] as any[]),
       // An invoice counts for an order when it names the order, or sits on a PO that does
       ids.length ? this.prisma.invoice.findMany({
         where: { status: { notIn: ['DRAFT', 'CANCELLED'] }, OR: [{ buildOrderId: { in: ids } }, { po: { buildOrderId: { in: ids } } }] },
@@ -389,7 +393,7 @@ export class ReportingService {
     const [projects, baselines, parts, invoices] = await Promise.all([
       this.prisma.project.findMany({ select: { id: true, name: true, status: true, contractValue: true, targetMarginPct: true, client: { select: { name: true } } } }),
       this.prisma.estimateBaseline.findMany({ where: { status: 'APPROVED' }, orderBy: { id: 'desc' } }),
-      this.budgets.partsWhere({ status: 'APPROVED', OR: [{ projectId: { not: null } }, { splits: { some: { projectId: { not: null } } } }] }),
+      Promise.all([this.budgets.partsWhere({ status: 'APPROVED', OR: [{ projectId: { not: null } }, { splits: { some: { projectId: { not: null } } } }] }), this.budgets.stockParts({ kind: 'USED', projectId: { not: null } })]).then((x) => x.flat()),
       this.prisma.invoice.findMany({
         where: { status: { notIn: ['DRAFT', 'CANCELLED'] }, OR: [{ projectId: { not: null } }, { po: { projectId: { not: null } } }] },
         select: { projectId: true, taxable: true, paid: true, tds: true, po: { select: { projectId: true } } },

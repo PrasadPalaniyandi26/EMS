@@ -11,6 +11,18 @@ export function ChargedToSection({ txn, showClient }: { txn: any; showClient?: b
   const objectId: number | null = kind === 'project' ? txn.project_id : kind === 'product' ? txn.product_id : kind === 'overhead' ? txn.department_id : null;
   const objectName: string | null = kind === 'project' ? txn.project_name : kind === 'product' ? txn.product_name : kind === 'overhead' ? txn.department_name : null;
   const isExpense = txn.type === 'expense';
+  // A stock purchase is charged to the Store; its parts are charged to a job only when used
+  if (txn.context_type === 'stock') {
+    return (
+      <DetailSection title="Stock purchase">
+        <DetailGrid>
+          <DetailField label="Goes to" value="Store" wide />
+          {(txn.stock_lines ?? []).map((l: any) => <DetailField key={`${l.item_id}-${l.amount}`} label={`${l.part_no}: ${l.quantity} ${l.uom ?? ''}`} value={`₹${Number(l.amount).toLocaleString('en-IN')} before GST`} wide />)}
+          {txn.over_budget_reason && <DetailField label="Over-budget reason" value={txn.over_budget_reason} tone="warning" wide />}
+        </DetailGrid>
+      </DetailSection>
+    );
+  }
   if (!kind && !txn.client_name) return null;
 
   const costingHref = kind === 'project' && objectId ? `/business/projects/${objectId}` : kind === 'product' && objectId ? `/business/products/${objectId}` : null;

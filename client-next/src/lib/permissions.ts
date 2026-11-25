@@ -18,3 +18,7 @@ export const canPropose = (r: RoleLike) => isFinanceRole(r) || isOperationsRole(
 
 // Job BOMs: Configurator and Operations both work on them
 export const canEditJobBom = (r: RoleLike) => canConfigure(r) || isOperationsRole(r) || up(r) === 'MANAGER';
+
+// Bulk stock: who records stock used, enters counts and sets up stock parts; and who adds opening stock and approves a count
+export const canRecordStock = (r: RoleLike) => canConfigure(r) || isOperationsRole(r);
+export const canApproveStock = isFinanceRole;

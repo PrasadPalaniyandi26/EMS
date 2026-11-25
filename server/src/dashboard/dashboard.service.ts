@@ -321,6 +321,11 @@ export class DashboardService {
 
   async getProjectBurn(userId: number, roleName: string, dateFrom?: string, dateTo?: string) {
     const parts = await this.periodParts(userId, roleName, dateFrom, dateTo);
+    // Project cost includes stock used, for people who see everyone's spend
+    if ((await this.resolveVisibleUserIds(userId, roleName)) === null) {
+      const range = parseRange(dateFrom, dateTo);
+      parts.push(...(await this.budgets.stockParts({ kind: 'USED', projectId: { not: null }, ...(range.from || range.to ? { movedOn: { ...(range.from ? { gte: range.from } : {}), ...(range.to ? { lte: range.to } : {}) } } : {}) })));
+    }
     const spentBy = new Map<number, number>();
     for (const p of parts) if (p.costObject === 'PROJECT' && p.projectId != null) spentBy.set(p.projectId, (spentBy.get(p.projectId) ?? 0) + p.amount);
     const spent = [...spentBy.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);

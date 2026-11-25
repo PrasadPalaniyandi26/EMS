@@ -236,6 +236,12 @@ Columns on `users`, all in `schema.prisma`: `contact_no`, `house_apt`, `address`
 - Seller details come from Company (Organization, Company tab): legal name, GSTIN, address, phone, email, bank, branch, bank address, account name, account number, IFSC, notes, closing line. They are copied onto the invoice when it is issued, so later edits never change an issued invoice. The logo is the exception: it is the current company logo (PNG, JPEG or WebP under about 200 KB), not a copy.
 - The invoice number rule (`invoiceNumber` in `server/src/invoicing/gst.ts`) is still the old one; the template's `NILAINV-2603-001` format is to be confirmed.
 
+## Bulk Stock (`server/src/stock/`, page `/budget/stock`)
+- A part is `DIRECT` or `STOCK` (supply mode). Two daily entries: stock in (an expense with `contextType: 'stock'`, posted on submit, reversed on reject, send back or void) and stock used on a project or order. Plus opening stock and the monthly count.
+- Every ledger change goes through `StockService.post()` (it locks the balance row). Valuation is weighted average cost.
+- Money totals count a purchase once: Monitor and budget report totals leave stock used out; job actual cost is expenses plus `BudgetsService.stockParts()`. A new job-cost figure must add both.
+- Stock purchases are budgeted on the **Store** department; count differences go to **Workshop**. Both are found by name.
+
 ## File Uploads (Receipts)
 - `POST /api/v1/receipts/upload` — multipart, returns `{ filename }`; stored in `UPLOAD_DIR/Receipts/`
 - `GET /api/v1/receipts/:filename` — protected by JWT guard; **cannot use `window.open()` directly** (no auth header). Use `fetch(url, { credentials: 'include', headers: { Authorization: 'Bearer <token>' } })` → blob → `URL.createObjectURL()` → `window.open()`

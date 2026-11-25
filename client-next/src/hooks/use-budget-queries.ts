@@ -40,7 +40,7 @@ export interface MonitorLine extends BudgetLine {
 
 export interface MonitorView {
   fy: number; label: string; plan: BudgetPlanInfo | null; as_of?: string;
-  kpis: { approved: number; actual: number; committed: number; forecast: number; open_alerts: number; unbudgeted: number; unbudgeted_count: number } | null;
+  kpis: { approved: number; actual: number; committed: number; forecast: number; open_alerts: number; unbudgeted: number; unbudgeted_count: number; stock_used: number } | null;
   lines: MonitorLine[];
 }
 
@@ -49,6 +49,7 @@ export interface LineDetail {
   months: { year: number; month: number; label: string; budget: number; actual: number; committed: number }[];
   alerts: { id: number; level: AlertLevel; message: string; opened_at: string }[];
   expenses: { id: number; reference_id: string; description: string | null; date_recorded: string; status: string; amount: number }[];
+  stock_entries: { id: number; kind: string; part_no: string; uom: string; quantity: number; amount: number; moved_on: string }[];
 }
 
 export interface BudgetAlert {

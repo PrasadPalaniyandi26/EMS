@@ -22,6 +22,8 @@ import { Switch } from '@/components/ui/switch';
 import { FileDropzone } from '@/components/shared/file-dropzone';
 import { GstRateSelect, GstIncludedSwitch } from '@/components/shared/gst-fields';
 import { computeTotalAmount, restoreEnteredAmount, amountLabel } from '@/lib/gst';
+import { useStockParts } from '@/hooks/use-stock-queries';
+import { StockLinesField, emptyStockLine, stockLinesReady, type StockLineForm } from '@/components/stock/stock-lines-field';
 
 const sanitizeText = (v: unknown): string => {
   if (typeof v !== 'string') return '';
@@ -73,6 +75,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
   const [saving, setSaving] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [overBudgetReason, setOverBudgetReason] = useState('');
+  const [stockLines, setStockLines] = useState<StockLineForm[]>([emptyStockLine()]);
   const [dupCheckFailed, setDupCheckFailed] = useState(false);
   const [dupWarning, setDupWarning] = useState<{ hardBlock: boolean; softWarn: boolean; matches: any[] } | null>(null);
 
@@ -97,8 +100,15 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
   const chosen = named.find((p) => String(p.id) === codeId);
   const effectiveClientId = chosen?.client_id ?? (clientId ? Number(clientId) : null);
 
+  // A stock purchase goes to the Store and lists the parts bought
+  const isStock = isExpense && contextType === 'stock';
+  const { data: stockParts } = useStockParts(open && isStock);
+  const rate = Number(gstRate.replace('%', '')) || 0;
+  const netAmount = Math.round(((Number(amount) || 0) / (gstAdded && rate ? 1 + rate / 100 : 1)) * 100) / 100;
+  const chargedOk = isStock || !!codeId;
+
   // Budget line this expense lands on, and what is left on it
-  const headroomOn = isExpense && !!categoryId && !!codeId && !!contextType && !!dateRecorded && Number(amount) > 0;
+  const headroomOn = isExpense && !!categoryId && chargedOk && !!contextType && !!dateRecorded && Number(amount) > 0;
   const { data: headroom, isFetching: headroomLoading } = useHeadroom({
     date: dateRecorded, contextType, categoryId,
     projectId: contextType === 'project' ? codeId : undefined,
@@ -134,6 +144,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
               : '',
       );
       setOverBudgetReason(editing.over_budget_reason || '');
+      setStockLines(editing.stock_lines?.length ? editing.stock_lines.map((l) => ({ itemId: String(l.item_id), quantity: String(l.quantity), amount: String(l.amount) })) : [emptyStockLine()]);
       setBuildOrderId(editing.build_order_id ? String(editing.build_order_id) : '');
       setCategoryId(editing.category_id ? String(editing.category_id) : '');
       setTypeId(String((allCategories || []).find((c) => c.id === editing.category_id)?.type_id ?? ''));
@@ -151,6 +162,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
     } else {
       setClientId('');
       setOverBudgetReason('');
+      setStockLines([emptyStockLine()]);
       setContextType('project');
       setCodeId('');
       setBuildOrderId('');
@@ -250,8 +262,13 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
       toast.error('Choose a category');
       return;
     }
-    if (isExpense && (!contextType || !codeId)) {
+    if (isExpense && (!contextType || !chargedOk)) {
       toast.error('Choose the project, product or department this is charged to');
+      return;
+    }
+
+    if (isStock && !stockLinesReady(stockLines, netAmount)) {
+      toast.error('Complete the parts bought. Their amounts must add up to the amount before GST.');
       return;
     }
 
@@ -316,6 +333,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
         departmentId: contextType === 'overhead' && codeId ? Number(codeId) : null,
         overBudgetReason: isExpense && headroomOn && gate.needsReason ? overBudgetReason.trim() || null : null,
         needsReimbursement: isExpense ? needsReimbursement : false,
+        stockLines: isStock ? stockLines.map((l) => ({ itemId: Number(l.itemId), quantity: Number(l.quantity), amount: Number(l.amount) })) : undefined,
       };
       if (editing) {
         await api.put(`/transactions/${editing.id}`, body);
@@ -325,7 +343,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
         toast.success('Transaction created');
       }
       if (gstRate) rememberGstRate(gstRate);
-      invalidate('transactions', 'dashboard');
+      invalidate('transactions', 'dashboard', 'stock');
       onSaved?.();
       onClose();
     } catch (err: any) {
@@ -347,7 +365,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
       title={isAdd ? `Add New ${isExpense ? 'Expense' : 'Income'}` : `Edit ${isExpense ? 'Expense' : 'Income'}`}
       icon={editing ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
       onSave={() => handleSave()}
-      canSave={!!amount && !isNaN(Number(amount)) && Number(amount) > 0 && !!dateRecorded && (!isExpense || (!!categoryId && !!contextType && !!codeId)) && !(headroomOn && headroomLoading) && !gate.blocked && !(gate.needsReason && !overBudgetReason.trim())}
+      canSave={!!amount && !isNaN(Number(amount)) && Number(amount) > 0 && !!dateRecorded && (!isExpense || (!!categoryId && !!contextType && chargedOk)) && (!isStock || stockLinesReady(stockLines, netAmount)) && !(headroomOn && headroomLoading) && !gate.blocked && !(gate.needsReason && !overBudgetReason.trim())}
       saveLabel={editing ? `Update ${isExpense ? 'Expense' : 'Income'}` : `Add ${isExpense ? 'Expense' : 'Income'}`}
       size="xl"
     >
@@ -364,10 +382,12 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
               <option value="project">Project</option>
               <option value="product">Product</option>
               {isExpense && <option value="overhead">Overhead</option>}
+              {isExpense && <option value="stock">Stock purchase</option>}
             </NativeSelect>
           </Field>
 
-          <Field required={isExpense} label={contextType === 'product' ? 'Product' : contextType === 'project' ? 'Project' : contextType === 'overhead' ? 'Department' : 'Project / Product'} hint={chosen?.client_name ? `Client: ${chosen.client_name}` : undefined}>
+          {isStock && <p className="text-[12px] text-[var(--shell-text-muted)]">Bought into the Store. A project or order is charged only when it uses the parts.</p>}
+          {!isStock && <Field required={isExpense} label={contextType === 'product' ? 'Product' : contextType === 'project' ? 'Project' : contextType === 'overhead' ? 'Department' : 'Project / Product'} hint={chosen?.client_name ? `Client: ${chosen.client_name}` : undefined}>
             <NativeSelect
               value={codeId}
               onChange={(e) => { setCodeId(e.target.value); setBuildOrderId(''); }}
@@ -378,7 +398,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
                 <option key={o.id} value={o.id}>{o.label}</option>
               ))}
             </NativeSelect>
-          </Field>
+          </Field>}
 
           {isExpense && contextType === 'product' && !!codeId && (productOrders?.length ?? 0) > 0 && (
             <Field label="Order" hint="Optional. Choose the customer order this was spent on to see its real cost.">
@@ -533,6 +553,12 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
             </div>
           </Field>
         </div>
+
+        {isStock && (
+          <div className="md:col-span-3">
+            <StockLinesField lines={stockLines} onChange={setStockLines} parts={stockParts ?? []} netAmount={netAmount} />
+          </div>
+        )}
 
         {/* Duplicate warning */}
         {dupWarning && (

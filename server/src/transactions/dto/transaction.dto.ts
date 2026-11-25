@@ -1,5 +1,23 @@
-import { IsString, IsNumber, IsPositive, IsDateString, IsOptional, IsIn, IsInt, IsBoolean, Min, Max, MaxLength, IsArray, IsNotEmpty } from 'class-validator';
+import { IsString, IsNumber, IsPositive, IsDateString, IsOptional, IsIn, IsInt, IsBoolean, Min, Max, MaxLength, IsArray, IsNotEmpty, ValidateNested, ArrayMaxSize } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
+
+export class StockLineDto {
+  @Type(() => Number)
+  @IsInt()
+  itemId: number;
+
+  // In the part's purchase unit
+  @Type(() => Number)
+  @IsNumber()
+  @IsPositive()
+  quantity: number;
+
+  // Net of GST
+  @Type(() => Number)
+  @IsNumber()
+  @IsPositive()
+  amount: number;
+}
 
 export class CreateTransactionDto {
   @IsIn(['income', 'expense'])
@@ -79,6 +97,13 @@ export class CreateTransactionDto {
   @IsString()
   @MaxLength(500)
   overBudgetReason?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @ValidateNested({ each: true })
+  @Type(() => StockLineDto)
+  stockLines?: StockLineDto[];
 
   @IsOptional()
   @IsString()
@@ -182,6 +207,13 @@ export class UpdateTransactionDto {
   @IsString()
   @MaxLength(500)
   overBudgetReason?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @ValidateNested({ each: true })
+  @Type(() => StockLineDto)
+  stockLines?: StockLineDto[];
 
   @IsOptional()
   @IsString()

@@ -6,6 +6,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { TXN_STATUS } from '../common/constants/transaction-status';
 import { addWorkingDays } from '../common/helpers/working-days';
 import { financeSelfApprovalAllowed } from '../common/config/approval-policy';
+import { STORE_DEPARTMENT, departmentNamed } from '../common/helpers/stock-departments';
 
 const PENDING = [TXN_STATUS.PENDING_MANAGER, TXN_STATUS.PENDING_FINANCE] as string[];
 const COUNTED = [TXN_STATUS.APPROVED, ...PENDING];
@@ -18,7 +19,10 @@ export type Part = {
   txnId: number; ref: string | null; status: string; year: number; month: number; amount: number;
   costObject: string; projectId: number | null; productId: number | null; departmentId: number | null; buildOrderId?: number | null;
   typeId: number | null; categoryId: number | null; submitterName?: string | null; submittedAt?: Date | null;
+  // From the stock ledger rather than an expense
+  stock?: boolean;
 };
+type Cell = { budget: number; actual: number; committed: number; stock: number };
 
 const n = (v: any) => (v == null ? 0 : Number(v));
 const r2 = (v: number) => Math.round(v * 100) / 100;
@@ -206,7 +210,23 @@ export class BudgetsService {
     });
     const parts: Part[] = [];
     for (const t of txns as any[]) parts.push(...this.partsOf(t, s));
+    // Stock used on a job, and stock count differences (charged to Workshop)
+    parts.push(...(await this.stockParts({ kind: { in: ['USED', 'ADJUST'] }, movedOn: { gte: from, lte: to } })));
     return parts;
+  }
+
+  // Ledger entries shaped like expense parts. Their ids are negative, so they never match an expense.
+  async stockParts(where: any): Promise<Part[]> {
+    const moves = await this.prisma.stockMove.findMany({ where, include: { category: { select: { typeId: true } }, buildOrder: { select: { productId: true } } } });
+    return moves.map((m: any) => {
+      const costObject = m.buildOrderId != null ? 'PRODUCT' : m.projectId != null ? 'PROJECT' : 'DEPARTMENT';
+      return {
+        txnId: -m.id, ref: `STK-${m.id}`, status: TXN_STATUS.APPROVED, year: m.movedOn.getUTCFullYear(), month: m.movedOn.getUTCMonth() + 1,
+        amount: -n(m.value), costObject, projectId: costObject === 'PROJECT' ? m.projectId : null, productId: m.buildOrder?.productId ?? null,
+        departmentId: costObject === 'DEPARTMENT' ? m.departmentId : null, buildOrderId: m.buildOrderId, typeId: m.category?.typeId ?? null, categoryId: m.categoryId,
+        submitterName: m.createdByName, submittedAt: m.createdAt, stock: true,
+      };
+    });
   }
 
   partsOf(t: any, s: Settings): Part[] {
@@ -215,7 +235,8 @@ export class BudgetsService {
     const ratio = total > 0 ? cost / total : 1;
     const d = new Date(t.dateRecorded);
     const base = { txnId: t.id, ref: t.referenceId, status: t.status, year: d.getFullYear(), month: d.getMonth() + 1, submitterName: t.submittedByName, submittedAt: t.submittedAt, buildOrderId: (t.buildOrderId ?? null) as number | null };
-    const kind = (t.contextType || 'project') === 'product' ? 'PRODUCT' : t.contextType === 'overhead' ? 'DEPARTMENT' : 'PROJECT';
+    // A stock purchase counts on the Store department's line, never on a job
+    const kind = (t.contextType || 'project') === 'product' ? 'PRODUCT' : t.contextType === 'overhead' || t.contextType === 'stock' ? 'DEPARTMENT' : 'PROJECT';
     const mk = (amount: number, projectId: any, productId: any, categoryId: any, typeId: any): Part => ({
       ...base, amount: amount * ratio, costObject: kind,
       projectId: kind === 'PROJECT' ? projectId ?? t.projectId ?? null : null,
@@ -256,13 +277,13 @@ export class BudgetsService {
   }
 
   private lineTotals(line: any) {
-    const byMonth = new Map<string, { budget: number; actual: number; committed: number }>();
-    for (const p of line.periods) byMonth.set(`${p.year}-${p.month}`, { budget: n(p.amount), actual: 0, committed: 0 });
+    const byMonth = new Map<string, Cell>();
+    for (const p of line.periods) byMonth.set(`${p.year}-${p.month}`, { budget: n(p.amount), actual: 0, committed: 0, stock: 0 });
     return byMonth;
   }
 
   private computeUsage(lines: any[], parts: Part[]) {
-    const usage = new Map<number, Map<string, { budget: number; actual: number; committed: number }>>();
+    const usage = new Map<number, Map<string, Cell>>();
     for (const l of lines) usage.set(l.id, this.lineTotals(l));
     const unmatched: Part[] = [];
     for (const p of parts) {
@@ -270,8 +291,9 @@ export class BudgetsService {
       if (!line) { unmatched.push(p); continue; }
       const m = usage.get(line.id)!;
       const key = `${p.year}-${p.month}`;
-      const cell = m.get(key) ?? { budget: 0, actual: 0, committed: 0 };
+      const cell = m.get(key) ?? { budget: 0, actual: 0, committed: 0, stock: 0 };
       if (p.status === TXN_STATUS.APPROVED) cell.actual += p.amount; else cell.committed += p.amount;
+      if (p.stock) cell.stock += p.amount;
       m.set(key, cell);
     }
     return { usage, unmatched };
@@ -419,17 +441,17 @@ export class BudgetsService {
     };
   }
 
-  private mapLine(l: any, lk: Awaited<ReturnType<BudgetsService['lookups']>>, usage: Map<string, { budget: number; actual: number; committed: number }>, months: { year: number; month: number }[]) {
+  private mapLine(l: any, lk: Awaited<ReturnType<BudgetsService['lookups']>>, usage: Map<string, Cell>, months: { year: number; month: number }[]) {
     const names = this.lineNames(l, lk);
     const periods = months.map((m) => n(l.periods.find((p: any) => p.year === m.year && p.month === m.month)?.amount));
-    let actual = 0; let committed = 0;
-    for (const v of usage.values()) { actual += v.actual; committed += v.committed; }
+    let actual = 0; let committed = 0; let stock = 0;
+    for (const v of usage.values()) { actual += v.actual; committed += v.committed; stock += v.stock; }
     return {
       id: l.id, plan_id: l.planId, cost_object: l.costObject, project_id: l.projectId, product_id: l.productId, build_order_id: l.buildOrderId ?? null, department_id: l.departmentId,
       type_id: l.typeId, category_id: l.categoryId, control_level: l.controlLevel, strict: l.strict, is_contingency: l.isContingency,
       owner_id: l.ownerId, owner_name: names.ownerName, note: l.note,
       object_name: names.object, object_code: names.objectCode, type_label: names.typeLabel, category_label: names.catLabel, label: names.label,
-      periods, total: r2(periods.reduce((a, b) => a + b, 0)), actual: r2(actual), committed: r2(committed),
+      periods, total: r2(periods.reduce((a, b) => a + b, 0)), actual: r2(actual), committed: r2(committed), stock_used: r2(stock),
     };
   }
 
@@ -467,7 +489,8 @@ export class BudgetsService {
       if (!data.typeId) throw new HttpException('Choose an expense type.', HttpStatus.BAD_REQUEST);
       const type = await this.prisma.categoryType.findUnique({ where: { id: data.typeId } });
       if (!type) throw new HttpException('Expense type not found.', HttpStatus.NOT_FOUND);
-      if (type.appliesTo && !type.appliesTo.split(',').includes(KIND[costObject])) {
+      const isStore = costObject === 'DEPARTMENT' && (await this.prisma.department.findUnique({ where: { id: data.departmentId }, select: { name: true } }))?.name === STORE_DEPARTMENT;
+      if (!isStore && type.appliesTo && !type.appliesTo.split(',').includes(KIND[costObject])) {
         throw new HttpException(`${[type.code, type.name].filter(Boolean).join(' ')} cannot be charged to ${costObject === 'DEPARTMENT' ? 'overheads' : costObject.toLowerCase() + 's'}.`, HttpStatus.BAD_REQUEST);
       }
       if (data.controlLevel === 'CATEGORY') {
@@ -662,9 +685,11 @@ export class BudgetsService {
       plan: this.mapPlan(plan, s),
       as_of: today.toISOString(),
       kpis: {
-        approved: sum((r) => r.total), actual: sum((r) => r.actual), committed: sum((r) => r.committed),
-        forecast: sum((r) => r.forecast ?? r.total), open_alerts: alerts.length,
-        unbudgeted: r2(unmatched.reduce((a, p) => a + p.amount, 0)), unbudgeted_count: new Set(unmatched.map((p) => p.txnId)).size,
+        // Totals are money spent: stock used is left out, because its purchase is already counted
+        approved: sum((r) => r.total), actual: sum((r) => r.actual - r.stock_used), committed: sum((r) => r.committed),
+        stock_used: sum((r) => r.stock_used),
+        forecast: sum((r) => (r.forecast == null ? r.total : r.used !== 0 ? r.forecast * ((r.used - r.stock_used) / r.used) : r.forecast)), open_alerts: alerts.length,
+        unbudgeted: r2(unmatched.filter((p) => !p.stock).reduce((a, p) => a + p.amount, 0)), unbudgeted_count: new Set(unmatched.filter((p) => !p.stock).map((p) => p.txnId)).size,
       },
       lines: rows,
     };
@@ -690,7 +715,14 @@ export class BudgetsService {
       }),
       alerts: alerts.map((a) => ({ id: a.id, level: a.level, message: a.message, opened_at: a.openedAt })),
       expenses: txns.map((t) => ({ id: t.id, reference_id: t.referenceId, description: t.description, date_recorded: t.dateRecorded, status: t.status, amount: n(t.totalAmount ?? t.amount) })),
+      stock_entries: await this.stockEntries(mine.filter((p) => p.stock).map((p) => -p.txnId)),
     };
+  }
+
+  private async stockEntries(ids: number[]) {
+    if (!ids.length) return [];
+    const moves = await this.prisma.stockMove.findMany({ where: { id: { in: ids } }, include: { item: { select: { partNo: true, uom: true } } }, orderBy: [{ movedOn: 'desc' }, { id: 'desc' }], take: 25 });
+    return moves.map((m) => ({ id: m.id, kind: m.kind, part_no: m.item.partNo, uom: m.item.uom, quantity: -n(m.quantity), amount: -n(m.value), moved_on: m.movedOn }));
   }
 
   // ── Headroom and the check at submit ─────────────────────────────────────
@@ -704,9 +736,11 @@ export class BudgetsService {
     const category = await this.prisma.category.findUnique({ where: { id: q.categoryId }, include: { categoryType: true } });
     if (!category?.categoryType) return out('NONE');
     const type = category.categoryType;
-    const ct = (q.contextType || 'project') === 'product' ? 'PRODUCT' : q.contextType === 'overhead' ? 'DEPARTMENT' : 'PROJECT';
+    const isStock = q.contextType === 'stock';
+    if (isStock) q = { ...q, departmentId: await departmentNamed(this.prisma, STORE_DEPARTMENT) };
+    const ct = (q.contextType || 'project') === 'product' ? 'PRODUCT' : q.contextType === 'overhead' || isStock ? 'DEPARTMENT' : 'PROJECT';
     const kind = KIND[ct];
-    if (type.appliesTo && !type.appliesTo.split(',').includes(kind)) {
+    if (!isStock && type.appliesTo && !type.appliesTo.split(',').includes(kind)) {
       return out('NOT_ALLOWED', { message: `${[type.code, type.name].filter(Boolean).join(' ')} cannot be charged to ${ct === 'DEPARTMENT' ? 'overheads' : ct.toLowerCase() + 's'}. Choose another category or charge it elsewhere.` });
     }
     const fy = this.fyOf(date, s.fyStartMonth);
@@ -771,7 +805,7 @@ export class BudgetsService {
       if (!this.objectIdOf(p)) {
         throw new HttpException(`Choose the ${p.costObject === 'PRODUCT' ? 'product' : p.costObject === 'DEPARTMENT' ? 'department' : 'project'} this expense is charged to before submitting.`, HttpStatus.BAD_REQUEST);
       }
-      if (type?.appliesTo && !type.appliesTo.split(',').includes(kind)) {
+      if (full.contextType !== 'stock' && type?.appliesTo && !type.appliesTo.split(',').includes(kind)) {
         throw new HttpException(`${[type.code, type.name].filter(Boolean).join(' ')} cannot be charged to ${p.costObject === 'DEPARTMENT' ? 'overheads' : p.costObject.toLowerCase() + 's'}.`, HttpStatus.BAD_REQUEST);
       }
       if (!controlled) continue;
@@ -927,11 +961,23 @@ export class BudgetsService {
           });
         }
       }
-      if (rule('NO_LINE')?.enabled && unmatched.length) {
-        const ids = new Set(unmatched.map((p) => p.txnId));
+      const loose = unmatched.filter((p) => !p.stock);
+      if (rule('NO_LINE')?.enabled && loose.length) {
+        const ids = new Set(loose.map((p) => p.txnId));
         wanted.set(key('NO_LINE', null), {
           ruleCode: 'NO_LINE', lineId: null, level: 'WARNING', ownerId: null, action: 'view_expenses',
-          message: `${ids.size} expense${ids.size === 1 ? '' : 's'} (${inr(unmatched.reduce((a, p) => a + p.amount, 0))}) match no budget line`,
+          message: `${ids.size} expense${ids.size === 1 ? '' : 's'} (${inr(loose.reduce((a, p) => a + p.amount, 0))}) match no budget line`,
+        });
+      }
+    }
+
+    if (rule('REORDER')?.enabled) {
+      const items = await this.prisma.item.findMany({ where: { supplyMode: 'STOCK', isActive: true, reorderLevel: { not: null } }, include: { stockBalance: true }, orderBy: { partNo: 'asc' } });
+      const low = items.filter((i) => n(i.stockBalance?.quantity) <= n(i.reorderLevel));
+      if (low.length) {
+        wanted.set(key('REORDER', null), {
+          ruleCode: 'REORDER', lineId: null, level: 'CAUTION', ownerId: null, action: 'open_stock',
+          message: `${low.length} stock part${low.length === 1 ? ' is' : 's are'} at or below the reorder level: ${low.slice(0, 5).map((i) => i.partNo).join(', ')}${low.length > 5 ? '…' : ''}`,
         });
       }
     }
@@ -1000,7 +1046,7 @@ export class BudgetsService {
       let budget = 0; let actual = 0; let committed = 0;
       for (const l of counted) {
         const c = usage.get(l.id)?.get(`${m.year}-${m.month}`);
-        if (c) { budget += c.budget; actual += c.actual; committed += c.committed; }
+        if (c) { budget += c.budget; actual += c.actual - c.stock; committed += c.committed; }
       }
       cumBudget += budget; cumUsed += actual + committed;
       return { Month: `${MON[m.month - 1]} ${m.year}`, Budget: r2(budget), Actual: r2(actual), Committed: r2(committed), Remaining: r2(budget - actual - committed), 'Cumulative Budget': r2(cumBudget), 'Cumulative Used': r2(cumUsed) };
@@ -1019,7 +1065,7 @@ export class BudgetsService {
       this.loadParts(useFy, s),
       this.lookups(),
     ]);
-    const { unmatched } = this.computeUsage(lines, parts);
+    const unmatched = this.computeUsage(lines, parts).unmatched.filter((p) => !p.stock);
     // An expense charged to an order is listed with the order's code
     const orderIds = [...new Set(unmatched.map((p) => p.buildOrderId).filter((x): x is number => x != null))];
     const orderCode = new Map((orderIds.length ? await this.prisma.buildOrder.findMany({ where: { id: { in: orderIds } }, select: { id: true, code: true } }) : []).map((o) => [o.id, o.code]));
@@ -1047,13 +1093,16 @@ export class BudgetsService {
       'Cost Object': l.object_name, Type: l.category_label ? `${l.type_label} / ${l.category_label}` : l.type_label,
       Budget: l.total, Actual: l.actual, Committed: l.committed, Remaining: l.available, '% Used': l.pct,
     }));
+    // The same material is on the Store line when bought and on a job line when used: the totals count it once
+    const stockUsed = r2((m.lines as any[]).filter((l) => !l.is_contingency && l.cost_object !== 'RESERVE').reduce((a, l) => a + l.stock_used, 0));
     // The totals add up the rows shown. The plan's own approved total also holds the reserve and held contingency, which have no row here.
     const sum = (k: 'Budget' | 'Actual' | 'Committed' | 'Remaining') => r2(rows.reduce((a, r) => a + (Number(r[k]) || 0), 0));
-    const used = sum('Actual') + sum('Committed');
+    const actualMoney = r2(sum('Actual') - stockUsed);
+    const used = actualMoney + sum('Committed');
     return {
       title: `Budget vs Actual ${m.label}`, columns: ['Cost Object', 'Type', 'Budget', 'Actual', 'Committed', 'Remaining', '% Used'], rows,
-      totals: { Budget: sum('Budget'), Actual: sum('Actual'), Committed: sum('Committed'), Remaining: sum('Remaining'), '% Used': sum('Budget') > 0 ? r2((used / sum('Budget')) * 100) : null },
-      note: 'One row for each budget line. Reserve and held contingency are not listed, so the totals match Budget by Month rather than the plan total.',
+      totals: { Budget: sum('Budget'), Actual: actualMoney, Committed: sum('Committed'), Remaining: r2(sum('Remaining') + stockUsed), '% Used': sum('Budget') > 0 ? r2((used / sum('Budget')) * 100) : null },
+      note: `One row for each budget line. Reserve and held contingency are not listed, so the totals match Budget by Month rather than the plan total.${stockUsed ? ` Job rows include ${inr(stockUsed)} of stock used; the totals leave it out because its purchase is already counted.` : ''}`,
     };
   }
 

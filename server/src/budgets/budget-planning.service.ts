@@ -649,7 +649,7 @@ export class BudgetPlanningService {
     const [projects, ests, spend, bases] = await Promise.all([
       this.prisma.project.findMany({ where: { isActive: true, isSystem: false }, orderBy: { name: 'asc' }, include: { client: { select: { name: true } } } }),
       this.prisma.costEstimate.findMany({ include: { lines: true }, orderBy: { version: 'desc' } }),
-      this.budgets.partsWhere({ status: 'APPROVED', projectId: { not: null } }),
+      Promise.all([this.budgets.partsWhere({ status: 'APPROVED', projectId: { not: null } }), this.budgets.stockParts({ kind: 'USED', projectId: { not: null } })]).then((x) => x.flat()),
       this.prisma.estimateBaseline.findMany({ where: { status: { in: ['PROPOSED', 'APPROVED'] } }, select: { projectId: true, status: true } }),
     ]);
     const ac = new Map<number, number>();
@@ -685,7 +685,7 @@ export class BudgetPlanningService {
     const [est, milestones, spend, lk, rates, baseRows, priceRows] = await Promise.all([
       this.prisma.costEstimate.findFirst({ where: { projectId: id }, orderBy: { version: 'desc' }, include: { lines: { orderBy: { id: 'asc' } } } }),
       this.prisma.projectMilestone.findMany({ where: { projectId: id }, orderBy: { plannedDate: 'asc' } }),
-      this.budgets.partsWhere({ status: 'APPROVED', projectId: id }),
+      Promise.all([this.budgets.partsWhere({ status: 'APPROVED', projectId: id }), this.budgets.stockParts({ kind: 'USED', projectId: id })]).then((x) => x.flat()),
       this.prisma.categoryType.findMany({ select: { id: true, name: true, code: true } }),
       this.rates(),
       this.prisma.estimateBaseline.findMany({ where: { projectId: id }, orderBy: { id: 'desc' } }),
@@ -1046,7 +1046,7 @@ export class BudgetPlanningService {
     const plannedUnits = build.reduce((a, b) => a + b.planned, 0);
     const actualUnits = build.reduce((a, b) => a + b.actual, 0);
     // Materials actually bought for this product this year, against what the standard allows for the units built
-    const parts = await this.budgets.partsWhere({ status: 'APPROVED', productId: id });
+    const parts = [...(await this.budgets.partsWhere({ status: 'APPROVED', productId: id })), ...(await this.budgets.stockParts({ kind: 'USED', buildOrder: { productId: id } }))];
     const fyKeys = new Set(months.map((m) => `${m.year}-${m.month}`));
     const matSpend = r2(parts.filter((x) => x.costObject === 'PRODUCT' && (!e200 || x.typeId === e200.id) && fyKeys.has(`${x.year}-${x.month}`)).reduce((a, x) => a + x.amount, 0));
     const liveBought = roll ? roll.cost.material + roll.cost.scrap + roll.cost.freight + roll.cost.outsourced : 0;

@@ -3,7 +3,7 @@
 import { canConfigure, isFinanceRole } from '@/lib/permissions';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { CalendarX2, Layers, Network, Plus, Replace, ShoppingCart, Tags } from 'lucide-react';
+import { CalendarX2, Layers, Network, Plus, Replace, ShoppingCart, Tags, Boxes } from 'lucide-react';
 import { ColumnDef, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, getSortedRowModel, SortingState } from '@tanstack/react-table';
 import api from '@/lib/api-client';
 import { downloadCsv, toCsv } from '@/lib/csv';
@@ -26,6 +26,9 @@ import { useItemCategories } from '@/hooks/use-planning-queries';
 import { ImportModal } from '@/components/budgets/import-modal';
 import { money, unitPlain } from '@/components/budgets/budget-ui';
 import { PageFrame } from '@/components/shared/module/page-frame';
+import { canRecordStock } from '@/lib/permissions';
+import { qty, useStockOnHand } from '@/hooks/use-stock-queries';
+import { StockSettingsModal } from '@/components/stock/stock-modals';
 
 
 type Sourcing = 'ALL' | 'BUY' | 'MAKE';
@@ -54,6 +57,8 @@ export default function PartMasterPage() {
   const [replaceId, setReplaceId] = useState<number | null>(null); const [altId, setAltId] = useState<number | null>(null); const [historyFor, setHistoryFor] = useState<Item | null>(null); const [cancelRep, setCancelRep] = useState<Item | null>(null);
   const [open, setOpen] = useState(false); const [editing, setEditing] = useState<Item | null>(null); const [del, setDel] = useState<Item | null>(null); const [buyFor, setBuyFor] = useState<Item | null>(null); const [catsOpen, setCatsOpen] = useState(false); const [whereFor, setWhereFor] = useState<Item | null>(null); const [category, setCategory] = useState('ALL');
   const categories = useItemCategories(); const [impOpen, setImpOpen] = useState(false);
+  const canStock = useAuthStore((s) => canRecordStock(s.user?.role_name));
+  const stock = useStockOnHand(); const [stockOpen, setStockOpen] = useState(false);
   useEffect(() => { setHeader('Part master', 'Parts, bought or made, and their standard prices'); }, [setHeader]);
 
   const rows = useMemo(() => (data ?? []).filter((i) =>
@@ -92,6 +97,11 @@ export default function PartMasterPage() {
   const prices = useItemPrices(selected?.id ?? null);
   const canUseLast = !!selected && selected.sourcing === 'BUY' && selected.last_price != null && selected.last_price !== selected.standard_price;
 
+  const stockRow = selected ? stock.data?.find((r) => r.id === selected.id) ?? null : null;
+  // Bought or made, a part can be a stock part unless it belongs to one project
+  const stockPart = selected && selected.project_id == null && (selected.status === 'ACTIVE' || stockRow?.supply_mode === 'STOCK')
+    ? { id: selected.id, part_no: selected.part_no, name: selected.name, uom: selected.uom, supply_mode: stockRow?.supply_mode ?? ('DIRECT' as const), purchase_uom: stockRow?.purchase_uom ?? null, purchase_factor: stockRow?.purchase_factor ?? null, reorder_level: stockRow?.reorder_level ?? null, category_id: stockRow?.category_id ?? null }
+    : null;
   // Anyone can see where a part is used; changing it is for Finance and Admin
   const itemActions: DetailActionDef[] = !selected ? [] : [
     ...(canEdit && selected.status === 'ACTIVE' ? [{ label: 'Edit', onClick: () => { setEditing(selected); setOpen(true); } }] : []),
@@ -100,6 +110,7 @@ export default function PartMasterPage() {
     ...(canEdit && selected.status === 'ACTIVE' ? [selected.scheduled
       ? { label: 'Cancel replacement', icon: <CalendarX2 className="h-4 w-4 text-[var(--nav-indigo)]" />, onClick: () => setCancelRep(selected) }
       : { label: 'Replace', icon: <Replace className="h-4 w-4 text-[var(--nav-indigo)]" />, onClick: () => setReplaceId(selected.id) }] : []),
+    ...(canStock && stockPart ? [{ label: 'Stock settings', icon: <Boxes className="h-4 w-4 text-[var(--nav-amber)]" />, onClick: () => setStockOpen(true) }] : []),
     // A made part is not bought, so Record purchase is only for bought parts
     ...(isFinance && selected.status === 'ACTIVE' && selected.sourcing === 'BUY' ? [{ label: 'Record purchase', variant: 'primary' as const, icon: <ShoppingCart className="h-4 w-4 text-[var(--nav-violet)]" />, onClick: () => setBuyFor(selected) }] : []),
     // A part that has been on a BOM is replaced or retired, never deleted, so its history stays
@@ -188,6 +199,14 @@ export default function PartMasterPage() {
           </ul>
         )}
       </DetailSection>
+      {stockPart && (
+        <DetailSection title="Stock" action={canStock ? <button type="button" onClick={() => setStockOpen(true)} className="text-[12px] font-medium text-[var(--shell-accent)] hover:underline focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]">Settings</button> : undefined}>
+          <DetailGrid>
+            <DetailField label="Supply mode" value={stockPart.supply_mode === 'STOCK' ? 'Stock' : 'Direct'} />
+            {stockRow && <><DetailField label="On hand" value={`${qty(stockRow.quantity)} ${selected.uom}`} /><DetailField label="Average cost" value={money(stockRow.avg_cost, currency)} /><DetailField label="Stock value" value={money(stockRow.value, currency)} /></>}
+          </DetailGrid>
+        </DetailSection>
+      )}
       <DetailSection title="Supply">
         <DetailGrid>
           {selected.sourcing === 'BUY' && <DetailField label="OEM part number" value={selected.oem_part_no ?? undefined} wide />}
@@ -244,6 +263,7 @@ export default function PartMasterPage() {
       <ConfirmDialog open={!!cancelRep} title="Cancel replacement" confirmLabel="Cancel replacement" message={`Keep ${cancelRep?.name} as it is? The change scheduled for ${cancelRep?.scheduled ? formatDate(cancelRep.scheduled.effective_from) : ''} will not happen.`} onCancel={() => setCancelRep(null)}
         onConfirm={async () => { const i = cancelRep; setCancelRep(null); if (!i?.scheduled) return; try { await api.delete(`/budgets/part-replacements/${i.scheduled.id}`); toast.success('Replacement cancelled.'); invalidate('budgets'); } catch (e: any) { toast.error(e?.message || 'Could not cancel.'); } }} />
       <PartUsageModal isOpen={!!whereFor} onClose={() => setWhereFor(null)} item={whereFor} />
+      <StockSettingsModal isOpen={stockOpen && !!stockPart} onClose={() => setStockOpen(false)} part={stockPart} />
       <RecordPurchaseModal isOpen={!!buyFor} onClose={() => setBuyFor(null)} item={buyFor} />
       <ImportModal isOpen={impOpen} onClose={() => setImpOpen(false)} title="Import parts" endpoint="/budgets/items/import" templateName="part-master-template.csv" headers={PART_HEADERS}
         sample={[['CONN-24', '24-pin terminal block', 'Electronics', 'Buy', 'nos', '95', '', '', '102', 'Phoenix', '10', '1757019'], ['SUB-FRAME', 'Welded frame', 'Mechanical', 'Make', 'nos', '', '4200', '1800', '', '', '21', '']]}

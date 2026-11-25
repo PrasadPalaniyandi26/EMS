@@ -27,16 +27,18 @@ import { BuildStepModal } from '@/components/budgets/planning-modals';
 import { ConfirmDialog } from '@/components/shared/modal-primitives';
 import { TabBar, marginTone as projectMarginTone, money, unitPrice, useTabParam } from '@/components/budgets/budget-ui';
 import { cn } from '@/lib/utils';
+import { JobStockTab } from '@/components/stock/job-stock-tab';
 
-type Tab = 'bom' | 'operations' | 'standard' | 'timeline' | 'variances';
+type Tab = 'bom' | 'operations' | 'standard' | 'timeline' | 'variances' | 'material';
 const TABS: { value: Tab; label: string }[] = [
   { value: 'bom', label: 'Bill of materials' }, { value: 'operations', label: 'Build operations' }, { value: 'standard', label: 'Cost vs standard' },
-  { value: 'timeline', label: 'Build timeline' }, { value: 'variances', label: 'Variances' },
+  { value: 'timeline', label: 'Build timeline' }, { value: 'variances', label: 'Variances' }, { value: 'material', label: 'Material' },
 ];
 const TAB_VALUES = TABS.map((t) => t.value);
 // With no target or minimum margin set there is nothing to judge a margin against, so only a loss is coloured
 const marginTone = (m: number | null, target: number | null, min: number | null) => (target == null && min == null ? (m != null && m < 0 ? 'danger' as const : 'muted' as const) : projectMarginTone(m, target, min));
 const EMPTY: Record<Tab, string> = {
+  material: '',
   bom: 'The standard BOM has not been imported yet. Click Import BOM.',
   operations: 'No build operations on this order. Click Add build operation, or reimport the BOM from the product.',
   standard: 'The standard BOM has not been imported yet, so there is nothing to compare.',
@@ -332,6 +334,7 @@ export default function BuildOrderDetailPage() {
   const varianceSummary = !o || !a ? null : (
     <div className="space-y-4">
       <DetailSummary title="Cost against plan" subtitle={o.code} status={o.status === 'DELIVERED' ? 'Delivered: final figures' : 'In progress: spent so far'} statusClass="text-[var(--shell-text-muted)]" figure={money(a.approved, currency)} figureLabel="Approved spend" />
+        {!!a.stock_used && <p className="text-[12px] text-[var(--shell-text-muted)]">Includes {money(a.stock_used, currency)} of stock used. The entries are on the Material tab.</p>}
       <DetailSection title="Materials and production (E200)">
         <DetailGrid>
           <DetailField label="Spent" value={money(a.approved_e200, currency)} />
@@ -339,7 +342,7 @@ export default function BuildOrderDetailPage() {
           <DetailField label="Left to spend" value={a.remaining != null ? signedMoney(a.remaining) : undefined} tone={a.remaining != null && a.remaining < 0 ? 'danger' : 'muted'} />
           <DetailField label="Used so far" value={a.spent_pct != null ? `${a.spent_pct.toFixed(0)}%` : undefined} />
         </DetailGrid>
-        <p className="text-[12px] text-[var(--shell-text-muted)]">Expected is the material, scrap, freight and outsourced work of this order&apos;s BOM for {o.quantity} unit{o.quantity === 1 ? '' : 's'}. Only approved expenses charged to this order count.</p>
+        <p className="text-[12px] text-[var(--shell-text-muted)]">Expected is the material, scrap, freight and outsourced work of this order&apos;s BOM for {o.quantity} unit{o.quantity === 1 ? '' : 's'}. Approved expenses charged to this order and stock used on it count.</p>
       </DetailSection>
       <DetailSection title="Variances">
         <DetailGrid>
@@ -455,7 +458,7 @@ export default function BuildOrderDetailPage() {
     <div className="flex h-full min-h-0 flex-col bg-[var(--shell-surface)]">
       <TabBar<Tab> value={tab} onChange={switchTab} tabs={TABS} />
       <div role="tabpanel" id="tabpanel" aria-labelledby={`tab-${tab}`} className="min-h-0 flex-1">
-        <ModuleShell
+        {tab === 'material' ? <JobStockTab buildOrderId={id} /> : <ModuleShell
           showPanel={!!selected}
           searchRow={<DataTableToolbar table={table} actions={<><ToolbarActions actions={alwaysActions} /><ToolbarActions actions={itemActions} /></>} />}
           intelligencePanel={
@@ -466,7 +469,7 @@ export default function BuildOrderDetailPage() {
           }
         >
           <DataTable isLoading={isLoading} columns={columns} data={rows} tableInstance={table} emptyMessage={EMPTY[tab]} />
-        </ModuleShell>
+        </ModuleShell>}
       </div>
 
       <SwapPartModal isOpen={swapOpen} onClose={() => setSwapOpen(false)} order={o} lineId={selected?.id ?? null} />

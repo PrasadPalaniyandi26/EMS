@@ -413,7 +413,7 @@ export default function ExpensePage() {
     if (['DRAFT', 'SENT_BACK'].includes(st)) {
       return [
         { label: 'Submit', variant: 'primary', onClick: handleSubmit },
-        { label: selectedTxn.is_split === 1 ? 'Re-split' : 'Split', icon: <Split className="h-4 w-4 text-[var(--warning)]" />, onClick: openSplit },
+        ...(selectedTxn.context_type === 'stock' ? [] : [{ label: selectedTxn.is_split === 1 ? 'Re-split' : 'Split', icon: <Split className="h-4 w-4 text-[var(--warning)]" />, onClick: openSplit }]),
         { label: 'Edit', onClick: openEdit },
         { label: 'Delete', variant: 'danger', onClick: handleDelete },
       ];

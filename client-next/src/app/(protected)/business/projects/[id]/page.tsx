@@ -23,15 +23,17 @@ import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailActions, T
 import { JobBomImportModal } from '@/components/budgets/job-bom-import-modal';
 import { BomLineModal, BomSettingsModal, BuildStepModal, EstimateLineModal, EstimatePhasesModal, MilestoneModal, ProjectSettingsModal, RejectBaselineModal, StepTypesModal } from '@/components/budgets/planning-modals';
 import { TabBar, money, projectVerdict, TONE_CLASS } from '@/components/budgets/budget-ui';
+import { JobStockTab } from '@/components/stock/job-stock-tab';
 import { formatDate } from '@/lib/currency';
 import { todayIso, workingDaysBetween } from '@/lib/working-days';
 import { cn } from '@/lib/utils';
 
-type Tab = 'estimate' | 'baselines' | 'jobbom' | 'jobsteps' | 'milestones';
+type Tab = 'estimate' | 'baselines' | 'jobbom' | 'jobsteps' | 'milestones' | 'material';
 
 const JOB_TABS: { value: Tab; label: string }[] = [{ value: 'jobbom', label: 'Job BOM' }, { value: 'jobsteps', label: 'Job build operations' }];
-const TABS: { value: Tab; label: string }[] = [{ value: 'estimate', label: 'Estimate' }, { value: 'baselines', label: 'Baselines' }, { value: 'milestones', label: 'Milestones' }];
+const TABS: { value: Tab; label: string }[] = [{ value: 'estimate', label: 'Estimate' }, { value: 'baselines', label: 'Baselines' }, { value: 'milestones', label: 'Milestones' }, { value: 'material', label: 'Material' }];
 const EMPTY: Record<Tab, string> = {
+  material: '',
   jobbom: 'No parts yet. Click Add part to build the job from the Part master, or Import BOM to start from a product.',
   jobsteps: 'No build operations yet. Click Add build operation for the work done in house or outsourced.',
   estimate: 'No estimate lines yet. Click Add line to enter what the project will cost, phase by phase. Labour can use the rate card.',
@@ -426,7 +428,7 @@ export default function ProjectBudgetPage() {
     <div className="flex h-full min-h-0 flex-col bg-[var(--shell-surface)]">
       <TabBar<Tab> value={tab} onChange={switchTab} tabs={tabs} />
       <div role="tabpanel" id="tabpanel" aria-labelledby={`tab-${tab}`} className="min-h-0 flex-1">
-        <ModuleShell
+        {tab === 'material' ? <JobStockTab projectId={id} /> : <ModuleShell
           showPanel={!!selected}
           searchRow={<DataTableToolbar table={table} actions={<><ToolbarActions actions={alwaysActions} /><ToolbarActions actions={itemActions} /></>} />}
           intelligencePanel={
@@ -437,7 +439,7 @@ export default function ProjectBudgetPage() {
           }
         >
           <DataTable isLoading={isLoading} columns={columns} data={rows} tableInstance={table} emptyMessage={EMPTY[tab]} />
-        </ModuleShell>
+        </ModuleShell>}
       </div>
 
       <ProjectSettingsModal isOpen={setOpen} onClose={() => setSetOpen(false)} data={data} />
