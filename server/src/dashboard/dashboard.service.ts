@@ -6,6 +6,10 @@ import { COMMITTED_STATUSES, committedStatusSql } from '../common/constants/tran
 import { ApprovalsService } from '../approvals/approvals.service';
 import { parseRange, today } from '../common/helpers/dates';
 import { previousPeriod } from './previous-period';
+import { toDataScope } from '../common/helpers/data-scope';
+
+// An employee sees their own spend, not the budget or baseline it is set against
+const seesBudgets = (role: string) => (role || '').toUpperCase() !== 'EMPLOYEE';
 
 @Injectable()
 export class DashboardService {
@@ -205,7 +209,7 @@ export class DashboardService {
     const perm = await this.prisma.userPermission.findUnique({ where: { userId } });
     const role = (roleName || '').toUpperCase();
     const fallback = role === 'ADMIN' || role === 'FINANCE' ? 'All' : role === 'MANAGER' ? 'Department' : 'Self';
-    const scope = perm?.dataScope || fallback;
+    const scope = perm?.dataScope ? toDataScope(perm.dataScope) : fallback;
 
     if (scope === 'All') return null;
     if (scope === 'Self') return [userId];
@@ -417,7 +421,7 @@ export class DashboardService {
 
     return spent.map(([id, amount]) => {
       const spentAmt = parseFloat(amount.toFixed(2));
-      const budget = parseFloat((baseMap.get(id) ?? 0).toFixed(2));
+      const budget = seesBudgets(roleName) ? parseFloat((baseMap.get(id) ?? 0).toFixed(2)) : 0;
       return {
         project_id: id,
         project_name: projMap[id]?.name || 'Unknown',
@@ -458,7 +462,7 @@ export class DashboardService {
 
     return spent.map(([id, amount]) => {
       const spentAmt = parseFloat(amount.toFixed(2));
-      const budget = parseFloat((planned.get(id) ?? 0).toFixed(2));
+      const budget = seesBudgets(roleName) ? parseFloat((planned.get(id) ?? 0).toFixed(2)) : 0;
       return {
         product_id: id,
         product_name: prodMap[id]?.name || 'Unknown',

@@ -74,7 +74,7 @@ describe('Managers list and permissions (e2e)', () => {
     it('creates or updates the one row for the user and returns what was saved', async () => {
       const first = await put(admin, `/users/${empId}/permissions`, { permissions: { expense: ['view'] }, single_limit: 1234, monthly_limit: 5678, data_scope: 'Own' });
       expect(first.status).toBe(200);
-      expect(first.body.data).toMatchObject({ permissions: { expense: ['view'] }, single_limit: 1234, monthly_limit: 5678, data_scope: 'Own' });
+      expect(first.body.data).toMatchObject({ permissions: { expense: ['view'] }, single_limit: 1234, monthly_limit: 5678, data_scope: 'Self' });
 
       const second = await put(admin, `/users/${empId}/permissions`, { permissions: { expense: ['view', 'create'] }, single_limit: 4321, monthly_limit: 8765, data_scope: 'Department' });
       expect(second.status).toBe(200);

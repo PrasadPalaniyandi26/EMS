@@ -2,11 +2,25 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { parseRange } from '../common/helpers/dates';
 
+// A user record's contact and personal details; only an Admin reads them in the log
+const PERSONAL = ['email', 'login_name', 'contact_no', 'house_apt', 'address', 'city', 'state', 'country', 'postal_code', 'date_of_birth'];
+
+function withoutPersonal(json: string | null) {
+  if (!json) return json;
+  try {
+    const value = JSON.parse(json);
+    for (const key of PERSONAL) if (key in value) value[key] = '(hidden)';
+    return JSON.stringify(value);
+  } catch {
+    return null;
+  }
+}
+
 @Injectable()
 export class AuditService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(filters: any = {}) {
+  async findAll(filters: any = {}, viewerRole?: string) {
     const where: any = {};
     const range = parseRange(filters.dateFrom, filters.dateTo);
     if (filters.tableName) where.tableName = String(filters.tableName);
@@ -52,8 +66,8 @@ export class AuditService {
         action: l.action,
         changed_by: l.changedBy,
         username: l.user?.username,
-        old_values: l.oldValues,
-        new_values: l.newValues,
+        old_values: viewerRole !== 'ADMIN' && l.tableName === 'users' ? withoutPersonal(l.oldValues) : l.oldValues,
+        new_values: viewerRole !== 'ADMIN' && l.tableName === 'users' ? withoutPersonal(l.newValues) : l.newValues,
         changed_at: l.changedAt,
       })),
       total, page, limit,

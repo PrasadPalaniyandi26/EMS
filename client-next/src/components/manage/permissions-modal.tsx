@@ -84,6 +84,9 @@ const CATEGORY_COLORS: Record<string, string> = {
   Core: 'text-[var(--shell-text)]', Finance: 'text-[var(--success)]', Operations: 'text-[var(--info)]', Governance: 'text-[var(--warning)]',
 };
 
+// The values the server stores, with the words shown for them
+const SCOPES = [{ value: 'Self', label: 'Own Records' }, { value: 'Department', label: 'Department' }, { value: 'All', label: 'Global' }];
+
 export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; onClose: () => void; user: any }) {
   const [perms, setPerms] = useState<PermMap>(() => JSON.parse(JSON.stringify(DEFAULT_PERMS)));
   const [template, setTemplate] = useState('Employee');
@@ -95,12 +98,18 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
     if (isOpen && user?.id) {
       setPerms(JSON.parse(JSON.stringify(DEFAULT_PERMS)));
       setTemplate('Employee');
+      // Nothing carries over from the person opened before
+      setThresholds({ single: '10000', monthly: '50000' });
+      setScope('Department');
       // Load existing permissions
       api.get(`/users/${user.id}/permissions`).then((res) => {
         const d = res.data as any;
-        if (d && d.permissions && Object.keys(d.permissions).length > 0) {
-          setPerms(d.permissions);
-          setTemplate('Custom');
+        if (d) {
+          // Limits and visibility can be saved without any module ticks, so they load either way
+          if (d.permissions && Object.keys(d.permissions).length > 0) {
+            setPerms(d.permissions);
+            setTemplate('Custom');
+          }
           setThresholds({
             single: String(d.single_limit || 10000),
             monthly: String(d.monthly_limit || 50000),
@@ -277,20 +286,20 @@ export function PermissionsModal({ isOpen, onClose, user }: { isOpen: boolean; o
               <span className="text-[12px] font-semibold">Data Visibility</span>
             </div>
             <div className="p-3 space-y-2">
-              {['Own Records', 'Department', 'Global'].map((s) => (
+              {SCOPES.map(({ value: s, label }) => (
                 <button key={s} onClick={() => setScope(s)}
                   className={cn('w-full text-left px-3 py-2 rounded-lg text-[12px] font-semibold transition-all flex items-center gap-2',
                     scope === s ? 'bg-[var(--shell-accent)] text-[var(--shell-accent-fg)]' : 'text-[var(--shell-text-muted)] hover:text-[var(--shell-text)]')}
                   style={scope !== s ? { background: 'var(--shell-bg)' } : {}}
                 >
                   <div className={cn('w-2 h-2 rounded-full shrink-0', scope === s ? 'bg-white' : 'bg-[var(--shell-border)]')} />
-                  {s}
+                  {label}
                 </button>
               ))}
               <p className="text-[12px] text-[var(--shell-text-muted)] font-semibold leading-relaxed pt-1 italic">
-                {scope === 'Own Records' && 'User sees only their own transactions and records.'}
-                {scope === 'Department' && 'Access limited to their department branch.'}
-                {scope === 'Global' && 'Full access across all departments and records.'}
+                {scope === 'Self' && 'Reports and analytics show only their own records.'}
+                {scope === 'Department' && 'Reports and analytics show their reporting tree.'}
+                {scope === 'All' && "Reports and analytics show everyone's records."}
               </p>
             </div>
           </div>

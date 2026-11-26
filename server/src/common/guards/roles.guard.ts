@@ -18,7 +18,7 @@ export class RolesGuard implements CanActivate {
 
     const { user } = context.switchToHttp().getRequest();
     const userRoleName = (user?.role_name || '').toLowerCase();
-    const userLegacyRole = (user?.role || '').toLowerCase();
-    return requiredRoles.some((r) => r.toLowerCase() === userRoleName || r.toLowerCase() === userLegacyRole);
+    // Only the active role counts. The old users.role column is not kept in step with role changes.
+    return requiredRoles.some((r) => r.toLowerCase() === userRoleName);
   }
 }

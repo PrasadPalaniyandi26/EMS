@@ -3,7 +3,7 @@ import type { ApiResponse } from './types';
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '/api/v1';
 
 let accessToken: string | null = null;
-let refreshPromise: Promise<string> | null = null;
+let refreshPromise: Promise<unknown> | null = null;
 
 export function setAccessToken(token: string | null) {
   accessToken = token;
@@ -18,8 +18,14 @@ export function clearAccessToken() {
 }
 
 export async function refreshAccessToken(): Promise<string> {
+  await refreshSessionData();
+  return accessToken!;
+}
+
+// The one place a refresh is made: it also returns the signed-in user, for restoring the session
+export async function refreshSessionData<T = unknown>(): Promise<T> {
   // If already refreshing, return the existing promise
-  if (refreshPromise) return refreshPromise;
+  if (refreshPromise) return refreshPromise as Promise<T>;
 
   // Refresh tokens rotate, so two tabs refreshing at once would invalidate each other. A Web Lock makes the
   // tabs refresh one at a time (the second one then simply uses the cookie the first one rotated).
@@ -34,14 +40,14 @@ export async function refreshAccessToken(): Promise<string> {
       const data = await res.json();
       if (!data.data?.accessToken) throw new Error('Invalid refresh response');
       accessToken = data.data.accessToken;
-      return accessToken!;
+      return data.data;
     })
     .finally(() => {
       // Clear the promise when done so future calls can refresh again if needed
       refreshPromise = null;
     });
 
-  return refreshPromise;
+  return refreshPromise as Promise<T>;
 }
 
 async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
@@ -126,6 +132,8 @@ export const api = {
 export default api;
 
 // Downloads a file behind the sign-in (a PDF or image) and returns it as a Blob, with the same token refresh as other requests
+export const isViewable = (type: string) => /^(application\/pdf|image\/(jpeg|png|gif|webp))(;|$)/.test(type);
+
 export async function fetchBlob(endpoint: string): Promise<Blob> {
   const url = `${API_BASE}${endpoint}`;
   const send = () => fetch(url, { credentials: 'include', headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {} });

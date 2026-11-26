@@ -6,7 +6,7 @@ import { useCategories, useCategoryTypes, useProjects, useProducts, useDepartmen
 import { useHeadroom } from '@/hooks/use-budget-queries';
 import { useOrdersForExpense } from '@/hooks/use-build-orders';
 import { BudgetHeadroom, headroomGate } from '@/components/budgets/budget-headroom';
-import api, { getAccessToken, API_BASE } from '@/lib/api-client';
+import api from '@/lib/api-client';
 import { CURRENCY_SYMBOL, toLocalYMD, parseApiDate, parseOcrDate } from '@/lib/currency';
 import { toast } from 'sonner';
 import { Plus, Pencil, Eye, Trash2, FileText, Sparkles } from 'lucide-react';
@@ -24,12 +24,12 @@ import { GstRateSelect, GstIncludedSwitch } from '@/components/shared/gst-fields
 import { computeTotalAmount, restoreEnteredAmount, amountLabel } from '@/lib/gst';
 import { useStockParts } from '@/hooks/use-stock-queries';
 import { StockLinesField, emptyStockLine, stockLinesReady, type StockLineForm } from '@/components/stock/stock-lines-field';
+import { openReceipt } from '@/components/shared/detail/detail-kit';
 
 const sanitizeText = (v: unknown): string => {
   if (typeof v !== 'string') return '';
   return v.replace(/<[^>]*>/g, '').trim().slice(0, 500);
 };
-
 
 
 interface TransactionModalProps {
@@ -120,7 +120,6 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
     excludeId: editing?.id,
   }, headroomOn);
   const gate = headroomGate(headroomOn ? headroom : undefined);
-
 
   useEffect(() => {
     if (!open) {
@@ -226,20 +225,7 @@ export function TransactionModal({ open, onClose, type, editing, onSaved }: Tran
       window.open(url, '_blank');
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } else if (editing?.receipt_path) {
-      try {
-        const token = getAccessToken();
-        const res = await fetch(`${API_BASE}/receipts/${editing.receipt_path}`, {
-          credentials: 'include',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        if (!res.ok) { toast.error('Failed to open receipt'); return; }
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        window.open(url, '_blank');
-        setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      } catch {
-        toast.error('Failed to open receipt');
-      }
+      await openReceipt(editing.receipt_path);
     }
   };
 

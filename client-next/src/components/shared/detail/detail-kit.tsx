@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { FileText, ArrowUpRight, Send, Pencil, Trash2, CheckCircle2, XCircle, CornerUpLeft, Ban, PauseCircle, PlayCircle, Shield, UserX, Briefcase, CreditCard, Calculator, Archive } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { getAccessToken, API_BASE } from '@/lib/api-client';
+import { getAccessToken, API_BASE, isViewable } from '@/lib/api-client';
 
 // The one layout for the right-hand detail panel on every page:
 //
@@ -136,12 +136,16 @@ export function DetailAllocation({ items, total }: { items: Array<{ label: strin
 // Opens a stored receipt. The files sit behind the login, so a plain link would be refused: fetch it with the
 // access token and open the blob.
 export async function openReceipt(path: string) {
-  const url = path.startsWith('/') ? path : `${API_BASE}/receipts/${path}`;
+  // Always a file name under our own API: a stored value must never choose where the token is sent
+  const url = `${API_BASE}/receipts/${encodeURIComponent(path)}`;
   try {
     const token = getAccessToken();
     const res = await fetch(url, { credentials: 'include', headers: token ? { Authorization: `Bearer ${token}` } : {} });
     if (!res.ok) { toast.error(`Receipt load failed: ${res.status}`); return; }
-    const blobUrl = URL.createObjectURL(await res.blob());
+    const blob = await res.blob();
+    // A blob page runs as this app, so only pictures and PDFs are opened
+    if (!isViewable(blob.type)) { toast.error('This file type cannot be opened.'); return; }
+    const blobUrl = URL.createObjectURL(blob);
     window.open(blobUrl, '_blank');
     setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
   } catch {

@@ -79,7 +79,7 @@ export class DashboardOverviewService {
       this.prisma.transaction.count({ where: { userId: user.id, status: { in: ['DRAFT', 'SENT_BACK'] } } }),
       this.approvals.getPending(user.id).then((r) => r.length),
       this.prisma.transaction.findMany({
-        where: { ...userWhere, status: { notIn: ['DELETED', 'VOIDED'] } },
+        where: { ...userWhere, status: { notIn: ['DELETED', 'VOIDED'] }, AND: [{ OR: [{ userId: user.id }, { status: { notIn: ['DRAFT', 'SENT_BACK'] } }] }] },
         include: { category: { select: { name: true } }, user: { select: { username: true } } },
         orderBy: [{ dateRecorded: 'desc' }, { id: 'desc' }], take: 8,
       }),

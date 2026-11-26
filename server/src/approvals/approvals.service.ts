@@ -1,3 +1,4 @@
+import { Prisma } from '../generated/prisma/client';
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -311,6 +312,12 @@ export class ApprovalsService {
     return [...txRequests.map((r) => this.mapRequest(r)), ...recRequests.map((r) => this.mapRecurringRequest(r))];
   }
 
+  // Locks the request for this decision. Whoever comes second waits, then finds it no longer pending.
+  private async claimRequest(tx: Prisma.TransactionClient, requestId: number) {
+    const held = await tx.approvalRequest.updateMany({ where: { id: requestId, status: 'PENDING' }, data: { resolvedAt: new Date() } });
+    if (!held.count) throw new HttpException('Request already processed.', HttpStatus.CONFLICT);
+  }
+
   async approve(requestId: number, approverId: number, comments?: string, isClaimable?: boolean) {
     const req = await this.prisma.approvalRequest.findUnique({
       where: { id: requestId },
@@ -350,8 +357,9 @@ export class ApprovalsService {
         if (!selfAllowed) throw new HttpException('Cannot approve your own recurring schedule.', HttpStatus.FORBIDDEN);
       }
 
-      const approver = await this.prisma.user.findUnique({ where: { id: approverId } });
+      const approver = await this.prisma.user.findUnique({ where: { id: approverId }, include: { roleRelation: true } });
       const approverName = approver?.username || 'Unknown';
+      const approverRole = approver?.roleRelation?.name ?? null;
       const code = rec?.code || `#${req.recurringTransactionId}`;
 
       if (recStatus === 'PENDING_MANAGER') {
@@ -370,12 +378,12 @@ export class ApprovalsService {
             });
             await tx.recurringTransaction.update({
               where: { id: req.recurringTransactionId! },
-              data: { status: 'PENDING_FINANCE', approvedByName: approverName },
+              data: { status: 'PENDING_FINANCE', approvedById: approverId, approvedByName: approverName, approvedByRole: approverRole },
             });
           } else {
             await tx.recurringTransaction.update({
               where: { id: req.recurringTransactionId! },
-              data: { status: 'APPROVED', isActive: true, approvedByName: approverName },
+              data: { status: 'APPROVED', isActive: true, approvedById: approverId, approvedByName: approverName, approvedByRole: approverRole },
             });
           }
         });
@@ -397,7 +405,7 @@ export class ApprovalsService {
           if (claimed.count === 0) throw new HttpException('Request already processed.', HttpStatus.CONFLICT);
           await tx.recurringTransaction.update({
             where: { id: req.recurringTransactionId! },
-            data: { status: 'APPROVED', isActive: true, approvedByName: approverName },
+            data: { status: 'APPROVED', isActive: true, approvedById: approverId, approvedByName: approverName, approvedByRole: approverRole },
           });
         });
         this.audit.log({ tableName: 'recurring_transactions', recordId: req.recurringTransactionId, action: 'UPDATE', changedBy: approverId, oldValues: { status: 'PENDING_FINANCE' }, newValues: { status: 'APPROVED' } }).catch((e: any) => this.logger.warn('Background task failed', e?.message));
@@ -563,18 +571,20 @@ export class ApprovalsService {
       if (recStatus === 'PENDING_MANAGER' && !(await this.isAssignedManager(req, approverId, rec?.userId))) throw new HttpException('This request is assigned to another manager.', HttpStatus.FORBIDDEN);
       if (recStatus === 'PENDING_FINANCE' && !rejIsFinance) throw new HttpException('Only Finance can reject at this stage.', HttpStatus.FORBIDDEN);
 
-      const approver = await this.prisma.user.findUnique({ where: { id: approverId } });
+      const approver = await this.prisma.user.findUnique({ where: { id: approverId }, include: { roleRelation: true } });
       const approverName = approver?.username || 'Unknown';
+      const approverRole = approver?.roleRelation?.name ?? null;
       const code = rec?.code || `#${req.recurringTransactionId}`;
 
       await this.prisma.$transaction(async (tx) => {
+        await this.claimRequest(tx, requestId);
         await tx.approvalRequest.updateMany({
           where: { recurringTransactionId: req.recurringTransactionId!, status: 'PENDING' },
           data: { approverId, status: 'REJECTED', comments: comments || null, actionDate: new Date(), resolvedAt: new Date() },
         });
         await tx.recurringTransaction.update({
           where: { id: req.recurringTransactionId! },
-          data: { status: 'REJECTED', isActive: false, rejectedByName: approverName },
+          data: { status: 'REJECTED', isActive: false, rejectedById: approverId, rejectedByName: approverName, rejectedByRole: approverRole },
         });
       });
       this.audit.log({ tableName: 'recurring_transactions', recordId: req.recurringTransactionId!, action: 'UPDATE', changedBy: approverId, oldValues: { status: recStatus }, newValues: { status: 'REJECTED' } }).catch((e: any) => this.logger.warn('Background task failed', e?.message));
@@ -593,6 +603,9 @@ export class ApprovalsService {
     if (txStatus === 'PENDING_MANAGER' && !rejIsManager) throw new HttpException('Not authorized to reject this request.', HttpStatus.FORBIDDEN);
     if (txStatus === 'PENDING_MANAGER' && !(await this.isAssignedManager(req, approverId, req.transaction?.userId))) throw new HttpException('This request is assigned to another manager.', HttpStatus.FORBIDDEN);
     if (txStatus === 'PENDING_FINANCE' && !rejIsFinance) throw new HttpException('Not authorized to reject this request.', HttpStatus.FORBIDDEN);
+    if (txStatus !== 'PENDING_MANAGER' && txStatus !== 'PENDING_FINANCE') {
+      throw new HttpException(`This record is '${txStatus}', so there is nothing to reject.`, HttpStatus.BAD_REQUEST);
+    }
 
     await this.prisma.$transaction(async (tx) => {
       const claimed = await tx.approvalRequest.updateMany({
@@ -643,18 +656,20 @@ export class ApprovalsService {
       if (recStatus === 'PENDING_MANAGER' && !(await this.isAssignedManager(req, approverId, rec?.userId))) throw new HttpException('This request is assigned to another manager.', HttpStatus.FORBIDDEN);
       if (recStatus === 'PENDING_FINANCE' && !sbIsFinance) throw new HttpException('Only Finance can send back at this stage.', HttpStatus.FORBIDDEN);
 
-      const approver = await this.prisma.user.findUnique({ where: { id: approverId } });
+      const approver = await this.prisma.user.findUnique({ where: { id: approverId }, include: { roleRelation: true } });
       const approverName = approver?.username || 'Unknown';
+      const approverRole = approver?.roleRelation?.name ?? null;
       const code = rec?.code || `#${req.recurringTransactionId}`;
 
       await this.prisma.$transaction(async (tx) => {
+        await this.claimRequest(tx, requestId);
         await tx.approvalRequest.updateMany({
           where: { recurringTransactionId: req.recurringTransactionId!, status: 'PENDING' },
           data: { status: 'SENT_BACK', comments: comments || null, actionDate: new Date(), resolvedAt: new Date() },
         });
         await tx.recurringTransaction.update({
           where: { id: req.recurringTransactionId! },
-          data: { status: 'SENT_BACK', sentBackByName: approverName },
+          data: { status: 'SENT_BACK', sentBackById: approverId, sentBackByName: approverName, sentBackByRole: approverRole },
         });
       });
       this.audit.log({ tableName: 'recurring_transactions', recordId: req.recurringTransactionId!, action: 'UPDATE', changedBy: approverId, oldValues: { status: recStatus }, newValues: { status: 'SENT_BACK' } }).catch((e: any) => this.logger.warn('Background task failed', e?.message));
@@ -675,9 +690,17 @@ export class ApprovalsService {
     if (txStatus === 'PENDING_MANAGER' && !(await this.isAssignedManager(req, approverId, (req as any).transaction?.userId))) throw new HttpException('This request is assigned to another manager.', HttpStatus.FORBIDDEN);
     if (txStatus === 'PENDING_FINANCE' && !sbIsFinance) throw new HttpException('Not authorized to send back this request.', HttpStatus.FORBIDDEN);
 
+    if (txStatus !== 'PENDING_MANAGER' && txStatus !== 'PENDING_FINANCE') {
+      throw new HttpException(`This record is '${txStatus}', so there is nothing to send back.`, HttpStatus.BAD_REQUEST);
+    }
+
     await this.prisma.$transaction(async (tx) => {
+      await this.claimRequest(tx, requestId);
+      // The record must still be waiting; the request's own status is set below with its comments
+      const held = await tx.transaction.updateMany({ where: { id: req.transactionId!, status: txStatus }, data: { status: 'SENT_BACK' } });
+      if (!held.count) throw new HttpException('This record changed while you were deciding it. Reload and try again.', HttpStatus.CONFLICT);
       await tx.approvalRequest.updateMany({
-        where: { transactionId: req.transactionId!, status: 'PENDING' },
+        where: { OR: [{ id: requestId }, { transactionId: req.transactionId!, status: 'PENDING' }] },
         data: { approverId, status: 'SENT_BACK', comments: comments || null, actionDate: new Date(), resolvedAt: new Date() },
       });
       await this.stock.reversePurchase(tx, req.transactionId!, 'Expense sent back', approverId);

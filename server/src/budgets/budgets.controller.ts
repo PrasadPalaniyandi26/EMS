@@ -50,8 +50,8 @@ export class BudgetsController {
 
   @Get('impact')
   @Roles('admin', 'finance', 'manager')
-  impact(@Query('ids') ids?: string) {
-    return this.service.impactFor((ids ?? '').split(',').map(Number).filter((x) => x > 0));
+  impact(@CurrentUser() u: Actor, @Query('ids') ids?: string) {
+    return this.service.impactFor((ids ?? '').split(',').map(Number).filter((x) => x > 0), u);
   }
 
   @Get('settings')
@@ -124,5 +124,5 @@ export class BudgetsController {
 
   @Get('dashboard')
   @Roles(...READ)
-  dashboard() { return this.service.dashboardLines(); }
+  dashboard(@CurrentUser() u: Actor) { return this.service.dashboardLines(undefined, scopeOf(u)); }
 }

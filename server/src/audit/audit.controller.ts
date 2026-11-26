@@ -5,6 +5,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { ApiTags } from '@nestjs/swagger';
 import { ROLES } from '../common/constants/roles';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('audit')
 @Controller('v1/audit')
@@ -13,6 +14,6 @@ import { ROLES } from '../common/constants/roles';
 export class AuditController {
   constructor(private service: AuditService) {}
 
-  @Get() findAll(@Query() query: any) { return this.service.findAll(query); }
+  @Get() findAll(@Query() query: any, @CurrentUser('role_name') roleName: string) { return this.service.findAll(query, roleName); }
   @Get('stats') stats() { return this.service.getStats(); }
 }

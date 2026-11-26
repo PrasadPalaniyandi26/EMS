@@ -446,7 +446,8 @@ export class StockService {
 
   // Rejected, sent back or voided: take the stock out again. Refused when it has already been used.
   async reversePurchase(tx: Tx, transactionId: number, why: string, userId: number) {
-    const moves = await tx.stockMove.findMany({ where: { transactionId, kind: 'IN' } });
+    // Newest first, so the date taken for each part is that of its latest posting
+    const moves = await tx.stockMove.findMany({ where: { transactionId, kind: 'IN' }, orderBy: { id: 'desc' } });
     if (!moves.length) return;
     const t = await tx.transaction.findUnique({ where: { id: transactionId }, select: { referenceId: true } });
     const byItem = new Map<number, { quantity: number; value: number; movedOn: Date; categoryId: number | null }>();
@@ -583,16 +584,26 @@ export class StockService {
       if (qty != null && !(qty >= 0 && qty <= 1e9)) throw bad('Counted quantities must be zero or more.');
       return this.prisma.stockCountLine.update({ where: { id: line.id }, data: { countedQty: qty } });
     });
-    await this.prisma.$transaction(updates);
+    await this.prisma.$transaction([
+      // Fails the whole save (P2025) if the count stopped being a draft since it was read
+      this.prisma.stockCount.update({ where: { id, status: 'DRAFT' }, data: { status: 'DRAFT' } }),
+      ...updates,
+    ]);
     this.log('stock_counts', id, 'UPDATE', user.id, { lines: b.lines });
     return { id };
+  }
+
+  // Moves a count on only from the status the checks above saw, so two requests at once cannot both win
+  private async countStep(id: number, from: string, data: Prisma.StockCountUpdateManyMutationInput) {
+    const moved = await this.prisma.stockCount.updateMany({ where: { id, status: from }, data });
+    if (!moved.count) throw bad('This count has just changed. Reload it and try again.', HttpStatus.CONFLICT);
   }
 
   async submitCount(id: number, user: Actor) {
     const c = await this.countOrThrow(id);
     if (c.status !== 'DRAFT') throw bad('Only a draft count can be submitted.', HttpStatus.CONFLICT);
     if (c.lines.some((l) => l.countedQty == null)) throw bad('Enter a counted quantity for every part. Enter zero when there is none.');
-    await this.prisma.stockCount.update({ where: { id }, data: { status: 'SUBMITTED', submittedAt: new Date(), submittedByName: user.username ?? null, note: null } });
+    await this.countStep(id, 'DRAFT', { status: 'SUBMITTED', submittedAt: new Date(), submittedByName: user.username ?? null, note: null });
     this.log('stock_counts', id, 'SUBMIT', user.id);
     return { id };
   }
@@ -603,7 +614,7 @@ export class StockService {
     const note = text(b.note);
     if (b.decision === 'send_back') {
       if (!note) throw bad('Say what needs to change.');
-      await this.prisma.stockCount.update({ where: { id }, data: { status: 'DRAFT', note } });
+      await this.countStep(id, 'SUBMITTED', { status: 'DRAFT', note });
       this.log('stock_counts', id, 'SEND_BACK', user.id, { note });
       return { id };
     }

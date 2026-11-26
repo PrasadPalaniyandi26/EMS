@@ -7,7 +7,8 @@ import { COMMITTED_STATUSES } from '../common/constants/transaction-status';
 import { buildGstFields } from '../common/utils/gst';
 import { BudgetsService } from '../budgets/budgets.service';
 import { StockService } from '../stock/stock.service';
-import { today } from '../common/helpers/dates';
+import { today, parseDay } from '../common/helpers/dates';
+import { assertOwnAttachment } from '../common/helpers/attachments';
 
 // Upper bound for ?limit= on list endpoints; the client's largest request is 500.
 const MAX_PAGE_SIZE = 500;
@@ -75,8 +76,10 @@ export class TransactionsService {
 
   async findAll(userId: number, filters: any) {
     const where: any = { userId, NOT: { status: 'DELETED' } };
-    if (filters.dateFrom) where.dateRecorded = { ...where.dateRecorded, gte: new Date(filters.dateFrom) };
-    if (filters.dateTo) where.dateRecorded = { ...where.dateRecorded, lte: new Date(filters.dateTo) };
+    const from = parseDay(filters.dateFrom, 'The start date');
+    const to = parseDay(filters.dateTo, 'The end date');
+    if (from) where.dateRecorded = { ...where.dateRecorded, gte: from };
+    if (to) where.dateRecorded = { ...where.dateRecorded, lte: to };
     if (filters.category) where.categoryId = Number(filters.category);
     if (filters.paymentMethod) where.paymentMethod = filters.paymentMethod;
     if (filters.clientId) where.clientId = Number(filters.clientId);
@@ -146,6 +149,7 @@ export class TransactionsService {
 
   async create(userId: number, data: any) {
     // All users create transactions as DRAFT; Finance submits the same way as others
+    assertOwnAttachment(data.receiptPath, null, userId);
     const gstFields = buildGstFields(Number(data.amount), data.gstRate ?? null, !!data.gstIncluded);
     const buildOrderId = await this.resolveBuildOrder(data);
     // A stock purchase goes into the Store: it is charged to no project or product
@@ -247,7 +251,20 @@ export class TransactionsService {
   // Submits run one at a time, so two expenses cannot both pass the same budget headroom
   private submitQueue: Promise<unknown> = Promise.resolve();
   submit(transactionId: number, userId: number) {
-    const run = this.submitQueue.then(() => this.submitNow(transactionId, userId));
+    return this.inTurn(() => this.submitNow(transactionId, userId));
+  }
+
+  update(id: number, userId: number, patch: any) {
+    return this.inTurn(() => this.updateNow(id, userId, patch));
+  }
+
+  split(transactionId: number, splits: any[], userId: number) {
+    return this.inTurn(() => this.splitNow(transactionId, splits, userId));
+  }
+
+  // shortcut: one queue in one process; with more than one API instance, claim the row's status in the database instead
+  private inTurn<T>(work: () => Promise<T>): Promise<T> {
+    const run = this.submitQueue.then(work);
     this.submitQueue = run.catch(() => undefined);
     return run;
   }
@@ -285,7 +302,7 @@ export class TransactionsService {
           data: { transactionId, approverId: userId, levelNum: 1, status: 'PENDING' },
         });
         await tx.transaction.update({
-          where: { id: transactionId },
+          where: { id: transactionId, status: { in: ['DRAFT', 'SENT_BACK'] } },
           data: { status: 'PENDING_FINANCE', submittedAt: new Date() },
         });
       });
@@ -331,7 +348,7 @@ export class TransactionsService {
           data: { transactionId, approverId: financeUser.id, levelNum: 1, status: 'PENDING' },
         });
         await tx.transaction.update({
-          where: { id: transactionId },
+          where: { id: transactionId, status: { in: ['DRAFT', 'SENT_BACK'] } },
           data: { status: 'PENDING_FINANCE', submittedAt: new Date() },
         });
       });
@@ -372,7 +389,7 @@ export class TransactionsService {
           data: { transactionId, approverId: financeUser.id, levelNum: 1, status: 'PENDING' },
         });
         await tx.transaction.update({
-          where: { id: transactionId },
+          where: { id: transactionId, status: { in: ['DRAFT', 'SENT_BACK'] } },
           data: { status: 'PENDING_FINANCE', submittedAt: new Date() },
         });
       });
@@ -424,7 +441,7 @@ export class TransactionsService {
         data: { transactionId, approverId: managerId!, levelNum: 1, status: 'PENDING' },
       });
       await tx.transaction.update({
-        where: { id: transactionId },
+        where: { id: transactionId, status: { in: ['DRAFT', 'SENT_BACK'] } },
         data: { status: 'PENDING_MANAGER', submittedAt: new Date() },
       });
     });
@@ -448,7 +465,7 @@ export class TransactionsService {
     return submitted;
   }
 
-  async update(id: number, userId: number, patch: any) {
+  private async updateNow(id: number, userId: number, patch: any) {
     // Guard: only DRAFT or SENT_BACK transactions can be edited
     const existing = await this.prisma.transaction.findFirst({ where: { id, userId, NOT: { status: 'DELETED' } } });
     if (!existing) throw new HttpException('Transaction not found.', HttpStatus.NOT_FOUND);
@@ -458,6 +475,7 @@ export class TransactionsService {
         HttpStatus.BAD_REQUEST,
       );
     }
+    assertOwnAttachment(patch.receiptPath, existing.receiptPath, userId);
     const oldSnapshot = this.mapTransaction(existing);
     // A change names only what it changes (the panel's receipt upload sends the receipt alone): the rest stays as it was
     const has = (k: string) => patch[k] !== undefined;
@@ -532,13 +550,26 @@ export class TransactionsService {
     return updated;
   }
 
-  async delete(id: number, userId: number) {
+  delete(id: number, userId: number) {
+    return this.inTurn(() => this.deleteNow(id, userId));
+  }
+
+  bulkDelete(ids: unknown, userId: number) {
+    // Without a list the database filter would be dropped, and every record of the caller matched
+    if (!Array.isArray(ids) || !ids.length || ids.some((x) => !Number.isInteger(Number(x)) || Number(x) <= 0)) {
+      throw new HttpException('Choose the records to delete.', HttpStatus.BAD_REQUEST);
+    }
+    return this.inTurn(() => this.bulkDeleteNow(ids.map(Number), userId));
+  }
+
+  private async deleteNow(id: number, userId: number) {
     const existing = await this.prisma.transaction.findFirst({ where: { id, userId, NOT: { status: 'DELETED' } } });
     if (!existing) throw new HttpException('Transaction not found.', HttpStatus.NOT_FOUND);
     if (KEPT.includes(existing.status || '')) {
       throw new HttpException(`Cannot delete a transaction with status '${existing.status}'.`, HttpStatus.BAD_REQUEST);
     }
-    const result = await this.prisma.transaction.updateMany({ where: { id, userId }, data: { status: 'DELETED' } });
+    const result = await this.prisma.transaction.updateMany({ where: { id, userId, status: { notIn: [...KEPT, 'DELETED'] } }, data: { status: 'DELETED' } });
+    if (!result.count) throw new HttpException('This record changed while you were deleting it. Reload and try again.', HttpStatus.CONFLICT);
     if (result.count > 0) {
       this.audit.log({
         tableName: 'transactions', recordId: id, referenceId: existing?.referenceId ?? undefined,
@@ -549,7 +580,7 @@ export class TransactionsService {
     return result.count > 0;
   }
 
-  async bulkDelete(ids: number[], userId: number) {
+  private async bulkDeleteNow(ids: number[], userId: number) {
     const existing = await this.prisma.transaction.findMany({
       where: { userId, id: { in: ids }, NOT: { status: 'DELETED' } }, select: { id: true, referenceId: true, status: true },
     });
@@ -560,7 +591,12 @@ export class TransactionsService {
         HttpStatus.BAD_REQUEST,
       );
     }
-    const result = await this.prisma.transaction.updateMany({ where: { userId, id: { in: existing.map((e) => e.id) } }, data: { status: 'DELETED' } });
+    // All or none: if any of them moved on since the check, none is deleted
+    const result = await this.prisma.$transaction(async (tx) => {
+      const done = await tx.transaction.updateMany({ where: { userId, id: { in: existing.map((e) => e.id) }, status: { notIn: [...KEPT, 'DELETED'] } }, data: { status: 'DELETED' } });
+      if (done.count !== existing.length) throw new HttpException('Some of these records changed while you were deleting them. Reload and try again.', HttpStatus.CONFLICT);
+      return done;
+    });
     if (result.count > 0) {
       for (const e of existing) {
         this.audit.log({
@@ -625,7 +661,7 @@ export class TransactionsService {
     }));
   }
 
-  async split(transactionId: number, splits: any[], userId: number) {
+  private async splitNow(transactionId: number, splits: any[], userId: number) {
     if (!splits || splits.length < 2) {
       throw new HttpException('At least 2 splits are required.', HttpStatus.BAD_REQUEST);
     }
@@ -734,8 +770,8 @@ export class TransactionsService {
     });
     if (!hasRole) throw new HttpException('Only Finance or Admin can process reimbursements.', HttpStatus.FORBIDDEN);
 
-    await this.prisma.transaction.update({
-      where: { id: transactionId },
+    const paid = await this.prisma.transaction.updateMany({
+      where: { id: transactionId, status: 'APPROVED', OR: [{ reimbursementStatus: null }, { reimbursementStatus: { not: 'PAID' } }] },
       data: {
         reimbursementStatus: dto.status,
         reimbursedAt: new Date(),
@@ -745,6 +781,7 @@ export class TransactionsService {
         reimbursementNote: dto.note ?? null,
       },
     });
+    if (!paid.count) throw new HttpException('This expense changed while you were processing it. Reload and try again.', HttpStatus.CONFLICT);
     this.audit.log({
       tableName: 'transactions', recordId: transactionId,
       referenceId: txn.referenceId ?? undefined,
@@ -780,8 +817,10 @@ export class TransactionsService {
 
     if (filters.userId) where.userId = Number(filters.userId);
     if (filters.categoryId) where.categoryId = Number(filters.categoryId);
-    if (filters.dateFrom) where.dateRecorded = { ...where.dateRecorded, gte: new Date(filters.dateFrom) };
-    if (filters.dateTo) where.dateRecorded = { ...where.dateRecorded, lte: new Date(filters.dateTo) };
+    const from = parseDay(filters.dateFrom, 'The start date');
+    const to = parseDay(filters.dateTo, 'The end date');
+    if (from) where.dateRecorded = { ...where.dateRecorded, gte: from };
+    if (to) where.dateRecorded = { ...where.dateRecorded, lte: to };
 
     const rows = await this.prisma.transaction.findMany({
       where,
@@ -824,16 +863,19 @@ export class TransactionsService {
     if (!eligible.length) throw new HttpException('No eligible transactions found.', HttpStatus.BAD_REQUEST);
 
     const eligibleIds = eligible.map((t) => t.id);
-    await this.prisma.transaction.updateMany({
-      where: { id: { in: eligibleIds } },
-      data: {
-        reimbursementStatus: dto.status,
-        reimbursedAt: new Date(),
-        reimbursedById: userId,
-        reimbursedByName: username,
-        reimbursementReference: dto.reference ?? null,
-        reimbursementNote: dto.note ?? null,
-      },
+    await this.prisma.$transaction(async (tx) => {
+      const done = await tx.transaction.updateMany({
+        where: { id: { in: eligibleIds }, status: 'APPROVED', OR: [{ reimbursementStatus: null }, { reimbursementStatus: 'ON_HOLD' }] },
+        data: {
+          reimbursementStatus: dto.status,
+          reimbursedAt: new Date(),
+          reimbursedById: userId,
+          reimbursedByName: username,
+          reimbursementReference: dto.reference ?? null,
+          reimbursementNote: dto.note ?? null,
+        },
+      });
+      if (done.count !== eligibleIds.length) throw new HttpException('Some of these expenses changed while you were processing them. Reload and try again.', HttpStatus.CONFLICT);
     });
     for (const t of eligible) {
       this.audit.log({
@@ -871,8 +913,10 @@ export class TransactionsService {
 
   async exportCsv(userId: number, filters: any): Promise<string> {
     const where: any = { userId, NOT: { status: 'DELETED' } };
-    if (filters.dateFrom) where.dateRecorded = { ...where.dateRecorded, gte: new Date(filters.dateFrom) };
-    if (filters.dateTo) where.dateRecorded = { ...where.dateRecorded, lte: new Date(filters.dateTo) };
+    const from = parseDay(filters.dateFrom, 'The start date');
+    const to = parseDay(filters.dateTo, 'The end date');
+    if (from) where.dateRecorded = { ...where.dateRecorded, gte: from };
+    if (to) where.dateRecorded = { ...where.dateRecorded, lte: to };
     if (filters.category) where.categoryId = Number(filters.category);
     if (filters.paymentMethod) where.paymentMethod = filters.paymentMethod;
     if (filters.clientId) where.clientId = Number(filters.clientId);
@@ -1021,17 +1065,13 @@ export class TransactionsService {
     const voidedByName = user?.username || 'Unknown';
 
     await this.prisma.$transaction(async (tx) => {
-      await this.stock.reversePurchase(tx, id, 'Expense voided', userId);
-      await tx.transaction.update({
-        where: { id },
-        data: {
-          status: 'VOIDED',
-          voidedById: userId,
-          voidedByName: voidedByName,
-          voidedAt: new Date(),
-          voidReason: reason.trim(),
-        },
+      // First, so a second void or a reimbursement waits here and then finds the record no longer eligible
+      const claim = await tx.transaction.updateMany({
+        where: { id, status: 'APPROVED', OR: [{ reimbursementStatus: null }, { reimbursementStatus: { not: 'PAID' } }] },
+        data: { status: 'VOIDED', voidedById: userId, voidedByName: voidedByName, voidedAt: new Date(), voidReason: reason.trim() },
       });
+      if (!claim.count) throw new HttpException('This record changed while you were voiding it. Reload and try again.', HttpStatus.CONFLICT);
+      await this.stock.reversePurchase(tx, id, 'Expense voided', userId);
     });
 
     this.audit.log({

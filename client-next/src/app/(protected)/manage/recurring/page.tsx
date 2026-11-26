@@ -6,7 +6,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { Tags } from 'lucide-react';
 import { ManageCategoriesDialog } from '@/components/manage/manage-categories-dialog';
 import { useRecurring, useCategories, useInvalidate, useRecurringRuns } from '@/hooks/use-queries';
-import api, { getAccessToken, API_BASE } from '@/lib/api-client';
+import api from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -45,7 +45,7 @@ import {
 import { useDataTable } from '@/hooks/use-data-table';
 import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
-import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAttachment, DetailTimeline, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
+import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAttachment, DetailTimeline, DetailActions, ToolbarActions, type DetailActionDef, openReceipt } from '@/components/shared/detail/detail-kit';
 import { getStatusConfig } from '@/lib/status';
 import { PageFrame } from '@/components/shared/module/page-frame';
 
@@ -336,19 +336,7 @@ export default function RecurringPage() {
     }
   };
 
-  const handleViewReceipt = async (receiptPath: string) => {
-    try {
-      const token = getAccessToken();
-      const res = await fetch(`${API_BASE}/receipts/${receiptPath}`, {
-        credentials: 'include',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      const blob = await res.blob();
-      window.open(URL.createObjectURL(blob), '_blank');
-    } catch {
-      toast.error('Failed to open receipt');
-    }
-  };
+  const handleViewReceipt = (receiptPath: string) => openReceipt(receiptPath);
 
   const handleReject = async () => {
     if (selectedCount !== 1) { toast.error('Select exactly one record to reject'); return; }
@@ -413,15 +401,13 @@ export default function RecurringPage() {
     try {
       await api.post(`/recurring/${modalTarget.id}/resume`, {
         next_run: updatedData.next_run,
-        amount: Number(updatedData.amount),
-        frequency: updatedData.frequency,
       });
       toast.success('Schedule Resumed successfully');
       invalidate('recurring');
       setIsResumeModalOpen(false);
       setRowSelection({});
-    } catch {
-      toast.error('Failed to resume schedule');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to resume schedule');
     }
   };
 

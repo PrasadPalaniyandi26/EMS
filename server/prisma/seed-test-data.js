@@ -83,7 +83,7 @@ async function main() {
         userId: u.id, permissions: {},
         singleLimit: d.role === 'EMPLOYEE' ? 25000 : 100000,
         monthlyLimit: d.role === 'EMPLOYEE' ? 100000 : 500000,
-        dataScope: d.role === 'EMPLOYEE' ? 'Own' : 'Department',
+        dataScope: d.role === 'EMPLOYEE' ? 'Self' : 'Department',
       },
     });
     users[d.username] = u;

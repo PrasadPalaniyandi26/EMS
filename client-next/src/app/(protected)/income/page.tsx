@@ -6,7 +6,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { Tags } from 'lucide-react';
 import { ManageCategoriesDialog } from '@/components/manage/manage-categories-dialog';
 import { useAllTransactions, useCategories, useClients, useProjects, useInvalidate, useApprovalTrail } from '@/hooks/use-queries';
-import api, { getAccessToken, API_BASE } from '@/lib/api-client';
+import api from '@/lib/api-client';
 import { formatCurrency, formatDate, parseApiDate, CURRENCY_SYMBOL } from '@/lib/currency';
 import { STATUS_CONFIG } from '@/lib/status';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -40,7 +40,7 @@ import { ModuleShell } from '@/components/shared/module/module-shell';
 import { ModuleIntelligencePanel } from '@/components/shared/module/module-intelligence-panel';
 import { TransactionDetail } from '@/components/transactions/transaction-detail';
 import { VoidModal } from '@/components/approvals/approvals-modals';
-import { DetailActions, DetailSummary, DetailSection, DetailGrid, DetailField, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
+import { DetailActions, DetailSummary, DetailSection, DetailGrid, DetailField, ToolbarActions, type DetailActionDef, openReceipt } from '@/components/shared/detail/detail-kit';
 import { CurrencyInput, useConfirm } from '@/components/shared/modal-primitives';
 import { PageFrame } from '@/components/shared/module/page-frame';
 
@@ -158,17 +158,7 @@ export default function IncomePage() {
 
   const handlePanelDocClick = async () => {
     if (selectedTxn?.receipt_path) {
-      try {
-        const token = getAccessToken();
-        const res = await fetch(`${API_BASE}/receipts/${selectedTxn.receipt_path}`, {
-          credentials: 'include',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        const blob = await res.blob();
-        window.open(URL.createObjectURL(blob), '_blank');
-      } catch {
-        toast.error('Failed to open receipt');
-      }
+      await openReceipt(selectedTxn.receipt_path);
     } else {
       panelFileRef.current?.click();
     }

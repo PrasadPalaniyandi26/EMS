@@ -24,6 +24,7 @@ import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { RecordLink, TabBar, useTabParam } from '@/components/budgets/budget-ui';
 import { useCategories, useClients, useProducts, useProjects } from '@/hooks/use-queries';
+import { toCsv, downloadCsv } from '@/lib/csv';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const escapeHtml = (v: unknown): string => {
@@ -326,17 +327,11 @@ export default function ReportingPage() {
   const totalCell = (col: string, ci: number) => (result!.totals[col] != null ? result!.totals[col] : ci === 0 ? 'Total' : '');
   const shownText = (col: string, v: unknown) =>
     typeof v === 'number' && CURRENCY_COLS.has(col) ? formatCurrency(v, currency) : isPctCol(col) && v != null && v !== '' ? `${v}%` : v == null ? '' : String(v);
-  const csvCell = (v: unknown) => JSON.stringify(typeof v === 'string' && /^[=+\-@\t\r]/.test(v) ? `'${v}` : v ?? '');
   const exportCSV = () => {
     if (!result) return;
-    const lines = [result.columns.map(csvCell).join(',')];
-    for (const row of filteredRows) {
-      lines.push(result.columns.map((c) => csvCell(row[c])).join(','));
-    }
-    if (withTotals) lines.push(result.columns.map((c, ci) => csvCell(totalCell(c, ci))).join(','));
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-    a.download = `${result.title.replace(/\s+/g, '_')}.csv`; a.click();
+    const rows = filteredRows.map((row) => result.columns.map((c) => row[c]));
+    if (withTotals) rows.push(result.columns.map((c, ci) => totalCell(c, ci)));
+    downloadCsv(`${result.title.replace(/\s+/g, '_')}.csv`, toCsv(result.columns, rows));
   };
 
   // What the report was narrowed to, in words, for the head of an export

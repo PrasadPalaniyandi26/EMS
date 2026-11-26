@@ -5,7 +5,10 @@ import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ROLES } from '../common/constants/roles';
 import { buildGstFields } from '../common/utils/gst';
-import { today } from '../common/helpers/dates';
+import { today, parseDay } from '../common/helpers/dates';
+import { ApprovalsService } from '../approvals/approvals.service';
+
+const FREQUENCIES = ['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly'];
 
 @Injectable()
 export class RecurringService {
@@ -14,6 +17,7 @@ export class RecurringService {
     private prisma: PrismaService,
     private audit: AuditService,
     private notifications: NotificationsService,
+    private approvals: ApprovalsService,
   ) {}
 
   private mapRecurring(r: any) {
@@ -83,7 +87,16 @@ export class RecurringService {
     return this.mapRecurring(r);
   }
 
+  // What a schedule will post, and when: a bad value here would be approved once and then posted again and again
+  private checkTerms(data: any) {
+    if (!(Number(data.amount) > 0) || !Number.isFinite(Number(data.amount))) throw new HttpException('Enter an amount above zero.', HttpStatus.BAD_REQUEST);
+    if (!parseDay(data.next_run || data.nextRunDate, 'The next run date')) throw new HttpException('Choose the next run date.', HttpStatus.BAD_REQUEST);
+    if (data.frequency && !FREQUENCIES.includes(String(data.frequency).toLowerCase())) throw new HttpException('Choose how often it repeats.', HttpStatus.BAD_REQUEST);
+  }
+
   async create(userId: number, data: any) {
+    this.checkTerms(data);
+    if (!Number(data.category_id || data.categoryId)) throw new HttpException('Choose a category.', HttpStatus.BAD_REQUEST);
     const gstFields = buildGstFields(Number(data.amount), data.gst_rate ?? null, !!data.gst_included);
     const r = await this.prisma.recurringTransaction.create({
       data: {
@@ -92,7 +105,7 @@ export class RecurringService {
         categoryId: (data.category_id || data.categoryId) ? Number(data.category_id || data.categoryId) : undefined as any,
         description: data.description || null,
         paymentMethod: data.payment_method || data.paymentMethod || 'cash',
-        frequency: data.frequency || 'monthly',
+        frequency: String(data.frequency || 'monthly').toLowerCase(),
         nextRunDate: new Date(data.next_run || data.nextRunDate),
         startDate: new Date(data.next_run || data.nextRunDate),
         endDate: data.end_date ? new Date(data.end_date) : null,
@@ -113,6 +126,7 @@ export class RecurringService {
   }
 
   async update(userId: number, id: number, data: any) {
+    this.checkTerms(data);
     const existing = await this.prisma.recurringTransaction.findFirst({ where: { id, userId } });
     if (existing && !['DRAFT', 'SENT_BACK'].includes((existing as any).status || 'DRAFT')) {
       throw new HttpException(
@@ -128,8 +142,10 @@ export class RecurringService {
         categoryId: (data.category_id || data.categoryId) ? Number(data.category_id || data.categoryId) : undefined,
         description: data.description || null,
         paymentMethod: data.payment_method || data.paymentMethod || 'cash',
-        frequency: data.frequency || 'monthly',
+        frequency: String(data.frequency || 'monthly').toLowerCase(),
         nextRunDate: new Date(data.next_run || data.nextRunDate),
+        // Editing a draft sets its first run again, which a month-end schedule is measured from
+        startDate: new Date(data.next_run || data.nextRunDate),
         endDate: data.end_date !== undefined ? (data.end_date ? new Date(data.end_date) : null) : undefined,
         clientId: (data.client_id || data.clientId) ? Number(data.client_id || data.clientId) : null,
         projectId: (data.project_id || data.projectId) ? Number(data.project_id || data.projectId) : null,
@@ -160,15 +176,20 @@ export class RecurringService {
     if (!rec) throw new HttpException('Recurring schedule not found', HttpStatus.NOT_FOUND);
     if (rec.status !== 'APPROVED') throw new HttpException('Only APPROVED schedules can be resumed.', HttpStatus.BAD_REQUEST);
     if (rec.isActive) throw new HttpException('Schedule is already active.', HttpStatus.BAD_REQUEST);
-    await this.prisma.recurringTransaction.update({
-      where: { id },
-      data: {
-        isActive: true,
-        nextRunDate: data.next_run ? new Date(data.next_run) : rec.nextRunDate,
-        ...(data.frequency ? { frequency: data.frequency } : {}),
-        ...(data.amount ? { amount: Number(data.amount) } : {}),
-      },
-    });
+    const frequencyChanged = data?.frequency && String(data.frequency).toLowerCase() !== String(rec.frequency).toLowerCase();
+    const amountChanged = data?.amount !== undefined && data.amount !== null && data.amount !== '' && Math.abs(Number(data.amount) - Number(rec.totalAmount ?? rec.amount)) > 0.005;
+    if (frequencyChanged || amountChanged) throw new HttpException('The amount and frequency were approved. To change them, create a new schedule and submit it.', HttpStatus.BAD_REQUEST);
+    const now = today();
+    // A date that passed while paused moves up to today: paused periods are not posted afterwards.
+    // It never moves earlier than the run that was due, or each pause and resume could post another payment.
+    let nextRunDate = rec.nextRunDate < now ? now : rec.nextRunDate;
+    if (data?.next_run) {
+      const wanted = parseDay(data.next_run, 'The next run date')!;
+      if (wanted < now) throw new HttpException('The next run date cannot be in the past.', HttpStatus.BAD_REQUEST);
+      if (wanted < nextRunDate) throw new HttpException(`The next run is due on ${nextRunDate.toISOString().slice(0, 10)}. It can move later, not earlier.`, HttpStatus.BAD_REQUEST);
+      nextRunDate = wanted;
+    }
+    await this.prisma.recurringTransaction.update({ where: { id }, data: { isActive: true, nextRunDate } });
     return this.findById(userId, id);
   }
 
@@ -290,142 +311,34 @@ export class RecurringService {
     return this.findById(userId, id);
   }
 
-  // ─── Approve ───────────────────────────────────────────────────────────────
-  // Manager approves PENDING_MANAGER → escalates to PENDING_FINANCE
-  // Finance approves PENDING_FINANCE → APPROVED + is_active=true
-  async approve(approverId: number, id: number) {
-    const rec = await this.prisma.recurringTransaction.findFirst({ where: { id } });
+  // ─── Approve and reject ────────────────────────────────────────────────────
+  // The schedule list's buttons follow the same rules as the Approvals page, so both go through ApprovalsService:
+  // self-approval, the requester's own manager, and who may act at each stage.
+  private async pendingRequest(id: number) {
+    const rec = await this.prisma.recurringTransaction.findUnique({ where: { id } });
     if (!rec) throw new HttpException('Recurring schedule not found', HttpStatus.NOT_FOUND);
-
-    const recStatus = (rec as any).status;
-    const [approverIsManager, approverIsFinance] = await Promise.all([
-      this.userHasRole(approverId, ROLES.MANAGER),
-      this.userHasRole(approverId, ROLES.FINANCE),
-    ]);
-
-    const approver = await this.prisma.user.findUnique({ where: { id: approverId }, include: { roleRelation: true } });
-    const approverName = approver?.username || 'Unknown';
-    const approverRole = approver?.roleRelation?.name || null;
-    const code = (rec as any).code || `#${id}`;
-
-    if (recStatus === 'PENDING_MANAGER') {
-      if (!approverIsManager) throw new HttpException('Only Managers can approve at this stage.', HttpStatus.FORBIDDEN);
-
-      const financeUser = await this.prisma.user.findFirst({
-        where: {
-          isActive: true,
-          id: { not: (rec as any).userId },
-          userRoles: { some: { role: { name: ROLES.FINANCE } } },
-        },
-      });
-
-      const req = await this.prisma.approvalRequest.findFirst({
-        where: { recurringTransactionId: id, status: 'PENDING' },
-      });
-
-      await this.prisma.$transaction(async (tx) => {
-        if (req) {
-          await tx.approvalRequest.update({
-            where: { id: req.id },
-            data: { approverId, status: 'APPROVED', actionDate: new Date(), resolvedAt: new Date() },
-          });
-        }
-        if (financeUser) {
-          await tx.approvalRequest.create({
-            data: { recurringTransactionId: id, approverId: financeUser.id, levelNum: 2, status: 'PENDING' },
-          });
-          await tx.recurringTransaction.update({
-            where: { id },
-            data: { status: 'PENDING_FINANCE', approvedById: approverId, approvedByName: approverName, approvedByRole: approverRole },
-          });
-        } else {
-          // No Finance user — Manager is final approver
-          await tx.recurringTransaction.update({
-            where: { id },
-            data: { status: 'APPROVED', isActive: true, approvedById: approverId, approvedByName: approverName, approvedByRole: approverRole },
-          });
-        }
-      });
-
-      this.audit.log({ tableName: 'recurring_transactions', recordId: id, action: 'UPDATE', changedBy: approverId, oldValues: { status: 'PENDING_MANAGER' }, newValues: { status: financeUser ? 'PENDING_FINANCE' : 'APPROVED' } }).catch((e: any) => this.logger.warn('Background task failed', e?.message));
-      if (financeUser) {
-        this.notifications.create(financeUser.id, { type: 'approval', title: 'Recurring Schedule Pending Finance Review', message: `${code} approved by Manager, awaiting your final approval.`, entityType: 'recurring', entityId: id }).catch((e: any) => this.logger.warn('Background task failed', e?.message));
-      } else {
-        this.notifications.create((rec as any).userId, { type: 'approval', title: 'Recurring Schedule Approved', message: `Your recurring schedule ${code} has been approved.`, entityType: 'recurring', entityId: id }).catch((e: any) => this.logger.warn('Background task failed', e?.message));
-      }
-      return this.findById((rec as any).userId, id);
-    }
-
-    if (recStatus === 'PENDING_FINANCE') {
-      if (!approverIsFinance) throw new HttpException('Only Finance can approve at this stage.', HttpStatus.FORBIDDEN);
-
-      const req = await this.prisma.approvalRequest.findFirst({
-        where: { recurringTransactionId: id, status: 'PENDING' },
-      });
-
-      await this.prisma.$transaction(async (tx) => {
-        if (req) {
-          await tx.approvalRequest.update({
-            where: { id: req.id },
-            data: { approverId, status: 'APPROVED', actionDate: new Date(), resolvedAt: new Date() },
-          });
-        }
-        await tx.recurringTransaction.update({
-          where: { id },
-          data: { status: 'APPROVED', isActive: true, approvedById: approverId, approvedByName: approverName, approvedByRole: approverRole },
-        });
-      });
-
-      this.audit.log({ tableName: 'recurring_transactions', recordId: id, action: 'UPDATE', changedBy: approverId, oldValues: { status: 'PENDING_FINANCE' }, newValues: { status: 'APPROVED' } }).catch((e: any) => this.logger.warn('Background task failed', e?.message));
-      this.notifications.create((rec as any).userId, { type: 'approval', title: 'Recurring Schedule Approved', message: `Your recurring schedule ${code} has been fully approved by Finance.`, entityType: 'recurring', entityId: id }).catch((e: any) => this.logger.warn('Background task failed', e?.message));
-      return this.findById((rec as any).userId, id);
-    }
-
-    throw new HttpException(`Cannot approve a schedule with status '${recStatus}'.`, HttpStatus.BAD_REQUEST);
+    const req = ['PENDING_MANAGER', 'PENDING_FINANCE'].includes(rec.status ?? '')
+      ? await this.prisma.approvalRequest.findFirst({ where: { recurringTransactionId: id, status: 'PENDING' } })
+      : null;
+    if (!req) throw new HttpException(`There is nothing to decide on a schedule with status '${rec.status}'.`, HttpStatus.BAD_REQUEST);
+    return { rec, req };
   }
 
-  // ─── Reject ────────────────────────────────────────────────────────────────
+  // ApprovalsService answers, without checking anyone, when someone else has just decided
+  private assertDecided(result: { message?: string } | undefined) {
+    if (result?.message === 'Request already processed.') throw new HttpException('Someone else has just decided this schedule.', HttpStatus.CONFLICT);
+  }
+
+  async approve(approverId: number, id: number) {
+    const { rec, req } = await this.pendingRequest(id);
+    this.assertDecided(await this.approvals.approve(req.id, approverId));
+    return this.findById(rec.userId, id);
+  }
+
   async reject(approverId: number, id: number, comments?: string) {
-    const rec = await this.prisma.recurringTransaction.findFirst({ where: { id } });
-    if (!rec) throw new HttpException('Recurring schedule not found', HttpStatus.NOT_FOUND);
-
-    const recStatus = (rec as any).status;
-    if (!['PENDING_MANAGER', 'PENDING_FINANCE'].includes(recStatus)) {
-      throw new HttpException(`Cannot reject a schedule with status '${recStatus}'.`, HttpStatus.BAD_REQUEST);
-    }
-
-    const [rejIsManager, rejIsFinance] = await Promise.all([
-      this.userHasRole(approverId, ROLES.MANAGER),
-      this.userHasRole(approverId, ROLES.FINANCE),
-    ]);
-    if (recStatus === 'PENDING_MANAGER' && !rejIsManager) throw new HttpException('Only Managers can reject at this stage.', HttpStatus.FORBIDDEN);
-    if (recStatus === 'PENDING_FINANCE' && !rejIsFinance) throw new HttpException('Only Finance can reject at this stage.', HttpStatus.FORBIDDEN);
-
-    const approver = await this.prisma.user.findUnique({ where: { id: approverId }, include: { roleRelation: true } });
-    const approverName = approver?.username || 'Unknown';
-    const approverRole = approver?.roleRelation?.name || null;
-    const code = (rec as any).code || `#${id}`;
-
-    const req = await this.prisma.approvalRequest.findFirst({
-      where: { recurringTransactionId: id, status: 'PENDING' },
-    });
-
-    await this.prisma.$transaction(async (tx) => {
-      if (req) {
-        await tx.approvalRequest.update({
-          where: { id: req.id },
-          data: { approverId, status: 'REJECTED', comments: comments || null, actionDate: new Date(), resolvedAt: new Date() },
-        });
-      }
-      await tx.recurringTransaction.update({
-        where: { id },
-        data: { status: 'REJECTED', isActive: false, rejectedById: approverId, rejectedByName: approverName, rejectedByRole: approverRole },
-      });
-    });
-
-    this.audit.log({ tableName: 'recurring_transactions', recordId: id, action: 'UPDATE', changedBy: approverId, oldValues: { status: recStatus }, newValues: { status: 'REJECTED' } }).catch((e: any) => this.logger.warn('Background task failed', e?.message));
-    this.notifications.create((rec as any).userId, { type: 'warning', title: 'Recurring Schedule Rejected', message: `Your recurring schedule ${code} was rejected by ${approverName}${comments ? `: ${comments}` : '.'}`, entityType: 'recurring', entityId: id }).catch((e: any) => this.logger.warn('Background task failed', e?.message));
-    return this.findById((rec as any).userId, id);
+    const { rec, req } = await this.pendingRequest(id);
+    this.assertDecided(await this.approvals.reject(req.id, approverId, comments?.trim() || 'Rejected from the schedule list'));
+    return this.findById(rec.userId, id);
   }
 
   // ─── Send Back ─────────────────────────────────────────────────────────────
@@ -495,11 +408,11 @@ export class RecurringService {
     const day = today();
     const due = await this.prisma.recurringTransaction.findMany({
       // Only an approved schedule posts spend: a draft or one waiting for approval must not run
-      where: { isActive: true, status: 'APPROVED', nextRunDate: { lte: day }, OR: [{ endDate: null }, { endDate: { gte: day } }] },
+      where: { isActive: true, status: 'APPROVED', user: { isActive: true }, nextRunDate: { lte: day }, OR: [{ endDate: null }, { endDate: { gte: day } }] },
     });
     let processed = 0;
     for (const r of due) {
-      const nextDate = this.calculateNext(r.nextRunDate, r.frequency || 'monthly');
+      const nextDate = this.calculateNext(r.nextRunDate, r.frequency || 'monthly', r.startDate);
       let lastErr: any;
 
       // A closed month does not take new spend: a run due in one is posted today instead, and says when it was due
@@ -516,10 +429,17 @@ export class RecurringService {
       }
       let createdId = 0;
       let createdRef = '';
+      let taken = false;
 
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
           await this.prisma.$transaction(async (tx) => {
+            const claim = await tx.recurringTransaction.updateMany({
+              where: { id: r.id, nextRunDate: r.nextRunDate, isActive: true, status: 'APPROVED' },
+              data: { nextRunDate: nextDate, lastRunDate: now },
+            });
+            taken = claim.count === 0;
+            if (taken) return;
             const created = await tx.transaction.create({
               data: {
                 userId: r.userId, type: (r as any).type || 'expense',
@@ -541,12 +461,11 @@ export class RecurringService {
             const seq = String(10000 + created.id).padStart(5, '0');
             const referenceId = ((r as any).type || 'expense') === 'expense' ? `EXP-${seq}` : `INC-${seq}`;
             await tx.transaction.update({ where: { id: created.id }, data: { referenceId } });
-            await tx.recurringTransaction.update({
-              where: { id: r.id }, data: { nextRunDate: nextDate, lastRunDate: now },
-            });
             createdId = created.id;
             createdRef = referenceId;
           });
+          lastErr = null;
+          if (taken) break;
           processed++;
           this.audit.log({
             tableName: 'transactions', recordId: createdId, referenceId: createdRef,
@@ -567,25 +486,27 @@ export class RecurringService {
     return { processed, total: due.length };
   }
 
-  private calculateNext(from: Date, frequency: string): Date {
+  // `started` is the schedule's first run: a month-end schedule goes back to its own day after a shorter month
+  private calculateNext(from: Date, frequency: string, started?: Date | null): Date {
     const d = new Date(from);
+    const anchor = started ? started.getDate() : 0;
     switch (frequency) {
       case 'daily': d.setDate(d.getDate() + 1); break;
       case 'weekly': d.setDate(d.getDate() + 7); break;
       case 'biweekly': d.setDate(d.getDate() + 14); break;
-      case 'monthly': this.addMonthsSafe(d, 1); break;
-      case 'quarterly': this.addMonthsSafe(d, 3); break;
-      case 'yearly': this.addMonthsSafe(d, 12); break;
-      default: this.addMonthsSafe(d, 1);
+      case 'quarterly': this.addMonthsSafe(d, 3, anchor); break;
+      case 'yearly': this.addMonthsSafe(d, 12, anchor); break;
+      default: this.addMonthsSafe(d, 1, anchor);
     }
     return d;
   }
 
-  private addMonthsSafe(d: Date, months: number): void {
-    const day = d.getDate();
+  private addMonthsSafe(d: Date, months: number, anchor = 0): void {
+    const lastDayOf = (x: Date) => new Date(x.getFullYear(), x.getMonth() + 1, 0).getDate();
+    // Only a date sitting on a month end was shortened; any other day was chosen and is kept
+    const day = d.getDate() === lastDayOf(d) && anchor > d.getDate() ? anchor : d.getDate();
     d.setDate(1);
     d.setMonth(d.getMonth() + months);
-    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-    d.setDate(Math.min(day, lastDay));
+    d.setDate(Math.min(day, lastDayOf(d)));
   }
 }

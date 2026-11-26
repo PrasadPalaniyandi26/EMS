@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "check:csv": "node scripts/check-csv.mjs",
     "start": "next start",
     "check:design": "node scripts/check-design.mjs",
     "test:smoke": "node scripts/smoke.mjs",

@@ -1,6 +1,7 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '../generated/prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { BudgetsService } from './budgets.service';
 import { ROLES } from '../common/constants/roles';
@@ -846,12 +847,14 @@ export class BudgetPlanningService {
     }
     const newer = await this.prisma.estimateBaseline.findFirst({ where: { projectId: b.projectId, id: { gt: id }, status: { in: ['PROPOSED', 'APPROVED'] } } });
     if (newer) throw bad('A newer baseline exists for this project. Approve that one, or propose again.', HttpStatus.CONFLICT);
+    const push = await this.baselinePush(b);
+    await this.budgets.assertOpenMonths(push.changes);
     await this.prisma.$transaction([
       this.prisma.estimateBaseline.updateMany({ where: { projectId: b.projectId, status: 'APPROVED' }, data: { status: 'SUPERSEDED' } }),
       this.prisma.estimateBaseline.updateMany({ where: { projectId: b.projectId, status: 'PROPOSED', id: { lt: id } }, data: { status: 'SUPERSEDED' } }),
       this.prisma.estimateBaseline.update({ where: { id }, data: { status: 'APPROVED', approvedByName: user.username ?? null, approvedAt: new Date() } }),
     ]);
-    const plan = await this.addBaselineToPlan(b);
+    const plan = await push.apply();
     this.log('estimate_baselines', id, 'APPROVE', user.id, plan);
     return { id, lines_added: plan.added, lines_updated: plan.updated, lines_removed: plan.removed };
   }
@@ -868,13 +871,16 @@ export class BudgetPlanningService {
   }
 
   // When the current year's plan is still a draft, an approved baseline adds its budget lines: one per expense type, plus contingency
-  private async addBaselineToPlan(b: { id: number; projectId: number; contingency: any; lines: any }) {
+  // Returns what the push would change month by month, and the writes that make it happen
+  private async baselinePush(b: { id: number; projectId: number; contingency: any; lines: any }) {
     const p = await this.projectOrThrow(b.projectId);
     const s = await this.budgets.getSettings();
     const fy = this.budgets.fyOf(new Date(), s.fyStartMonth);
     const plan = await this.prisma.budgetPlan.findUnique({ where: { fy } });
-    if (!plan || plan.status !== 'DRAFT') return { added: 0, updated: 0, removed: 0 };
+    const changes: { year: number; month: number; before: number; after: number }[] = [];
+    if (!plan || plan.status !== 'DRAFT') return { changes, apply: async () => ({ added: 0, updated: 0, removed: 0 }) };
     const projectId = b.projectId;
+    const writes: (() => Promise<unknown>)[] = [];
     const months = this.budgets.fyMonths(fy, s.fyStartMonth);
     const start = p.start_date ? new Date(p.start_date) : this.today();
     const end = p.end_date ? new Date(p.end_date) : new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 5, 28));
@@ -889,28 +895,50 @@ export class BudgetPlanningService {
     const kept = new Set<number>();
     const mk = async (typeId: number | null, total: number, contingency: boolean) => {
       if (total <= 0) return;
-      const exists = await this.prisma.budgetLine.findFirst({ where: { planId: plan.id, projectId, typeId, isContingency: contingency, isActive: true } });
+      const exists = await this.prisma.budgetLine.findFirst({ where: { planId: plan.id, projectId, typeId, isContingency: contingency, isActive: true }, include: { periods: true } });
+      const periods = spread(total);
       if (exists) {
         kept.add(exists.id);
         if (!auto(exists.note)) return;
-        await this.prisma.budgetLine.update({ where: { id: exists.id }, data: { note: `From baseline #${b.id}`, periods: { deleteMany: {}, create: spread(total) } } });
+        changes.push(...this.monthMoves(exists.periods, periods));
+        writes.push(() => this.prisma.budgetLine.update({ where: { id: exists.id }, data: { note: `From baseline #${b.id}`, periods: { deleteMany: {}, create: periods } } }));
         updated++;
         return;
       }
-      const row = await this.prisma.budgetLine.create({ data: { planId: plan.id, costObject: 'PROJECT', projectId, typeId: contingency ? null : typeId, isContingency: contingency, ownerId: p.lead_id ?? null, note: `From baseline #${b.id}`, periods: { create: spread(total) } } });
-      kept.add(row.id);
+      changes.push(...this.monthMoves([], periods));
+      writes.push(() => this.prisma.budgetLine.create({ data: { planId: plan.id, costObject: 'PROJECT', projectId, typeId: contingency ? null : typeId, isContingency: contingency, ownerId: p.lead_id ?? null, note: `From baseline #${b.id}`, periods: { create: periods } } }));
       added++;
     };
     for (const [typeId, total] of byType) if (typeId) await mk(typeId, total, false);
     await mk(null, n(b.contingency), true);
     // An expense type that is no longer in the estimate loses its line, unless the line was made by hand
-    const stale = await this.prisma.budgetLine.findMany({ where: { planId: plan.id, projectId, isActive: true, id: { notIn: [...kept] } } });
+    const stale = await this.prisma.budgetLine.findMany({ where: { planId: plan.id, projectId, isActive: true, id: { notIn: [...kept] } }, include: { periods: true } });
     for (const l of stale) {
       if (!auto(l.note)) continue;
-      await this.prisma.budgetLine.update({ where: { id: l.id }, data: { isActive: false } });
+      changes.push(...this.monthMoves(l.periods, []));
+      writes.push(() => this.prisma.budgetLine.update({ where: { id: l.id }, data: { isActive: false } }));
       removed++;
     }
-    return { added, updated, removed };
+    return {
+      changes,
+      apply: async () => {
+        for (const write of writes) await write();
+        return { added, updated, removed };
+      },
+    };
+  }
+
+  // Month by month, what a line held and what it would hold
+  private monthMoves(was: { year: number; month: number; amount: unknown }[], will: { year: number; month: number; amount: number }[]) {
+    const moves = new Map<string, { year: number; month: number; before: number; after: number }>();
+    const at = (x: { year: number; month: number }) => {
+      const key = `${x.year}-${x.month}`;
+      if (!moves.has(key)) moves.set(key, { year: x.year, month: x.month, before: 0, after: 0 });
+      return moves.get(key)!;
+    };
+    for (const x of was) at(x).before += n(x.amount as never);
+    for (const x of will) at(x).after += x.amount;
+    return [...moves.values()];
   }
 
   async saveMilestone(projectId: number, id: number | null, b: any) {
@@ -1552,7 +1580,8 @@ export class BudgetPlanningService {
     const months = this.budgets.fyMonths(fy, s.fyStartMonth);
     const periods = months.map((m) => ({ year: m.year, month: m.month, amount: r2((plans.find((x) => x.year === m.year && x.month === m.month)?.plannedUnits ?? 0) * unit) }));
     if (!periods.some((x) => x.amount > 0)) throw bad('Enter planned units in the build plan first.');
-    const existing = await this.prisma.budgetLine.findFirst({ where: { planId: plan.id, productId, typeId: type.id, isActive: true } });
+    const existing = await this.prisma.budgetLine.findFirst({ where: { planId: plan.id, productId, typeId: type.id, isActive: true }, include: { periods: true } });
+    await this.budgets.assertOpenMonths(this.monthMoves(existing?.periods ?? [], periods));
     if (existing) {
       await this.prisma.budgetLinePeriod.deleteMany({ where: { lineId: existing.id } });
       await this.prisma.budgetLinePeriod.createMany({ data: periods.map((x) => ({ ...x, lineId: existing.id })) });
@@ -1582,8 +1611,13 @@ export class BudgetPlanningService {
     return out;
   }
 
-  async changes(status?: string) {
-    const rows = await this.prisma.budgetChange.findMany({ where: status && status !== 'ALL' ? { status } : {}, orderBy: { createdAt: 'desc' }, take: 200 });
+  async changes(status?: string, viewer?: Actor) {
+    let own = {};
+    if (viewer && this.isManager(viewer)) {
+      const mine = (await this.prisma.budgetLine.findMany({ where: { ownerId: viewer.id }, select: { id: true } })).map((l) => l.id);
+      own = { OR: [{ requestedById: viewer.id }, { fromLineId: { in: mine } }, { toLineId: { in: mine } }] };
+    }
+    const rows = await this.prisma.budgetChange.findMany({ where: { ...(status && status !== 'ALL' ? { status } : {}), ...own }, orderBy: { createdAt: 'desc' }, take: 200 });
     const names = await this.lineLabel([...new Set(rows.flatMap((r) => [r.fromLineId, r.toLineId]).filter((x): x is number => x != null))]);
     const s = await this.budgets.getSettings();
     return {
@@ -1634,30 +1668,32 @@ export class BudgetPlanningService {
     }
     if (b.decision === 'reject') {
       if (!b.note?.trim()) throw bad('Say why it is rejected.');
-      await this.prisma.budgetChange.update({ where: { id }, data: { status: 'REJECTED', decidedByName: user.username ?? null, decidedAt: new Date(), decisionNote: b.note.trim() } });
+      const done = await this.prisma.budgetChange.updateMany({ where: { id, status: 'PENDING' }, data: { status: 'REJECTED', decidedByName: user.username ?? null, decidedAt: new Date(), decisionNote: b.note.trim() } });
+      if (!done.count) throw bad('This change has already been decided.', HttpStatus.CONFLICT);
       return { status: 'REJECTED' };
     }
     if (b.decision !== 'approve') throw bad('Decision must be approve or reject.');
     const s = await this.budgets.getSettings();
     if (n(ch.amount) > s.approvalThreshold && (user.role_name || '').toUpperCase() !== 'ADMIN') throw bad('Changes above the approval threshold need an Admin.', HttpStatus.FORBIDDEN);
-    const adjust = async (lineId: number, delta: number) => {
-      const line = await this.prisma.budgetLine.findUnique({ where: { id: lineId }, include: { periods: true, plan: true } });
+    const adjust = async (tx: Prisma.TransactionClient, lineId: number, delta: number) => {
+      const line = await tx.budgetLine.findUnique({ where: { id: lineId }, include: { periods: true, plan: true } });
       if (!line) throw bad('Budget line not found.', HttpStatus.NOT_FOUND);
       const months = this.budgets.fyMonths(line.plan.fy, s.fyStartMonth);
       const now = new Date();
       const m = months.find((x) => x.year === now.getFullYear() && x.month === now.getMonth() + 1) ?? months[11];
       // Money in a closed month does not move, the same as when a line is edited
-      if (await this.prisma.periodLock.findUnique({ where: { year_month: { year: m.year, month: m.month } } })) throw bad(`Month ${m.month}/${m.year} is closed, so budget cannot move in it. Ask an Admin to reopen the month first.`, HttpStatus.CONFLICT);
-      const cur = line.periods.find((p) => p.year === m.year && p.month === m.month);
-      const next = r2(n(cur?.amount) + delta);
-      if (next < 0) throw bad('The line does not have that much budget left in the current month.');
-      await this.prisma.budgetLinePeriod.upsert({ where: { lineId_year_month: { lineId, year: m.year, month: m.month } }, update: { amount: next }, create: { lineId, year: m.year, month: m.month, amount: next } });
+      if (await tx.periodLock.findUnique({ where: { year_month: { year: m.year, month: m.month } } })) throw bad(`Month ${m.month}/${m.year} is closed, so budget cannot move in it. Ask an Admin to reopen the month first.`, HttpStatus.CONFLICT);
+      // The database adds, so two changes approved together both count; going below zero undoes the whole approval
+      const row = await tx.budgetLinePeriod.upsert({ where: { lineId_year_month: { lineId, year: m.year, month: m.month } }, update: { amount: { increment: r2(delta) } }, create: { lineId, year: m.year, month: m.month, amount: r2(delta) } });
+      if (n(row.amount) < 0) throw bad('The line does not have that much budget left in the current month.');
     };
-    await this.prisma.$transaction(async () => {
-      if (ch.fromLineId) await adjust(ch.fromLineId, -n(ch.amount));
-      if (ch.toLineId) await adjust(ch.toLineId, n(ch.amount));
+    await this.prisma.$transaction(async (tx) => {
+      // Claiming first locks the change, so a second approval waits and then finds it decided
+      const claim = await tx.budgetChange.updateMany({ where: { id, status: 'PENDING' }, data: { status: 'APPROVED', decidedByName: user.username ?? null, decidedAt: new Date(), decisionNote: b.note?.trim() || null } });
+      if (!claim.count) throw bad('This change has already been decided.', HttpStatus.CONFLICT);
+      if (ch.fromLineId) await adjust(tx, ch.fromLineId, -n(ch.amount));
+      if (ch.toLineId) await adjust(tx, ch.toLineId, n(ch.amount));
     });
-    await this.prisma.budgetChange.update({ where: { id }, data: { status: 'APPROVED', decidedByName: user.username ?? null, decidedAt: new Date(), decisionNote: b.note?.trim() || null } });
     this.log('budget_changes', id, 'APPROVE', user.id, {});
     return { status: 'APPROVED' };
   }
@@ -1677,7 +1713,10 @@ export class BudgetPlanningService {
     if (!Number.isInteger(y) || y < 2000 || y > 2100 || !Number.isInteger(m) || m < 1 || m > 12) throw bad('Choose a valid month and year.');
   }
 
-  async close(year: number, month: number) {
+  private isManager(u: Actor) { return (u.role_name || '').toUpperCase() === 'MANAGER'; }
+
+  // Without a viewer it returns every line, which closing the month needs
+  async close(year: number, month: number, viewer?: Actor) {
     this.assertMonth(year, month);
     const s = await this.budgets.getSettings();
     const fyKey = s.fyStartMonth === 1 ? year : month >= s.fyStartMonth ? year : year - 1;
@@ -1685,7 +1724,7 @@ export class BudgetPlanningService {
     const lock = await this.prisma.periodLock.findUnique({ where: { year_month: { year, month } } });
     const locks = await this.prisma.periodLock.findMany({ orderBy: [{ year: 'desc' }, { month: 'desc' }], take: 12 });
     if (!plan) return { year, month, fy: fyKey, plan: null, locked: !!lock, lock, locks, lines: [] };
-    const m = await this.budgets.monitor(fyKey);
+    const m = await this.budgets.monitor(fyKey, viewer && this.isManager(viewer) ? { ownerId: viewer.id } : {});
     const lines = (m.lines as any[]).filter((l) => !l.is_contingency && l.cost_object !== 'RESERVE');
     const notes = await this.prisma.varianceNote.findMany({ where: { year, month } });
     const detail = await Promise.all(lines.map(async (l) => {
@@ -1710,7 +1749,9 @@ export class BudgetPlanningService {
   async saveVariance(b: { line_id: number; year: number; month: number; reason_code: string; comment?: string }, user: Actor) {
     if (!b.reason_code) throw bad('Choose a reason.');
     this.assertMonth(b.year, b.month);
-    if (!(await this.prisma.budgetLine.findFirst({ where: { id: Number(b.line_id), isActive: true }, select: { id: true } }))) throw bad('Budget line not found.', HttpStatus.NOT_FOUND);
+    const line = await this.prisma.budgetLine.findFirst({ where: { id: Number(b.line_id), isActive: true }, select: { ownerId: true } });
+    if (!line) throw bad('Budget line not found.', HttpStatus.NOT_FOUND);
+    if (this.isManager(user) && line.ownerId !== user.id) throw bad('Only the line owner explains its variance.', HttpStatus.FORBIDDEN);
     if (await this.prisma.periodLock.findUnique({ where: { year_month: { year: Number(b.year), month: Number(b.month) } } })) throw bad('This month is closed.', HttpStatus.CONFLICT);
     await this.prisma.varianceNote.upsert({
       where: { lineId_year_month: { lineId: Number(b.line_id), year: Number(b.year), month: Number(b.month) } },

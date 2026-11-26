@@ -12,8 +12,10 @@ import { ApiTags } from '@nestjs/swagger';
 export class ProductsController {
   constructor(private service: ProductsService) {}
 
-  @Get() findAll(@Query('clientId') clientId?: number, @Query('typeId') typeId?: number) {
-    return this.service.findAll({ clientId, typeId });
+  @Get() async findAll(@CurrentUser('role_name') roleName: string, @Query('clientId') clientId?: number, @Query('typeId') typeId?: number) {
+    const products = await this.service.findAll({ clientId, typeId });
+    // Everyone picks products by name; the standard cost is a costing figure
+    return roleName === 'EMPLOYEE' ? products.map((p: object) => ({ ...p, standard_cost: null })) : products;
   }
   @Post() @UseGuards(RolesGuard) @Roles('manager', 'admin')
   create(@Body() body: any, @CurrentUser('id') userId: number) {

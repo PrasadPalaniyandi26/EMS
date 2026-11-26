@@ -125,7 +125,8 @@ Modules: `auth`, `users`, `roles`, `categories`, `clients`, `projects`, `product
 - `ResponseInterceptor`: wraps all responses in `{ success, data, error, meta }` — auto-extracts pagination when service returns `{ rows, total, page, limit }`
 - `HttpExceptionFilter`: normalizes all errors; handles Prisma constraint codes (P2002, P2003, P2025)
 - `RolesGuard`: checks `role_name` string against `@Roles()` decorator
-- Rate limiting: 10 req/15min on auth endpoints, 200 req/60s on general API
+- Rate limiting (`common/security.ts`, `main.ts`): failed sign-ins 10 per account and address and 50 per address in 15 min; 200 req/60s on general API; `trust proxy` is loopback
+- `JwtStrategy` reads the account on every request: authorize on `role_name` only, never the legacy `users.role` column
 - Validation pipe: whitelist + implicit type conversion enabled globally
 
 ### Frontend (`client-next/src/`)

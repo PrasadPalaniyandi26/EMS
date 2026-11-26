@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Ban, CircleCheck, CreditCard, FileText, FolderOpen, Paperclip, Pencil, Plus, Send, Trash2, Undo2 } from 'lucide-react';
 import { ColumnDef, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, getSortedRowModel, SortingState } from '@tanstack/react-table';
-import api, { fetchBlob } from '@/lib/api-client';
+import api, { fetchBlob, isViewable } from '@/lib/api-client';
 import { downloadCsv, toCsv } from '@/lib/csv';
 import { formatDate } from '@/lib/currency';
 import { money } from '@/lib/money';
@@ -32,7 +32,8 @@ async function openFile(name: string) {
   // The tab is opened from the click itself, so the browser does not block it; the file then loads into it
   const win = window.open('', '_blank');
   try {
-    const blob = await fetchBlob(`/receipts/${name}`);
+    const blob = await fetchBlob(`/receipts/${encodeURIComponent(name)}`);
+    if (!isViewable(blob.type)) throw new Error('not a picture or PDF');
     const url = URL.createObjectURL(blob);
     if (win) win.location.href = url; else window.open(url, '_blank');
   } catch {

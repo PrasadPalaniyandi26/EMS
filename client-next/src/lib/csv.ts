@@ -22,12 +22,18 @@ export function parseCsv(text: string): { headers: string[]; rows: Record<string
   const lines = cells.filter((r) => r.some((c) => c.trim() !== ''));
   if (!lines.length) return { headers: [], rows: [] };
   const headers = lines[0].map(key);
-  const rows = lines.slice(1).map((r) => Object.fromEntries(headers.map((h, i) => [h, (r[i] ?? '').trim()])));
+  // An export imported again loses the apostrophe added above
+  const value = (s: string) => (s.startsWith("'") && FORMULA.test(s.slice(1)) ? s.slice(1) : s);
+  const rows = lines.slice(1).map((r) => Object.fromEntries(headers.map((h, i) => [h, value((r[i] ?? '').trim())])));
   return { headers, rows };
 }
 
+// A spreadsheet runs a cell that starts with = + - @, so such text gets a leading apostrophe. Plain numbers stay numbers.
+const FORMULA = /^[=+\-@\t\r]/;
+const safe = (s: string) => (FORMULA.test(s) && !/^-?\d+(\.\d+)?$/.test(s) ? `'${s}` : s);
+
 const cell = (v: unknown) => {
-  const s = v == null ? '' : String(v);
+  const s = typeof v === 'string' ? safe(v) : v == null ? '' : String(v);
   return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 

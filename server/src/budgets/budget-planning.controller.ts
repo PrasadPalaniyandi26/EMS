@@ -102,13 +102,13 @@ export class BudgetPlanningController {
   @Post('products/:id/to-plan') @Roles(...PROPOSE) toPlan(@Param('id', ParseIntPipe) id: number, @CurrentUser() u: Actor) { return this.s.buildToPlan(id, u); }
 
   // Changes
-  @Get('changes') changes(@Query('status') status?: string) { return this.s.changes(status); }
+  @Get('changes') changes(@Query('status') status: string | undefined, @CurrentUser() u: Actor) { return this.s.changes(status, u); }
   @Post('changes') @Roles(...PLAN) requestChange(@Body() b: any, @CurrentUser() u: Actor) { return this.s.requestChange(b, u); }
   @Post('changes/:id/decision') @Roles('admin', 'finance') decide(@Param('id', ParseIntPipe) id: number, @Body() b: any, @CurrentUser() u: Actor) { return this.s.decideChange(id, b, u); }
   @Delete('changes/:id') @Roles(...PLAN) cancel(@Param('id', ParseIntPipe) id: number, @CurrentUser() u: Actor) { return this.s.cancelChange(id, u); }
 
   // Monthly close
-  @Get('close') close(@Query('year') year: string, @Query('month') month: string) { return this.s.close(Number(year), Number(month)); }
+  @Get('close') close(@Query('year') year: string, @Query('month') month: string, @CurrentUser() u: Actor) { return this.s.close(Number(year), Number(month), u); }
   @Post('close/variance') @Roles(...PLAN) variance(@Body() b: any, @CurrentUser() u: Actor) { return this.s.saveVariance(b, u); }
   @Post('close/lock') @Roles('admin', 'finance') lock(@Body() b: any, @CurrentUser() u: Actor) { return this.s.lockMonth(Number(b.year), Number(b.month), u); }
   @Post('close/unlock') @Roles('admin') unlock(@Body() b: any, @CurrentUser() u: Actor) { return this.s.unlockMonth(Number(b.year), Number(b.month), u); }

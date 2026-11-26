@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { toLocalYMD } from '@/lib/currency';
 import { amountLabel, restoreEnteredAmount } from '@/lib/gst';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -351,7 +352,7 @@ export function ResumeRecurringModal({
     if (target) {
       const gstIncluded = target.gst_included ?? false;
       setForm({
-        next_run: (target.next_run_date || '').split('T')[0],
+        next_run: [(target.next_run_date || '').split('T')[0], toLocalYMD()].sort()[1], // a passed date moves to today
         amount: String(restoreEnteredAmount(target.net_amount, target.total_amount, gstIncluded, target.amount ?? 0)),
         frequency: target.frequency || 'monthly',
         gst_rate: target.gst_rate ? `${target.gst_rate}%` : '',
@@ -361,6 +362,8 @@ export function ResumeRecurringModal({
   }, [target]);
 
   if (!target) return null;
+  // The run that was due, or today if that date has passed: it can move later, never earlier
+  const earliestRun = [(target.next_run_date || '').split('T')[0], toLocalYMD()].sort()[1];
 
   return (
     <ModuleModal
@@ -381,7 +384,7 @@ export function ResumeRecurringModal({
           </Button>
           <button
             onClick={() => onConfirm(form)}
-            disabled={!form.next_run || !form.amount || Number(form.amount) <= 0 || !form.frequency}
+            disabled={!form.next_run || form.next_run < earliestRun}
             className="px-6 py-2.5 btn-action-primary border border-[var(--shell-border)] text-[var(--shell-text)] rounded-lg text-[12px] font-semibold shadow-none transition-all flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Play className="w-4 h-4" /> Resume Schedule
@@ -403,38 +406,20 @@ export function ResumeRecurringModal({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-          <Field label="Next Billing Date" required>
-            <div className="relative">
-              <CalendarDays aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--shell-accent)]" />
-              <Input
-                type="date"
-                className={`${ctl} pl-10`}
-                value={form.next_run}
-                onChange={(e) => setForm({ ...form, next_run: e.target.value })}
-              />
-            </div>
-          </Field>
-          <Field label={`Amount ${amountLabel(form.gst_rate, form.gst_included)}`} required>
-            <CurrencyInput value={form.amount} onChange={(v) => setForm({ ...form, amount: v })} />
-          </Field>
-        </div>
-
-        <Field label="Frequency" required>
-          <Select value={form.frequency.toLowerCase()} onValueChange={(v) => setForm({ ...form, frequency: v })}>
-            <SelectTrigger className={sel}>
-              <SelectValue placeholder="Frequency" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="daily">Daily</SelectItem>
-              <SelectItem value="weekly">Weekly</SelectItem>
-              <SelectItem value="biweekly">Every 2 weeks</SelectItem>
-              <SelectItem value="monthly">Monthly</SelectItem>
-              <SelectItem value="quarterly">Every 3 months</SelectItem>
-              <SelectItem value="yearly">Yearly</SelectItem>
-            </SelectContent>
-          </Select>
+        <Field label="Next Billing Date" required>
+          <div className="relative">
+            <CalendarDays aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--shell-accent)]" />
+            <Input
+              type="date"
+              min={earliestRun}
+              className={`${ctl} pl-10`}
+              value={form.next_run}
+              onChange={(e) => setForm({ ...form, next_run: e.target.value })}
+            />
+          </div>
         </Field>
+
+        <p className="text-[12px] text-[var(--shell-text-muted)]">The amount and frequency stay as approved. To change them, create a new schedule and submit it.</p>
       </div>
     </ModuleModal>
   );

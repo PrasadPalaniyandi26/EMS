@@ -82,10 +82,12 @@ describe('Transaction rules (e2e)', () => {
   describe('changing a record', () => {
     it('keeps everything else when only the receipt changes', async () => {
       const id = await draft(admin, { amount: 1180, gstRate: 18, gstIncluded: true, description: 'ZZ receipt only' });
-      const r = await call('put', `/transactions/${id}`, admin, { receiptPath: 'receipt-1.pdf' });
+      const up = await request(app.getHttpServer()).post('/api/v1/receipts/upload').set('Authorization', `Bearer ${admin}`).attach('receipt', Buffer.from('%PDF-1.4 test'), 'receipt-1.pdf');
+      const name = up.body.data.filename as string;
+      const r = await call('put', `/transactions/${id}`, admin, { receiptPath: name });
       expect(r.status).toBe(200);
       const t = await prisma.transaction.findUniqueOrThrow({ where: { id } });
-      expect(t.receiptPath).toBe('receipt-1.pdf');
+      expect(t.receiptPath).toBe(name);
       expect(Number(t.totalAmount)).toBe(1180);
       expect(Number(t.amount)).toBe(1180);
       expect(t.categoryId).toBe(categoryA);

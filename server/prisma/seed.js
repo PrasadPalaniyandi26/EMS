@@ -130,7 +130,11 @@ async function main() {
   console.log('  ✓ Internal product seeded');
 
   // ── 8. Admin User ──
-  const passwordHash = await bcrypt.hash('admin123', 12);
+  // The well-known password is for development only. In production it comes from SEED_ADMIN_PASSWORD, or is made up and shown once.
+  const production = process.env.NODE_ENV === 'production';
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD || (production ? require('crypto').randomBytes(12).toString('base64url') : 'admin123');
+  const hadAdmin = !!(await prisma.user.findUnique({ where: { username: 'admin' }, select: { id: true } }));
+  const passwordHash = await bcrypt.hash(adminPassword, 12);
   const adminRole = await prisma.role.findUniqueOrThrow({ where: { name: 'ADMIN' } });
   await prisma.user.upsert({
     where: { username: 'admin' },
@@ -146,7 +150,10 @@ async function main() {
       currency: 'INR',
     },
   });
-  console.log('  ✓ Admin user seeded (admin / admin123)');
+  if (hadAdmin) console.log('  ✓ Admin user already exists; its password was left as it is');
+  else if (process.env.SEED_ADMIN_PASSWORD) console.log('  ✓ Admin user created with SEED_ADMIN_PASSWORD');
+  else if (production) console.log(`  ✓ Admin user created. Password, shown only now: ${adminPassword}`);
+  else console.log('  ✓ Admin user seeded (admin / admin123, development only)');
 
   // ── 9. Reset autoincrement sequences to avoid conflicts ──
   // After inserting with explicit IDs, we need to advance the sequences

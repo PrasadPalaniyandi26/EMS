@@ -385,7 +385,7 @@ export class BudgetsService {
     if (plan.status !== 'DRAFT') throw new HttpException('Only a draft plan can be submitted.', HttpStatus.CONFLICT);
     const count = await this.prisma.budgetLine.count({ where: { planId: plan.id, isActive: true } });
     if (!count) throw new HttpException('Add at least one budget line before submitting.', HttpStatus.BAD_REQUEST);
-    const row = await this.prisma.budgetPlan.update({ where: { id: plan.id }, data: { status: 'SUBMITTED', submittedAt: new Date(), submittedByName: user.username ?? null, decisionNote: null } });
+    const row = await this.prisma.budgetPlan.update({ where: { id: plan.id }, data: { status: 'SUBMITTED', submittedAt: new Date(), submittedByName: user.username ?? null, submittedById: user.id, decisionNote: null } });
     this.audit.log({ tableName: 'budget_plans', recordId: plan.id, action: 'SUBMIT', changedBy: user.id, newValues: row }).catch(() => undefined);
     const approvers = await this.prisma.user.findMany({ where: { userRoles: { some: { role: { name: { in: ['ADMIN', 'FINANCE'] } } } } } as any, select: { id: true } });
     for (const a of approvers) {
@@ -399,7 +399,9 @@ export class BudgetsService {
     const plan = await this.planOrThrow(fy);
     if (plan.status !== 'SUBMITTED') throw new HttpException('Only a submitted plan can be approved or sent back.', HttpStatus.CONFLICT);
     // Whoever submitted the plan does not approve it, unless nobody else can
-    if (body.decision === 'approve' && plan.submittedByName && plan.submittedByName === user.username && !financeSelfApprovalAllowed()) {
+    // The name is compared only for a plan submitted before the id was kept
+    const own = plan.submittedById != null ? plan.submittedById === user.id : !!plan.submittedByName && plan.submittedByName === user.username;
+    if (body.decision === 'approve' && own && !financeSelfApprovalAllowed()) {
       const other = await this.prisma.user.findFirst({ where: { isActive: true, id: { not: user.id }, userRoles: { some: { role: { name: { in: ['FINANCE', 'ADMIN'] } } } } } });
       if (other) throw new HttpException('You submitted this plan. Another Finance or Admin user needs to approve it.', HttpStatus.FORBIDDEN);
     }
@@ -541,7 +543,7 @@ export class BudgetsService {
   }
 
   // Money in a closed month cannot move: any change to a locked month is refused
-  private async assertOpenMonths(changes: { year: number; month: number; before: number; after: number }[]) {
+  async assertOpenMonths(changes: { year: number; month: number; before: number; after: number }[]) {
     const moved = changes.filter((c) => r2(c.before) !== r2(c.after));
     if (!moved.length) return;
     const locks = await this.prisma.periodLock.findMany({ select: { year: true, month: true } });
@@ -593,7 +595,9 @@ export class BudgetsService {
     const line = await this.prisma.budgetLine.findUnique({ where: { id } });
     if (!line || !line.isActive) throw new HttpException('Budget line not found.', HttpStatus.NOT_FOUND);
     this.assertCanChange(line, user, isFinance);
-    await this.editablePlan(line.planId, body.reason, user.id, isFinance);
+    const plan = await this.editablePlan(line.planId, body.reason, user.id, isFinance);
+    const months = this.fyMonths(plan.fy, (await this.getSettings()).fyStartMonth);
+    if (!months.some((m) => m.year === Number(body.year) && m.month === Number(body.month))) throw new HttpException('That month is not in this plan\'s financial year.', HttpStatus.BAD_REQUEST);
     const amount = r2(Math.max(0, Number(body.amount) || 0));
     const existing = await this.prisma.budgetLinePeriod.findUnique({ where: { lineId_year_month: { lineId: id, year: Number(body.year), month: Number(body.month) } } });
     await this.assertOpenMonths([{ year: Number(body.year), month: Number(body.month), before: n(existing?.amount), after: amount }]);
@@ -834,11 +838,18 @@ export class BudgetsService {
   }
 
   // Budget impact of the expenses in the approval queue
-  async impactFor(ids: number[]) {
+  async impactFor(ids: number[], viewer?: { id: number; role_name?: string }) {
     if (!ids.length) return {};
     const s = await this.getSettings();
+    // The same reach as the approval queue: assigned to them, their team's, or open to any Manager
+    const reach = (viewer?.role_name || '').toUpperCase() === 'MANAGER' ? {
+      OR: [
+        { userId: viewer!.id }, { user: { managerId: viewer!.id } }, { approvals: { some: { approverId: viewer!.id } } },
+        { user: { managerId: null } }, { user: { manager: { userRoles: { none: { role: { name: 'MANAGER' } } } } } },
+      ],
+    } : {};
     const txns = await this.prisma.transaction.findMany({
-      where: { id: { in: ids } },
+      where: { id: { in: ids }, ...reach },
       include: { category: { select: { typeId: true } }, splits: { include: { category: { select: { typeId: true } } } } },
     });
     const out: Record<number, any> = {};

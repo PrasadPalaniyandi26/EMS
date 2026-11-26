@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createWorker } from 'tesseract.js';
+import { PrismaService } from '../prisma/prisma.service';
+import { uploadedBy } from '../common/helpers/attachments';
 
 export interface OcrResult {
   amount: string | null;
@@ -14,27 +16,55 @@ export interface OcrResult {
 @Injectable()
 export class ReceiptsService {
   private readonly logger = new Logger(ReceiptsService.name);
+  constructor(private readonly prisma: PrismaService) {}
+
+  // A file is read by whoever may read the record it is on; until then only by the person who uploaded it
+  async mayOpen(filename: string, userId: number): Promise<boolean> {
+    if (uploadedBy(filename, userId)) return true;
+    const txns = await this.prisma.transaction.findMany({ where: { receiptPath: filename }, select: { userId: true } });
+    if (txns.some((t) => t.userId === userId)) return true;
+    const onPo = !!(await this.prisma.clientPo.findFirst({ where: { filePath: filename }, select: { id: true } }));
+    if (!txns.length && !onPo) return false;
+    const roles = (await this.prisma.userRole.findMany({ where: { userId }, include: { role: true } })).map((r) => r.role.name);
+    const has = (...names: string[]) => names.some((n) => roles.includes(n));
+    // Managers, Finance and Admin read any transaction's detail; invoicing is also read by Operations
+    return (txns.length > 0 && has('ADMIN', 'FINANCE', 'MANAGER')) || (onPo && has('ADMIN', 'FINANCE', 'MANAGER', 'OPERATIONS'));
+  }
 
   async extractFromFile(filePath: string, mimeType: string): Promise<OcrResult> {
     let rawText = '';
 
+    let worker: Awaited<ReturnType<typeof createWorker>> | undefined;
     try {
       if (mimeType === 'application/pdf') {
         // For PDFs, return empty — PDF text extraction requires additional libs
         // Tesseract works on images; we skip PDFs gracefully
-        return { amount: null, date: null, paymentMethod: null, referenceNo: null, description: null, category: null, rawText: '' };
+        return this.nothingRead();
       }
 
-      const worker = await createWorker('eng', 1, { langPath: process.cwd() });
-      const { data } = await worker.recognize(filePath);
+      // Only a real picture reaches the reader: the controller names the file by its bytes
+      if (!/\.(jpg|png|webp)$/.test(filePath)) return this.nothingRead();
+
+      // Without an errorHandler the library also throws from its worker's message listener, outside any try, and the
+      // whole API stops. The handler also covers start-up failures, where createWorker would otherwise never settle.
+      let failed!: (reason: Error) => void;
+      const failure = new Promise<never>((_, reject) => { failed = reject; });
+      failure.catch(() => undefined);
+      worker = await Promise.race([createWorker('eng', 1, { langPath: process.cwd(), errorHandler: (e: unknown) => failed(new Error(String(e))) }), failure]);
+      const { data } = await Promise.race([worker.recognize(filePath), failure]);
       rawText = data.text || '';
-      await worker.terminate();
     } catch (err) {
-      this.logger.warn(`OCR failed for ${filePath}: ${err.message}`);
-      return { amount: null, date: null, paymentMethod: null, referenceNo: null, description: null, category: null, rawText: '' };
+      this.logger.warn(`OCR failed for ${filePath}: ${(err as Error).message}`);
+      return this.nothingRead();
+    } finally {
+      await worker?.terminate().catch(() => undefined);
     }
 
     return this.parse(rawText);
+  }
+
+  private nothingRead(): OcrResult {
+    return { amount: null, date: null, paymentMethod: null, referenceNo: null, description: null, category: null, rawText: '' };
   }
 
   private parse(text: string): OcrResult {

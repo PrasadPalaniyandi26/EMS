@@ -1,4 +1,5 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { assertOwnAttachment } from '../common/helpers/attachments';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -161,6 +162,7 @@ export class InvoicingService {
     const validUntil = b.valid_until ? day(b.valid_until, 'valid-until date') : null;
     if (validUntil && validUntil.getTime() < poDate.getTime()) throw bad('The valid-until date cannot be before the PO date.');
     const link = await this.links(clientId, b.project_id, b.build_order_id);
+    assertOwnAttachment(b.file_path, null, user.id);
     const data = { clientId, poNumber: cleanText(b.po_number, 'PO number', 60, true)!, poDate, value: money(b.value, 'The PO value', { allowZero: false }), validUntil, ...link, filePath: cleanText(b.file_path, 'File', 255), note: cleanText(b.note, 'Note', 500), createdBy: user.id, createdByName: user.username ?? null };
     try {
       const p = await this.prisma.clientPo.create({ data });
@@ -194,6 +196,7 @@ export class InvoicingService {
       data.project = link.projectId ? { connect: { id: link.projectId } } : { disconnect: true };
       data.buildOrder = link.buildOrderId ? { connect: { id: link.buildOrderId } } : { disconnect: true };
     }
+    assertOwnAttachment(b.file_path, cur.filePath, user.id);
     if (b.file_path !== undefined) data.filePath = cleanText(b.file_path, 'File', 255);
     if (b.note !== undefined) data.note = cleanText(b.note, 'Note', 500);
     const before = await this.getPo(id);
@@ -375,6 +378,13 @@ export class InvoicingService {
     return out;
   }
 
+  // The checks above a write read the invoice before the transaction. This locks it and refuses if it has changed since,
+  // so two requests cannot both pay it, or one rewrite or delete what the other has issued.
+  private async claim(tx: Prisma.TransactionClient, cur: { id: number; status: string; updatedAt: Date }) {
+    const held = await tx.invoice.updateMany({ where: { id: cur.id, status: cur.status, updatedAt: cur.updatedAt }, data: { updatedAt: new Date() } });
+    if (!held.count) throw bad('This invoice changed while you were working on it. Reload it and try again.', HttpStatus.CONFLICT);
+  }
+
   async updateInvoice(id: number, b: any, user: Actor) {
     const cur = await this.getInvoiceRow(id);
     if (cur.status !== 'DRAFT') throw bad('Only a draft invoice can be edited. An issued invoice is cancelled, not changed.', HttpStatus.CONFLICT);
@@ -384,6 +394,7 @@ export class InvoicingService {
     const { taxed, totals } = this.priced(lines as any, sup.supply);
     const before = this.mapInvoice(cur);
     await this.prisma.$transaction(async (tx) => {
+      await this.claim(tx, cur);
       await tx.invoiceLine.deleteMany({ where: { invoiceId: id } });
       await tx.invoice.update({
         where: { id },
@@ -405,7 +416,10 @@ export class InvoicingService {
     const cur = await this.getInvoiceRow(id);
     if (cur.status !== 'DRAFT') throw bad('Only a draft invoice can be deleted. Cancel an issued invoice instead.', HttpStatus.CONFLICT);
     const before = this.mapInvoice(cur);
-    await this.prisma.invoice.delete({ where: { id } });
+    await this.prisma.$transaction(async (tx) => {
+      await this.claim(tx, cur);
+      await tx.invoice.delete({ where: { id } });
+    });
     this.log('invoices', id, 'DELETE', user.id, 'Draft', before, null);
     return { deleted: true };
   }
@@ -441,6 +455,7 @@ export class InvoicingService {
     const before = this.mapInvoice(cur);
 
     await this.prisma.$transaction(async (tx) => {
+      await this.claim(tx, cur);
       // The counter row is locked by this update until the transaction ends, so two invoices can never take the same number
       // A number typed by the user does not use up the running number, so the next automatic one follows on as before
       let seq = 0;
@@ -476,6 +491,7 @@ export class InvoicingService {
     await this.assertMonthOpen(cur.invoiceDate, 'its invoices cannot be cancelled');
     const before = this.mapInvoice(cur);
     await this.prisma.$transaction(async (tx) => {
+      await this.claim(tx, cur);
       await tx.invoice.update({ where: { id }, data: { status: 'CANCELLED', cancelReason: why, cancelledAt: new Date(), cancelledByName: user.username ?? null } });
       await this.settlePo(tx, cur.poId);
     });
@@ -512,6 +528,7 @@ export class InvoicingService {
     const before = this.mapInvoice(cur);
 
     await this.prisma.$transaction(async (tx) => {
+      await this.claim(tx, cur);
       let transactionId: number | null = null;
       if (amount > 0) {
         const cat = await this.incomeCategory(tx);
@@ -545,6 +562,7 @@ export class InvoicingService {
     await this.assertMonthOpen(pay.paidOn, 'its payments cannot be removed');
     const before = this.mapInvoice(cur);
     await this.prisma.$transaction(async (tx) => {
+      await this.claim(tx, cur);
       // The income entry the payment made is voided, not erased, so the history stays
       if (pay.transactionId) {
         await tx.transaction.update({ where: { id: pay.transactionId }, data: { status: 'VOIDED', voidedAt: new Date(), voidedById: user.id, voidedByName: user.username ?? null, voidReason: `Payment removed from ${cur.number}` } });

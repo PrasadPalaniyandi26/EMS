@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
 import { ROLES } from '../common/constants/roles';
+import { toDataScope, SAVEABLE_SCOPES } from '../common/helpers/data-scope';
 
 @Injectable()
 export class UsersService {
@@ -190,7 +191,11 @@ export class UsersService {
     }
 
     try {
-      await this.prisma.user.update({ where: { id }, data });
+      // A new password ends every session, so a copied token cannot outlive it
+      await this.prisma.$transaction([
+        this.prisma.user.update({ where: { id }, data }),
+        ...(data.passwordHash ? [this.prisma.refreshToken.deleteMany({ where: { userId: id } })] : []),
+      ]);
 
       if (dto.roles && Array.isArray(dto.roles) && dto.roles.length > 0) {
         await this.setUserRoles(id, dto.roles);
@@ -322,16 +327,18 @@ export class UsersService {
       permissions: perm.permissions,
       single_limit: Number(perm.singleLimit),
       monthly_limit: Number(perm.monthlyLimit),
-      data_scope: perm.dataScope,
+      data_scope: toDataScope(perm.dataScope ?? 'Department'),
     };
   }
 
   async setPermissions(userId: number, data: any) {
+    const scope = data.data_scope || 'Department';
+    if (!SAVEABLE_SCOPES.includes(scope)) throw new HttpException('Choose Own Records, Department or Global for data visibility.', HttpStatus.BAD_REQUEST);
     const fields = {
       permissions: data.permissions || {},
       singleLimit: Number(data.single_limit) || 10000,
       monthlyLimit: Number(data.monthly_limit) || 50000,
-      dataScope: data.data_scope || 'Department',
+      dataScope: toDataScope(scope),
     };
     await this.prisma.userPermission.upsert({ where: { userId }, create: { userId, ...fields }, update: fields });
     return this.getPermissions(userId);

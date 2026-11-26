@@ -2,6 +2,7 @@ import './common/helpers/timezone';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { applyEdgeSecurity } from './common/security';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import cookieParser from 'cookie-parser';
@@ -40,6 +41,7 @@ async function bootstrap() {
     credentials: true,
   });
   app.use(cookieParser());
+  applyEdgeSecurity(app);
 
   // Rate limiting — upload endpoints; general limit on all API
   app.use(
@@ -85,7 +87,9 @@ async function bootstrap() {
 
   const logger = new Logger('Bootstrap');
   const port = parseInt(process.env.PORT || '5000', 10);
-  await app.listen(port);
+  // Behind a proxy on the same machine, set HOST=127.0.0.1 so the API cannot be reached around it
+  if (process.env.HOST) await app.listen(port, process.env.HOST);
+  else await app.listen(port);
   logger.log(`🚀 EMS NestJS Server running on http://localhost:${port}`);
   if (process.env.NODE_ENV !== 'production') {
     logger.log(`📖 API docs: http://localhost:${port}/api/docs`);

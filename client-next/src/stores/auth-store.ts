@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { api, setAccessToken, clearAccessToken } from '@/lib/api-client';
+import { api, setAccessToken, clearAccessToken, refreshSessionData } from '@/lib/api-client';
 import type { User, LoginCredentials, LoginResponse } from '@/lib/types';
 
 // Deduplication guard — prevents concurrent /auth/refresh calls from refreshSession
@@ -46,9 +46,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (sessionRefreshPromise) return sessionRefreshPromise;
     sessionRefreshPromise = (async () => {
       try {
-        const res = await api.post<LoginResponse>('/auth/refresh');
-        setAccessToken(res.data.accessToken);
-        set({ user: res.data.user, isAuthenticated: true, isLoading: false });
+        const data = await refreshSessionData<LoginResponse>();
+        set({ user: data.user, isAuthenticated: true, isLoading: false });
       } catch {
         clearAccessToken();
         set({ user: null, isAuthenticated: false, isLoading: false });
@@ -74,8 +73,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const res = await api.put<User>(`/users/${state.user.id}/switch-role`, { roleId });
     // Re-issue access token so JWT carries the new role_name for backend guards
     try {
-      const refreshRes = await api.post<LoginResponse>('/auth/refresh');
-      setAccessToken(refreshRes.data.accessToken);
+      await refreshSessionData();
     } catch {
       // If refresh fails, store update still takes effect for frontend checks
     }

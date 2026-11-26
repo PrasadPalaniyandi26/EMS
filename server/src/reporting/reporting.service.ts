@@ -447,7 +447,8 @@ export class ReportingService {
     // The ledger lists records one by one, whatever their status, apart from deleted and voided ones.
     // A split record is listed as one row for each part, the way the summaries count it. Recurring schedules are left out: the cron turns them into real records.
     const LEDGER_CAP = 2000;
-    const group = status ? ReportingService.LEDGER_STATUS[status] : undefined;
+    // Own keys only: 'constructor' would otherwise be read from the object's prototype
+    const group = status && Object.hasOwn(ReportingService.LEDGER_STATUS, status) ? ReportingService.LEDGER_STATUS[status] : undefined;
     const where = this.buildWhere(userId, type, dateFrom, dateTo);
     where.status = group ? { in: group.statuses } : { notIn: ['DELETED', 'VOIDED'] };
     // A draft or sent-back record is private to its owner until it is submitted

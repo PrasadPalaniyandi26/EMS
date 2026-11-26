@@ -408,6 +408,25 @@ export class BuildOrdersService {
     return { id: row.id, code: row.code };
   }
 
+  // Edits and status moves take turns, so an edit that passed its "still open" check cannot land after the order moved on.
+  // shortcut: one queue in one process; with more than one API instance, claim the order's status in each write instead
+  private queue: Promise<unknown> = Promise.resolve();
+  private inTurn<T>(work: () => Promise<T>): Promise<T> {
+    const run = this.queue.then(work);
+    this.queue = run.catch(() => undefined);
+    return run;
+  }
+
+  update(id: number, b: any, user: Actor) { return this.inTurn(() => this.updateNow(id, b, user)); }
+  importBom(id: number, b: any, user: Actor) { return this.inTurn(() => this.importBomNow(id, b, user)); }
+  swap(id: number, lineId: number, b: any, user: Actor) { return this.inTurn(() => this.swapNow(id, lineId, b, user)); }
+  saveCostSettings(id: number, b: any, user: Actor) { return this.inTurn(() => this.saveCostSettingsNow(id, b, user)); }
+  saveOperation(id: number, opId: number | null, b: any, user: Actor) { return this.inTurn(() => this.saveOperationNow(id, opId, b, user)); }
+  removeOperation(id: number, opId: number, user: Actor) { return this.inTurn(() => this.removeOperationNow(id, opId, user)); }
+  refreshCost(id: number, user: Actor) { return this.inTurn(() => this.refreshCostNow(id, user)); }
+  move(id: number, action: string, b: any, user: Actor) { return this.inTurn(() => this.moveNow(id, action, b, user)); }
+  remove(id: number, user: Actor) { return this.inTurn(() => this.removeNow(id, user)); }
+
   private async openOrder(id: number) {
     const o = await this.prisma.buildOrder.findUnique({ where: { id } });
     if (!o) throw bad('Order not found.', HttpStatus.NOT_FOUND);
@@ -415,7 +434,7 @@ export class BuildOrdersService {
     return o;
   }
 
-  async update(id: number, b: any, user: Actor) {
+  private async updateNow(id: number, b: any, user: Actor) {
     const o = await this.openOrder(id);
     const v = await this.validate(b, o);
     await this.prisma.buildOrder.update({ where: { id }, data: v });
@@ -423,7 +442,7 @@ export class BuildOrdersService {
     return { id };
   }
 
-  async remove(id: number, user: Actor) {
+  private async removeNow(id: number, user: Actor) {
     const o = await this.prisma.buildOrder.findUnique({ where: { id } });
     if (!o) return { deleted: true };
     if (o.status !== 'COMMITTED') throw bad('Only an order that has not been released can be deleted. Cancel it instead.', HttpStatus.CONFLICT);
@@ -443,7 +462,7 @@ export class BuildOrdersService {
 
   // Copy the product's BOM in force today and its operations into the order.
   // Always replaces the whole copy, from the same product again or from a different one. A different product makes this an order for that product.
-  async importBom(id: number, b: any, user: Actor) {
+  private async importBomNow(id: number, b: any, user: Actor) {
     const o = await this.prisma.buildOrder.findUnique({ where: { id } });
     if (!o) throw bad('Order not found.', HttpStatus.NOT_FOUND);
     if (o.status !== 'COMMITTED') throw bad('The standard BOM can only be imported before the order is released.', HttpStatus.CONFLICT);
@@ -473,7 +492,7 @@ export class BuildOrdersService {
   }
 
   // The one change a copied BOM allows: use another part of the same alternate group, then cost the order again
-  async swap(id: number, lineId: number, b: any, user: Actor) {
+  private async swapNow(id: number, lineId: number, b: any, user: Actor) {
     await this.openOrder(id);
     const bom = await this.orderBom(id);
     const line = bom ? await this.prisma.bomLine.findFirst({ where: { id: lineId, bomId: bom.id } }) : null;
@@ -495,7 +514,7 @@ export class BuildOrdersService {
 
   // Freight and handling %, warranty % and an overhead rate per hour for this order only. They live on the order's own BOM copy,
   // so the product and its approved standard cost are not touched. An overhead rate equal to the company rate clears the override.
-  async saveCostSettings(id: number, b: any, user: Actor) {
+  private async saveCostSettingsNow(id: number, b: any, user: Actor) {
     await this.openOrder(id);
     const bom = await this.orderBom(id);
     if (!bom) throw bad('Import the standard BOM first.', HttpStatus.CONFLICT);
@@ -524,7 +543,7 @@ export class BuildOrdersService {
   }
 
   // Build operations of this order's own BOM. They start as the product's and each order can change them; the order is costed again after every change.
-  async saveOperation(id: number, opId: number | null, b: any, user: Actor) {
+  private async saveOperationNow(id: number, opId: number | null, b: any, user: Actor) {
     await this.openOrder(id);
     const bom = await this.orderBom(id);
     if (!bom) throw bad('Import the standard BOM first.', HttpStatus.CONFLICT);
@@ -539,7 +558,7 @@ export class BuildOrdersService {
     return { id: row.id, unit_cost: cost };
   }
 
-  async removeOperation(id: number, opId: number, user: Actor) {
+  private async removeOperationNow(id: number, opId: number, user: Actor) {
     await this.openOrder(id);
     const bom = await this.orderBom(id);
     const op = bom ? await this.prisma.bomOperation.findFirst({ where: { id: opId, bomId: bom.id } }) : null;
@@ -550,7 +569,7 @@ export class BuildOrdersService {
     return { deleted: true, unit_cost: cost };
   }
 
-  async refreshCost(id: number, user: Actor) {
+  private async refreshCostNow(id: number, user: Actor) {
     await this.openOrder(id);
     if (!(await this.orderBom(id))) throw bad('Import the standard BOM first.', HttpStatus.CONFLICT);
     const cost = await this.refresh(id);
@@ -565,7 +584,7 @@ export class BuildOrdersService {
   }
 
   // Release, start the build, deliver or cancel
-  async move(id: number, action: string, b: any, user: Actor) {
+  private async moveNow(id: number, action: string, b: any, user: Actor) {
     const o = await this.prisma.buildOrder.findUnique({ where: { id } });
     if (!o) throw bad('Order not found.', HttpStatus.NOT_FOUND);
     const data: any = {};
