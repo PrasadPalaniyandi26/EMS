@@ -157,7 +157,7 @@ export default function HubPage() {
               const isOver = pct >= 100;
               const isWarn = pct >= 80 && !isOver;
               return (
-                <div key={b.id} className="px-4 py-2.5">
+                <div key={b.category_id} className="px-4 py-2.5">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-[12px] font-semibold text-black dark:text-white truncate max-w-[180px]">{b.category_name}</span>
                     <span className={`text-[12px] font-semibold ${isOver ? 'text-[var(--danger)]' : isWarn ? 'text-[var(--warning)]' : 'text-[var(--shell-text-muted)]'}`}>{pct}%</span>
