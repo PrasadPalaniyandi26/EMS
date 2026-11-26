@@ -11,7 +11,7 @@ import { useHeaderStore } from '@/stores/header-store';
 import { useAuthStore } from '@/stores/auth-store';
 import api from '@/lib/api-client';
 import { useBudgetPlans, fyLabel } from '@/hooks/use-budget-queries';
-import { formatCurrency, getDateRange } from '@/lib/currency';
+import { formatCurrency, getDateRange, toLocalYMD } from '@/lib/currency';
 import {
   BarChart3, FileText, TrendingDown, TrendingUp, Scale, Target, ListFilter,
   ArrowLeftRight, Users, Download, Sheet,
@@ -528,7 +528,7 @@ export default function ReportingPage() {
           {(selectedType === 'receivables-ageing' || selectedType === 'stock-value') && (
             <label className="flex items-center gap-2 text-[12px] text-[var(--shell-text-muted)]">
               As of
-              <input type="date" aria-label="As of date" value={asOf} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setAsOf(e.target.value)}
+              <input type="date" aria-label="As of date" value={asOf} max={toLocalYMD()} onChange={(e) => setAsOf(e.target.value)}
                 className="rounded-lg px-3 py-1.5 text-[12px] border outline-none" style={inputStyle} />
               {!asOf && <span>today</span>}
             </label>

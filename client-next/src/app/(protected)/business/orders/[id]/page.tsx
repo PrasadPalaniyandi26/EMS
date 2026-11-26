@@ -490,7 +490,7 @@ export default function BuildOrderDetailPage() {
       <OrderStepModal isOpen={startOpen} onClose={() => setStartOpen(false)} order={o} step="start" />
       <BuildOrderModal isOpen={editOpen} onClose={() => setEditOpen(false)} editing={o} />
       <CancelOrderModal isOpen={cancelOpen} onClose={() => setCancelOpen(false)} order={o} />
-      <ConfirmDialog open={deliverOpen} title="Mark as delivered" confirmLabel="Deliver" message={`Record ${o?.code} as delivered today, ${formatDate(new Date().toISOString())}? It can no longer change.`} onCancel={() => setDeliverOpen(false)}
+      <ConfirmDialog open={deliverOpen} title="Mark as delivered" confirmLabel="Deliver" message={`Record ${o?.code} as delivered today, ${formatDate(new Date())}? It can no longer change.`} onCancel={() => setDeliverOpen(false)}
         onConfirm={() => { setDeliverOpen(false); if (o) act(() => api.post(`/build-orders/${o.id}/deliver`, {}), 'Order delivered.'); }} />
       <ConfirmDialog open={delOrder} destructive title="Delete order" confirmLabel="Delete" message={`Delete ${o?.code}? It has not been released. Its BOM copy goes with it.`} onCancel={() => setDelOrder(false)}
         onConfirm={async () => { setDelOrder(false); if (!o) return; try { await api.delete(`/build-orders/${o.id}`); toast.success('Order deleted.'); invalidate('budgets'); router.push('/business/orders'); } catch (err: any) { toast.error(err?.message || 'Could not delete.'); } }} />

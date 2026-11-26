@@ -4,6 +4,12 @@ import { BadRequestException } from '@nestjs/common';
 
 const DAY = /^\d{4}-\d{2}-\d{2}/;
 
+// Today's calendar date in the business time zone, as UTC midnight: the form DATE columns are read and written in.
+export function today(): Date {
+  const d = new Date();
+  return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+}
+
 export function parseDay(value: string | undefined | null, name: string): Date | undefined {
   if (value === undefined || value === null || value === '') return undefined;
   const d = DAY.test(String(value)) ? new Date(String(value)) : new Date(NaN);

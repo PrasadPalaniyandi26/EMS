@@ -5,6 +5,7 @@ import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ROLES } from '../common/constants/roles';
 import { buildGstFields } from '../common/utils/gst';
+import { today } from '../common/helpers/dates';
 
 @Injectable()
 export class RecurringService {
@@ -491,9 +492,10 @@ export class RecurringService {
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async processDue() {
     const now = new Date();
+    const day = today();
     const due = await this.prisma.recurringTransaction.findMany({
       // Only an approved schedule posts spend: a draft or one waiting for approval must not run
-      where: { isActive: true, status: 'APPROVED', nextRunDate: { lte: now }, OR: [{ endDate: null }, { endDate: { gte: now } }] },
+      where: { isActive: true, status: 'APPROVED', nextRunDate: { lte: day }, OR: [{ endDate: null }, { endDate: { gte: day } }] },
     });
     let processed = 0;
     for (const r of due) {
@@ -505,11 +507,11 @@ export class RecurringService {
       let postDate = r.nextRunDate;
       let lateNote = '';
       if (await isClosed(r.nextRunDate)) {
-        if (await isClosed(now)) {
+        if (await isClosed(day)) {
           this.logger.warn(`Recurring ${r.id} is due in a closed month and so is today's month; it will run when a month is open.`);
           continue;
         }
-        postDate = now;
+        postDate = day;
         lateNote = ` (due ${r.nextRunDate.toISOString().slice(0, 10)})`;
       }
       let createdId = 0;

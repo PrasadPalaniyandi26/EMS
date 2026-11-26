@@ -7,6 +7,7 @@ import { COMMITTED_STATUSES } from '../common/constants/transaction-status';
 import { buildGstFields } from '../common/utils/gst';
 import { BudgetsService } from '../budgets/budgets.service';
 import { StockService } from '../stock/stock.service';
+import { today } from '../common/helpers/dates';
 
 // Upper bound for ?limit= on list endpoints; the client's largest request is 500.
 const MAX_PAGE_SIZE = 500;
@@ -202,8 +203,8 @@ export class TransactionsService {
     const d = txn.dateRecorded;
     const month = d.getMonth() + 1;
     const year = d.getFullYear();
-    const start = new Date(year, month - 1, 1);
-    const end = new Date(year, month, 0, 23, 59, 59, 999);
+    const start = new Date(Date.UTC(year, month - 1, 1));
+    const end = new Date(Date.UTC(year, month, 0));
 
     // ── Per-user spend limits ──
     const perm = await this.prisma.userPermission.findUnique({ where: { userId } });
@@ -919,9 +920,6 @@ export class TransactionsService {
     });
     if (!original) throw new HttpException('Transaction not found.', HttpStatus.NOT_FOUND);
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
     const t = await this.prisma.transaction.create({
       data: {
         userId, type: original.type,
@@ -931,7 +929,7 @@ export class TransactionsService {
         isClaimable: original.isClaimable,
         needsReimbursement: original.needsReimbursement ?? false,
         receiptNumber: original.receiptNumber ?? null,
-        dateRecorded: today,
+        dateRecorded: today(),
         categoryId: original.categoryId,
         description: original.description,
         paymentMethod: original.paymentMethod,
@@ -955,8 +953,6 @@ export class TransactionsService {
   async checkDuplicates(userId: number, data: { totalAmount: number; receiptNumber?: string; projectId?: number; dateRecorded: string; type: string; excludeId?: number }) {
     const { totalAmount, receiptNumber, projectId, dateRecorded, type, excludeId } = data;
     const date = new Date(dateRecorded);
-    const dayStart = new Date(date); dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(date); dayEnd.setHours(23, 59, 59, 999);
     const base: any = {
       userId,
       type,
@@ -978,7 +974,7 @@ export class TransactionsService {
 
     // Soft warn: same totalAmount + same date
     const exactMatches = await this.prisma.transaction.findMany({
-      where: { ...base, totalAmount: Number(totalAmount), dateRecorded: { gte: dayStart, lte: dayEnd } },
+      where: { ...base, totalAmount: Number(totalAmount), dateRecorded: date },
       include: { category: true, client: true, project: true, product: true, department: true },
       take: 5,
     });

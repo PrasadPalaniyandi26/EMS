@@ -6,6 +6,7 @@ import { AppModule } from './../src/app.module';
 import { PrismaService } from './../src/prisma/prisma.service';
 import { ResponseInterceptor } from './../src/common/interceptors/response.interceptor';
 import { HttpExceptionFilter } from './../src/common/filters/http-exception.filter';
+import { today as businessToday } from './../src/common/helpers/dates';
 
 // Rules of the Transactions group: what can be changed, deleted, split, voided and approved, and who can see a record's notes.
 // Test data starts with "ZZ " in the description and is removed before and after the run.
@@ -38,7 +39,7 @@ describe('Transaction rules (e2e)', () => {
     if (!r.body?.data?.accessToken) throw new Error(`Login failed for ${username} (${r.status})`);
     return r.body.data.accessToken as string;
   };
-  const today = () => new Date().toISOString().slice(0, 10);
+  const today = () => businessToday().toISOString().slice(0, 10);
 
   const cleanup = async () => {
     await prisma.transactionNote.deleteMany({ where: { transaction: { description: { startsWith: 'ZZ ' } } } });

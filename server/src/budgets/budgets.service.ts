@@ -7,6 +7,7 @@ import { TXN_STATUS } from '../common/constants/transaction-status';
 import { addWorkingDays } from '../common/helpers/working-days';
 import { financeSelfApprovalAllowed } from '../common/config/approval-policy';
 import { STORE_DEPARTMENT, departmentNamed } from '../common/helpers/stock-departments';
+import { today } from '../common/helpers/dates';
 
 const PENDING = [TXN_STATUS.PENDING_MANAGER, TXN_STATUS.PENDING_FINANCE] as string[];
 const COUNTED = [TXN_STATUS.APPROVED, ...PENDING];
@@ -145,7 +146,7 @@ export class BudgetsService {
     const months = this.fyMonths(fy, startMonth);
     const first = months[0];
     const last = months[11];
-    return { from: new Date(first.year, first.month - 1, 1), to: new Date(last.year, last.month, 0, 23, 59, 59, 999) };
+    return { from: new Date(Date.UTC(first.year, first.month - 1, 1)), to: new Date(Date.UTC(last.year, last.month, 0, 23, 59, 59, 999)) };
   }
 
   // ── Names for cost objects, types and owners ─────────────────────────────
@@ -404,7 +405,7 @@ export class BudgetsService {
     }
     let row;
     if (body.decision === 'approve') {
-      const started = new Date() >= this.fyRange(fy, s.fyStartMonth).from;
+      const started = today() >= this.fyRange(fy, s.fyStartMonth).from;
       row = await this.prisma.budgetPlan.update({
         where: { id: plan.id },
         data: { status: started ? 'ACTIVE' : 'APPROVED', approvedAt: new Date(), approvedById: user.id, approvedByName: user.username ?? null, decisionNote: body.note?.trim() || null },
@@ -730,7 +731,7 @@ export class BudgetsService {
   // What a single expense (or one split part) would do to its budget line
   async headroom(q: { date?: string; contextType?: string; projectId?: number; productId?: number; departmentId?: number; buildOrderId?: number; categoryId?: number; amount?: number; excludeId?: number; gstClaimable?: boolean; netAmount?: number }) {
     const s = await this.getSettings();
-    const date = q.date ? new Date(q.date) : new Date();
+    const date = q.date ? new Date(q.date) : today();
     const out = (state: string, extra: any = {}) => ({ state, message: null as string | null, ...extra });
     if (!q.categoryId) return out('NONE');
     const category = await this.prisma.category.findUnique({ where: { id: q.categoryId }, include: { categoryType: true } });
@@ -917,14 +918,14 @@ export class BudgetsService {
     const rules = await this.prisma.budgetAlertRule.findMany();
     const rule = (code: string) => rules.find((r) => r.code === code);
     const wanted = new Map<string, { ruleCode: string; lineId: number | null; level: string; message: string; action: string; ownerId: number | null }>();
-    const today = new Date();
-    const fy = this.fyOf(today, s.fyStartMonth);
+    const day = today();
+    const fy = this.fyOf(day, s.fyStartMonth);
     const range = this.fyRange(fy, s.fyStartMonth);
     const plan = await this.prisma.budgetPlan.findUnique({ where: { fy } });
     const key = (code: string, lineId: number | null) => `${code}:${lineId ?? 0}`;
 
     if (rule('PLAN_READINESS')?.enabled) {
-      if (today >= range.from && (!plan || !CONTROLLING.includes(plan.status))) {
+      if (day >= range.from && (!plan || !CONTROLLING.includes(plan.status))) {
         wanted.set(key('PLAN_READINESS', null), {
           ruleCode: 'PLAN_READINESS', lineId: null, level: 'WARNING', action: 'open_plan', ownerId: null,
           message: plan ? `${this.fyLabel(fy, s.fyStartMonth)} plan is ${plan.status.toLowerCase()} and the year has started` : `${this.fyLabel(fy, s.fyStartMonth)} has no budget plan and the year has started`,
@@ -938,7 +939,7 @@ export class BudgetsService {
       const parts = await this.loadParts(fy, s);
       const { usage, unmatched } = this.computeUsage(lines, parts);
       const th = this.thresholds(rules);
-      const elapsedShare = Math.min(1, (today.getTime() - range.from.getTime()) / (range.to.getTime() - range.from.getTime()));
+      const elapsedShare = Math.min(1, (day.getTime() - range.from.getTime()) / (range.to.getTime() - range.from.getTime()));
       for (const l of lines) {
         if (l.isContingency || l.costObject === 'RESERVE') continue;
         let budget = 0; let used = 0;
@@ -984,7 +985,7 @@ export class BudgetsService {
 
     if (rule('APPROVAL_WAIT')?.enabled) {
       const days = n(rule('APPROVAL_WAIT')?.threshold) || 5;
-      const cutoff = addWorkingDays(today, -days);
+      const cutoff = addWorkingDays(day, -days);
       const waiting = await this.prisma.transaction.findMany({ where: { type: 'expense', status: { in: PENDING }, submittedAt: { lt: cutoff } }, select: { id: true, amount: true, totalAmount: true } });
       if (waiting.length) {
         wanted.set(key('APPROVAL_WAIT', null), {

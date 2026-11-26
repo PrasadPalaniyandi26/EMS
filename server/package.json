@@ -91,6 +91,7 @@
     ],
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
+    "globalSetup": "<rootDir>/../test/jest-timezone.js",
     "moduleNameMapper": {
       "^(\\.{1,2}/.*)\\.js$": "$1"
     },

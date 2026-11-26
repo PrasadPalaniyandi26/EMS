@@ -8,7 +8,7 @@ import { ApprovalsService } from '../approvals/approvals.service';
 import { InvoicingService } from '../invoicing/invoicing.service';
 import { DashboardService } from './dashboard.service';
 import { COMMITTED_STATUSES, committedStatusSql } from '../common/constants/transaction-status';
-import { parseRange } from '../common/helpers/dates';
+import { parseRange, today } from '../common/helpers/dates';
 import { workingDaysBetween } from '../common/helpers/working-days';
 
 const DAY = 86400000;
@@ -152,8 +152,8 @@ export class DashboardOverviewService {
 
   // The last twelve months: income, expenses, net and the running net
   private async series(ids: number[] | null) {
-    const cutoff = new Date();
-    cutoff.setUTCDate(1); cutoff.setUTCHours(0, 0, 0, 0); cutoff.setUTCMonth(cutoff.getUTCMonth() - 11);
+    const cutoff = today();
+    cutoff.setUTCDate(1); cutoff.setUTCMonth(cutoff.getUTCMonth() - 11);
     const who = ids === null ? Prisma.empty : Prisma.sql`AND user_id = ANY(${ids}::int[])`;
     const rows = await this.prisma.$queryRaw<{ yr: number; mo: number; type: string; total: number }[]>`
       SELECT EXTRACT(YEAR FROM date_recorded)::int AS yr, EXTRACT(MONTH FROM date_recorded)::int AS mo, type, SUM(amount)::float AS total
@@ -162,7 +162,7 @@ export class DashboardOverviewService {
       GROUP BY yr, mo, type`;
     const map = new Map<string, { income: number; expense: number }>();
     for (const r of rows) { const k = `${r.yr}-${r.mo}`; const e = map.get(k) ?? { income: 0, expense: 0 }; if (r.type === 'income') e.income = r.total; if (r.type === 'expense') e.expense = r.total; map.set(k, e); }
-    const now = new Date();
+    const now = today();
     let running = 0;
     return Array.from({ length: 12 }, (_, i) => {
       const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (11 - i), 1));
@@ -189,7 +189,7 @@ export class DashboardOverviewService {
   // Share of the financial year that has passed, counted from its own first month
   private async elapsedPct(fy: number) {
     const start = (await this.budgets.getSettings()).fyStartMonth;
-    const now = new Date();
+    const now = today();
     const months = this.budgets.fyMonths(fy, start);
     const at = months.findIndex((m) => m.year === now.getUTCFullYear() && m.month === now.getUTCMonth() + 1);
     if (at < 0) return now.getTime() < Date.UTC(months[0].year, months[0].month - 1, 1) ? 0 : 100;
@@ -198,12 +198,12 @@ export class DashboardOverviewService {
   }
 
   private portfolio(projects: any[], meta: { id: number; status: string | null; end_date: Date | null }[], orders: any[]) {
-    const today = new Date(); today.setUTCHours(0, 0, 0, 0);
+    const day = today();
     const metaOf = new Map(meta.map((m) => [m.id, m]));
     const rows = projects.map((p) => {
       const m = metaOf.get(p.id);
       const status = m?.status || 'Active';
-      const overdue = status === 'Active' && !!m?.end_date && m.end_date.getTime() < today.getTime();
+      const overdue = status === 'Active' && !!m?.end_date && m.end_date.getTime() < day.getTime();
       const est = p.estimate_total as number | null;
       const overSpent = est != null && est > 0 && p.actual > est;
       const lowMargin = p.projected_margin_pct != null && (p.projected_margin_pct < 0 || (p.min_margin_pct != null && p.projected_margin_pct < p.min_margin_pct));
@@ -219,7 +219,7 @@ export class DashboardOverviewService {
     const cost = costed.reduce((a, o) => a + o.total_cost, 0);
     const next = [...open].sort((a, b) => String(a.delivery_date).localeCompare(String(b.delivery_date))).slice(0, 4).map((o) => ({
       id: o.id, code: o.code, product: o.product_name, customer: o.client_name, delivery_date: o.delivery_date, status: o.status, value: o.total_value,
-      days: workingDaysBetween(today, new Date(o.delivery_date)), late: !!o.late,
+      days: workingDaysBetween(day, new Date(o.delivery_date)), late: !!o.late,
     }));
     return {
       projects: {

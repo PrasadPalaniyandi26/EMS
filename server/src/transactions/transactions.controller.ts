@@ -7,6 +7,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { CreateTransactionDto, UpdateTransactionDto, ProcessReimbursementDto, BulkProcessReimbursementDto } from './dto/transaction.dto';
 import { ApiTags } from '@nestjs/swagger';
+import { today } from '../common/helpers/dates';
 
 @ApiTags('transactions')
 @Controller('v1/transactions')
@@ -35,7 +36,7 @@ export class TransactionsController {
   @Get('export')
   async exportCsv(@CurrentUser('id') userId: number, @Query() query: any, @Res() res: Response) {
     const csv = await this.service.exportCsv(userId, query);
-    const date = new Date().toISOString().split('T')[0];
+    const date = today().toISOString().split('T')[0];
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="transactions-${date}.csv"`);
     res.send(csv);

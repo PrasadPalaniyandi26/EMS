@@ -6,6 +6,7 @@ import { AppModule } from './../src/app.module';
 import { PrismaService } from './../src/prisma/prisma.service';
 import { ResponseInterceptor } from './../src/common/interceptors/response.interceptor';
 import { HttpExceptionFilter } from './../src/common/filters/http-exception.filter';
+import { today as businessToday } from './../src/common/helpers/dates';
 
 // What an expense must say before it is submitted, and what happens to a split when the amount changes.
 // Test data starts with "ZZ " in the description and is removed before and after the run.
@@ -36,7 +37,7 @@ describe('Expense rules for budgets (e2e)', () => {
     if (!r.body?.data?.accessToken) throw new Error(`Login failed for ${username} (${r.status})`);
     return r.body.data.accessToken as string;
   };
-  const today = () => new Date().toISOString().slice(0, 10);
+  const today = () => businessToday().toISOString().slice(0, 10);
 
   const cleanup = async () => {
     await prisma.transactionSplit.deleteMany({ where: { transaction: { description: { startsWith: 'ZZ ' } } } });

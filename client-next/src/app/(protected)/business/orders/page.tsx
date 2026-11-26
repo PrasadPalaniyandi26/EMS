@@ -287,7 +287,7 @@ export default function OrdersPage() {
       <CancelOrderModal isOpen={!!cancelFor} onClose={() => setCancelFor(null)} order={cancelFor} />
       <ConfirmDialog open={!!del} destructive title="Delete order" confirmLabel="Delete" message={`Delete ${del?.code}? It has not been released. Its BOM copy goes with it.`} onCancel={() => setDel(null)}
         onConfirm={() => { const r = del; setDel(null); if (!r) return; setSelection({}); act(() => api.delete(`/build-orders/${r.id}`), 'Order deleted.'); }} />
-      <ConfirmDialog open={!!deliver} title="Mark as delivered" confirmLabel="Deliver" message={`Record ${deliver?.code} as delivered today, ${formatDate(new Date().toISOString())}? It can no longer change.`} onCancel={() => setDeliver(null)}
+      <ConfirmDialog open={!!deliver} title="Mark as delivered" confirmLabel="Deliver" message={`Record ${deliver?.code} as delivered today, ${formatDate(new Date())}? It can no longer change.`} onCancel={() => setDeliver(null)}
         onConfirm={() => { const r = deliver; setDeliver(null); if (r) act(() => api.post(`/build-orders/${r.id}/deliver`, {}), 'Order delivered.'); }} />
     </ModuleShell>
   );

@@ -6,6 +6,7 @@ import { AppModule } from './../src/app.module';
 import { PrismaService } from './../src/prisma/prisma.service';
 import { ResponseInterceptor } from './../src/common/interceptors/response.interceptor';
 import { HttpExceptionFilter } from './../src/common/filters/http-exception.filter';
+import { today as businessToday } from './../src/common/helpers/dates';
 
 // Life cycle of the main records on the real database: client, project, product, parts and alternates,
 // budget, build order, expense (submit, approve, send back, reject, void), income and recurring.
@@ -36,8 +37,8 @@ describe('Life cycle (e2e)', () => {
   let recurringId: number;
   let currentFy: number;
   let typeId: number;
-  const today = () => new Date().toISOString().slice(0, 10);
-  const inDays = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+  const today = () => businessToday().toISOString().slice(0, 10);
+  const inDays = (n: number) => new Date(businessToday().getTime() + n * 86400000).toISOString().slice(0, 10);
 
   const call = async (method: 'get' | 'post' | 'put' | 'delete', url: string, token: string, body?: unknown): Promise<Res> => {
     let res: Res = { status: 0, body: {} };

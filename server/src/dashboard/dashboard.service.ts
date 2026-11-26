@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { BudgetsService } from '../budgets/budgets.service';
 import { COMMITTED_STATUSES, committedStatusSql } from '../common/constants/transaction-status';
 import { ApprovalsService } from '../approvals/approvals.service';
-import { parseRange } from '../common/helpers/dates';
+import { parseRange, today } from '../common/helpers/dates';
 import { previousPeriod } from './previous-period';
 
 @Injectable()
@@ -96,10 +96,8 @@ export class DashboardService {
 
   async getMonthlyTrend(userId: number) {
     // Single SQL query replaces the previous 24 individual Prisma calls (12 months × 2 types)
-    const cutoff = new Date();
-    cutoff.setMonth(cutoff.getMonth() - 11);
-    cutoff.setDate(1);
-    cutoff.setHours(0, 0, 0, 0);
+    const t = today();
+    const cutoff = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() - 11, 1));
 
     const rows = await this.prisma.$queryRaw<
       { yr: number; mo: number; type: string; total: number }[]
@@ -264,7 +262,7 @@ export class DashboardService {
   async getCategoryHeatmap(userId: number, roleName: string, dateFrom?: string, dateTo?: string) {
     const range = parseRange(dateFrom, dateTo);
     const visibleIds = await this.resolveVisibleUserIds(userId, roleName);
-    const end = range.to ?? new Date();
+    const end = range.to ?? today();
     const start = range.from ?? (() => { const d = new Date(end); d.setUTCMonth(d.getUTCMonth() - 11); d.setUTCDate(1); d.setUTCHours(0, 0, 0, 0); return d; })();
 
     // A split expense counts under each category it was split into, the same way Budget counts it
@@ -341,8 +339,7 @@ export class DashboardService {
     let comparison: null | { from: string; to: string; previous_from: string; previous_to: string; rows: { category: string; now: number; before: number; change: number }[] } = null;
     if (range.from && range.to) {
       const day = (d: Date) => d.toISOString().slice(0, 10);
-      const today = new Date(day(new Date()));
-      const { until, prevFrom, prevTo } = previousPeriod(new Date(day(range.from)), new Date(day(range.to)), today);
+      const { until, prevFrom, prevTo } = previousPeriod(new Date(day(range.from)), new Date(day(range.to)), today());
       const totals = new Map<string, { now: number; before: number }>();
       const add = (list: typeof parts, key: 'now' | 'before') => {
         for (const p of list) {

@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { BudgetsService } from '../budgets/budgets.service';
 import { InvoicingService } from '../invoicing/invoicing.service';
 import { COUNTABLE_STATUSES, COMMITTED_STATUSES, countableStatusSql } from '../common/constants/transaction-status';
-import { parseDay, parseRange, parseYear } from '../common/helpers/dates';
+import { parseDay, parseRange, parseYear, today } from '../common/helpers/dates';
 import { workingDaysBetween } from '../common/helpers/working-days';
 import { DashboardService } from '../dashboard/dashboard.service';
 import { StockService } from '../stock/stock.service';
@@ -734,10 +734,10 @@ export class ReportingService {
       ORDER BY MIN(t.date_recorded) ASC
     `, ...params);
     const r2 = ReportingService.r2;
-    const today = Date.now();
+    const asOf = today();
     const mapped = rows.map((r) => ({
       Employee: r.employee || 'Unknown', 'Employee ID': `NT${r.employee_num}`, Claims: r.claims, Pending: r2(Number(r.pending)), 'On Hold': r2(Number(r.on_hold)), Outstanding: r2(Number(r.outstanding)),
-      'Oldest Claim': ReportingService.iso(new Date(r.oldest)), 'Days Waiting': Math.max(0, workingDaysBetween(new Date(r.oldest), new Date(today))),
+      'Oldest Claim': ReportingService.iso(new Date(r.oldest)), 'Days Waiting': Math.max(0, workingDaysBetween(new Date(r.oldest), asOf)),
     }));
     const sum = (k: 'Claims' | 'Pending' | 'On Hold' | 'Outstanding') => r2(mapped.reduce((a, r) => a + r[k], 0));
     return {

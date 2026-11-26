@@ -876,9 +876,9 @@ export class BudgetPlanningService {
     if (!plan || plan.status !== 'DRAFT') return { added: 0, updated: 0, removed: 0 };
     const projectId = b.projectId;
     const months = this.budgets.fyMonths(fy, s.fyStartMonth);
-    const start = p.start_date ? new Date(p.start_date) : new Date();
-    const end = p.end_date ? new Date(p.end_date) : new Date(start.getFullYear(), start.getMonth() + 5, 28);
-    const idx = months.map((m, i) => ({ m, i })).filter(({ m }) => new Date(m.year, m.month - 1, 28) >= start && new Date(m.year, m.month - 1, 1) <= end).map(({ i }) => i);
+    const start = p.start_date ? new Date(p.start_date) : this.today();
+    const end = p.end_date ? new Date(p.end_date) : new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 5, 28));
+    const idx = months.map((m, i) => ({ m, i })).filter(({ m }) => Date.UTC(m.year, m.month - 1, 28) >= start.getTime() && Date.UTC(m.year, m.month - 1, 1) <= end.getTime()).map(({ i }) => i);
     const use = idx.length ? idx : [0];
     const byType = new Map<number | null, number>();
     for (const l of (b.lines as any[])) byType.set(l.type_id ?? null, (byType.get(l.type_id ?? null) ?? 0) + n(l.quantity) * n(l.rate));

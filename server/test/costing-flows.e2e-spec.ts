@@ -7,6 +7,7 @@ import { AppModule } from './../src/app.module';
 import { PrismaService } from './../src/prisma/prisma.service';
 import { ResponseInterceptor } from './../src/common/interceptors/response.interceptor';
 import { HttpExceptionFilter } from './../src/common/filters/http-exception.filter';
+import { today as businessToday } from './../src/common/helpers/dates';
 
 // Costing from the product and the project side: who may do what, the BOM and its operations, price and margins,
 // the standard cost and the project estimate, baseline and milestones.
@@ -45,7 +46,7 @@ describe('Costing flows (e2e)', () => {
     await prisma.userRole.create({ data: { userId: user.id, roleId: role.id, isDefault: true } });
     return user.id;
   };
-  const today = () => new Date().toISOString().slice(0, 10);
+  const today = () => businessToday().toISOString().slice(0, 10);
 
   const cleanup = async () => {
     const products = (await prisma.product.findMany({ where: { name: { startsWith: 'ZZ ' } }, select: { id: true } })).map((p) => p.id);

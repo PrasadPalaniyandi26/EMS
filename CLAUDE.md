@@ -281,6 +281,7 @@ Columns on `users`, all in `schema.prisma`: `contact_no`, `house_apt`, `address`
   - Do not use `os.platform()` or `process.platform` guards as a substitute for writing portable code
 - **UI changes must follow `client-next/DESIGN.md`** (tokens, type scale, shared components for tables, panels, dialogs and forms). Run `npm run check:design` in `client-next/` before finishing a UI change; it must pass.
 - **Schedule day counts are working days (Monday to Friday)**: milestones, build-order lead times, build days and delivery windows, days late or spare, approval waiting. Use `server/src/common/helpers/working-days.ts` and `client-next/src/lib/working-days.ts`; never subtract dates by `86400000`. Public holidays are not modelled. Money terms (invoice due dates, payment terms, ageing) stay calendar days.
+- **"Today" is the business's date**: the server runs in `APP_TIMEZONE` (default `Asia/Kolkata`) whatever zone the host uses. On the server and in tests use `today()` from `server/src/common/helpers/dates.ts`; in the browser use `toLocalYMD()`. DATE columns are UTC midnight, so build date bounds with `Date.UTC`, never `new Date(y, m, d)`, `setHours(0,0,0,0)` or `toISOString()` on the current time.
 - Do not refactor working code unless explicitly asked
 - Do not add comments, docstrings, or type annotations to code you didn't change
 - Prefer editing existing files over creating new ones

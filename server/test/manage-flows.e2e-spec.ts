@@ -7,6 +7,7 @@ import { AppModule } from './../src/app.module';
 import { PrismaService } from './../src/prisma/prisma.service';
 import { ResponseInterceptor } from './../src/common/interceptors/response.interceptor';
 import { HttpExceptionFilter } from './../src/common/filters/http-exception.filter';
+import { today as businessToday } from './../src/common/helpers/dates';
 
 // The Manage records: clients, projects and products. What each one checks, what a partial change leaves alone,
 // what stops a delete, and who may change them.
@@ -43,7 +44,7 @@ describe('Manage records (e2e)', () => {
     const user = await prisma.user.create({ data: { username, loginName: username, email: `${username}@test.local`, passwordHash: await bcrypt.hash(PASSWORD, 4), roleId: role.id } });
     await prisma.userRole.create({ data: { userId: user.id, roleId: role.id, isDefault: true } });
   };
-  const day = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+  const day = (n: number) => new Date(businessToday().getTime() + n * 86400000).toISOString().slice(0, 10);
   let clientId: number; let typeId: number;
 
   const cleanup = async () => {

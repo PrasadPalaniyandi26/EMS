@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import './common/helpers/timezone';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
