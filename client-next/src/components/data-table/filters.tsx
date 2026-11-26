@@ -36,7 +36,7 @@ export function Filters({ defs }: { defs: FilterDef[] }) {
     return (
       <>
         {defs.map((f) => (
-          <NativeSelect key={f.id} aria-label={f.label} value={f.value} onChange={(e) => f.onChange(e.target.value)} className="!h-8 !w-auto">
+          <NativeSelect key={f.id} aria-label={f.label} value={f.value} onChange={(e) => f.onChange(e.target.value)} className="!h-8 !w-auto max-lg:!h-10">
             {f.placeholder && <option value={f.defaultValue ?? f.options[0]?.value} hidden>{f.placeholder}</option>}
             {f.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </NativeSelect>
@@ -49,7 +49,7 @@ export function Filters({ defs }: { defs: FilterDef[] }) {
   const reset = () => defs.filter(isActive).forEach((f) => f.onChange(f.defaultValue ?? f.options[0]?.value ?? ""))
   return (
     <>
-      <Button type="button" variant="outline" onClick={() => setOpen(true)} className="h-8 gap-1.5 px-3 text-[13px] font-medium">
+      <Button type="button" variant="outline" onClick={() => setOpen(true)} className="h-8 gap-1.5 px-3 text-[13px] font-medium max-lg:h-10">
         <ListFilter aria-hidden className="h-4 w-4 text-[var(--shell-text-muted)]" />
         Filters…
         {active > 0 && <span aria-label={`${active} active`} className="tabular-nums font-semibold text-[var(--shell-accent)]">{active}</span>}

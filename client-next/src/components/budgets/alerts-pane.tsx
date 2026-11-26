@@ -20,7 +20,7 @@ const ACTIONS: Record<string, { label: string; href: string; why: string }> = {
   open_line: { label: 'Open line', href: '/budget/monitor?tab=lines', why: 'Look at the line, its expenses and its forecast.' },
   view_expenses: { label: 'See lines', href: '/budget/monitor?tab=lines', why: 'See which expenses are using the line.' },
   open_plan: { label: 'Open planner', href: '/budget/planner', why: 'Change the budget or move money between lines.' },
-  open_stock: { label: 'Open stock', href: '/budget/stock', why: 'See which parts to buy again.' },
+  open_stock: { label: 'Open stock register', href: '/budget/stock', why: 'See which parts to buy again.' },
   open_approvals: { label: 'Open approvals', href: '/approvals', why: 'Approve or send back the expenses that are waiting.' },
 };
 

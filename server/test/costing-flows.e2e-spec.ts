@@ -257,6 +257,7 @@ describe('Costing flows (e2e)', () => {
       expect((await ms({ name: '', planned_date: today() })).status).toBe(400);
       expect((await ms({ name: 'ZZ Design', planned_date: 'not a date' })).status).toBe(400);
       expect((await ms({ name: 'ZZ Design', planned_date: today(), done_date: 'nope' })).status).toBe(400);
+      expect((await ms({ name: 'ZZ Design', planned_date: today(), done_date: '2999-01-01' })).status).toBe(400);
       const first = await ms({ name: 'ZZ Design', planned_date: today() });
       expect(first.status).toBe(201);
       const second = await ms({ name: 'ZZ Build', planned_date: today() });

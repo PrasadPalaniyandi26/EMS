@@ -90,6 +90,17 @@
 
   /* Shell tokens. surface/border/text/muted/accent are ALIASES of the shadcn tokens below (one source of
      truth); bg and hover have no shadcn equivalent and stay here. */
+  --brand-ink:         #16245a;  /* logo only: letter, trend and dot */
+  --brand-trend:       #0d8a5f;
+  --brand-dot:         #b98a1e;
+  --brand-letter-top:  #14306b;
+  --brand-letter-base: #0a2352;
+  --brand-edge:        transparent;
+  --brand-stem:        #0a2352;
+  --brand-stem-edge:   transparent;
+  --brand-silver-top:  #8a98a8;
+  --brand-silver-base: #74849a;
+  --brand-grey:        #8a98a8;
   --shell-bg:          #f4f4f4;  /* canvas: sidebar, top bar, page edge */
   --shell-surface:     var(--card);
   --shell-border:      var(--border);
@@ -222,6 +233,17 @@
   color-scheme: dark;
   /* Shell: two solid surfaces (canvas and surface) separated by hairlines, no blur or gradient.
      surface/border/text/muted/accent alias the shadcn tokens below (same as light). */
+  --brand-ink:         #f4f4f4;
+  --brand-trend:       #34c98e;
+  --brand-dot:         #e3b341;
+  --brand-letter-top:  #46c48c;
+  --brand-letter-base: #1f7a5c;
+  --brand-edge:        #8fe6bd;
+  --brand-stem:        #1c5c48;
+  --brand-stem-edge:   #d9b25c;
+  --brand-silver-top:  #ffffff;
+  --brand-silver-base: #a9d9c5;
+  --brand-grey:        #8f9a97;
   --shell-bg:          #262626;  /* canvas */
   --shell-surface:     var(--card);
   --shell-border:      var(--border);
@@ -513,16 +535,26 @@
   }
   .btn-action-primary:hover { opacity: 0.88; }
   .btn-action-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  /* Below desktop width the buttons are tapped, not clicked */
+  @media (max-width: 1023px) {
+    .btn-action, .btn-action-primary { height: 40px; min-height: 40px; }
+  }
 
   /* ── Nav ────────────────────────────────────────────── */
+  /* The current page is the one solid shape in the menu: no tint to hunt for */
   .nav-active {
-    background: color-mix(in srgb, var(--shell-accent) 12%, transparent);
-    color: var(--shell-accent);
+    background: var(--shell-accent);
+    color: var(--shell-accent-fg);
     font-weight: 600;
     border-radius: 6px;
   }
   .nav-active:hover {
-    background: color-mix(in srgb, var(--shell-accent) 18%, transparent);
+    background: color-mix(in srgb, var(--shell-accent) 90%, var(--shell-text));
+  }
+  /* The usual accent ring would vanish on the accent fill, so it turns inward in the text colour */
+  .nav-active:focus-visible {
+    outline: 2px solid var(--shell-accent-fg);
+    outline-offset: -4px;
   }
 
   /* ── Dialog header ──────────────────────────────────── */
@@ -580,4 +612,20 @@ th { text-transform: capitalize; }
 @media (prefers-reduced-motion: no-preference) {
   .bar-fill { transform-origin: left center; animation: bar-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: var(--bar-delay, 0ms); }
 }
+/* Sign in: ruled like the title artwork, fading out towards the edges */
+.ledger-grid {
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--shell-border) 55%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--shell-border) 55%, transparent) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 75% 70% at 40% 45%, black 25%, transparent 100%);
+}
+/* The stages arrive one after another, in the order the work happens */
+@media (prefers-reduced-motion: no-preference) {
+  .stage-tile { animation: stage-in 500ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .stage-tile:nth-child(2) { animation-delay: 120ms; }
+  .stage-tile:nth-child(3) { animation-delay: 240ms; }
+  .stage-tile:nth-child(4) { animation-delay: 360ms; }
+}
+@keyframes stage-in { from { transform: translateY(8px); } to { transform: none; } }
 @keyframes bar-in { from { transform: scaleX(0); } to { transform: scaleX(1); } }

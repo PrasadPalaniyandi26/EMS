@@ -23,7 +23,7 @@ const L = {
   monitor: { label: 'Monitor', href: '/budget/monitor' },
   parts: { label: 'Part master', href: '/budget/parts' },
   rates: { label: 'Cost rates', href: '/budget/rates' },
-  stock: { label: 'Stock', href: '/budget/stock' },
+  stock: { label: 'Stock register', href: '/budget/stock' },
   projects: { label: 'Projects', href: '/business/projects' },
   products: { label: 'Products', href: '/business/products' },
   orders: { label: 'Orders', href: '/business/orders' },

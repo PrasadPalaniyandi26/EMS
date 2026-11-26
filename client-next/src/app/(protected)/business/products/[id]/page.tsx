@@ -22,20 +22,22 @@ import { ConfirmDialog } from '@/components/shared/modal-primitives';
 import { DetailSummary, DetailSection, DetailGrid, DetailField, DetailAllocation, DetailActions, ToolbarActions, type DetailActionDef } from '@/components/shared/detail/detail-kit';
 import { BomLineModal, BuildPlanModal, BuildStepModal, ProductPricingModal, RejectCostModal, StandardCostModal, StepTypesModal } from '@/components/budgets/planning-modals';
 import { TabBar, TONE_CLASS, marginTone, money, productVerdict, unitPrice, useTabParam } from '@/components/budgets/budget-ui';
+import { AgainstStandardSection, CostElementDetail, CostGoesSection, costSheetColumns, costSheetRows, signedMoney, standardStatus, type CostRow } from '@/components/budgets/cost-sheet';
 import { formatDate } from '@/lib/currency';
 import { ORDER_STATUS, type BuildOrderStatus } from '@/hooks/use-build-orders';
 import { cn } from '@/lib/utils';
 
-type Tab = 'bom' | 'operations' | 'plan' | 'standard' | 'variances';
+type Tab = 'bom' | 'operations' | 'sheet' | 'plan' | 'standard' | 'variances';
 type Standard = ProductCosting['standards'][number];
 type PlanMonth = ProductCosting['build_plan'][number];
 
 const TABS: { value: Tab; label: string }[] = [
-  { value: 'bom', label: 'Bill of materials' }, { value: 'operations', label: 'Build operations' }, { value: 'standard', label: 'Standard cost' },
+  { value: 'bom', label: 'Bill of materials' }, { value: 'operations', label: 'Build operations' }, { value: 'sheet', label: 'Cost sheet' }, { value: 'standard', label: 'Standard cost' },
   { value: 'plan', label: 'Build plan' }, { value: 'variances', label: 'Variances' },
 ];
 const TAB_VALUES = TABS.map((t) => t.value);
 const EMPTY: Record<Tab, string> = {
+  sheet: 'Nothing to cost yet. Add parts on the Bill of materials tab or build operations.',
   bom: 'No parts yet. Click Add part to pick parts from the Part master.',
   operations: 'No build operations yet. Click Add build operation for final assembly, testing, packing or outsourced work.',
   plan: 'No build plan for this year.',
@@ -107,6 +109,15 @@ export default function ProductCostingDetailPage() {
     achieved: m.planned > 0 ? (m.actual / m.planned) * 100 : null,
   });
 
+  // Today's rolled-up cost, element by element, against the latest approved standard
+  const approvedStd = data?.approved ?? null;
+  const yearUnits = a?.planned_units ?? 0;
+  const yearLabel = yearUnits > 0 && data ? `For ${yearUnits} planned unit${yearUnits === 1 ? '' : 's'}` : null;
+  const sheetRows = useMemo(() => (!data?.cost ? [] : costSheetRows({
+    cost: data.cost, lines: data.lines, operations: data.operations, currency, priceNote: 'standard prices',
+    freightPct: data.bom?.freight_pct, warrantyPct: data.bom?.warranty_pct, units: data.annual.planned_units, standard: data.approved,
+  })), [data, currency]);
+
   const newestStandardId = Math.max(0, ...(data?.standards.map((s) => s.id) ?? []));
   const rows = useMemo<any[]>(() => {
     if (!data) return [];
@@ -114,10 +125,12 @@ export default function ProductCostingDetailPage() {
     if (tab === 'operations') return data.operations;
     if (tab === 'plan') return data.build_plan.map((m) => ({ ...m, id: `${m.year}-${m.month}` }));
     if (tab === 'standard') return data.standards;
+    if (tab === 'sheet') return sheetRows;
     return data.lines.filter((l) => sourcing === 'ALL' || l.sourcing === sourcing);
-  }, [data, tab, sourcing]);
+  }, [data, tab, sourcing, sheetRows]);
 
   const columns = useMemo<ColumnDef<any, any>[]>(() => {
+    if (tab === 'sheet') return costSheetColumns({ currency, manyHeader: yearLabel, standardFy: approvedStd?.fy });
     if (tab === 'bom') return [
       { accessorKey: 'sequence', header: headerRight('Seq'), cell: ({ row }) => <NumCell>{row.original.sequence}</NumCell>, size: 48 },
       { accessorKey: 'group_name', header: 'Group', cell: ({ row }) => <TextCell value={row.original.group_name} muted className="block max-w-[110px] truncate" />, size: 110 },
@@ -170,7 +183,7 @@ export default function ProductCostingDetailPage() {
       ] : []),
       { id: 'status', header: 'Status', size: 130, cell: ({ row }) => <ToneText label={driftOf(row.original)} tone={driftTone(row.original)} /> },
     ];
-  }, [tab, currency, c, units, a?.unit_cost, a?.plan_unit_cost, newestStandardId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tab, currency, c, units, a?.unit_cost, a?.plan_unit_cost, newestStandardId, yearLabel, approvedStd?.fy]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const table = useDataTable({
     data: rows, columns, state: { sorting, rowSelection: selection }, onSortingChange: setSorting, getRowId: (r) => String(r.id),
@@ -240,7 +253,7 @@ export default function ProductCostingDetailPage() {
       {pr && (
         <DetailSection title={`Price and margin, ${fyText(pr.fy)}`}>
           {pr.price == null && pr.target_margin_pct == null && pr.min_margin_pct == null ? (
-            <p className="text-[12px] text-[var(--shell-text-muted)]">No selling price is set for {fyText(pr.fy)}.{isFinance ? ' Use Price and costing to add one.' : ' Ask Finance to add one.'}</p>
+            <p className="text-[12px] text-[var(--shell-text-muted)]">No selling price is set for {fyText(pr.fy)}.{isFinance ? ' Add one with Price and costing on the Cost sheet or Standard cost tab.' : ' Ask Finance to add one.'}</p>
           ) : (
             <>
               <DetailGrid>
@@ -335,8 +348,35 @@ export default function ProductCostingDetailPage() {
     </div>
   );
 
+  const sheetSummary = !data || !c ? null : (
+    <div className="space-y-4">
+      <DetailSummary title="Cost per unit" subtitle={[data.product.code, "today's cost"].filter(Boolean).join(' · ')}
+        status={standardStatus(c.total, approvedStd, currency).text} statusClass={standardStatus(c.total, approvedStd, currency).className}
+        figure={money(c.total, currency)} figureLabel="Total of all cost elements" />
+      {pr && (
+        <DetailSection title={`At today's cost, ${fyText(pr.fy)}`}>
+          <DetailGrid>
+            <DetailField label="Selling price per unit" value={pr.price != null ? money(pr.price, currency) : 'Not set'} />
+            <DetailField label="Profit per unit" value={pr.price != null ? signedMoney(pr.price - c.total, currency) : undefined} tone={pr.price != null && pr.price < c.total ? 'danger' : 'muted'} />
+            <DetailField label="Margin" value={pr.price ? `${(((pr.price - c.total) / pr.price) * 100).toFixed(1)}%` : undefined} tone={marginTone(pr.price ? ((pr.price - c.total) / pr.price) * 100 : null, pr.target_margin_pct, pr.min_margin_pct)} />
+            <DetailField label="Target margin" value={pr.target_margin_pct != null ? `${pr.target_margin_pct}%` : 'Not set'} />
+            {yearUnits > 0 && <DetailField label={`Cost of ${yearUnits} planned units`} value={money(c.total * yearUnits, currency)} wide />}
+          </DetailGrid>
+          {pr.basis === 'STANDARD' && Math.abs(pr.unit_cost - c.total) > 0.5 && <p className="text-[12px] text-[var(--shell-text-muted)]">The product&apos;s margin elsewhere uses the approved standard cost of {money(pr.unit_cost, currency)}.</p>}
+        </DetailSection>
+      )}
+      <CostGoesSection cost={c} currency={currency} />
+      <AgainstStandardSection total={c.total} standard={approvedStd} currency={currency} units={yearUnits} unitsLabel={`${yearUnits} planned units`}
+        missing="No standard cost is approved yet. Use Propose standard cost to send this cost for approval." note="A difference means parts, rates or the BOM have moved since the standard was approved. Propose a new standard cost to adopt today's figures." />
+      {data.bom?.adjust_reason && <p className="text-[12px] text-[var(--warning)]">Adjusted from the defaults: {data.bom.adjust_reason}</p>}
+      {c.pool_missing && !data.bom?.overhead_rate_override && <p role="alert" className="text-[12px] text-[var(--warning)]">There are no overhead pools for {fyText(c.fy)}, so this cost carries no overhead. Add them under Cost rates.</p>}
+      <p className="text-[12px] text-[var(--shell-text-muted)]">Select a cost element to see what makes it up.</p>
+    </div>
+  );
+
   const detail = (() => {
     if (!selected) return null;
+    if (tab === 'sheet') return <CostElementDetail row={selected as CostRow} lines={data?.lines ?? []} operations={data?.operations ?? []} overheadRate={c?.overhead_rate ?? 0} currency={currency} manyLabel={yearLabel} />;
     if (tab === 'variances') {
       const l = selected as BomLineRow;
       const r = lineVar(l);
@@ -517,8 +557,8 @@ export default function ProductCostingDetailPage() {
     ...(tab === 'operations' && canCfg ? [{ label: 'Add build operation', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setEditOp(null); setOpOpen(true); } }] : []),
     ...(tab === 'operations' && canCfg ? [{ label: 'Manage operation types', icon: <Settings2 className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setTypesOpen(true) }] : []),
     ...(tab === 'plan' && canProp ? [{ label: 'Add to budget plan', icon: <CalendarPlus className="h-4 w-4 text-[var(--nav-cyan)]" />, disabled: data?.plan_status !== 'DRAFT', onClick: () => setPlanConfirm(true) }] : []),
-    ...(tab === 'standard' && canProp && data && data.lines.length > 0 ? [{ label: 'Propose standard cost', icon: <Calculator className="h-4 w-4 text-[var(--info)]" />, onClick: () => act(() => api.post(`/budgets/products/${id}/standard-cost`, {}), 'Standard cost proposed. Approve it on the Standard cost tab.') }] : []),
-    ...(isFinance && data ? [{ label: 'Price and costing', icon: <Tag className="h-4 w-4 text-[var(--nav-violet)]" />, onClick: () => setPricingOpen(true) }] : []),
+    ...((tab === 'standard' || tab === 'sheet') && canProp && data && data.lines.length > 0 ? [{ label: 'Propose standard cost', icon: <Calculator className="h-4 w-4 text-[var(--info)]" />, onClick: () => act(() => api.post(`/budgets/products/${id}/standard-cost`, {}), 'Standard cost proposed. Approve it on the Standard cost tab.') }] : []),
+    ...((tab === 'sheet' || tab === 'standard') && isFinance && data ? [{ label: 'Price and costing', icon: <Tag className="h-4 w-4 text-[var(--nav-violet)]" />, onClick: () => setPricingOpen(true) }] : []),
   ];
 
   return (
@@ -537,8 +577,8 @@ export default function ProductCostingDetailPage() {
             />
           }
           intelligencePanel={
-            <ModuleIntelligencePanel title={selected ? (tab === 'operations' ? 'Build operation' : tab === 'standard' ? 'Standard cost' : tab === 'plan' ? 'Month' : 'Part') : 'Summary'} onClose={() => setSelection({})} hasSelection={!!selected}
-              idle={tab === 'variances' ? varianceSummary : tab === 'standard' ? standardSummary : costSummary} footer={itemActions.length ? <DetailActions actions={itemActions} /> : undefined}>
+            <ModuleIntelligencePanel title={selected ? (tab === 'sheet' ? 'Cost element' : tab === 'operations' ? 'Build operation' : tab === 'standard' ? 'Standard cost' : tab === 'plan' ? 'Month' : 'Part') : 'Summary'} onClose={() => setSelection({})} hasSelection={!!selected}
+              idle={tab === 'variances' ? varianceSummary : tab === 'standard' ? standardSummary : tab === 'sheet' ? sheetSummary ?? undefined : costSummary} footer={itemActions.length ? <DetailActions actions={itemActions} /> : undefined}>
               {detail}
             </ModuleIntelligencePanel>
           }

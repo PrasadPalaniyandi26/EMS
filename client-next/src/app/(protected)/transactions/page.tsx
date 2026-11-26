@@ -100,6 +100,9 @@ export default function TransactionsPage() {
 
   useEffect(() => { setHeader('Transactions', 'View all transactions'); }, [setHeader]);
 
+  // Read after mounting, so the server and browser render the same first page
+  useEffect(() => { const q = new URLSearchParams(window.location.search).get('search'); if (q) setSearch(q); }, []);
+
   useEffect(() => { setPagination((p) => ({ ...p, pageIndex: 0 })); }, [search, filterType, filterPayment, filterClient, datePreset, dateFrom, dateTo]);
 
   const queryParams = useMemo(() => ({

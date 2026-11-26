@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, ArrowLeftRight, CheckCircle2, XCircle, ClipboardList, Clock, Network, Replace, Layers, History, Star, Unlink } from 'lucide-react';
 import { fyLabel } from '@/hooks/use-budget-queries';
 import api from '@/lib/api-client';
+import { todayIso } from '@/lib/working-days';
 import { ModuleModal } from '@/components/shared/module/module-modal';
 import { ConfirmDialog, Field, NativeSelect, CurrencyInput, SectionHeader, SegmentedControl, inp } from '@/components/shared/modal-primitives';
 import { PickSelect } from '@/components/shared/pick-select';
@@ -259,7 +260,7 @@ export function MilestoneModal({ isOpen, onClose, projectId, editing }: Base & {
   }, [isOpen, editing]);
   return (
     <ModuleModal isOpen={isOpen} onClose={onClose} size="sm" title={editing ? 'Edit milestone' : 'Add milestone'} icon={editing ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-      canSave={!saving && !!name.trim() && !!planned} saveLabel={editing ? 'Update milestone' : 'Add milestone'}
+      canSave={!saving && !!name.trim() && !!planned && !(done && done > todayIso())} saveLabel={editing ? 'Update milestone' : 'Add milestone'}
       onSave={() => run(() => {
         const body = { name, planned_date: planned, done_date: done || null };
         return editing ? api.put(`/budgets/projects/${projectId}/milestones/${editing.id}`, body) : api.post(`/budgets/projects/${projectId}/milestones`, body);
@@ -268,7 +269,7 @@ export function MilestoneModal({ isOpen, onClose, projectId, editing }: Base & {
         <Field label="Milestone" required>{text(name, setName, { maxLength: 120 })}</Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Planned date" required><Input type="date" className={ctl} value={planned} onChange={(e) => setPlanned(e.target.value)} /></Field>
-          <Field label="Done on"><Input type="date" className={ctl} value={done} onChange={(e) => setDone(e.target.value)} /></Field>
+          <Field label="Done on" error={done && done > todayIso() ? 'The done date cannot be in the future.' : undefined}><Input type="date" className={ctl} value={done} max={todayIso()} onChange={(e) => setDone(e.target.value)} /></Field>
         </div>
       </div>
     </ModuleModal>

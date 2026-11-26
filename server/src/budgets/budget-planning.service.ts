@@ -921,6 +921,7 @@ export class BudgetPlanningService {
     const planned = new Date(b.planned_date); const done = b.done_date ? new Date(b.done_date) : null;
     if (Number.isNaN(planned.getTime())) throw bad('Enter the planned date as a real date.');
     if (done && Number.isNaN(done.getTime())) throw bad('Enter the done date as a real date.');
+    if (done && done.getTime() > this.today().getTime()) throw bad('The done date cannot be in the future.');
     const data = { name, plannedDate: planned, doneDate: done };
     const row = id ? await this.prisma.projectMilestone.update({ where: { id }, data }) : await this.prisma.projectMilestone.create({ data: { ...data, projectId } });
     return { id: row.id };

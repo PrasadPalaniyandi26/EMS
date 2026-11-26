@@ -28,11 +28,12 @@ import { ConfirmDialog } from '@/components/shared/modal-primitives';
 import { TabBar, marginTone as projectMarginTone, money, unitPrice, useTabParam } from '@/components/budgets/budget-ui';
 import { cn } from '@/lib/utils';
 import { JobStockTab } from '@/components/stock/job-stock-tab';
+import { AgainstStandardSection, CostElementDetail, CostGoesSection, costSheetColumns, costSheetRows, standardStatus, type CostRow } from '@/components/budgets/cost-sheet';
 
 type Tab = 'bom' | 'operations' | 'standard' | 'timeline' | 'variances' | 'material';
 const TABS: { value: Tab; label: string }[] = [
-  { value: 'bom', label: 'Bill of materials' }, { value: 'operations', label: 'Build operations' }, { value: 'standard', label: 'Cost vs standard' },
-  { value: 'timeline', label: 'Build timeline' }, { value: 'variances', label: 'Variances' }, { value: 'material', label: 'Material' },
+  { value: 'bom', label: 'Bill of materials' }, { value: 'operations', label: 'Build operations' }, { value: 'standard', label: 'Cost sheet' },
+  { value: 'material', label: 'Material' }, { value: 'timeline', label: 'Build timeline' }, { value: 'variances', label: 'Variances' },
 ];
 const TAB_VALUES = TABS.map((t) => t.value);
 // With no target or minimum margin set there is nothing to judge a margin against, so only a loss is coloured
@@ -81,14 +82,11 @@ export default function BuildOrderDetailPage() {
   const editable = !!o && o.editable && canEdit;
   const signed = (x: number) => `${x > 0 ? '+' : x < 0 ? '-' : ''}${unitPrice(Math.abs(x), currency)}`;
 
-  const stdRows = useMemo(() => {
-    if (!c) return [];
-    const parts: [string, number, number | null][] = [
-      ['Material', c.material, sn?.material ?? null], ['Scrap', c.scrap, sn?.scrap ?? null], ['Freight and handling', c.freight, sn?.freight ?? null],
-      ['Build operations', c.conversion + c.fixed, sn ? sn.conversion + sn.fixed : null], ['Overhead', c.overhead, sn?.overhead ?? null], ['Warranty', c.warranty, sn?.warranty ?? null], ['Cost per unit', c.total, sn?.total ?? null],
-    ];
-    return parts.map(([label, mine, std], i) => ({ id: i, label, mine, std, diff: std == null ? null : mine - std, total: label === 'Cost per unit' }));
-  }, [c, sn]);
+  const stdRows = useMemo(() => (!o || !c ? [] : costSheetRows({
+    cost: c, lines: o.lines, operations: o.operations, currency, priceNote: "this order's BOM prices",
+    freightPct: o.bom_settings?.freight_pct, warrantyPct: o.bom_settings?.warranty_pct, units: o.quantity, standard: sn,
+  })), [o, c, sn, currency]);
+  const orderUnits = `For ${o?.quantity ?? 0} unit${o?.quantity === 1 ? '' : 's'}`;
 
   // The dates the order has to hit: parts arriving, each step being built, then the earliest and the promised delivery
   const timelineRows = useMemo(() => {
@@ -107,7 +105,7 @@ export default function BuildOrderDetailPage() {
         out.push({ date: at(st.lead_days), day: st.lead_days, event: `Step ${st.sequence} parts arrive`, detail: `${plural(parts.length, 'part')}${last ? `, last is ${last.part_no}` : ''}`, status: lateParts.length ? 'Too late' : '', tone: lateParts.length ? 'danger' : 'muted' });
       }
       if (st.build_days > 0) {
-        out.push({ date: at(st.begins_day), day: st.begins_day, event: `Step ${st.sequence} build begins`, detail: `${plural(st.build_days, 'day')}, done ${formatDate(at(st.finish_day))}`, status: st.finish_day > o.lead.window_days ? 'Too late' : '', tone: st.finish_day > o.lead.window_days ? 'danger' : 'muted' });
+        out.push({ date: at(st.begins_day), day: st.begins_day, event: `Step ${st.sequence} build begins`, detail: `${plural(st.build_days, 'day')}, finishes ${formatDate(at(st.finish_day))}`, status: st.finish_day > o.lead.window_days ? 'Too late' : '', tone: st.finish_day > o.lead.window_days ? 'danger' : 'muted' });
       }
     }
     const spare = o.lead.window_days - o.lead.needed_days;
@@ -123,15 +121,16 @@ export default function BuildOrderDetailPage() {
       { accessorKey: 'sequence', header: headerRight('Seq'), cell: ({ row }) => <NumCell>{row.original.sequence}</NumCell>, size: 48 },
       { accessorKey: 'part_no', header: 'Part', cell: ({ row }) => <IdCell value={row.original.part_no} />, size: 110 },
       { accessorKey: 'name', header: 'Name', cell: ({ row }) => <TextCell value={row.original.name} strong className="block max-w-[170px] truncate" /> },
-      { accessorKey: 'quantity', header: headerRight('Qty'), cell: ({ row }) => <NumCell>{row.original.quantity}{row.original.scrap_pct ? <span className="text-[var(--shell-text-muted)]"> (+{row.original.scrap_pct}%)</span> : null}</NumCell>, size: 90 },
+      { accessorKey: 'quantity', header: headerRight('Qty'), cell: ({ row }) => <NumCell>{row.original.quantity}</NumCell>, size: 60 },
+      { accessorKey: 'scrap_pct', header: headerRight('Scrap'), cell: ({ row }) => <NumCell>{row.original.scrap_pct ? `${row.original.scrap_pct}%` : '—'}</NumCell>, size: 70 },
       { accessorKey: 'unit_cost', header: headerRight('Unit cost'), cell: ({ row }) => <NumCell>{unitPrice(row.original.unit_cost, currency)}</NumCell>, size: 110 },
       { accessorKey: 'amount', header: headerRight('Amount'), cell: ({ row }) => <NumCell strong>{unitPrice(row.original.amount, currency)}</NumCell>, size: 110 },
       {
-        accessorKey: 'lead_time_days', header: headerRight('Lead time (days)'), size: 130,
+        accessorKey: 'lead_time_days', header: headerRight('Lead (days)'), size: 90,
         cell: ({ row }) => { const l = row.original as OrderLine; if (l.item_id == null) return <NumCell>—</NumCell>; const late = !!o?.lead.late_lines.includes(l.id); return <div className="text-right">{l.lead_time_days == null ? <ToneText label="Not set" tone="warning" /> : <ToneText label={String(l.lead_time_days)} tone={late ? 'danger' : 'muted'} />}</div>; },
       },
       {
-        id: 'alternate', header: 'Alternate', size: 170,
+        id: 'alternate', header: 'Alternate', size: 110,
         cell: ({ row }) => { const l = row.original as OrderLine; if (l.part_status && l.part_status !== 'ACTIVE') return <ToneText label={`Part ${l.part_status === 'REPLACED' ? 'replaced' : 'retired'}`} tone="warning" />; return l.swapped ? <ToneText label={`Swapped from ${l.source_part_no}`} tone="info" /> : l.alternates.length ? <TextCell value={`${l.alternates.length} available`} muted /> : <TextCell value="" />; },
       },
     ];
@@ -160,23 +159,12 @@ export default function BuildOrderDetailPage() {
       { id: 'overhead', header: headerRight('Overhead'), cell: ({ row }) => <NumCell>{(row.original.is_outsourced || row.original.is_fixed) ? '—' : money(row.original.hours * (c?.overhead_rate ?? 0), currency)}</NumCell>, size: 110 },
       { id: 'total', header: headerRight('Total'), cell: ({ row }) => <NumCell strong>{money(row.original.amount + ((row.original.is_outsourced || row.original.is_fixed) ? 0 : row.original.hours * (c?.overhead_rate ?? 0)), currency)}</NumCell>, size: 120 },
     ];
-    return [
-      { accessorKey: 'label', header: 'Cost per unit', cell: ({ row }) => <TextCell value={row.original.label} strong={row.original.total} /> },
-      { accessorKey: 'mine', header: headerRight('This order'), cell: ({ row }) => <NumCell strong={row.original.total}>{money(row.original.mine, currency)}</NumCell>, size: 150 },
-      // With no approved standard there is nothing to compare, so the two empty columns are left out
-      ...(sn ? [
-        { accessorKey: 'std', header: headerRight(`Approved standard ${fyText(sn.fy)}`), cell: ({ row }: any) => <NumCell strong={row.original.total}>{row.original.std == null ? '—' : money(row.original.std, currency)}</NumCell>, size: 190 },
-        {
-          accessorKey: 'diff', header: headerRight('Difference'), size: 140,
-          cell: ({ row }: any) => { const d = row.original.diff as number | null; return <div className="text-right"><ToneText label={d == null ? '—' : d === 0 ? '0' : `${d > 0 ? '+' : '-'}${money(Math.abs(d), currency)}`} tone={d == null || Math.abs(d) < 0.5 ? 'muted' : d > 0 ? 'warning' : 'success'} /></div>; },
-        },
-      ] : []),
-    ];
+    return costSheetColumns({ currency, manyHeader: orderUnits, standardFy: sn?.fy });
   }, [tab, currency, o, c, sn]);
 
   const table = useDataTable({
     data: rows, columns, state: { sorting, rowSelection: selection }, onSortingChange: setSorting, getRowId: (r) => String(r.id),
-    enableRowSelection: tab !== 'standard' && tab !== 'timeline', enableMultiRowSelection: false,
+    enableRowSelection: tab !== 'timeline', enableMultiRowSelection: false,
     onRowSelectionChange: (u) => setSelection(typeof u === 'function' ? u(selection) : u),
     getCoreRowModel: getCoreRowModel(), getFilteredRowModel: getFilteredRowModel(), getPaginationRowModel: getPaginationRowModel(), getSortedRowModel: getSortedRowModel(),
   });
@@ -202,20 +190,29 @@ export default function BuildOrderDetailPage() {
     { label: 'Edit', icon: <Pencil className="h-4 w-4 text-[var(--info)]" />, onClick: () => { setEditOp(selected as OrderOperation); setOpOpen(true); } },
     { label: 'Delete', variant: 'danger', icon: <Trash2 className="h-4 w-4 text-[var(--danger)]" />, onClick: () => setDelOp(selected as OrderOperation) },
   ] : [];
-  const alwaysActions: DetailActionDef[] = !o || !canEdit ? [] : [
-    ...(tab === 'operations' && o.editable && o.has_bom ? [{ label: 'Add build operation', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setEditOp(null); setOpOpen(true); } }] : []),
+  // Each tab shows only its own actions. The next step moves the whole order on, so it is on every tab; managing the
+  // order itself (BOM copy, reopen, cancel, edit, delete) stays on the first tab, away from the row-level Delete buttons.
+  const may = !!o && canEdit;
+  const operationActions: DetailActionDef[] = may && tab === 'operations' && o.editable && o.has_bom
+    ? [{ label: 'Add build operation', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setEditOp(null); setOpOpen(true); } }] : [];
+  const costActions: DetailActionDef[] = !may || tab !== 'standard' ? [] : [
     ...(o.editable ? [{ label: 'Price and costing', icon: <Tag className="h-4 w-4 text-[var(--nav-violet)]" />, onClick: () => setPricingOpen(true) }] : []),
     ...(o.editable && o.has_bom && driftNow ? [{ label: 'Recost', icon: <RefreshCw className="h-4 w-4 text-[var(--nav-orange)]" />, onClick: () => act(() => api.post(`/build-orders/${o.id}/recost`, {}), 'Order costed again.') }] : []),
-    ...(o.status === 'COMMITTED' && o.has_bom ? [{ label: 'Reimport BOM', icon: <PackageOpen className="h-4 w-4 text-[var(--nav-cyan)]" />, onClick: () => setReimport(true) }] : []),
+  ];
+  const nextStep: DetailActionDef[] = !may ? [] : [
     ...(o.status === 'COMMITTED' && !o.has_bom ? [{ label: 'Import BOM', variant: 'primary' as const, icon: <PackageOpen className="h-4 w-4 text-[var(--nav-cyan)]" />, onClick: () => act(() => api.post(`/build-orders/${o.id}/import-bom`, {}), 'Standard BOM imported and the order costed.') }] : []),
     ...(o.status === 'COMMITTED' && o.has_bom ? [{ label: 'Release', variant: 'primary' as const, icon: <Rocket className="h-4 w-4 text-[var(--nav-indigo)]" />, onClick: () => openStep('release') }] : []),
-    ...(o.status === 'RELEASED' ? [{ label: 'Reopen', icon: <Undo2 className="h-4 w-4 text-[var(--nav-slate)]" />, onClick: () => openStep('reopen') }] : []),
     ...(o.status === 'RELEASED' ? [{ label: 'Start build', variant: 'primary' as const, icon: <Hammer className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setStartOpen(true) }] : []),
     ...(o.status === 'IN_BUILD' && isFinance ? [{ label: 'Deliver', variant: 'primary' as const, icon: <CircleCheck className="h-4 w-4 text-[var(--nav-violet)]" />, onClick: () => setDeliverOpen(true) }] : []),
+  ];
+  const manageActions: DetailActionDef[] = !may || tab !== 'bom' ? [] : [
+    ...(o.status === 'COMMITTED' && o.has_bom ? [{ label: 'Reimport BOM', icon: <PackageOpen className="h-4 w-4 text-[var(--nav-cyan)]" />, onClick: () => setReimport(true) }] : []),
+    ...(o.status === 'RELEASED' ? [{ label: 'Reopen', icon: <Undo2 className="h-4 w-4 text-[var(--nav-slate)]" />, onClick: () => openStep('reopen') }] : []),
     ...((o.status === 'RELEASED' || o.status === 'IN_BUILD') && isFinance ? [{ label: 'Cancel order', icon: <Ban className="h-4 w-4 text-[var(--nav-rose)]" />, onClick: () => setCancelOpen(true) }] : []),
     ...(o.editable ? [{ label: 'Edit order', icon: <Pencil className="h-4 w-4 text-[var(--info)]" />, onClick: () => setEditOpen(true) }] : []),
     ...(o.status === 'COMMITTED' ? [{ label: 'Delete order', variant: 'danger' as const, icon: <Trash2 className="h-4 w-4 text-[var(--danger)]" />, onClick: () => setDelOrder(true) }] : []),
   ];
+  const alwaysActions: DetailActionDef[] = [...operationActions, ...costActions, ...nextStep, ...manageActions];
   // A selected part's own action (Swap part) comes first, then the order's main action
   const panelActions = [...itemActions, ...alwaysActions.filter((a) => a.variant === 'primary')].slice(0, 3);
 
@@ -234,7 +231,7 @@ export default function BuildOrderDetailPage() {
           {o.stale.bom_newer != null && <p>The product&apos;s BOM has a newer version (version {o.stale.bom_newer}) than the copy on this order (version {o.source_bom_version}).</p>}
           {o.stale.ended_parts > 0 && <p>{o.stale.ended_parts} part{o.stale.ended_parts === 1 ? ' has' : 's have'} been replaced or retired on the Part master since this was copied.</p>}
           {o.stale.standard_changed && <p>The approved standard cost has changed since this was copied.</p>}
-          {o.status === 'COMMITTED' ? <p>Use Reimport BOM to pick the changes up.</p> : <p>Reopen the order first if you want to reimport the BOM.</p>}
+          {o.status === 'COMMITTED' ? <p>Use Reimport BOM on the Bill of materials tab to pick the changes up.</p> : <p>To reimport the BOM, first reopen the order on the Bill of materials tab.</p>}
         </div>
       )}
       {o.has_bom && c && (
@@ -247,11 +244,11 @@ export default function BuildOrderDetailPage() {
             <DetailField label={`Overhead (${money(c.overhead_rate, currency)}/h)`} value={money(c.overhead, currency)} />
             <DetailField label="Warranty" value={money(c.warranty, currency)} />
           </DetailGrid>
-          {o.cost_drift != null && driftNow && o.editable && <p className="text-[12px] text-[var(--warning)]">Part prices have moved by {signed(o.cost_drift)} per unit since this was costed. Recost to update it.</p>}
+          {o.cost_drift != null && driftNow && o.editable && <p className="text-[12px] text-[var(--warning)]">Part prices have moved by {signed(o.cost_drift)} per unit since this was costed. Use Recost on the Cost sheet tab to update it.</p>}
         </DetailSection>
       )}
       <DetailSection title="Price and margin">
-        {o.unit_price == null ? <p className="text-[12px] text-[var(--shell-text-muted)]">No selling price is set for this order.{editable ? ' Use Price and costing to add one.' : ''}</p> : (
+        {o.unit_price == null ? <p className="text-[12px] text-[var(--shell-text-muted)]">No selling price is set for this order.{editable ? ' Add one with Price and costing on the Cost sheet tab.' : ''}</p> : (
           <>
             <DetailGrid>
               <DetailField label="Selling price" value={unitPrice(o.unit_price, currency)} />
@@ -262,7 +259,7 @@ export default function BuildOrderDetailPage() {
               <DetailField label="Minimum margin" value={t?.min_margin_pct != null ? `${t.min_margin_pct}%` : 'Not set'} />
               {liveMargin != null && <DetailField label="Margin at today's part prices" value={`${liveMargin.toFixed(1)}%`} tone={marginTone(liveMargin, t?.target_margin_pct ?? null, t?.min_margin_pct ?? null) === 'muted' ? 'warning' : marginTone(liveMargin, t?.target_margin_pct ?? null, t?.min_margin_pct ?? null)} wide />}
             </DetailGrid>
-            {liveMargin != null && liveMargin < 0 && <p role="alert" className="text-[12px] text-[var(--danger)]">At today&apos;s part prices the cost per unit is above the selling price, so this order would make a loss. Recost to see it in the margin.</p>}
+            {liveMargin != null && liveMargin < 0 && <p role="alert" className="text-[12px] text-[var(--danger)]">At today&apos;s part prices the cost per unit is above the selling price, so this order would make a loss. Use Recost on the Cost sheet tab to see it in the margin.</p>}
             {margin != null && margin < 0 && <p role="alert" className="text-[12px] text-[var(--danger)]">The cost per unit is above the selling price, so this order makes a loss.</p>}
             {margin != null && margin >= 0 && t?.min_margin_pct != null && margin < t.min_margin_pct && <p role="alert" className="text-[12px] text-[var(--danger)]">Margin is below the minimum of {t.min_margin_pct}%.</p>}
           </>
@@ -315,22 +312,34 @@ export default function BuildOrderDetailPage() {
     </div>
   );
 
+  const signedMoney = (x: number) => `${x > 0 ? '+' : x < 0 ? '-' : ''}${money(Math.abs(x), currency)}`;
+  const orderCost = o && c ? c.total * o.quantity : 0;
+  const profit = o && c && o.unit_price != null ? (o.unit_price - c.total) * o.quantity : null;
+  const costMargin = o && c && o.unit_price ? ((o.unit_price - c.total) / o.unit_price) * 100 : null;
   const standardSummary = !o || !c ? null : (
     <div className="space-y-4">
-      <DetailSummary title="Against the standard" subtitle={o.code} status={sn ? `Approved standard ${fyText(sn.fy)}` : 'No approved standard cost'} statusClass="text-[var(--shell-text-muted)]"
-        figure={sn ? `${c.total >= sn.total ? '+' : '−'}${money(Math.abs(c.total - sn.total), currency)}` : undefined} figureLabel="This order against the standard" />
-      <DetailSection title="Cost per unit">
+      <DetailSummary title="Cost per unit" subtitle={`${o.code} · ${o.quantity} unit${o.quantity === 1 ? '' : 's'}`}
+        status={standardStatus(c.total, sn, currency).text} statusClass={standardStatus(c.total, sn, currency).className}
+        figure={money(c.total, currency)} figureLabel="Total of all cost elements" />
+      <DetailSection title="For this order">
         <DetailGrid>
-          <DetailField label="This order" value={money(c.total, currency)} />
-          <DetailField label="Approved standard" value={sn ? money(sn.total, currency) : 'None'} />
+          <DetailField label="Total cost" value={money(orderCost, currency)} />
+          <DetailField label="Order value" value={o.total_value != null ? money(o.total_value, currency) : 'No price set'} />
+          <DetailField label="Profit" value={profit != null ? signedMoney(profit) : undefined} tone={profit != null && profit < 0 ? 'danger' : 'muted'} />
+          <DetailField label="Margin" value={costMargin != null ? `${costMargin.toFixed(1)}%` : undefined} tone={marginTone(costMargin, t?.target_margin_pct ?? null, t?.min_margin_pct ?? null)} />
+          <DetailField label="Selling price per unit" value={o.unit_price != null ? unitPrice(o.unit_price, currency) : undefined} />
+          <DetailField label="Target margin" value={t?.target_margin_pct != null ? `${t.target_margin_pct}%` : 'Not set'} />
         </DetailGrid>
+        {driftNow && o.editable && o.cost_drift != null && <p className="text-[12px] text-[var(--warning)]">Part prices have moved by {signed(o.cost_drift)} per unit since the order was costed. Recost to update the saved cost.</p>}
       </DetailSection>
-      <p className="text-[12px] text-[var(--shell-text-muted)]">{sn ? 'The order keeps the BOM it copied, so it can differ from the standard as it stands now.' : 'Approve a standard cost on the product to compare this order against it.'}</p>
+      <CostGoesSection cost={c} currency={currency} />
+      <AgainstStandardSection total={c.total} standard={sn} currency={currency} units={o.quantity} unitsLabel="the order"
+        missing="Approve a standard cost on the product to compare this order against it." note="The order keeps the BOM it copied, so it can differ from the standard as it stands now." />
+      <p className="text-[12px] text-[var(--shell-text-muted)]">Select a cost element to see what makes it up.</p>
     </div>
   );
 
   const a = o?.actuals;
-  const signedMoney = (x: number) => `${x > 0 ? '+' : x < 0 ? '-' : ''}${money(Math.abs(x), currency)}`;
   const varianceSummary = !o || !a ? null : (
     <div className="space-y-4">
       <DetailSummary title="Cost against plan" subtitle={o.code} status={o.status === 'DELIVERED' ? 'Delivered: final figures' : 'In progress: spent so far'} statusClass="text-[var(--shell-text-muted)]" figure={money(a.approved, currency)} figureLabel="Approved spend" />
@@ -377,6 +386,9 @@ export default function BuildOrderDetailPage() {
 
   const detail = (() => {
     if (!selected || !o) return null;
+    if (tab === 'standard') {
+      return <CostElementDetail row={selected as CostRow} lines={o.lines} operations={o.operations} overheadRate={c?.overhead_rate ?? 0} currency={currency} manyLabel={orderUnits} />;
+    }
     if (tab === 'variances') {
       const x = selected as { reference_id: string | null; date_recorded: string; description: string | null; category_name: string | null; is_e200: boolean; amount: number; status: string | null; submitted_by_name: string | null };
       const st = statusWord(x.status);
@@ -458,11 +470,11 @@ export default function BuildOrderDetailPage() {
     <div className="flex h-full min-h-0 flex-col bg-[var(--shell-surface)]">
       <TabBar<Tab> value={tab} onChange={switchTab} tabs={TABS} />
       <div role="tabpanel" id="tabpanel" aria-labelledby={`tab-${tab}`} className="min-h-0 flex-1">
-        {tab === 'material' ? <JobStockTab buildOrderId={id} /> : <ModuleShell
+        {tab === 'material' ? <JobStockTab buildOrderId={id} nextStep={nextStep} /> : <ModuleShell
           showPanel={!!selected}
           searchRow={<DataTableToolbar table={table} actions={<><ToolbarActions actions={alwaysActions} /><ToolbarActions actions={itemActions} /></>} />}
           intelligencePanel={
-            <ModuleIntelligencePanel title={selected ? (tab === 'operations' ? 'Build operation' : tab === 'variances' ? 'Expense' : 'Part') : 'Summary'} onClose={() => setSelection({})} hasSelection={!!selected}
+            <ModuleIntelligencePanel title={selected ? (tab === 'operations' ? 'Build operation' : tab === 'variances' ? 'Expense' : tab === 'standard' ? 'Cost element' : 'Part') : 'Summary'} onClose={() => setSelection({})} hasSelection={!!selected}
               idle={tab === 'timeline' ? timelineSummary : tab === 'variances' ? varianceSummary : tab === 'standard' ? standardSummary : summary} footer={panelActions.length ? <DetailActions actions={panelActions} /> : undefined}>
               {detail}
             </ModuleIntelligencePanel>

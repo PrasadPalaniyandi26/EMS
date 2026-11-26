@@ -12,9 +12,9 @@ export function RelatedLinks() {
   const links = relatedLinks(pathname, role);
   if (!links.length) return null;
   return (
-    <nav aria-label="Related pages" className="ml-auto flex items-center gap-4 self-center">
+    <nav aria-label="Related pages" className="ml-auto flex items-center gap-4 self-center overflow-x-auto max-sm:w-full max-sm:border-t max-sm:border-[var(--shell-border)] max-sm:px-3">
       {links.map((l) => (
-        <Link key={l.href} href={l.href} className="whitespace-nowrap text-[13px] font-medium text-[var(--shell-accent)] hover:underline focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]">{l.label}</Link>
+        <Link key={l.href} href={l.href} className="whitespace-nowrap py-1 text-[13px] font-medium text-[var(--shell-accent)] hover:underline max-lg:py-2.5 focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]">{l.label}</Link>
       ))}
     </nav>
   );

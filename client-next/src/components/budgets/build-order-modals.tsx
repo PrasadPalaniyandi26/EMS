@@ -326,7 +326,7 @@ export function ReimportOrderBomModal({ isOpen, onClose, order }: Base & { order
                 {candidates.map((p) => <option key={p.id} value={p.id}>{name(p)}{p.bom_version != null ? ` · BOM version ${p.bom_version}` : ''}</option>)}
               </NativeSelect>
             </Field>
-            <p className="text-[13px] text-[var(--shell-text)]">The order becomes an order for {name(target) || 'that product'}. The build plan it counts against, the standard it is compared with and the margin goals follow the new product. The selling price stays{order.unit_price != null ? ` at ${unitPrice(order.unit_price)}` : ''}, so check it under Price and costing.</p>
+            <p className="text-[13px] text-[var(--shell-text)]">The order becomes an order for {name(target) || 'that product'}. The build plan it counts against, the standard it is compared with and the margin goals follow the new product. The selling price stays{order.unit_price != null ? ` at ${unitPrice(order.unit_price)}` : ''}, so check it with Price and costing on the Cost sheet tab.</p>
           </>
         )}
         <p className="text-[12px] text-[var(--warning)]">Either way the whole BOM and its build operations are replaced, and any parts swapped for alternates go back to the standard.</p>
@@ -342,7 +342,7 @@ const STEPS: Record<OrderStep, { title: string; label: string; done: string; ico
     title: 'Release', label: 'Release order', done: 'Order released.', icon: <Rocket className="h-4 w-4" />,
     why: 'Releasing confirms the order and hands it over for building. Do it once the customer has committed, the BOM and any swaps are right, and the price is set.',
     changes: 'The BOM copy is final: it can no longer be imported again. Dates, units and price can still be edited, and a part can still be swapped for an alternate.',
-    next: 'Click Start build when work begins. Until then you can Reopen the order to bring it back to Committed.',
+    next: 'Click Start build when work begins. Until then you can reopen the order on the Bill of materials tab to bring it back to Committed.',
   },
   start: {
     title: 'Start build', label: 'Start build', done: 'Build started.', icon: <Hammer className="h-4 w-4" />,
@@ -370,7 +370,7 @@ export function OrderStepModal({ isOpen, onClose, order, step }: Base & { order:
   // Cost and margin risks, so a release is never a surprise
   if (step === 'release' && order.cost_drift != null && Math.abs(order.cost_drift) >= 0.005 && order.live_unit_cost != null) {
     const live = order.unit_price ? ((order.unit_price - order.live_unit_cost) / order.unit_price) * 100 : null;
-    warnings.push(`Part prices have moved by ${unitPrice(order.cost_drift)} per unit since this was costed${live != null ? `. At today's prices the margin is ${live.toFixed(1)}%` : ''}. Recost first if you want the margin to match.`);
+    warnings.push(`Part prices have moved by ${unitPrice(order.cost_drift)} per unit since this was costed${live != null ? `. At today's prices the margin is ${live.toFixed(1)}%` : ''}. Use Recost on the Cost sheet tab first if you want the margin to match.`);
   }
   if (step === 'release' && order.margin_pct != null && order.margin_pct < 0) warnings.push('The cost per unit is above the selling price, so this order makes a loss.');
   if (step === 'release' && order.unit_price == null) warnings.push('No selling price is set for this order.');

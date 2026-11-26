@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.ntems.ems',
-  appName: 'NTEMS',
+  appName: 'Kanakku',
   webDir: 'out',
   server: {
     // For live reload on device: set CAPACITOR_DEV_URL in .env.local, e.g. http://192.168.1.x:3000

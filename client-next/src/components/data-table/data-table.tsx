@@ -267,7 +267,7 @@ export function DataTable<TData, TValue>({
           {table.getPageCount() > 1 && (
           <div className="flex items-center gap-1.5">
             <button
-              className="px-3 py-1 text-[12px] font-medium rounded-lg transition-colors disabled:opacity-30"
+              className="rounded-lg px-3 py-1 text-[12px] font-medium transition-colors disabled:opacity-30 max-lg:min-h-10 max-lg:px-4"
               style={{ background: 'var(--shell-bg)', border: '1px solid var(--shell-border)', color: 'var(--shell-text)' }}
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
@@ -275,7 +275,7 @@ export function DataTable<TData, TValue>({
               Previous
             </button>
             <button
-              className="px-3 py-1 text-[12px] font-medium rounded-lg transition-colors disabled:opacity-30"
+              className="rounded-lg px-3 py-1 text-[12px] font-medium transition-colors disabled:opacity-30 max-lg:min-h-10 max-lg:px-4"
               style={{ background: 'var(--shell-bg)', border: '1px solid var(--shell-border)', color: 'var(--shell-text)' }}
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}

@@ -1,8 +1,8 @@
 @echo off
-title EMS — Expense Management System
+title Kanakku: NilaTech Finance and Operations Management
 echo.
 echo ╔══════════════════════════════════════════════╗
-echo ║   Expense Management System — Starting...   ║
+echo ║   Kanakku — Starting...                      ║
 echo ╚══════════════════════════════════════════════╝
 echo.
 

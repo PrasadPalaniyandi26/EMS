@@ -42,13 +42,13 @@ export function DataTableToolbar<TData>({
     <div className="flex flex-wrap items-center justify-between gap-2 w-full">
       {/* Left: action buttons */}
       {actions && (
-        <div className="toolbar-actions flex items-center gap-2 shrink-0 self-center flex-wrap">
+        <div className="toolbar-actions flex max-w-full flex-wrap items-center gap-2 self-center">
           {actions}
         </div>
       )}
 
       {/* Right: search + reset */}
-      <div className="flex items-center gap-2 ml-auto self-center">
+      <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2 self-center max-sm:w-full">
         {onImport && (
           <button type="button" className="btn-action" onClick={onImport}>
             <Upload aria-hidden className="h-4 w-4 text-[var(--warning)]" />
@@ -62,13 +62,13 @@ export function DataTableToolbar<TData>({
           </button>
         )}
         {filterDefs && <Filters defs={filterDefs} />}
-        <div className="relative w-full sm:w-[220px] min-w-[140px]">
+        <div className="relative min-w-[140px] max-sm:flex-1 sm:w-[220px]">
           <Input
             aria-label="Search"
             placeholder="Search..."
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
-            className="h-8 w-full rounded-md pl-3 pr-7 text-[13px] focus-visible:ring-1"
+            className="h-8 w-full rounded-md pl-3 pr-7 text-[13px] focus-visible:ring-1 max-lg:h-10"
             style={{ background: 'transparent', border: '1px solid var(--input)', color: 'var(--shell-text)' }}
           />
           {searchText && (
@@ -91,7 +91,7 @@ export function DataTableToolbar<TData>({
               table.resetColumnFilters();
               setSearchText("");
             }}
-            className="h-8 px-3 text-[13px] font-medium rounded-md"
+            className="h-8 rounded-md px-3 text-[13px] font-medium max-lg:h-10"
             style={{ color: 'var(--shell-text-muted)' }}
           >
             Reset

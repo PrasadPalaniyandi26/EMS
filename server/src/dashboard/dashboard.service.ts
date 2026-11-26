@@ -5,6 +5,7 @@ import { BudgetsService } from '../budgets/budgets.service';
 import { COMMITTED_STATUSES, committedStatusSql } from '../common/constants/transaction-status';
 import { ApprovalsService } from '../approvals/approvals.service';
 import { parseRange } from '../common/helpers/dates';
+import { previousPeriod } from './previous-period';
 
 @Injectable()
 export class DashboardService {
@@ -305,6 +306,82 @@ export class DashboardService {
         label: m.label,
         values: Object.fromEntries(categories.map((c) => [c, parseFloat((dataMap[m.key]?.[c] ?? 0).toFixed(2))])),
       })),
+    };
+  }
+
+  // Where the period's spend went, which categories moved against the period before, and the largest expenses.
+  // Counted like the heatmap: approved and waiting expenses, split ones by part. Stock counts once, when it is bought.
+  async getSpendBreakdown(userId: number, roleName: string, dateFrom?: string, dateTo?: string) {
+    const range = parseRange(dateFrom, dateTo);
+    const visibleIds = await this.resolveVisibleUserIds(userId, roleName);
+    const who = visibleIds !== null ? { userId: { in: visibleIds } } : {};
+    const partsBetween = (gte?: Date, lte?: Date) => this.budgets.partsWhere({
+      status: { in: COMMITTED_STATUSES }, ...who,
+      ...(gte || lte ? { dateRecorded: { ...(gte ? { gte } : {}), ...(lte ? { lte } : {}) } } : {}),
+    });
+    const parts = await partsBetween(range.from, range.to);
+    const r2 = (v: number) => Math.round(v * 100) / 100;
+
+    const stockIds = new Set((await this.prisma.transaction.findMany({
+      where: { id: { in: parts.map((p) => p.txnId) }, contextType: 'stock' }, select: { id: true },
+    })).map((t) => t.id));
+    const groupOf = (p: (typeof parts)[number]) => {
+      if (stockIds.has(p.txnId)) return 'Stock purchases';
+      if (p.costObject === 'DEPARTMENT') return 'Departments';
+      if (p.costObject === 'PRODUCT') return p.buildOrderId != null ? 'Orders' : p.productId != null ? 'Products' : 'Not assigned';
+      return p.projectId != null ? 'Projects' : 'Not assigned';
+    };
+    const grouped = new Map<string, number>();
+    for (const p of parts) grouped.set(groupOf(p), (grouped.get(groupOf(p)) ?? 0) + p.amount);
+
+    const names = new Map((await this.prisma.category.findMany({ select: { id: true, name: true } })).map((c) => [c.id, c.name]));
+    const nameOf = (id: number | null | undefined) => (id != null ? names.get(id) : undefined) ?? 'Uncategorized';
+
+    // A comparison needs a period with both ends
+    let comparison: null | { from: string; to: string; previous_from: string; previous_to: string; rows: { category: string; now: number; before: number; change: number }[] } = null;
+    if (range.from && range.to) {
+      const day = (d: Date) => d.toISOString().slice(0, 10);
+      const today = new Date(day(new Date()));
+      const { until, prevFrom, prevTo } = previousPeriod(new Date(day(range.from)), new Date(day(range.to)), today);
+      const totals = new Map<string, { now: number; before: number }>();
+      const add = (list: typeof parts, key: 'now' | 'before') => {
+        for (const p of list) {
+          const row = totals.get(nameOf(p.categoryId)) ?? { now: 0, before: 0 };
+          row[key] += p.amount;
+          totals.set(nameOf(p.categoryId), row);
+        }
+      };
+      add(await partsBetween(range.from, until), 'now');
+      add(await partsBetween(prevFrom, prevTo), 'before');
+      comparison = {
+        from: day(range.from), to: day(until), previous_from: day(prevFrom), previous_to: day(prevTo),
+        rows: [...totals.entries()]
+          .map(([category, v]) => ({ category, now: r2(v.now), before: r2(v.before), change: r2(v.now - v.before) }))
+          .filter((x) => x.change !== 0)
+          .sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
+          .slice(0, 6),
+      };
+    }
+
+    const byTxn = new Map<number, number>();
+    for (const p of parts) byTxn.set(p.txnId, (byTxn.get(p.txnId) ?? 0) + p.amount);
+    const top = [...byTxn.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+    const txns = new Map((await this.prisma.transaction.findMany({
+      where: { id: { in: top.map(([id]) => id) } },
+      select: { id: true, referenceId: true, description: true, dateRecorded: true, isSplit: true, category: { select: { name: true } } },
+    })).map((t) => [t.id, t]));
+
+    return {
+      total: r2(parts.reduce((a, p) => a + p.amount, 0)),
+      charged_to: [...grouped.entries()].map(([label, amount]) => ({ label, amount: r2(amount) })).sort((a, b) => b.amount - a.amount),
+      comparison,
+      largest: top.map(([id, amount]) => {
+        const t = txns.get(id)!;
+        return {
+          id, reference_id: t.referenceId, description: t.description, date_recorded: t.dateRecorded.toISOString().slice(0, 10),
+          category: t.isSplit ? 'Split' : t.category?.name ?? 'Uncategorized', amount: r2(amount),
+        };
+      }),
     };
   }
 

@@ -530,3 +530,22 @@ export function useInvalidate() {
     keys.forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
   };
 }
+
+export interface SpendBreakdownData {
+  total: number;
+  charged_to: { label: string; amount: number }[];
+  comparison: null | { from: string; to: string; previous_from: string; previous_to: string; rows: { category: string; now: number; before: number; change: number }[] };
+  largest: { id: number; reference_id: string | null; description: string | null; date_recorded: string; category: string; amount: number }[];
+}
+
+export function useSpendBreakdown(dateFrom?: string, dateTo?: string) {
+  const qs = new URLSearchParams();
+  if (dateFrom) qs.set('dateFrom', dateFrom);
+  if (dateTo) qs.set('dateTo', dateTo);
+  const q = qs.toString() ? `?${qs.toString()}` : '';
+  return useQuery({
+    queryKey: [QUERY_KEYS.ANALYTICS, 'spend-breakdown', dateFrom, dateTo],
+    queryFn: () => api.get<SpendBreakdownData>(`/dashboard/analytics/spend-breakdown${q}`).then((r) => r.data),
+    staleTime: LIVE_STALE,
+  });
+}

@@ -109,6 +109,27 @@ describe('Reports and analytics (e2e)', () => {
       expect(may.values[catA.name]).toBe(400);
       expect(may.values[catB.name]).toBe(600);
     });
+
+    it('is one large expense, compared by category part, and not assigned to anything', async () => {
+      const r = await get(admin, '/dashboard/analytics/spend-breakdown?dateFrom=2018-05-01&dateTo=2018-05-31');
+      expect(r.status).toBe(200);
+      const d = r.body.data;
+      expect(d.total).toBe(1000);
+      expect(d.charged_to).toEqual([{ label: 'Not assigned', amount: 1000 }]);
+      expect(d.largest).toHaveLength(1);
+      expect(d.largest[0]).toMatchObject({ id: txnId, amount: 1000, category: 'Split' });
+      expect(d.comparison).toMatchObject({ previous_from: '2018-04-01', previous_to: '2018-04-30' });
+      expect(d.comparison.rows).toEqual([
+        { category: catB.name, now: 600, before: 0, change: 600 },
+        { category: catA.name, now: 400, before: 0, change: 400 },
+      ]);
+    });
+
+    it('does not show an employee other people\'s spend', async () => {
+      const r = await get(employee, '/dashboard/analytics/spend-breakdown?dateFrom=2018-05-01&dateTo=2018-05-31');
+      expect(r.status).toBe(200);
+      expect(r.body.data.total).toBe(0);
+    });
   });
 
   describe('the profit and loss statement', () => {

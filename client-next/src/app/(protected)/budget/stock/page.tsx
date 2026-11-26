@@ -55,7 +55,7 @@ export default function StockPage() {
   const [newCount, setNewCount] = useState(false); const [countsFor, setCountsFor] = useState<number | null>(null);
   const [confirm, setConfirm] = useState<{ step: 'submit' | 'approve' | 'delete'; row: StockCountRow } | null>(null);
   const [sendBack, setSendBack] = useState<StockCountRow | null>(null);
-  useEffect(() => { setHeader('Stock', 'Parts bought in bulk: what is in the Store, what jobs used and the monthly count'); }, [setHeader]);
+  useEffect(() => { setHeader('Stock register', 'Parts bought in bulk: what is in the Store, what jobs used and the monthly count'); }, [setHeader]);
 
   const rows = useMemo<any[]>(() => {
     if (tab === 'onhand') return (onHand.data ?? []).filter((r) => level === 'ALL' || (level === 'REORDER' ? r.reorder : r.quantity > 0));

@@ -12,6 +12,7 @@ import { detailHref, kindOfLine, objectIdOf } from '@/components/budgets/planner
 import {
   useTopSpenders, useCategoryHeatmap, useProjectBurn, useProductBurn,
 } from '@/hooks/use-queries';
+import { SpendBreakdown } from '@/components/analytics/spend-breakdown';
 import { OrdersTab, PartPricesTab, PeopleTab, ProjectsTab, ReceivablesTab } from '@/components/analytics/analytics-tabs';
 
 const DATE_PRESETS = [
@@ -32,10 +33,11 @@ const HEAT_BINS = [
   { bg: 'var(--heat-3)', fg: 'var(--heat-3-text)' },
   { bg: 'var(--heat-4)', fg: 'var(--heat-4-text)' },
 ];
-function heatColor(val: number, max: number): { background: string; color: string } {
-  if (!val || !max) return { background: 'var(--shell-hover)', color: 'var(--shell-text-muted)' };
-  const pct = val / max;
-  const bin = HEAT_BINS[pct >= 0.75 ? 3 : pct >= 0.5 ? 2 : pct >= 0.25 ? 1 : 0];
+// Shaded by rank among the cells that have spend, so one very large amount cannot push all the others into one shade.
+// `ranked` is those amounts in ascending order; equal amounts get the same shade.
+function heatColor(val: number, ranked: number[]): { background: string; color: string } {
+  if (!val || !ranked.length) return { background: 'var(--shell-hover)', color: 'var(--shell-text-muted)' };
+  const bin = HEAT_BINS[Math.min(3, Math.floor((ranked.indexOf(val) * 4) / ranked.length))];
   return { background: bin.bg, color: bin.fg };
 }
 
@@ -102,11 +104,10 @@ function SpendTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
     return months.slice(first, last + 1);
   })();
 
-  const heatMax = heatmap
-    ? Math.max(...(heatmap.months || []).flatMap((m: any) =>
-        (heatmap.categories || []).map((c: string) => m.values[c] || 0)
-      ), 1)
-    : 1;
+  const heatRanked: number[] = ((heatmap?.months || []) as any[])
+    .flatMap((m) => ((heatmap?.categories || []) as string[]).map((c) => m.values[c] || 0))
+    .filter((v: number) => v > 0)
+    .sort((x: number, y: number) => x - y);
 
   // The budget plan for the current financial year, whatever period is chosen above
   const { data: monitor, isLoading: loadMonitor } = useBudgetMonitor(null);
@@ -154,11 +155,11 @@ function SpendTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
       {/* The overview first, across the full width so every category has room: spend by category and month */}
       <Panel title="Spend by category and month" action={
         <div className="flex items-center gap-2 text-[12px] text-[var(--shell-text-muted)]">
-          Lower
+          Shaded by rank: lower
           <span aria-hidden className="flex gap-0.5">
             {HEAT_BINS.map((b) => <span key={b.bg} className="h-3 w-5 rounded-md" style={{ background: b.bg }} />)}
           </span>
-          Higher
+          higher
         </div>
       }>
         <div className="overflow-x-auto p-4">
@@ -187,7 +188,7 @@ function SpendTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
                         return (
                           <td key={c} title={val ? fmt(val) : undefined}
                             className="rounded-md px-2 py-1.5 text-center font-semibold tabular-nums"
-                            style={heatColor(val, heatMax)}>
+                            style={heatColor(val, heatRanked)}>
                             {val ? <><span aria-hidden>{compact(val)}</span><span className="sr-only">{fmt(val)}</span></> : ''}
                           </td>
                         );
@@ -203,6 +204,8 @@ function SpendTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
           )}
         </div>
       </Panel>
+
+      <SpendBreakdown dateFrom={dateFrom} dateTo={dateTo} />
 
       {/* Who spends, and how projects and products stand against their budgets */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 2xl:grid-cols-4">

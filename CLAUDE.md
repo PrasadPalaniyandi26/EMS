@@ -3,7 +3,7 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
-EMS (Expense Management System) v4 — a full-stack expense tracking and approval system.
+Kanakku: NilaTech Finance and Operations Management (code name EMS) v4 — a full-stack system for expenses, income, approvals, budgets, costing, orders, stock and invoicing.
 - **Backend**: NestJS (port 5000), located in `server/`
 - **Frontend**: Next.js 16 with Turbopack (port 3000), located in `client-next/`
 - **Database**: PostgreSQL via Prisma ORM

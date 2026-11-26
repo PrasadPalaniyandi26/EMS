@@ -74,8 +74,8 @@ async function bootstrap() {
   // Swagger API docs — available at /api/docs (dev only)
   if (process.env.NODE_ENV !== 'production') {
     const swaggerConfig = new DocumentBuilder()
-      .setTitle('EMS API')
-      .setDescription('Expense Management System — REST API')
+      .setTitle('Kanakku API')
+      .setDescription('Kanakku: NilaTech Finance and Operations Management — REST API')
       .setVersion('1.0')
       .addBearerAuth()
       .build();

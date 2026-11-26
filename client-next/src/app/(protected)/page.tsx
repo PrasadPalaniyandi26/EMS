@@ -91,7 +91,7 @@ export default function HomePage() {
   return (
     <div className="h-full overflow-y-auto custom-scrollbar space-y-5 px-4 py-4">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 max-sm:basis-full">
           <PeriodBar presets={presets} active={activePreset} onPreset={handlePreset} from={dateFrom} to={dateTo}
             onFrom={(v) => { setDateFrom(v); setActivePreset('Custom'); }} onTo={(v) => { setDateTo(v); setActivePreset('Custom'); }} />
         </div>
@@ -102,7 +102,7 @@ export default function HomePage() {
       </div>
 
       {/* The headline figures: how the business did, what is waiting, and how the plan stands */}
-      <section aria-label="Key figures" className={cn('grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-[var(--shell-border)] bg-[var(--shell-border)] ', recv ? 'lg:grid-cols-6' : 'lg:grid-cols-5')}>
+      <section aria-label="Key figures" className={cn('grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-[var(--shell-border)] bg-[var(--shell-border)] lg:grid-cols-3 lg:max-[87.49rem]:[&>:last-child:nth-child(3n+2)]:col-span-2', recv ? 'min-[87.5rem]:grid-cols-6' : 'min-[87.5rem]:grid-cols-5')}>
         <Figure label="Net result" loading={loading} value={t ? money(t.net, currency) : ''} valueClass={netTone}
           spark={<Spark values={series.map((s) => s.net)} color={t && t.net < 0 ? 'var(--danger)' : INCOME} label="Net result by month, last twelve months" />}>
           <Delta now={t?.net ?? 0} before={prev?.net} versus={versus} format={(n) => plain(n, currency)} />
@@ -170,7 +170,7 @@ export default function HomePage() {
                     <XAxis dataKey="label" tick={axisTick} axisLine={false} tickLine={false} />
                     <YAxis tick={axisTick} axisLine={false} tickLine={false} width={48} tickFormatter={(v) => compact(Number(v))} />
                     <ReferenceLine y={0} stroke="var(--shell-border)" />
-                    <Tooltip formatter={(val, name) => [money(typeof val === 'number' ? val : 0, currency), name as string]} labelFormatter={(l, p) => { const d = (p?.[0]?.payload) as any; return d ? `${d.label} ${d.year}` : String(l); }} contentStyle={tooltipStyle} cursor={{ fill: 'var(--shell-hover)' }} />
+                    <Tooltip formatter={(val, name) => [money(typeof val === 'number' ? val : 0, currency), name as string]} labelFormatter={(l, p) => { const d = (p?.[0]?.payload) as any; return d ? `${d.label} ${d.year}` : String(l); }} contentStyle={tooltipStyle} itemStyle={{ color: 'var(--shell-text)' }} cursor={{ fill: 'var(--shell-hover)' }} />
                     {chartMode === 'monthly' ? (
                       <>
                         <Bar dataKey="income" name="Income" radius={[3, 3, 0, 0]} onClick={(d: any) => pickMonth(d.year, d.month)} cursor="pointer">

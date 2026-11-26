@@ -5,7 +5,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "╔══════════════════════════════════════════════╗"
-echo "║   Expense Management System — Starting...   ║"
+echo "║   Kanakku — Starting...                      ║"
 echo "╚══════════════════════════════════════════════╝"
 echo ""
 

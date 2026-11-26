@@ -65,6 +65,11 @@ export class DashboardController {
     return this.service.getCategoryHeatmap(userId, roleName, dateFrom, dateTo);
   }
 
+  @Get('analytics/spend-breakdown')
+  getSpendBreakdown(@CurrentUser('id') userId: number, @CurrentUser('role_name') roleName: string, @Query('dateFrom') dateFrom?: string, @Query('dateTo') dateTo?: string) {
+    return this.service.getSpendBreakdown(userId, roleName, dateFrom, dateTo);
+  }
+
   @Get('analytics/project-burn')
   getProjectBurn(@CurrentUser('id') userId: number, @CurrentUser('role_name') roleName: string, @Query('dateFrom') dateFrom?: string, @Query('dateTo') dateTo?: string) {
     return this.service.getProjectBurn(userId, roleName, dateFrom, dateTo);

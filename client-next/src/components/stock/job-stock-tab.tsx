@@ -19,7 +19,7 @@ import { qty, useJobStock, type StockMoveRow } from '@/hooks/use-stock-queries';
 import { StockUsedModal, type UsedMode } from '@/components/stock/stock-modals';
 
 // The Material tab of a project or an order: stock used, its cost, and how it compares with the BOM
-export function JobStockTab({ projectId, buildOrderId }: { projectId?: number; buildOrderId?: number }) {
+export function JobStockTab({ projectId, buildOrderId, nextStep = [] }: { projectId?: number; buildOrderId?: number; /** The order's next step, shown on every one of its tabs */ nextStep?: DetailActionDef[] }) {
   const currency = useAuthStore((s) => s.user?.currency || 'INR');
   const canRecord = useAuthStore((s) => canRecordStock(s.user?.role_name));
   const { data, isLoading } = useJobStock({ projectId, buildOrderId });
@@ -51,6 +51,8 @@ export function JobStockTab({ projectId, buildOrderId }: { projectId?: number; b
   const itemActions: DetailActionDef[] = !selected || !canRecord || selected.corrects_id ? [] : selected.closed
     ? [{ label: 'Correct', icon: <FilePen className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setDialog({ mode: 'correct', entry: selected }) }]
     : [{ label: 'Edit', onClick: () => setDialog({ mode: 'edit', entry: selected }) }];
+
+  const panelActions = [...itemActions, ...nextStep].slice(0, 3);
 
   const onBom = (data?.lines ?? []).filter((l) => l.on_bom);
   const bomValue = onBom.reduce((a, l) => a + (l.bom_value ?? 0), 0);
@@ -90,9 +92,9 @@ export function JobStockTab({ projectId, buildOrderId }: { projectId?: number; b
     <>
       <ModuleShell
         showPanel={!!selected}
-        searchRow={<DataTableToolbar table={table} onExport={exportCsv} actions={<><ToolbarActions actions={alwaysActions} /><ToolbarActions actions={itemActions} /></>} />}
+        searchRow={<DataTableToolbar table={table} onExport={exportCsv} actions={<><ToolbarActions actions={[...alwaysActions, ...nextStep]} /><ToolbarActions actions={itemActions} /></>} />}
         intelligencePanel={
-          <ModuleIntelligencePanel title={selected ? 'Entry' : 'Summary'} onClose={() => setSelection({})} hasSelection={!!selected} idle={summary} footer={itemActions.length ? <DetailActions actions={itemActions} /> : undefined}>{detail}</ModuleIntelligencePanel>
+          <ModuleIntelligencePanel title={selected ? 'Entry' : 'Summary'} onClose={() => setSelection({})} hasSelection={!!selected} idle={summary} footer={panelActions.length ? <DetailActions actions={panelActions} /> : undefined}>{detail}</ModuleIntelligencePanel>
         }
       >
         <DataTable isLoading={isLoading} columns={columns} data={rows} tableInstance={table} emptyMessage={data?.closed ?? 'No stock used yet. Click Add stock used when material is taken from the Store.'} />

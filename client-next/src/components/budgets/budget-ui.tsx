@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useState, type KeyboardEvent, type ReactNode, useRef } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { RelatedLinks } from '@/components/layout/related-links';
@@ -95,6 +95,13 @@ export function useTabParam<T extends string>(valid: readonly T[], initial: T): 
 // The page puts role="tabpanel" id={panelId} aria-labelledby={`tab-${value}`} around the active tab's content.
 // One tab is in the tab order; arrow keys, Home and End move between tabs.
 export function TabBar<T extends string>({ tabs, value, onChange, panelId = 'tabpanel' }: { tabs: { value: T; label: string }[]; value: T; onChange: (v: T) => void; panelId?: string }) {
+  const list = useRef<HTMLDivElement>(null);
+  // On a narrow screen the tab row scrolls, so the open tab is brought into view
+  useEffect(() => {
+    const box = list.current;
+    const tab = box?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (box && tab && (tab.offsetLeft < box.scrollLeft || tab.offsetLeft + tab.offsetWidth > box.scrollLeft + box.clientWidth)) box.scrollLeft = tab.offsetLeft - 16;
+  }, [value, tabs.length]);
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
     const i = tabs.findIndex((t) => t.value === value);
     const next = e.key === 'ArrowRight' ? (i + 1) % tabs.length : e.key === 'ArrowLeft' ? (i - 1 + tabs.length) % tabs.length : e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : -1;
@@ -104,12 +111,12 @@ export function TabBar<T extends string>({ tabs, value, onChange, panelId = 'tab
     requestAnimationFrame(() => document.getElementById(`tab-${tabs[next].value}`)?.focus());
   };
   return (
-    <div className="flex shrink-0 border-b border-[var(--shell-border)] px-4">
-    <div role="tablist" onKeyDown={onKey} className="flex gap-1">
+    <div className="flex shrink-0 flex-wrap gap-x-4 border-b border-[var(--shell-border)] px-4">
+    <div ref={list} role="tablist" onKeyDown={onKey} className="relative flex max-w-full gap-1 overflow-x-auto overflow-y-hidden">
       {tabs.map((t) => (
         <button
           key={t.value} id={`tab-${t.value}`} type="button" role="tab" aria-selected={value === t.value} aria-controls={panelId} tabIndex={value === t.value ? 0 : -1} onClick={() => onChange(t.value)}
-          className={cn('-mb-px border-b-2 px-3 py-2.5 text-[13px] font-medium focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]',
+          className={cn('-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2.5 text-[13px] font-medium focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-[var(--shell-accent)]',
             value === t.value ? 'border-[var(--shell-accent)] text-[var(--shell-text)]' : 'border-transparent text-[var(--shell-text-muted)] hover:text-[var(--shell-text)]')}
         >
           {t.label}

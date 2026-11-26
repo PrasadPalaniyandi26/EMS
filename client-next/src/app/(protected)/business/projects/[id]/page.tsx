@@ -24,15 +24,18 @@ import { JobBomImportModal } from '@/components/budgets/job-bom-import-modal';
 import { BomLineModal, BomSettingsModal, BuildStepModal, EstimateLineModal, EstimatePhasesModal, MilestoneModal, ProjectSettingsModal, RejectBaselineModal, StepTypesModal } from '@/components/budgets/planning-modals';
 import { TabBar, money, projectVerdict, TONE_CLASS } from '@/components/budgets/budget-ui';
 import { JobStockTab } from '@/components/stock/job-stock-tab';
+import { milestoneState } from '@/lib/milestones';
+import { todayIso } from '@/lib/working-days';
+import { CostElementDetail, CostGoesSection, costSheetColumns, costSheetRows, type CostRow } from '@/components/budgets/cost-sheet';
 import { formatDate } from '@/lib/currency';
-import { todayIso, workingDaysBetween } from '@/lib/working-days';
 import { cn } from '@/lib/utils';
 
-type Tab = 'estimate' | 'baselines' | 'jobbom' | 'jobsteps' | 'milestones' | 'material';
+type Tab = 'estimate' | 'baselines' | 'jobbom' | 'jobsteps' | 'jobsheet' | 'milestones' | 'material';
 
-const JOB_TABS: { value: Tab; label: string }[] = [{ value: 'jobbom', label: 'Job BOM' }, { value: 'jobsteps', label: 'Job build operations' }];
+const JOB_TABS: { value: Tab; label: string }[] = [{ value: 'jobbom', label: 'Job BOM' }, { value: 'jobsteps', label: 'Job build operations' }, { value: 'jobsheet', label: 'Cost sheet' }];
 const TABS: { value: Tab; label: string }[] = [{ value: 'estimate', label: 'Estimate' }, { value: 'baselines', label: 'Baselines' }, { value: 'milestones', label: 'Milestones' }, { value: 'material', label: 'Material' }];
 const EMPTY: Record<Tab, string> = {
+  jobsheet: 'Nothing to cost yet. Add parts on the Job BOM tab or job build operations.',
   material: '',
   jobbom: 'No parts yet. Click Add part to build the job from the Part master, or Import BOM to start from a product.',
   jobsteps: 'No build operations yet. Click Add build operation for the work done in house or outsourced.',
@@ -41,18 +44,6 @@ const EMPTY: Record<Tab, string> = {
   milestones: 'No milestones yet. Add the key phases of the project with a planned date, and mark each done when it is finished.',
 };
 
-// Milestone days are working days, Monday to Friday
-const days = (n: number) => `${n} day${n === 1 ? '' : 's'}`;
-type MsTone = 'success' | 'warning' | 'danger' | 'muted';
-// Done on or before the planned date is green, done after it is red, and still open past its date is orange
-const milestoneState = (m: Milestone): { status: string; tone: MsTone; days: string | null; diff: number | null } => {
-  if (m.done_date) {
-    const diff = workingDaysBetween(m.planned_date, m.done_date);
-    return diff > 0 ? { status: 'Done late', tone: 'danger', days: `${days(diff)} late`, diff } : { status: 'Done', tone: 'success', days: diff === 0 ? 'On time' : `${days(-diff)} early`, diff };
-  }
-  const over = workingDaysBetween(m.planned_date, todayIso());
-  return over > 0 ? { status: 'Overdue', tone: 'warning', days: `${days(over)} overdue`, diff: over } : { status: 'Open', tone: 'muted', days: null, diff: null };
-};
 const late = (m: Milestone) => milestoneState(m).status === 'Overdue';
 
 export default function ProjectBudgetPage() {
@@ -107,9 +98,15 @@ export default function ProjectBudgetPage() {
     setHeader(data ? `${data.project.code ?? ''} ${data.project.name}`.trim() : 'Project costing', data ? [client, verdict?.label].filter(Boolean).join(' · ') : 'Estimate, margin and progress');
   }, [setHeader, data, verdict?.label]);
 
-  const rows = useMemo<any[]>(() => (!data ? [] : tab === 'estimate' ? (est ? data.lines : []) : tab === 'baselines' ? data.baselines : tab === 'jobbom' ? job?.lines ?? [] : tab === 'jobsteps' ? job?.operations ?? [] : data.milestones), [data, est, job, tab]);
+  // What the job costs to build, element by element. Its warranty comes from the project estimate.
+  const sheetRows = useMemo(() => (!job?.cost ? [] : costSheetRows({
+    cost: job.cost, lines: job.lines, operations: job.operations, currency, priceNote: 'standard prices', freightPct: job.bom?.freight_pct, withWarranty: false,
+  })), [job, currency]);
+
+  const rows = useMemo<any[]>(() => (!data ? [] : tab === 'jobsheet' ? sheetRows : tab === 'estimate' ? (est ? data.lines : []) : tab === 'baselines' ? data.baselines : tab === 'jobbom' ? job?.lines ?? [] : tab === 'jobsteps' ? job?.operations ?? [] : data.milestones), [data, est, job, tab, sheetRows]);
 
   const columns = useMemo<ColumnDef<any, any>[]>(() => {
+    if (tab === 'jobsheet') return costSheetColumns({ currency });
     if (tab === 'jobbom') return [
       { accessorKey: 'sequence', header: headerRight('Seq'), cell: ({ row }) => <NumCell>{row.original.sequence}</NumCell>, size: 60 },
       { accessorKey: 'group_name', header: 'Group', cell: ({ row }) => <TextCell value={row.original.group_name} muted className="block max-w-[120px] truncate" />, size: 120 },
@@ -176,7 +173,7 @@ export default function ProjectBudgetPage() {
     ] :
     tab === 'jobsteps' ? [{ label: 'Edit', onClick: () => { setEditStep(selected); setStepOpen(true); } }, { label: 'Delete', variant: 'danger', onClick: () => setDelStep(selected) }] :
     tab === 'milestones' && planEstimate ? [
-      ...(!selected.done_date ? [{ label: 'Mark done', variant: 'primary' as const, icon: <CheckCheck className="h-4 w-4 text-[var(--nav-cyan)]" />, onClick: () => act(() => api.put(`/budgets/projects/${id}/milestones/${selected.id}`, { name: selected.name, planned_date: selected.planned_date.slice(0, 10), done_date: new Date().toISOString().slice(0, 10) }), 'Milestone marked done.') }] : []),
+      ...(!selected.done_date ? [{ label: 'Mark done', variant: 'primary' as const, icon: <CheckCheck className="h-4 w-4 text-[var(--nav-cyan)]" />, onClick: () => act(() => api.put(`/budgets/projects/${id}/milestones/${selected.id}`, { name: selected.name, planned_date: selected.planned_date.slice(0, 10), done_date: todayIso() }), 'Milestone marked done.') }] : []),
       { label: 'Edit', onClick: () => { setEditMs(selected); setMsOpen(true); } },
       { label: 'Delete', variant: 'danger', onClick: () => setDelMs(selected) },
     ] : [];
@@ -191,7 +188,7 @@ export default function ProjectBudgetPage() {
     ...(tab === 'estimate' && canProp ? [{ label: 'Manage phases', icon: <Settings2 className="h-4 w-4 text-[var(--warning)]" />, onClick: () => setPhasesOpen(true) }] : []),
     ...(tab === 'baselines' && est && canProp ? [{ label: 'Propose baseline', icon: <Flag className="h-4 w-4 text-[var(--shell-accent)]" />, onClick: () => setBaselineOpen(true) }] : []),
     ...(tab === 'milestones' && planEstimate ? [{ label: 'Add milestone', icon: <Plus className="h-4 w-4 text-[var(--success)]" />, onClick: () => { setEditMs(null); setMsOpen(true); } }] : []),
-    { label: 'Price and costing', icon: <Tag className="h-4 w-4 text-[var(--nav-violet)]" />, onClick: () => setSetOpen(true) },
+    ...((tab === 'estimate' || tab === 'baselines') && planEstimate ? [{ label: 'Price and costing', icon: <Tag className="h-4 w-4 text-[var(--nav-violet)]" />, onClick: () => setSetOpen(true) }] : []),
   ];
 
   const baselineLine = !est ? 'No estimate yet.' : baseline ? `Baseline ${money(baseline.total, currency)}, approved ${formatDate(baseline.approved_at)}.` : proposed ? 'A baseline is proposed and waiting for approval.' : 'No baseline yet. Propose one on the Baselines tab.';
@@ -323,8 +320,24 @@ export default function ProjectBudgetPage() {
     </div>
   );
 
+  const jobSheetSummary = !data || !job || !jc ? null : (
+    <div className="space-y-4">
+      <DetailSummary title="Job build cost" subtitle={data.project.code ?? data.project.name} figure={money(jc.total, currency)} figureLabel="Total of all cost elements" />
+      <DetailSection title="Against spend">
+        <DetailGrid>
+          <DetailField label="Spent on the project" value={money(data.actual, currency)} />
+          <DetailField label={data.actual > jc.total ? 'Over the build cost' : 'Left of the build cost'} value={money(Math.abs(jc.total - data.actual), currency)} tone={data.actual > jc.total ? 'danger' : 'muted'} />
+        </DetailGrid>
+        <p className="text-[12px] text-[var(--shell-text-muted)]">Spend is approved expenses and stock used on the project. It does not include in-house labour or overhead, which are not expenses.</p>
+      </DetailSection>
+      <CostGoesSection cost={jc} currency={currency} />
+      <p className="text-[12px] text-[var(--shell-text-muted)]">The job cost sits in the Estimate as two lines from this BOM. Contingency and warranty are added by the estimate, so this sheet has no warranty row. Select a cost element to see what makes it up.</p>
+    </div>
+  );
+
   const detail = (() => {
     if (!selected) return null;
+    if (tab === 'jobsheet') return <CostElementDetail row={selected as CostRow} lines={job?.lines ?? []} operations={job?.operations ?? []} overheadRate={job?.cost?.overhead_rate ?? 0} currency={currency} />;
     if (tab === 'jobbom') {
       const l = selected as BomLineRow;
       return (
@@ -432,8 +445,8 @@ export default function ProjectBudgetPage() {
           showPanel={!!selected}
           searchRow={<DataTableToolbar table={table} actions={<><ToolbarActions actions={alwaysActions} /><ToolbarActions actions={itemActions} /></>} />}
           intelligencePanel={
-            <ModuleIntelligencePanel title={selected ? (tab === 'estimate' ? 'Estimate line' : tab === 'baselines' ? 'Baseline' : tab === 'jobbom' ? 'Part' : tab === 'jobsteps' ? 'Build operation' : 'Milestone') : (tab === 'jobbom' || tab === 'jobsteps') ? 'Job BOM' : 'Summary'} onClose={() => setSelection({})} hasSelection={!!selected}
-              idle={((tab === 'jobbom' || tab === 'jobsteps') ? jobSummary : summary) ?? undefined} footer={itemActions.length ? <DetailActions actions={itemActions} /> : undefined}>
+            <ModuleIntelligencePanel title={selected ? (tab === 'jobsheet' ? 'Cost element' : tab === 'estimate' ? 'Estimate line' : tab === 'baselines' ? 'Baseline' : tab === 'jobbom' ? 'Part' : tab === 'jobsteps' ? 'Build operation' : 'Milestone') : (tab === 'jobbom' || tab === 'jobsteps') ? 'Job BOM' : 'Summary'} onClose={() => setSelection({})} hasSelection={!!selected}
+              idle={(tab === 'jobsheet' ? jobSheetSummary : (tab === 'jobbom' || tab === 'jobsteps') ? jobSummary : summary) ?? undefined} footer={itemActions.length ? <DetailActions actions={itemActions} /> : undefined}>
               {detail}
             </ModuleIntelligencePanel>
           }

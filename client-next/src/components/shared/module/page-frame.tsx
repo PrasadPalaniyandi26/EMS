@@ -14,7 +14,7 @@ export function PageFrame({ label, children }: { label: string; children: ReactN
   if (!relatedLinks(pathname, role).length) return <>{children}</>;
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--shell-surface)]">
-      <div className="flex shrink-0 gap-1 border-b border-[var(--shell-border)] px-4">
+      <div className="flex shrink-0 flex-wrap gap-x-4 border-b border-[var(--shell-border)] px-4">
         <span className="-mb-px border-b-2 border-[var(--shell-accent)] px-3 py-2.5 text-[13px] font-medium text-[var(--shell-text)]">{label}</span>
         <RelatedLinks />
       </div>
